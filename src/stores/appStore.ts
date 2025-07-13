@@ -50,6 +50,7 @@ interface AppStore extends AppState {
   selectItem: (itemId: string | null, itemType: 'module' | 'annotation' | null) => void;
   setGridConfig: (config: Partial<AppState['grid']>) => void;
   setViewport: (config: Partial<AppState['viewport']>) => void;
+  setAnnotationMode: (mode: AppState['annotationMode']) => void;
   checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => boolean;
   exportData: () => string;
   importData: (data: string) => void;
@@ -81,6 +82,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   history: [],
   historyIndex: -1,
+  annotationMode: 'none',
 
   // Actions
   loadModules: async () => {
@@ -215,6 +217,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set(state => ({
       viewport: { ...state.viewport, ...config }
     }));
+  },
+
+  setAnnotationMode: (mode: AppState['annotationMode']) => {
+    set({ annotationMode: mode });
   },
 
   checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => {

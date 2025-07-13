@@ -33,7 +33,7 @@ export interface PlacedModule {
 
 export interface Annotation {
   id: string;
-  type: 'line' | 'arrow' | 'text';
+  type: 'line' | 'arrow' | 'text' | 'optical-axis';
   layer: number;
   points?: Point[];
   text?: string;
@@ -41,6 +41,8 @@ export interface Annotation {
     color?: string;
     fontSize?: number;
     fontFamily?: string;
+    strokeWidth?: number;
+    strokeStyle?: 'solid' | 'dashed';
   };
 }
 
@@ -62,6 +64,14 @@ export interface ViewportConfig {
   pan: Point;
 }
 
+export interface Plate {
+  id: string;
+  name: string;
+  position: Point; // Position relative to the main plate
+  size: Size; // Size in grid cells
+  visible: boolean;
+}
+
 export interface AppState {
   modules: ModuleDefinition[];
   placedModules: PlacedModule[];
@@ -74,6 +84,7 @@ export interface AppState {
   viewport: ViewportConfig;
   history: unknown[]; // Command history for undo/redo
   historyIndex: number;
+  annotationMode: 'none' | 'line' | 'arrow' | 'text' | 'optical-axis';
 }
 
 export interface Command {

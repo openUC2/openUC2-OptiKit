@@ -10,7 +10,9 @@ export const Toolbar: React.FC = () => {
     importData, 
     undo, 
     redo,
-    centerView
+    centerView,
+    annotationMode,
+    setAnnotationMode
   } = useAppStore();
 
   const handleExport = () => {
@@ -92,6 +94,39 @@ export const Toolbar: React.FC = () => {
           title="Center View"
         >
           ⌖
+        </button>
+      </div>
+
+      <div className="toolbar-separator" />
+
+      <div className="toolbar-group">
+        <button 
+          className={`toolbar-button ${annotationMode === 'line' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
+          title="Draw Line"
+        >
+          ╱
+        </button>
+        <button 
+          className={`toolbar-button ${annotationMode === 'arrow' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
+          title="Draw Arrow"
+        >
+          ↗
+        </button>
+        <button 
+          className={`toolbar-button ${annotationMode === 'optical-axis' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
+          title="Draw Optical Axis"
+        >
+          ⟷
+        </button>
+        <button 
+          className={`toolbar-button ${annotationMode === 'text' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
+          title="Add Text"
+        >
+          T
         </button>
       </div>
 

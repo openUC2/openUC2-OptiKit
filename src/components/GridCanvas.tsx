@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Stage, Layer, Line, Rect, Text, Group, Image } from 'react-konva';
 import { useAppStore } from '../stores/appStore';
+import { AnnotationCanvas } from './AnnotationCanvas';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Point } from '../types';
 import type Konva from 'konva';
@@ -173,10 +174,20 @@ export const GridCanvas: React.FC = () => {
     const stage = stageRef.current;
     if (!stage) return;
 
-    const pos = stage.getPointerPosition();
-    if (!pos) return;
+    // Get the mouse position relative to the stage
+    const stageBox = stage.container().getBoundingClientRect();
+    const pointerPos = {
+      x: e.clientX - stageBox.left,
+      y: e.clientY - stageBox.top
+    };
 
-    const snappedPos = snapToGrid(pos);
+    // Transform the pointer position based on current viewport
+    const transformedPos = {
+      x: (pointerPos.x - viewport.pan.x) / viewport.zoom,
+      y: (pointerPos.y - viewport.pan.y) / viewport.zoom
+    };
+
+    const snappedPos = snapToGrid(transformedPos);
     const gridPos = pixelToGrid(snappedPos);
     
     placeModule(moduleId, gridPos, currentLayerIndex);
@@ -306,7 +317,11 @@ export const GridCanvas: React.FC = () => {
           {/* Placed modules */}
           {renderPlacedModules()}
           
-          {/* TODO: Render annotations */}
+          {/* Annotations */}
+          <AnnotationCanvas 
+            currentLayerIndex={currentLayerIndex}
+            viewport={viewport}
+          />
         </Layer>
       </Stage>
     </div>
