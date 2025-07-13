@@ -1,0 +1,11 @@
+id,name,group,color,width,height,thumbnail,cadUrl,description,defaultParams
+cube-1x1,Basic Cube,cubes,#3498db,1,1,/icons/cube-1x1.svg,/cad/cube-1x1.stl,Basic 1x1 cube module,"{""height"": 50}"
+cube-2x1,Double Cube,cubes,#e74c3c,2,1,/icons/cube-2x1.svg,/cad/cube-2x1.stl,Double cube module (2x1),"{""height"": 50}"
+cube-2x2,Quad Cube,cubes,#2ecc71,2,2,/icons/cube-2x2.svg,/cad/cube-2x2.stl,Quad cube module (2x2),"{""height"": 50}"
+lens-1x1,Lens,lenses,#f39c12,1,1,/icons/lens-1x1.svg,/cad/lens-1x1.stl,Optical lens module,"{""focalLength"": 100}"
+mirror-1x1,Mirror,lenses,#9b59b6,1,1,/icons/mirror-1x1.svg,/cad/mirror-1x1.stl,Mirror module,"{""angle"": 45}"
+led-1x1,LED,fluorescence,#e67e22,1,1,/icons/led-1x1.svg,/cad/led-1x1.stl,LED illumination module,"{""wavelength"": 470}"
+filter-1x1,Filter,fluorescence,#16a085,1,1,/icons/filter-1x1.svg,/cad/filter-1x1.stl,Optical filter module,"{""filterType"": ""bandpass""}"
+camera-1x1,Camera,cameras,#8e44ad,1,1,/icons/camera-1x1.svg,/cad/camera-1x1.stl,Camera module,"{""resolution"": ""1920x1080""}"
+stage-2x2,XY Stage,stages,#34495e,2,2,/icons/stage-2x2.svg,/cad/stage-2x2.stl,XY positioning stage,"{""range"": 25}"
+objective-1x1,Objective,lenses,#d35400,1,1,/icons/objective-1x1.svg,/cad/objective-1x1.stl,Microscope objective,"{""magnification"": 10}"

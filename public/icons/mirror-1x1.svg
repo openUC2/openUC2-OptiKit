@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+  <rect x="5" y="5" width="40" height="40" fill="#9b59b6" stroke="#8e44ad" stroke-width="2" rx="4"/>
+  <path d="M15 25 L35 15 L30 25 L35 35 Z" fill="white"/>
+  <text x="25" y="45" text-anchor="middle" font-size="8" fill="#333">MIRROR</text>
+</svg>

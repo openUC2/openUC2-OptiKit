@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Line, Rect, Text, Group } from 'react-konva';
+import { Stage, Layer, Line, Rect, Text, Group, Image } from 'react-konva';
 import { useAppStore } from '../stores/appStore';
+import { AnnotationCanvas } from './AnnotationCanvas';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Point } from '../types';
 import type Konva from 'konva';
@@ -11,6 +12,7 @@ const CANVAS_SIZE = 800; // Canvas size in pixels
 export const GridCanvas: React.FC = () => {
   const stageRef = useRef<Konva.Stage>(null);
   const [stageSize, setStageSize] = useState({ width: CANVAS_SIZE, height: CANVAS_SIZE });
+  const [moduleImages, setModuleImages] = useState<Record<string, HTMLImageElement>>({});
   
   const {
     grid,
@@ -43,6 +45,45 @@ export const GridCanvas: React.FC = () => {
     updateSize();
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Load SVG images for modules
+  useEffect(() => {
+    const loadModuleImages = async () => {
+      const imagePromises = modules.map(async (module) => {
+        if (module.thumbnail) {
+          try {
+            const img = new window.Image();
+            img.crossOrigin = 'anonymous';
+            return new Promise<[string, HTMLImageElement]>((resolve, reject) => {
+              img.onload = () => resolve([module.id, img]);
+              img.onerror = reject;
+              img.src = module.thumbnail!;
+            });
+          } catch (error) {
+            console.warn(`Failed to load image for module ${module.id}:`, error);
+            return null;
+          }
+        }
+        return null;
+      });
+
+      const results = await Promise.allSettled(imagePromises);
+      const imageMap: Record<string, HTMLImageElement> = {};
+      
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          const [moduleId, img] = result.value;
+          imageMap[moduleId] = img;
+        }
+      });
+
+      setModuleImages(imageMap);
+    };
+
+    if (modules.length > 0) {
+      loadModuleImages();
+    }
+  }, [modules]);
 
   // Generate grid lines
   const generateGridLines = () => {
@@ -133,10 +174,20 @@ export const GridCanvas: React.FC = () => {
     const stage = stageRef.current;
     if (!stage) return;
 
-    const pos = stage.getPointerPosition();
-    if (!pos) return;
+    // Get the mouse position relative to the stage
+    const stageBox = stage.container().getBoundingClientRect();
+    const pointerPos = {
+      x: e.clientX - stageBox.left,
+      y: e.clientY - stageBox.top
+    };
 
-    const snappedPos = snapToGrid(pos);
+    // Transform the pointer position based on current viewport
+    const transformedPos = {
+      x: (pointerPos.x - viewport.pan.x) / viewport.zoom,
+      y: (pointerPos.y - viewport.pan.y) / viewport.zoom
+    };
+
+    const snappedPos = snapToGrid(transformedPos);
     const gridPos = pixelToGrid(snappedPos);
     
     placeModule(moduleId, gridPos, currentLayerIndex);
@@ -159,6 +210,7 @@ export const GridCanvas: React.FC = () => {
         const cellSize = grid.cellSize * viewport.zoom;
         const width = moduleDefinition.footprint.width * cellSize;
         const height = moduleDefinition.footprint.height * cellSize;
+        const moduleImage = moduleImages[module.moduleId];
 
         return (
           <Group
@@ -169,23 +221,34 @@ export const GridCanvas: React.FC = () => {
             onDragEnd={(e) => handleModuleDragEnd(module.id, e)}
             onClick={() => selectItem(module.id, 'module')}
           >
-            <Rect
-              width={width}
-              height={height}
-              fill={moduleDefinition.color}
-              stroke={selectedItemId === module.id ? '#2980b9' : '#34495e'}
-              strokeWidth={selectedItemId === module.id ? 3 : 1}
-              opacity={0.8}
-            />
+            {moduleImage ? (
+              <Image
+                image={moduleImage}
+                width={width}
+                height={height}
+                stroke={selectedItemId === module.id ? '#2980b9' : '#34495e'}
+                strokeWidth={selectedItemId === module.id ? 3 : 1}
+                opacity={0.9}
+              />
+            ) : (
+              <Rect
+                width={width}
+                height={height}
+                fill={moduleDefinition.color}
+                stroke={selectedItemId === module.id ? '#2980b9' : '#34495e'}
+                strokeWidth={selectedItemId === module.id ? 3 : 1}
+                opacity={0.8}
+              />
+            )}
             <Text
               text={moduleDefinition.name}
               x={4}
-              y={4}
-              fontSize={12}
-              fill="#ffffff"
+              y={height - 16}
+              fontSize={10}
+              fill="#000000"
               fontFamily="Arial"
               width={width - 8}
-              height={height - 8}
+              height={12}
               verticalAlign="middle"
               align="center"
             />
@@ -254,7 +317,11 @@ export const GridCanvas: React.FC = () => {
           {/* Placed modules */}
           {renderPlacedModules()}
           
-          {/* TODO: Render annotations */}
+          {/* Annotations */}
+          <AnnotationCanvas 
+            currentLayerIndex={currentLayerIndex}
+            viewport={viewport}
+          />
         </Layer>
       </Stage>
     </div>

@@ -9,7 +9,10 @@ export const Toolbar: React.FC = () => {
     exportData, 
     importData, 
     undo, 
-    redo 
+    redo,
+    centerView,
+    annotationMode,
+    setAnnotationMode
   } = useAppStore();
 
   const handleExport = () => {
@@ -21,6 +24,14 @@ export const Toolbar: React.FC = () => {
     a.download = 'optikit-layout.json';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleShare = () => {
+    const data = exportData();
+    const subject = 'OpenUC2 OptiKit Layout';
+    const body = `Please find attached the OpenUC2 OptiKit layout configuration:\n\n${data}`;
+    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoUrl, '_blank');
   };
 
   const handleImport = () => {
@@ -77,6 +88,46 @@ export const Toolbar: React.FC = () => {
         >
           ⊞
         </button>
+        <button 
+          className="toolbar-button"
+          onClick={centerView}
+          title="Center View"
+        >
+          ⌖
+        </button>
+      </div>
+
+      <div className="toolbar-separator" />
+
+      <div className="toolbar-group">
+        <button 
+          className={`toolbar-button ${annotationMode === 'line' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
+          title="Draw Line"
+        >
+          ╱
+        </button>
+        <button 
+          className={`toolbar-button ${annotationMode === 'arrow' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
+          title="Draw Arrow"
+        >
+          ↗
+        </button>
+        <button 
+          className={`toolbar-button ${annotationMode === 'optical-axis' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
+          title="Draw Optical Axis"
+        >
+          ⟷
+        </button>
+        <button 
+          className={`toolbar-button ${annotationMode === 'text' ? 'active' : ''}`}
+          onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
+          title="Add Text"
+        >
+          T
+        </button>
       </div>
 
       <div className="toolbar-separator" />
@@ -88,6 +139,13 @@ export const Toolbar: React.FC = () => {
           title="Export Layout"
         >
           ↓
+        </button>
+        <button 
+          className="toolbar-button"
+          onClick={handleShare}
+          title="Share via Email"
+        >
+          ✉
         </button>
         <button 
           className="toolbar-button"

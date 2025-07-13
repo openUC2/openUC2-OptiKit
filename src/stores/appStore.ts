@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { loadModulesFromCSV } from '../utils/moduleLoader';
 import type { 
   AppState, 
   ModuleDefinition, 
@@ -12,47 +13,31 @@ import type {
 
 const GRID_CELL_SIZE = 50; // 50mm in pixels (assuming 1:1 scale)
 
-// Sample module definitions
+// Sample module definitions (fallback)
 const sampleModules: ModuleDefinition[] = [
   {
     id: 'cube-1x1',
     name: 'Basic Cube',
+    group: 'cubes',
     color: '#3498db',
     footprint: { width: 1, height: 1 },
-    defaultParams: { height: 50 }
-  },
-  {
-    id: 'cube-2x1',
-    name: 'Double Cube',
-    color: '#e74c3c',
-    footprint: { width: 2, height: 1 },
-    defaultParams: { height: 50 }
-  },
-  {
-    id: 'cube-2x2',
-    name: 'Quad Cube',
-    color: '#2ecc71',
-    footprint: { width: 2, height: 2 },
+    thumbnail: '/icons/cube-1x1.svg',
     defaultParams: { height: 50 }
   },
   {
     id: 'lens-1x1',
     name: 'Lens',
+    group: 'lenses',
     color: '#f39c12',
     footprint: { width: 1, height: 1 },
+    thumbnail: '/icons/lens-1x1.svg',
     defaultParams: { focalLength: 100 }
-  },
-  {
-    id: 'mirror-1x1',
-    name: 'Mirror',
-    color: '#9b59b6',
-    footprint: { width: 1, height: 1 },
-    defaultParams: { angle: 45 }
   }
 ];
 
 interface AppStore extends AppState {
   // Actions
+  loadModules: () => Promise<void>;
   addLayer: (name: string) => void;
   removeLayer: (layerId: string) => void;
   setActiveLayer: (layerId: string) => void;
@@ -65,12 +50,14 @@ interface AppStore extends AppState {
   selectItem: (itemId: string | null, itemType: 'module' | 'annotation' | null) => void;
   setGridConfig: (config: Partial<AppState['grid']>) => void;
   setViewport: (config: Partial<AppState['viewport']>) => void;
+  setAnnotationMode: (mode: AppState['annotationMode']) => void;
   checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => boolean;
   exportData: () => string;
   importData: (data: string) => void;
   undo: () => void;
   redo: () => void;
   executeCommand: (command: Command) => void;
+  centerView: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -95,8 +82,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   history: [],
   historyIndex: -1,
+  annotationMode: 'none',
 
   // Actions
+  loadModules: async () => {
+    try {
+      const modules = await loadModulesFromCSV();
+      set({ modules });
+    } catch (error) {
+      console.error('Failed to load modules:', error);
+      set({ modules: sampleModules });
+    }
+  },
+
   addLayer: (name: string) => {
     const newLayer: Layer = {
       id: uuidv4(),
@@ -221,6 +219,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }));
   },
 
+  setAnnotationMode: (mode: AppState['annotationMode']) => {
+    set({ annotationMode: mode });
+  },
+
   checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => {
     const state = get();
     
@@ -289,5 +291,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
   executeCommand: (command: Command) => {
     // TODO: Implement command execution with history
     command.execute();
+  },
+
+  centerView: () => {
+    set(state => ({
+      viewport: {
+        ...state.viewport,
+        pan: { x: 0, y: 0 },
+        zoom: 1
+      }
+    }));
   }
 }));
