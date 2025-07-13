@@ -64,14 +64,6 @@ export interface ViewportConfig {
   pan: Point;
 }
 
-export interface Plate {
-  id: string;
-  name: string;
-  position: Point; // Position relative to the main plate
-  size: Size; // Size in grid cells
-  visible: boolean;
-}
-
 export interface AppState {
   modules: ModuleDefinition[];
   placedModules: PlacedModule[];
