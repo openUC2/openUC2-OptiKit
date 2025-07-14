@@ -27,6 +27,14 @@ export function parseCSV(csvText: string): ModuleCSVRow[] {
   });
 }
 
+function addConfiguratorPrefix(path: string | undefined): string | undefined {
+  if (!path) return path;
+  // Only add prefix if path is relative and not already prefixed
+  if (path.startsWith('/configurator/')) return path;
+  if (path.startsWith('/')) return '/configurator' + path;
+  return '/configurator/' + path;
+}
+
 export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
   let defaultParams = {};
   try {
@@ -44,14 +52,14 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
       width: parseInt(row.width, 10),
       height: parseInt(row.height, 10)
     },
-    thumbnail: row.thumbnail,
-    cadUrl: row.cadUrl,
+    thumbnail: addConfiguratorPrefix(row.thumbnail),
+    cadUrl: addConfiguratorPrefix(row.cadUrl),
     description: row.description,
     defaultParams
   };
 }
 
-export async function loadModulesFromCSV(csvUrl: string = '/modules.csv'): Promise<ModuleDefinition[]> {
+export async function loadModulesFromCSV(csvUrl: string = '/configurator/modules.csv'): Promise<ModuleDefinition[]> {
   try {
     const response = await fetch(csvUrl);
     if (!response.ok) {
@@ -76,7 +84,7 @@ function getFallbackModules(): ModuleDefinition[] {
       group: 'cubes',
       color: '#3498db',
       footprint: { width: 1, height: 1 },
-      thumbnail: '/icons/cube-1x1.svg',
+      thumbnail: addConfiguratorPrefix('/icons/cube-1x1.svg'),
       defaultParams: { height: 50 }
     },
     {
@@ -85,7 +93,7 @@ function getFallbackModules(): ModuleDefinition[] {
       group: 'lenses',
       color: '#f39c12',
       footprint: { width: 1, height: 1 },
-      thumbnail: '/icons/lens-1x1.svg',
+      thumbnail: addConfiguratorPrefix('/icons/lens-1x1.svg'),
       defaultParams: { focalLength: 100 }
     }
   ];
