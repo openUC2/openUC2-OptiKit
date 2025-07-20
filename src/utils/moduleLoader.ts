@@ -15,7 +15,7 @@ export interface ModuleCSVRow {
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
   const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(',');
+  const headers = lines[0].split(';');
   
   return lines.slice(1).map(line => {
     const values = line.split(',');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { ModuleDefinition } from '../types';
 import './PartLibrary.css';
@@ -7,16 +7,23 @@ export const PartLibrary: React.FC = () => {
   const { modules, loadModules } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
+  const longPressTimeout = useRef<number | null>(null);
+  const isDragging = useRef(false);
 
   useEffect(() => {
     loadModules();
   }, [loadModules]);
 
   const filteredModules = modules.filter(module => {
+    try {
     const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGroup = selectedGroup === 'all' || module.group === selectedGroup;
     return matchesSearch && matchesGroup;
-  });
+  } catch (error) {
+    console.error('Error filtering modules:', error);
+    return false; // Skip this module if there's an error
+  }
+});
 
   const groups = ['all', ...new Set(modules.map(m => m.group))];
 
@@ -25,20 +32,21 @@ export const PartLibrary: React.FC = () => {
     e.dataTransfer.effectAllowed = 'copy';
   };
 
-  // Touch support for mobile devices
+  // Touch support for mobile devices with long press
   const handleTouchStart = (e: React.TouchEvent, moduleId: string) => {
-    e.preventDefault();
     const target = e.currentTarget as HTMLElement;
-    
-    // Store the module ID for touch handling
-    target.dataset.moduleId = moduleId;
-    
-    // Visual feedback
-    target.style.opacity = '0.7';
-    target.style.transform = 'scale(0.95)';
+    // Start long press timer
+    longPressTimeout.current = window.setTimeout(() => {
+      isDragging.current = true;
+      target.dataset.moduleId = moduleId;
+      // Visual feedback
+      target.style.opacity = '0.7';
+      target.style.transform = 'scale(0.95)';
+    }, 350); // 350ms long press
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current) return; // Only drag after long press
     e.preventDefault();
     const touch = e.touches[0];
     const target = e.currentTarget as HTMLElement;
@@ -51,7 +59,6 @@ export const PartLibrary: React.FC = () => {
                           touch.clientX <= rect.right && 
                           touch.clientY >= rect.top && 
                           touch.clientY <= rect.bottom;
-      
       if (isOverCanvas) {
         target.style.opacity = '0.5';
       } else {
@@ -61,17 +68,17 @@ export const PartLibrary: React.FC = () => {
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (longPressTimeout.current) window.clearTimeout(longPressTimeout.current);
+    const target = e.currentTarget as HTMLElement;
+    if (!isDragging.current) return; // Only drop if drag was started
+    isDragging.current = false;
     e.preventDefault();
     const touch = e.changedTouches[0];
-    const target = e.currentTarget as HTMLElement;
     const moduleId = target.dataset.moduleId;
-    
     // Reset visual feedback
     target.style.opacity = '1';
     target.style.transform = 'scale(1)';
-    
     if (!moduleId) return;
-    
     // Check if we're over the canvas
     const canvasElement = document.querySelector('.layout-canvas');
     if (canvasElement) {
@@ -80,7 +87,6 @@ export const PartLibrary: React.FC = () => {
                           touch.clientX <= rect.right && 
                           touch.clientY >= rect.top && 
                           touch.clientY <= rect.bottom;
-      
       if (isOverCanvas) {
         // Simulate a drop event
         const dropEvent = new CustomEvent('mobile-drop', {
@@ -95,6 +101,11 @@ export const PartLibrary: React.FC = () => {
     }
   };
 
+  const handleTouchCancel = () => {
+    if (longPressTimeout.current) window.clearTimeout(longPressTimeout.current);
+    isDragging.current = false;
+  };
+
   const renderModuleTile = (module: ModuleDefinition) => {
     return (
       <div
@@ -105,6 +116,7 @@ export const PartLibrary: React.FC = () => {
         onTouchStart={(e) => handleTouchStart(e, module.id)}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         title={module.description || module.name}
       >
         <div className="module-preview">

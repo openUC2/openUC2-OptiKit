@@ -1,19 +1,31 @@
-id,name,group,color,width,height,thumbnail,cadUrl,description,defaultParams
-cube-1x1,Basic Cube,cubes,#1e4670,1,1,/icons/uc2_emptycube.svg,/cad/cube-1x1.stl,Basic 1x1 cube module for structural support,"{""height"": 50}"
-lens-1x1,Lens (positive),lenses,#7cc142,1,1,/icons/uc2_lenspositive_1x1.svg,/cad/lens-1x1.stl,Optical lens module for beam focusing,"{""focalLength"": 100}"
-lens-1x1,Lens (negative),lenses,#7cc142,1,1,/icons/uc2_lensnegative_1x1.svg,/cad/lens-1x1.stl,Optical lens module for beam focusing,"{""focalLength"": -100}"
-mirror-1x1,Mirror,lenses,#4a9b8e,1,1,/icons/uc2_mirror_static.svg,/cad/mirror-1x1.stl,Mirror module for beam steering,"{""angle"": 45}"
-beamsplitter-1x1,Beamsplitter,lenses,#4a9b8e,1,1,/icons/uc2_beamsplittercube_1x1.svg,/cad/beamsplitter-1x1.stl,50/50 beamsplitter cube,"{""ratio"": ""50/50""}"
-led-470nm,LED Blue,fluorescence,#1e4670,2,1,/icons/uc2_ledblue_1x1.svg,/cad/led-470nm.stl,Blue LED 470nm for fluorescence excitation,"{""wavelength"": 470}"
-led-530nm,LED Green,fluorescence,#7cc142,1,1,/icons/uc2_ledgreen_1x1.svg,/cad/led-530nm.stl,Green LED 530nm for fluorescence excitation,"{""wavelength"": 530}"
-led-625nm,LED Red,fluorescence,#dc3545,1,1,/icons/uc2_ledred_1x1.svg,/cad/led-625nm.stl,Red LED 625nm for fluorescence excitation,"{""wavelength"": 625}"
-filter-bandpass,Bandpass Filter,fluorescence,#4a9b8e,1,1,/icons/uc2_filter_1x1.svg,/cad/filter-bandpass.stl,Bandpass optical filter module,"{""filterType"": ""bandpass"", ""wavelength"": 525}"
-filter-dichroic,Dichroic Mirror,fluorescence,#6c757d,1,1,/icons/uc2_dichroicmirror_1x1.svg,/cad/filter-dichroic.stl,Dichroic mirror for fluorescence separation,"{""cutoff"": 510}"
-camera-usb,USB Camera,cameras,#343a40,1,2,/icons/uc2_cctvcam_1x2.svg,/cad/camera-usb.stl,USB camera module for imaging,"{""resolution"": ""1920x1080""}"
-stage-z,Z Stage,stages,#495057,2,2,/icons/uc2_zstage_1x2.svg,/cad/stage-z.stl,Z-axis focus stage,"{""range"": 10}"
-laser-405nm,Laser 405nm,fluorescence,#6610f2,1,1,/icons/uc2_laser_1x1.svg,/cad/laser-405nm.stl,405nm laser diode module,"{""power"": 5}"
-laser-532nm,Laser 532nm,fluorescence,#198754,1,1,/icons/uc2_laser_1x1.svg,/cad/laser-532nm.stl,532nm laser diode module,"{""power"": 10}"
-photodiode,Photodiode,detector,#198754,1,1,/icons/uc2_photodiode_1x1.svg,/cad/laser-532nm.stl,photodiode,"{""power"": 10}"
-wildcard-1x1,Wild Card 1x1,wildcard,#6c757d,1,1,/icons/uc2_wildcard_1x1.svg,/cad/wildcard-1x1.stl,Customizable 1x1 module,"{""customText"": ""Custom Module"", ""isWildCard"": true}"
-wildcard-2x2,Wild Card 2x2,wildcard,#6c757d,2,2,/icons/uc2_wildcard_2x2.svg,/cad/wildcard-2x2.stl,Customizable 2x2 module,"{""customText"": ""Custom Module"", ""isWildCard"": true}"
-wildcard-3x3,Wild Card 3x3,wildcard,#6c757d,3,3,/icons/uc2_wildcard_3x3.svg,/cad/wildcard-3x3.stl,Customizable 3x3 module,"{""customText"": ""Custom Module"", ""isWildCard"": true}"
+id;name;group;color;width;height;thumbnail;cadUrl;description;defaultParams;autodeskInventor
+cube-1x1;Basic Cube;cubes;#1e4670;1;1;/icons/uc2_emptycube.svg;/cad/cube-1x1.stl;Basic 1x1 cube module for structural support;"{""height"": 50}";ASS - 2000 - CUB - V04.iam
+lens-1x1;Lens (positive);lenses;#7cc142;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/lens-1x1.stl;Optical lens module for beam focusing;"{""focalLength"": 100}";ASS - 2021 - CUBLEND40F50 - V04.iam
+lens-1x1;Lens (negative);lenses;#7cc142;1;1;/icons/uc2_lensnegative_1x1.svg;/cad/lens-1x1.stl;Optical lens module for beam focusing;"{""focalLength"": -100}";ASS - 2022 - CUBLEND40F100 - V04.iam
+mirror-1x1;Mirror;lenses;#4a9b8e;1;1;/icons/uc2_mirror_static.svg;/cad/mirror-1x1.stl;Mirror module for beam steering;"{""angle"": 45}";ASS - 2020 - CUBMIR45¡TH2 - V04.iam
+beamsplitter-1x1;Beamsplitter;lenses;#4a9b8e;1;1;/icons/uc2_beamsplittercube_1x1.svg;/cad/beamsplitter-1x1.stl;50/50 beamsplitter cube;"{""ratio"": ""50/50""}";ASS - 2011 - CUBSPLCUB - V04.iam
+led-470nm;LED Blue;fluorescence;#1e4670;2;1;/icons/uc2_ledblue_1x1.svg;/cad/led-470nm.stl;Blue LED 470nm for fluorescence excitation;"{""wavelength"": 470}";ASS - 2042 - CUBFLULEDBLUNEWENE - V04.iam
+led-530nm;LED Green;fluorescence;#7cc142;2;1;/icons/uc2_ledgreen_1x1.svg;/cad/led-530nm.stl;Green LED 530nm for fluorescence excitation;"{""wavelength"": 530}";ASS - 2043 - CUBFLULEDGRENEWENE - V04.iam
+led-625nm;LED Red;fluorescence;#dc3545;2;1;/icons/uc2_ledred_1x1.svg;/cad/led-625nm.stl;Red LED 625nm for fluorescence excitation;"{""wavelength"": 625}";ASS - 2046 - CUBLEDMTX - V04.iam
+filter-bandpass;Bandpass Filter;fluorescence;#4a9b8e;1;1;/icons/uc2_filter_1x1.svg;/cad/filter-bandpass.stl;Bandpass optical filter module;"{""filterType"": ""bandpass""; ""wavelength"": 525}";ASS - 2047 - CUBEXCFILWLS532 - V04.iam
+filter-dichroic;Dichroic Mirror;fluorescence;#6c757d;1;1;/icons/uc2_dichroicmirror_1x1.svg;/cad/filter-dichroic.stl;Dichroic mirror for fluorescence separation;"{""cutoff"": 510}";ASS - 2027 - CUBDICSPL+EMIFIL_WLS532 - A.iam
+camera-usb;USB Camera;cameras;#343a40;1;2;/icons/uc2_cctvcam_1x2.svg;/cad/camera-usb.stl;USB camera module for imaging;"{""resolution"": ""1920x1080""}";ASS - 2045 - CUBCAM_RASPBERRY - V04.iam
+stage-z;Z Stage;stages;#495057;2;2;/icons/uc2_zstage_1x2.svg;/cad/stage-z.stl;Z-axis focus stage;"{""range"": 10}";ASS - 3004 - CUBMANSTGR10 - V04.iam
+laser-405nm;Laser 405nm;fluorescence;#6610f2;1;1;/icons/uc2_laser_1x1.svg;/cad/laser-405nm.stl;405nm laser diode module;"{""power"": 5}";ASS - 2018 - CUBLAS520 - V04.iam
+laser-532nm;Laser 532nm;fluorescence;#198754;1;1;/icons/uc2_laser_1x1.svg;/cad/laser-532nm.stl;532nm laser diode module;"{""power"": 10}";ASS - 2018 - CUBLAS520 - V04.iam
+photodiode;Photodiode;detector;#198754;1;1;/icons/uc2_photodiode_1x1.svg;/cad/laser-532nm.stl;photodiode;"{""power"": 10}";ASS - 2019 - CUBPHOSEN+LEND16F28 - V04.iam
+wildcard-1x1;Wild Card 1x1;wildcard;#6c757d;1;1;/icons/uc2_wildcard_1x1.svg;/cad/wildcard-1x1.stl;Customizable 1x1 module;"{""customText"": ""Custom Module""; ""isWildCard"": true}";ASS - 2024 - CUBSAMHOL - V04.iam
+wildcard-2x2;Wild Card 2x2;wildcard;#6c757d;2;2;/icons/uc2_wildcard_2x2.svg;/cad/wildcard-2x2.stl;Customizable 2x2 module;"{""customText"": ""Custom Module""; ""isWildCard"": true}";ASS - 2035 - CUBMAG - V04.iam
+wildcard-3x3;Wild Card 3x3;wildcard;#6c757d;3;3;/icons/uc2_wildcard_3x3.svg;/cad/wildcard-3x3.stl;Customizable 3x3 module;"{""customText"": ""Custom Module""; ""isWildCard"": true}";ASS - 2038 - CUBFEPTUB - V04.iam
+lens-1x1;Lens (negative);lenses;#7cc142;1;1;/icons/uc2_lensnegative_1x1.svg;/cad/lens-1x1.stl;Optical lens module for beam focusing;"{""focalLength"": -100}";ASS - 2001 - CUBLEND40F50 - V03.iam
+sampleholder-1x1;Sample Holder standard lens;stages;#7cc143;1;1;/icons/uc2_sampleholder_1x1.png;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2005 - CUBSAMHOL - V03.iam
+eyepiece-1x1;Eyepiece;lenses;#7cc144;1;1;/icons/uc2_eyepiece_1x1.png;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2025 - CUBEYEPCE - V04.iam
+kinematicmirror-1x1;Kinematic Mirror ;mirror;#7cc145;1;1;/icons/uc2_kinematicmirror45_1x1.png;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2013 - CUBKINMIR45¡90¡ - V04 - A.iam
+kinematicmirror-90-1x1;Kinematic Mirror ;mirror;#7cc146;1;1;/icons/uc2_kinematicmirror90_1x1.png;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2013 - CUBKINMIR45¡90¡ - V04.iam
+cube-fiberholder-1x1;TO BE WRITTEN;lenses;#7cc147;1;1;/icons/uc2-fiberholder.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2044 - CUBFIBHOL - V04.iam
+cube-raspicam-2x1;TO BE WRITTEN;cameras;#7cc148;1;1;/icons/uc2-raspicam.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2045 - CUBCAM_RASPBERRY - V04.iam
+cube-ledmatrix-1x1;TO BE WRITTEN;illumination;#7cc149;1;1;/icons/uc2-ledmatrix.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2046 - CUBLEDMTX - V04.iam
+polfilter-1x1;TO BE WRITTEN;optics;#7cc150;1;1;/icons/uc2-polfilter.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2048 - CUBDBLPOLFIL - V04.iam
+pinhole-1x1;TO BE WRITTEN;optics;#7cc151;1;1;/icons/uc2-pinhole.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 4001 - PHNHOL - A.iam
+torch-1x1;TO BE WRITTEN;illumination;#7cc152;1;1;/icons/uc2-torch.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 4004 - TOR+BAT.iam
+screenholder-1x1;TO BE WRITTEN;optics;#7cc153;1;1;/icons/uc2-screen.svg;/cad/notdefined.stl;ToBeWritten;"{""defaultToBehFilled"": -100}";ASS - 2014 - CUBSCRHOL - V04.iam

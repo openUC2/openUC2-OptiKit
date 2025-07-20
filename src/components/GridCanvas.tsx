@@ -14,6 +14,7 @@ export const GridCanvas: React.FC = () => {
   const [stageSize, setStageSize] = useState({ width: CANVAS_SIZE, height: CANVAS_SIZE });
   const [moduleImages, setModuleImages] = useState<Record<string, HTMLImageElement>>({});
   const [isDraggingModule, setIsDraggingModule] = useState(false);
+  const annotationMode = useAppStore((state) => state.annotationMode);
   
   const {
     grid,
@@ -436,7 +437,7 @@ export const GridCanvas: React.FC = () => {
             });
           }
         }}
-        draggable={!isDraggingModule}
+        draggable={!isDraggingModule && annotationMode === 'none'}
         onDragStart={() => {
           // Prevent stage dragging while dragging modules
           if (isDraggingModule) return false;
@@ -457,11 +458,11 @@ export const GridCanvas: React.FC = () => {
               {generateGridLabels()}
             </>
           )}
-          
           {/* Placed modules */}
           {renderPlacedModules()}
-          
-          {/* Annotations */}
+        </Layer>
+        {/* Annotations always on top */}
+        <Layer listening={true}>
           <AnnotationCanvas 
             currentLayerIndex={currentLayerIndex}
             viewport={viewport}

@@ -113,7 +113,11 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   };
 
   const renderAnnotations = () => {
+    // Debug: log all annotations and currentLayerIndex
+    console.log('All annotations:', annotations);
+    console.log('Current layer index:', currentLayerIndex);
     const layerAnnotations = annotations.filter(ann => ann.layer === currentLayerIndex);
+    console.log('Annotations in current layer:', layerAnnotations);
     
     return layerAnnotations.map(annotation => {
       const isSelected = selectedItemId === annotation.id;

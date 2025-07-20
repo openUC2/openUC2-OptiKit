@@ -13,7 +13,13 @@ export const Layout: React.FC = () => {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      // Always show sidebars when switching to desktop
+      if (!mobile) {
+        setLeftSidebarOpen(true);
+        setRightSidebarOpen(true);
+      }
     };
     
     checkMobile();
