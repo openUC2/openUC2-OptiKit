@@ -8,7 +8,7 @@ import './styles/brand.css'
 import './App.css'
 
 function App() {
-  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl } = useAppStore();
+  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData } = useAppStore();
 
   useEffect(() => {
     // Load modules and state on app start
@@ -18,6 +18,7 @@ function App() {
       // Check for URL parameters to load a layout
       const urlParams = new URLSearchParams(window.location.search);
       const layoutUrl = urlParams.get('layout');
+      const encodedData = urlParams.get('data');
       
       if (layoutUrl) {
         importFromUrl(layoutUrl).then(success => {
@@ -27,6 +28,20 @@ function App() {
             console.error('Failed to load layout from URL:', layoutUrl);
           }
         });
+      } else if (encodedData) {
+        try {
+          // Decode base64 data and import
+          const jsonString = atob(encodedData);
+          const data = JSON.parse(jsonString);
+          importData(JSON.stringify(data));
+          console.log('Layout loaded from shared link');
+          
+          // Clean URL by removing the data parameter
+          const newUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        } catch (error) {
+          console.error('Failed to load layout from shared link:', error);
+        }
       }
     });
 
@@ -45,7 +60,7 @@ function App() {
       clearInterval(saveInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl]);
+  }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData]);
 
   return (
     <ThemeProvider theme={materialTheme}>

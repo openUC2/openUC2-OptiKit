@@ -11,7 +11,8 @@ import type {
   UC2Component,
   StateSnapshot,
   CompactExport,
-  CompactModule
+  CompactModule,
+  CompactAnnotation
 } from '../types';
 
 const GRID_CELL_SIZE = 50; // 50mm in pixels (assuming 1:1 scale)
@@ -60,6 +61,7 @@ interface AppStore extends AppState {
   exportData: () => Promise<string>;
   exportDataWithScreenshot: (screenshotDataUrl?: string) => Promise<string>;
   shareToGitHubDiscussions: () => void;
+  generateShareableLink: () => string;
   downloadSTLBundle: (password: string) => Promise<void>;
   importData: (data: string) => void;
   importFromUrl: (url: string) => Promise<boolean>;
@@ -455,9 +457,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
           customText: module.t
         }));
         
+        // Convert annotations if they exist
+        const annotations: Annotation[] = (compactData as CompactExport & { a?: CompactAnnotation[] }).a 
+          ? (compactData as CompactExport & { a: CompactAnnotation[] }).a.map((ann: CompactAnnotation) => ({
+              id: uuidv4(),
+              type: ann.t,
+              layer: 0,
+              points: ann.p || [],
+              text: ann.x
+            })) 
+          : [];
+        
         set({
           placedModules,
-          annotations: [],
+          annotations,
           layers: [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
         });
         return;
@@ -701,6 +714,48 @@ export const useAppStore = create<AppStore>((set, get) => ({
     } else {
       window.open(fullUrl, "_blank");
     }
+  },
+
+  generateShareableLink: () => {
+    const state = get();
+    
+    // Create compact export for URL sharing
+    const compactExport = {
+      m: state.placedModules.map(module => ({
+        i: module.moduleId,
+        p: [module.position.x, module.position.y, module.layer],
+        r: module.rotation,
+        ...(module.customText && { t: module.customText })
+      })),
+      a: state.annotations.map(annotation => ({
+        t: annotation.type,
+        p: annotation.points || [],
+        ...(annotation.text && { x: annotation.text })
+      }))
+    };
+    
+    // Base64 encode the compact JSON to make it URL-safe
+    const jsonString = JSON.stringify(compactExport);
+    const base64Data = btoa(jsonString);
+    
+    // Create shareable URL
+    const currentUrl = window.location.origin + window.location.pathname;
+    const shareableUrl = `${currentUrl}?data=${base64Data}`;
+    
+    // Check URL length and fallback if needed
+    if (shareableUrl.length > 2000) {
+      // For very large layouts, create a simplified version
+      const simplifiedExport = {
+        m: state.placedModules.map(module => ({
+          i: module.moduleId,
+          p: [module.position.x, module.position.y, module.layer]
+        }))
+      };
+      const simplifiedBase64 = btoa(JSON.stringify(simplifiedExport));
+      return `${currentUrl}?data=${simplifiedBase64}`;
+    }
+    
+    return shareableUrl;
   },
 
   downloadSTLBundle: async (password: string) => {

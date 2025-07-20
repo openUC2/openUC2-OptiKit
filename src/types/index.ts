@@ -116,6 +116,13 @@ export interface CompactModule {
   t?: string; // customText
 }
 
+export interface CompactAnnotation {
+  t: 'line' | 'arrow' | 'text' | 'optical-axis'; // type
+  p: Point[]; // points
+  x?: string; // text
+}
+
 export interface CompactExport {
   m: CompactModule[];
+  a?: CompactAnnotation[];
 }

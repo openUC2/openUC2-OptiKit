@@ -28,7 +28,8 @@ import {
   Help as HelpIcon,
   Lock as PrivacyIcon,
   ViewInAr as LogoIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Link as LinkIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 
@@ -38,6 +39,7 @@ export const Toolbar: React.FC = () => {
     setGridConfig, 
     exportData, 
     shareToGitHubDiscussions,
+    generateShareableLink,
     downloadSTLBundle,
     importData, 
     importFromUrl,
@@ -223,6 +225,23 @@ openUC2 team via GitHub repository
     }
   };
 
+  const handleGenerateShareableLink = () => {
+    const shareableUrl = generateShareableLink();
+    
+    // Copy to clipboard and show confirmation
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareableUrl).then(() => {
+        alert(`Shareable link copied to clipboard!\n\nURL: ${shareableUrl}\n\nAnyone with this link can open your layout in OptiKit.`);
+      }).catch(() => {
+        // Fallback if clipboard write fails
+        prompt('Copy this shareable link:', shareableUrl);
+      });
+    } else {
+      // Fallback for browsers without clipboard API
+      prompt('Copy this shareable link:', shareableUrl);
+    }
+  };
+
   return (
     <AppBar 
       position="static" 
@@ -349,6 +368,15 @@ openUC2 team via GitHub repository
               size="small"
             >
               <SaveIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Generate Shareable Link">
+            <IconButton 
+              color="inherit"
+              onClick={handleGenerateShareableLink}
+              size="small"
+            >
+              <LinkIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Share via Email">
