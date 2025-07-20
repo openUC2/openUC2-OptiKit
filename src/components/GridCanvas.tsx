@@ -33,6 +33,35 @@ export const GridCanvas: React.FC = () => {
   const activeLayer = layers.find(layer => layer.id === activeLayerId);
   const currentLayerIndex = activeLayer?.index ?? 0;
 
+  // Snap position to grid
+  const snapToGrid = useCallback((pos: Point): Point => {
+    if (!grid.snapEnabled) return pos;
+    
+    const cellSize = grid.cellSize; // Don't multiply by zoom for snapping
+    return {
+      x: Math.round(pos.x / cellSize) * cellSize,
+      y: Math.round(pos.y / cellSize) * cellSize
+    };
+  }, [grid.snapEnabled, grid.cellSize]);
+
+  // Convert pixel coordinates to grid coordinates
+  const pixelToGrid = useCallback((pos: Point): Point => {
+    const cellSize = grid.cellSize; // Don't multiply by zoom for grid conversion
+    return {
+      x: Math.floor(pos.x / cellSize),
+      y: Math.floor(pos.y / cellSize)
+    };
+  }, [grid.cellSize]);
+
+  // Convert grid coordinates to pixel coordinates
+  const gridToPixel = useCallback((pos: Point): Point => {
+    const cellSize = grid.cellSize; // Don't multiply by zoom for grid conversion
+    return {
+      x: pos.x * cellSize,
+      y: pos.y * cellSize
+    };
+  }, [grid.cellSize]);
+
   // Update stage size when window resizes
   useEffect(() => {
     const updateSize = () => {
@@ -231,34 +260,7 @@ export const GridCanvas: React.FC = () => {
     return labels;
   };
 
-  // Snap position to grid
-  const snapToGrid = useCallback((pos: Point): Point => {
-    if (!grid.snapEnabled) return pos;
-    
-    const cellSize = grid.cellSize; // Don't multiply by zoom for snapping
-    return {
-      x: Math.round(pos.x / cellSize) * cellSize,
-      y: Math.round(pos.y / cellSize) * cellSize
-    };
-  }, [grid.snapEnabled, grid.cellSize]);
 
-  // Convert pixel coordinates to grid coordinates
-  const pixelToGrid = useCallback((pos: Point): Point => {
-    const cellSize = grid.cellSize; // Don't multiply by zoom for grid conversion
-    return {
-      x: Math.floor(pos.x / cellSize),
-      y: Math.floor(pos.y / cellSize)
-    };
-  }, [grid.cellSize]);
-
-  // Convert grid coordinates to pixel coordinates
-  const gridToPixel = useCallback((pos: Point): Point => {
-    const cellSize = grid.cellSize; // Don't multiply by zoom for grid conversion
-    return {
-      x: pos.x * cellSize,
-      y: pos.y * cellSize
-    };
-  }, [grid.cellSize]);
 
   // Handle module drag start
   const handleModuleDragStart = () => {
