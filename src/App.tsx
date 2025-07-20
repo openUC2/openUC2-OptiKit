@@ -1,6 +1,9 @@
 import { useEffect } from 'react'
+import { ThemeProvider } from '@mui/material/styles'
+import { CssBaseline } from '@mui/material'
 import { Layout } from './components/Layout'
 import { useAppStore } from './stores/appStore'
+import { materialTheme } from './theme/materialTheme'
 import './styles/brand.css'
 import './App.css'
 
@@ -44,7 +47,12 @@ function App() {
     };
   }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl]);
 
-  return <Layout />
+  return (
+    <ThemeProvider theme={materialTheme}>
+      <CssBaseline />
+      <Layout />
+    </ThemeProvider>
+  )
 }
 
 export default App

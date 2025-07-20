@@ -1,101 +1,150 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Drawer, 
+  Tabs, 
+  Tab, 
+  IconButton, 
+  Paper,
+  useTheme,
+  useMediaQuery 
+} from '@mui/material';
+import {
+  Inventory as PartsIcon,
+  Settings as SettingsIcon
+} from '@mui/icons-material';
 import { PartLibrary } from './PartLibrary';
 import { GridCanvas } from './GridCanvas';
 import { LayerPanel } from './LayerPanel';
 import { PropertyPanel } from './PropertyPanel';
 import { BOMPanel } from './BOMPanel';
 import { Toolbar } from './Toolbar';
-import './Layout.css';
 
 export const Layout: React.FC = () => {
-  const [isMobile, setIsMobile] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [activeRightTab, setActiveRightTab] = useState<'layers' | 'properties' | 'bom'>('layers');
 
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth <= 768;
-      setIsMobile(mobile);
-      // Always show sidebars when switching to desktop
-      if (!mobile) {
-        setLeftSidebarOpen(true);
-        setRightSidebarOpen(true);
-      }
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+    // Always show sidebars when switching to desktop
+    if (!isMobile) {
+      setLeftSidebarOpen(true);
+      setRightSidebarOpen(true);
+    }
+  }, [isMobile]);
+
+  const sidebarWidth = 300;
 
   return (
-    <div className="layout">
-      <div className="layout-toolbar">
-        <Toolbar />
-        {isMobile && (
-          <div className="mobile-controls">
-            <button 
-              className="mobile-toggle"
-              onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-              title="Toggle Parts Library"
-            >
-              📦
-            </button>
-            <button 
-              className="mobile-toggle"
-              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-              title="Toggle Layers & Properties"
-            >
-              ⚙️
-            </button>
-          </div>
-        )}
-      </div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Toolbar */}
+      <Toolbar />
       
-      <div className="layout-main">
-        <div 
-          className={`layout-sidebar-left ${isMobile && !leftSidebarOpen ? 'collapsed' : ''}`}
+      {/* Mobile Controls */}
+      {isMobile && (
+        <Paper 
+          elevation={1} 
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            p: 1, 
+            borderRadius: 0 
+          }}
+        >
+          <IconButton 
+            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+            color="primary"
+          >
+            <PartsIcon />
+          </IconButton>
+          <IconButton 
+            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+            color="primary"
+          >
+            <SettingsIcon />
+          </IconButton>
+        </Paper>
+      )}
+      
+      {/* Main Layout */}
+      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Left Sidebar - Parts Library */}
+        <Drawer
+          variant={isMobile ? "temporary" : "persistent"}
+          anchor="left"
+          open={leftSidebarOpen}
+          onClose={() => setLeftSidebarOpen(false)}
+          sx={{
+            width: sidebarWidth,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: sidebarWidth,
+              boxSizing: 'border-box',
+              position: 'relative',
+              height: '100%',
+              top: 'auto',
+              borderRight: `1px solid ${theme.palette.divider}`,
+            },
+          }}
         >
           <PartLibrary />
-        </div>
+        </Drawer>
         
-        <div className="layout-canvas">
-          <GridCanvas />
-        </div>
-        
-        <div 
-          className={`layout-sidebar-right ${isMobile && !rightSidebarOpen ? 'collapsed' : ''}`}
+        {/* Canvas */}
+        <Box 
+          component="main"
+          sx={{ 
+            flexGrow: 1, 
+            display: 'flex', 
+            flexDirection: 'column',
+            overflow: 'hidden',
+            bgcolor: 'background.default'
+          }}
         >
-          <div className="right-sidebar-tabs">
-            <button 
-              className={`tab-button ${activeRightTab === 'layers' ? 'active' : ''}`}
-              onClick={() => setActiveRightTab('layers')}
+          <GridCanvas />
+        </Box>
+        
+        {/* Right Sidebar - Layers, Properties, BOM */}
+        <Drawer
+          variant={isMobile ? "temporary" : "persistent"}
+          anchor="right"
+          open={rightSidebarOpen}
+          onClose={() => setRightSidebarOpen(false)}
+          sx={{
+            width: sidebarWidth,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: sidebarWidth,
+              boxSizing: 'border-box',
+              position: 'relative',
+              height: '100%',
+              top: 'auto',
+              borderLeft: `1px solid ${theme.palette.divider}`,
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Tabs 
+              value={activeRightTab} 
+              onChange={(_, newValue) => setActiveRightTab(newValue)}
+              variant="fullWidth"
+              sx={{ borderBottom: 1, borderColor: 'divider' }}
             >
-              Layers
-            </button>
-            <button 
-              className={`tab-button ${activeRightTab === 'properties' ? 'active' : ''}`}
-              onClick={() => setActiveRightTab('properties')}
-            >
-              Properties
-            </button>
-            <button 
-              className={`tab-button ${activeRightTab === 'bom' ? 'active' : ''}`}
-              onClick={() => setActiveRightTab('bom')}
-            >
-              BOM
-            </button>
-          </div>
-          
-          <div className="right-sidebar-content">
-            {activeRightTab === 'layers' && <LayerPanel />}
-            {activeRightTab === 'properties' && <PropertyPanel />}
-            {activeRightTab === 'bom' && <BOMPanel />}
-          </div>
-        </div>
-      </div>
-    </div>
+              <Tab label="Layers" value="layers" />
+              <Tab label="Properties" value="properties" />
+              <Tab label="BOM" value="bom" />
+            </Tabs>
+            
+            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+              {activeRightTab === 'layers' && <LayerPanel />}
+              {activeRightTab === 'properties' && <PropertyPanel />}
+              {activeRightTab === 'bom' && <BOMPanel />}
+            </Box>
+          </Box>
+        </Drawer>
+      </Box>
+    </Box>
   );
 };

@@ -1,7 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {
+  Box,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  InputAdornment,
+  Paper
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  DragIndicator as DragIcon
+} from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import type { ModuleDefinition } from '../types';
-import './PartLibrary.css';
 
 export const PartLibrary: React.FC = () => {
   const { modules, loadModules } = useAppStore();
@@ -108,91 +125,195 @@ export const PartLibrary: React.FC = () => {
 
   const renderModuleTile = (module: ModuleDefinition) => {
     return (
-      <div
+      <Card
         key={module.id}
-        className="module-tile"
+        sx={{
+          cursor: 'grab',
+          position: 'relative',
+          height: 120,
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: 3,
+          },
+          '&:active': {
+            cursor: 'grabbing',
+            transform: 'scale(0.95)',
+          },
+        }}
         draggable
         onDragStart={(e) => handleDragStart(e, module.id)}
         onTouchStart={(e) => handleTouchStart(e, module.id)}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
-        title={module.description || module.name}
       >
-        <div className="module-preview">
-          {module.thumbnail ? (
-            <img 
-              src={module.thumbnail} 
-              alt={module.name}
-              className="module-icon"
-              style={{ width: '100%', height: '100%' }}
-            />
-          ) : (
-            <div 
-              className="module-fallback"
-              style={{ backgroundColor: module.color }}
-            >
-              <div className="module-footprint">
+        <CardContent sx={{ p: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              minHeight: 60,
+              borderRadius: 1,
+              bgcolor: 'grey.50',
+              mb: 1,
+            }}
+          >
+            {module.thumbnail ? (
+              <img 
+                src={module.thumbnail} 
+                alt={module.name}
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'contain',
+                  borderRadius: 4 
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  bgcolor: module.color || 'grey.300',
+                  borderRadius: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.75rem',
+                }}
+              >
                 {module.footprint.width} × {module.footprint.height}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="module-info">
-          <div className="module-name">{module.name}</div>
-          <div className="module-description">
-            {module.footprint.width} × {module.footprint.height} cells
-          </div>
-        </div>
-      </div>
+              </Box>
+            )}
+            <DragIcon 
+              sx={{ 
+                position: 'absolute', 
+                top: 2, 
+                right: 2, 
+                fontSize: 16, 
+                color: 'grey.400' 
+              }} 
+            />
+          </Box>
+          
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              fontWeight: 500, 
+              lineHeight: 1.2, 
+              mb: 0.5,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {module.name}
+          </Typography>
+          
+          <Chip 
+            label={`${module.footprint.width}×${module.footprint.height}`}
+            size="small"
+            variant="outlined"
+            sx={{ 
+              height: 20, 
+              fontSize: '0.65rem',
+              alignSelf: 'flex-start',
+            }}
+          />
+        </CardContent>
+      </Card>
     );
   };
 
   return (
-    <div className="part-library">
-      <div className="part-library-header">
-        <h3>Part Library</h3>
-        <div className="search-container">
-          <input
-            type="text"
-            placeholder="Search parts..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
-        <div className="group-filter">
-          <select 
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <Paper elevation={1} sx={{ p: 2, borderRadius: 0 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
+          Part Library
+        </Typography>
+        
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search parts..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ mb: 2 }}
+        />
+        
+        <FormControl fullWidth size="small">
+          <InputLabel>Group</InputLabel>
+          <Select
             value={selectedGroup}
+            label="Group"
             onChange={(e) => setSelectedGroup(e.target.value)}
-            className="group-select"
           >
             {groups.map(group => (
-              <option key={group} value={group}>
+              <MenuItem key={group} value={group}>
                 {group === 'all' ? 'All Groups' : group.charAt(0).toUpperCase() + group.slice(1)}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </div>
-      </div>
+          </Select>
+        </FormControl>
+      </Paper>
       
-      <div className="part-library-content">
-        <div className="module-grid">
+      {/* Content */}
+      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: 2,
+          }}
+        >
           {filteredModules.map(renderModuleTile)}
-        </div>
+        </Box>
         
         {filteredModules.length === 0 && (
-          <div className="no-results">
-            No parts found matching "{searchTerm}"
-          </div>
+          <Paper 
+            sx={{ 
+              p: 3, 
+              textAlign: 'center', 
+              mt: 2,
+              bgcolor: 'grey.50' 
+            }}
+          >
+            <Typography variant="body2" color="textSecondary">
+              No parts found matching "{searchTerm}"
+            </Typography>
+          </Paper>
         )}
-      </div>
+      </Box>
       
-      <div className="part-library-footer">
-        <p className="drag-hint">
-          💡 Drag parts onto the canvas to place them
-        </p>
-      </div>
-    </div>
+      {/* Footer */}
+      <Paper elevation={1} sx={{ p: 1.5, borderRadius: 0 }}>
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            color: 'text.secondary' 
+          }}
+        >
+          <DragIcon fontSize="small" />
+          Drag parts onto the canvas to place them
+        </Typography>
+      </Paper>
+    </Box>
   );
 };

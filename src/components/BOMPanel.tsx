@@ -1,7 +1,24 @@
 import React from 'react';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip
+} from '@mui/material';
+import {
+  Receipt as BOMIcon,
+  Inventory as InventoryIcon
+} from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import type { ModuleDefinition } from '../types';
-import './BOMPanel.css';
 
 export const BOMPanel: React.FC = () => {
   const { placedModules, modules } = useAppStore();
@@ -36,47 +53,128 @@ export const BOMPanel: React.FC = () => {
   const totalCost = bomItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   return (
-    <div className="bom-panel">
-      <h3>Bill of Materials (BOM)</h3>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <BOMIcon />
+        Bill of Materials
+      </Typography>
       
       {bomItems.length === 0 ? (
-        <p className="empty-state">No modules placed yet</p>
+        <Paper 
+          sx={{ 
+            flex: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            bgcolor: 'grey.50'
+          }}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <InventoryIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+            <Typography variant="body2" color="textSecondary">
+              No modules placed yet
+            </Typography>
+          </Box>
+        </Paper>
       ) : (
-        <>
-          <div className="bom-summary">
-            <p><strong>Total Items:</strong> {bomItems.reduce((sum, item) => sum + item.count, 0)}</p>
-            <p><strong>Unique Modules:</strong> {bomItems.length}</p>
-            <p><strong>Total Cost:</strong> ${totalCost.toFixed(2)}</p>
-          </div>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+          {/* Summary */}
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Summary
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+                <Box>
+                  <Typography variant="h4" color="primary">
+                    {bomItems.reduce((sum, item) => sum + item.count, 0)}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Total Items
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h4" color="secondary">
+                    {bomItems.length}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Unique Modules
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h4" color="success.main">
+                    ${totalCost.toFixed(2)}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Total Cost
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
           
-          <div className="bom-list">
-            <div className="bom-header">
-              <span>Module</span>
-              <span>Qty</span>
-              <span>Unit Cost</span>
-              <span>Total</span>
-            </div>
-            
-            {bomItems.map((item, index) => {
-              const unitPrice = (item.module.defaultParams as Record<string, unknown>)?.price as number || 0;
-              return (
-                <div key={index} className="bom-item">
-                  <div className="module-info">
-                    <div className="module-name">{item.module.name}</div>
-                    <div className="module-id">{item.module.id}</div>
-                    {item.module.autodeskInventor && (
-                      <div className="module-inventor">{item.module.autodeskInventor}</div>
-                    )}
-                  </div>
-                  <span className="quantity">{item.count}</span>
-                  <span className="unit-price">${unitPrice.toFixed(2)}</span>
-                  <span className="total-price">${item.totalPrice.toFixed(2)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </>
+          {/* BOM Table */}
+          <Paper sx={{ flex: 1, overflow: 'auto' }}>
+            <TableContainer>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Module</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Qty</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Unit</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {bomItems.map((item, index) => {
+                    const unitPrice = (item.module.defaultParams as Record<string, unknown>)?.price as number || 0;
+                    return (
+                      <TableRow key={index} hover>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.module.name}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              {item.module.id}
+                            </Typography>
+                            {item.module.autodeskInventor && (
+                              <Chip 
+                                label={item.module.autodeskInventor}
+                                size="small"
+                                variant="outlined"
+                                sx={{ mt: 0.5, fontSize: '0.65rem', height: 18 }}
+                              />
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={item.count} 
+                            size="small" 
+                            color="primary"
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">
+                            ${unitPrice.toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            ${item.totalPrice.toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };

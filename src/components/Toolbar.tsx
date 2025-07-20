@@ -1,6 +1,35 @@
 import React from 'react';
+import { 
+  AppBar, 
+  Toolbar as MuiToolbar, 
+  Typography, 
+  IconButton, 
+  Divider,
+  Box,
+  Tooltip
+} from '@mui/material';
+import {
+  Undo as UndoIcon,
+  Redo as RedoIcon,
+  GridOn as GridIcon,
+  CropFree as SnapIcon,
+  CenterFocusStrong as CenterIcon,
+  Timeline as LineIcon,
+  ArrowForward as ArrowIcon,
+  MoreHoriz as OpticalAxisIcon,
+  TextFields as TextIcon,
+  Save as SaveIcon,
+  Email as EmailIcon,
+  FolderOpen as ImportIcon,
+  Language as UrlIcon,
+  PhotoCamera as ScreenshotIcon,
+  Archive as STLIcon,
+  GitHub as GitHubIcon,
+  Help as HelpIcon,
+  Lock as PrivacyIcon,
+  ViewInAr as LogoIcon
+} from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
-import './Toolbar.css';
 
 export const Toolbar: React.FC = () => {
   const { 
@@ -187,166 +216,220 @@ openUC2 team via GitHub repository
   };
 
   return (
-    <div className="toolbar">
-      <div className="toolbar-logo">
-        <div className="toolbar-logo-icon">UC2</div>
-        <span className="toolbar-logo-text">openUC2</span>
-      </div>
+    <AppBar 
+      position="static" 
+      color="primary" 
+      elevation={2}
+      sx={{ zIndex: 1300 }}
+    >
+      <MuiToolbar sx={{ minHeight: '64px', gap: 1 }}>
+        {/* Logo Section */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          <LogoIcon sx={{ fontSize: 32, mr: 1, color: 'secondary.main' }} />
+          <Typography variant="h6" component="div" sx={{ fontWeight: 500 }}>
+            openUC2
+          </Typography>
+        </Box>
 
-      <div className="toolbar-separator" />
+        <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
-      <div className="toolbar-group">
-        <button 
-          className="toolbar-button"
-          onClick={undo}
-          title="Undo"
-        >
-          ↶
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={redo}
-          title="Redo"
-        >
-          ↷
-        </button>
-      </div>
+        {/* Undo/Redo Group */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Undo">
+            <IconButton 
+              color="inherit"
+              onClick={undo}
+              size="small"
+            >
+              <UndoIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Redo">
+            <IconButton 
+              color="inherit"
+              onClick={redo}
+              size="small"
+            >
+              <RedoIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
 
-      <div className="toolbar-separator" />
+        <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
-      <div className="toolbar-group">
-        <button 
-          className={`toolbar-button ${grid.gridVisible ? 'active' : ''}`}
-          onClick={() => setGridConfig({ gridVisible: !grid.gridVisible })}
-          title="Toggle Grid"
-        >
-          #
-        </button>
-        <button 
-          className={`toolbar-button ${grid.snapEnabled ? 'active' : ''}`}
-          onClick={() => setGridConfig({ snapEnabled: !grid.snapEnabled })}
-          title="Toggle Snap to Grid"
-        >
-          ⊞
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={centerView}
-          title="Center View"
-        >
-          ⌖
-        </button>
-      </div>
+        {/* Grid Controls */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Toggle Grid">
+            <IconButton 
+              color={grid.gridVisible ? "secondary" : "inherit"}
+              onClick={() => setGridConfig({ gridVisible: !grid.gridVisible })}
+              size="small"
+            >
+              <GridIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Toggle Snap to Grid">
+            <IconButton 
+              color={grid.snapEnabled ? "secondary" : "inherit"}
+              onClick={() => setGridConfig({ snapEnabled: !grid.snapEnabled })}
+              size="small"
+            >
+              <SnapIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Center View">
+            <IconButton 
+              color="inherit"
+              onClick={centerView}
+              size="small"
+            >
+              <CenterIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
 
-      <div className="toolbar-separator" />
+        <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
-      <div className="toolbar-group">
-        <button 
-          className={`toolbar-button ${annotationMode === 'line' ? 'active' : ''}`}
-          onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
-          title="Draw Line"
-        >
-          ╱
-        </button>
-        <button 
-          className={`toolbar-button ${annotationMode === 'arrow' ? 'active' : ''}`}
-          onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
-          title="Draw Arrow"
-        >
-          ↗
-        </button>
-        <button 
-          className={`toolbar-button ${annotationMode === 'optical-axis' ? 'active' : ''}`}
-          onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
-          title="Draw Optical Axis"
-        >
-          ⟷
-        </button>
-        <button 
-          className={`toolbar-button ${annotationMode === 'text' ? 'active' : ''}`}
-          onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
-          title="Add Text"
-        >
-          T
-        </button>
-      </div>
+        {/* Annotation Tools */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Draw Line">
+            <IconButton 
+              color={annotationMode === 'line' ? "secondary" : "inherit"}
+              onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
+              size="small"
+            >
+              <LineIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Draw Arrow">
+            <IconButton 
+              color={annotationMode === 'arrow' ? "secondary" : "inherit"}
+              onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
+              size="small"
+            >
+              <ArrowIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Draw Optical Axis">
+            <IconButton 
+              color={annotationMode === 'optical-axis' ? "secondary" : "inherit"}
+              onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
+              size="small"
+            >
+              <OpticalAxisIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add Text">
+            <IconButton 
+              color={annotationMode === 'text' ? "secondary" : "inherit"}
+              onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
+              size="small"
+            >
+              <TextIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
 
-      <div className="toolbar-separator" />
+        <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
-      <div className="toolbar-group">
-        <button 
-          className="toolbar-button"
-          onClick={handleExport}
-          title="Save Layout As..."
-        >
-          💾
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={handleShare}
-          title="Share via Email"
-        >
-          ✉
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={handleImport}
-          title="Import Layout"
-        >
-          📁
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={handleImportFromUrl}
-          title="Import from URL"
-        >
-          🌐
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={downloadScreenshot}
-          title="Download Screenshot"
-        >
-          📸
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={handleExportSTL}
-          title="Export STL Files"
-        >
-          📦
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={shareToGitHubDiscussions}
-          title="Share to GitHub Discussions"
-        >
-          🌐
-        </button>
-      </div>
+        {/* File Operations */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Save Layout As...">
+            <IconButton 
+              color="inherit"
+              onClick={handleExport}
+              size="small"
+            >
+              <SaveIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Share via Email">
+            <IconButton 
+              color="inherit"
+              onClick={handleShare}
+              size="small"
+            >
+              <EmailIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Import Layout">
+            <IconButton 
+              color="inherit"
+              onClick={handleImport}
+              size="small"
+            >
+              <ImportIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Import from URL">
+            <IconButton 
+              color="inherit"
+              onClick={handleImportFromUrl}
+              size="small"
+            >
+              <UrlIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Download Screenshot">
+            <IconButton 
+              color="inherit"
+              onClick={downloadScreenshot}
+              size="small"
+            >
+              <ScreenshotIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Export STL Files">
+            <IconButton 
+              color="inherit"
+              onClick={handleExportSTL}
+              size="small"
+            >
+              <STLIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Share to GitHub Discussions">
+            <IconButton 
+              color="inherit"
+              onClick={shareToGitHubDiscussions}
+              size="small"
+            >
+              <GitHubIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
 
-      <div className="toolbar-separator" />
+        <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
-      <div className="toolbar-group">
-        <button 
-          className="toolbar-button"
-          onClick={handleHelp}
-          title="Help"
-        >
-          ❓
-        </button>
-        <button 
-          className="toolbar-button"
-          onClick={handlePrivacy}
-          title="Privacy"
-        >
-          🔒
-        </button>
-      </div>
+        {/* Help Section */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Help">
+            <IconButton 
+              color="inherit"
+              onClick={handleHelp}
+              size="small"
+            >
+              <HelpIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Privacy">
+            <IconButton 
+              color="inherit"
+              onClick={handlePrivacy}
+              size="small"
+            >
+              <PrivacyIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
 
-      <div className="toolbar-title">
-        <h1>OptiKit - 2D Grid Builder</h1>
-      </div>
-    </div>
+        {/* Title */}
+        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 400 }}>
+            OptiKit - 2D Grid Builder
+          </Typography>
+        </Box>
+      </MuiToolbar>
+    </AppBar>
   );
 };

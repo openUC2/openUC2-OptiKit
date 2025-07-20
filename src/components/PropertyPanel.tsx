@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  TextField,
+  Chip,
+  Paper
+} from '@mui/material';
+import {
+  RotateRight as RotateIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Settings as SettingsIcon
+} from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
-import './PropertyPanel.css';
 
 export const PropertyPanel: React.FC = () => {
   const { 
@@ -20,14 +37,25 @@ export const PropertyPanel: React.FC = () => {
 
   if (!selectedItemId || !selectedItemType) {
     return (
-      <div className="property-panel">
-        <div className="property-panel-header">
-          <h4>Properties</h4>
-        </div>
-        <div className="property-panel-content">
-          <p className="no-selection">Select an item to view its properties</p>
-        </div>
-      </div>
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <SettingsIcon />
+          Properties
+        </Typography>
+        <Paper 
+          sx={{ 
+            flex: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            bgcolor: 'grey.50'
+          }}
+        >
+          <Typography variant="body2" color="textSecondary">
+            Select an item to view its properties
+          </Typography>
+        </Paper>
+      </Box>
     );
   }
 
@@ -61,97 +89,142 @@ export const PropertyPanel: React.FC = () => {
     const isWildCard = moduleDefinition.defaultParams?.isWildCard === true;
 
     return (
-      <div className="property-content">
-        <div className="property-group">
-          <h5>Module Info</h5>
-          <div className="property-item">
-            <label>Name:</label>
-            <span>{moduleDefinition.name}</span>
-          </div>
-          <div className="property-item">
-            <label>Position:</label>
-            <span>({module.position.x}, {module.position.y})</span>
-          </div>
-          <div className="property-item">
-            <label>Rotation:</label>
-            <span>{module.rotation}°</span>
-          </div>
-          <div className="property-item">
-            <label>Layer:</label>
-            <span>{module.layer}</span>
-          </div>
-          <div className="property-item">
-            <label>Footprint:</label>
-            <span>
-              {module.rotation === 90 || module.rotation === 270 ? 
-                `${moduleDefinition.footprint.height} × ${moduleDefinition.footprint.width}` : 
-                `${moduleDefinition.footprint.width} × ${moduleDefinition.footprint.height}`}
-            </span>
-          </div>
-        </div>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Module Info
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Name</Typography>
+                <Typography variant="body2">{moduleDefinition.name}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Position</Typography>
+                <Typography variant="body2">({module.position.x}, {module.position.y})</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Rotation</Typography>
+                <Typography variant="body2">{module.rotation}°</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Layer</Typography>
+                <Typography variant="body2">{module.layer}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Footprint</Typography>
+                <Typography variant="body2">
+                  {module.rotation === 90 || module.rotation === 270 ? 
+                    `${moduleDefinition.footprint.height} × ${moduleDefinition.footprint.width}` : 
+                    `${moduleDefinition.footprint.width} × ${moduleDefinition.footprint.height}`}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
 
         {isWildCard && (
-          <div className="property-group">
-            <h5>Wild Card Text</h5>
-            {isEditingText ? (
-              <div className="text-editor">
-                <textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="text-input"
-                  rows={3}
-                  placeholder="Enter custom text..."
-                />
-                <div className="text-actions">
-                  <button className="property-button" onClick={handleSaveText}>
-                    Save
-                  </button>
-                  <button className="property-button" onClick={handleCancelEdit}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-display">
-                <p>{module.customText || 'No custom text set'}</p>
-                <button className="property-button" onClick={handleEditText}>
-                  {module.customText ? 'Edit Text' : 'Add Text'}
-                </button>
-              </div>
-            )}
-          </div>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Wild Card Text
+              </Typography>
+              {isEditingText ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField
+                    multiline
+                    rows={3}
+                    fullWidth
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    placeholder="Enter custom text..."
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                    <Button 
+                      variant="contained" 
+                      size="small"
+                      startIcon={<SaveIcon />}
+                      onClick={handleSaveText}
+                    >
+                      Save
+                    </Button>
+                    <Button 
+                      variant="outlined" 
+                      size="small"
+                      startIcon={<CancelIcon />}
+                      onClick={handleCancelEdit}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <Box>
+                  <Typography variant="body2" sx={{ mb: 2, fontStyle: module.customText ? 'normal' : 'italic' }}>
+                    {module.customText || 'No custom text set'}
+                  </Typography>
+                  <Button 
+                    variant="outlined" 
+                    size="small"
+                    startIcon={<EditIcon />}
+                    onClick={handleEditText}
+                  >
+                    {module.customText ? 'Edit Text' : 'Add Text'}
+                  </Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
         )}
 
-        <div className="property-group">
-          <h5>Actions</h5>
-          <div className="property-actions">
-            <button 
-              className="property-button"
-              onClick={handleRotate}
-            >
-              Rotate 90°
-            </button>
-            <button 
-              className="property-button danger"
-              onClick={() => removeModule(module.id)}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Actions
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button 
+                variant="outlined"
+                startIcon={<RotateIcon />}
+                onClick={handleRotate}
+                size="small"
+              >
+                Rotate 90°
+              </Button>
+              <Button 
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={() => removeModule(module.id)}
+                size="small"
+              >
+                Delete
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
 
         {module.params && Object.keys(module.params).length > 0 && (
-          <div className="property-group">
-            <h5>Parameters</h5>
-            {Object.entries(module.params).map(([key, value]) => (
-              <div key={key} className="property-item">
-                <label>{key}:</label>
-                <span>{String(value)}</span>
-              </div>
-            ))}
-          </div>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Parameters
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {Object.entries(module.params).map(([key, value]) => (
+                  <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="caption" color="textSecondary">{key}</Typography>
+                    <Chip label={String(value)} size="small" variant="outlined" />
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
         )}
-      </div>
+      </Box>
     );
   };
 
@@ -160,49 +233,61 @@ export const PropertyPanel: React.FC = () => {
     if (!annotation) return null;
 
     return (
-      <div className="property-content">
-        <div className="property-group">
-          <h5>Annotation Info</h5>
-          <div className="property-item">
-            <label>Type:</label>
-            <span>{annotation.type}</span>
-          </div>
-          <div className="property-item">
-            <label>Layer:</label>
-            <span>{annotation.layer}</span>
-          </div>
-          {annotation.text && (
-            <div className="property-item">
-              <label>Text:</label>
-              <span>{annotation.text}</span>
-            </div>
-          )}
-        </div>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Annotation Info
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Type</Typography>
+                <Typography variant="body2">{annotation.type}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="textSecondary">Layer</Typography>
+                <Typography variant="body2">{annotation.layer}</Typography>
+              </Box>
+              {annotation.text && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="caption" color="textSecondary">Text</Typography>
+                  <Typography variant="body2">{annotation.text}</Typography>
+                </Box>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
 
-        <div className="property-group">
-          <h5>Actions</h5>
-          <div className="property-actions">
-            <button 
-              className="property-button danger"
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Actions
+            </Typography>
+            <Button 
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
               onClick={() => removeAnnotation(annotation.id)}
+              size="small"
             >
               Delete
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </CardContent>
+        </Card>
+      </Box>
     );
   };
 
   return (
-    <div className="property-panel">
-      <div className="property-panel-header">
-        <h4>Properties</h4>
-      </div>
-      <div className="property-panel-content">
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <SettingsIcon />
+        Properties
+      </Typography>
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
         {selectedItemType === 'module' && renderModuleProperties()}
         {selectedItemType === 'annotation' && renderAnnotationProperties()}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 };
