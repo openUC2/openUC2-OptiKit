@@ -9,7 +9,9 @@ import type {
   Layer, 
   Point, 
   UC2Component,
-  StateSnapshot
+  StateSnapshot,
+  CompactExport,
+  CompactModule
 } from '../types';
 
 const GRID_CELL_SIZE = 50; // 50mm in pixels (assuming 1:1 scale)
@@ -439,6 +441,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       const parsed = JSON.parse(data);
       
+      // Check if it's the compact GitHub discussions format
+      if (parsed.m) {
+        const compactData = parsed as CompactExport;
+        // Convert from compact format to internal format
+        const placedModules: PlacedModule[] = compactData.m.map((module: CompactModule) => ({
+          id: uuidv4(),
+          moduleId: module.i,
+          position: { x: module.p[0], y: module.p[1] },
+          rotation: module.r || 0,
+          layer: module.p[2] || 0,
+          params: {},
+          customText: module.t
+        }));
+        
+        set({
+          placedModules,
+          annotations: [],
+          layers: [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
+        });
+        return;
+      }
+      
       // Check if it's the new unified format with uc2_components
       if (parsed.uc2_components) {
         // Convert from new format to internal format
@@ -478,6 +502,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       const data = await response.text();
       const parsed = JSON.parse(data);
+      
+      // Check if it's the compact GitHub discussions format
+      if (parsed.m) {
+        const compactData = parsed as CompactExport;
+        // Convert from compact format to internal format
+        const placedModules: PlacedModule[] = compactData.m.map((module: CompactModule) => ({
+          id: uuidv4(),
+          moduleId: module.i,
+          position: { x: module.p[0], y: module.p[1] },
+          rotation: module.r || 0,
+          layer: module.p[2] || 0,
+          params: {},
+          customText: module.t
+        }));
+        
+        set({
+          placedModules,
+          annotations: [],
+          layers: [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
+        });
+        return true;
+      }
       
       // Check if it's the new unified format with uc2_components
       if (parsed.uc2_components) {
@@ -612,52 +658,46 @@ export const useAppStore = create<AppStore>((set, get) => ({
   shareToGitHubDiscussions: async () => {
     const state = get();
     
-    // Create a minimal export for GitHub sharing to reduce URL length
-    const minimalExport = {
-      uc2_components: state.placedModules.map((module, index) => {
-        const moduleDefinition = state.modules.find(m => m.id === module.moduleId);
-        const baseName = moduleDefinition?.name.replace(/\s+/g, '_') || 'Unknown';
-        const runningNumber = index.toString().padStart(2, '0');
-        
-        return {
-          name: `${baseName}_${runningNumber}`,
-          moduleId: module.moduleId,
-          grid_pos: [module.position.x, module.position.y, module.layer],
-          rotation: [0, module.rotation, 0],
-          ...(module.customText && { customText: module.customText })
-        };
-      }),
-      metadata: {
-        version: "1.0",
-        created: new Date().toISOString(),
-        software: "OpenUC2 OptiKit"
-      }
+    // Create ultra-minimal export for GitHub sharing to avoid URL length limits
+    const compactExport = {
+      m: state.placedModules.map(module => ({
+        i: module.moduleId,
+        p: [module.position.x, module.position.y, module.layer],
+        r: module.rotation,
+        ...(module.customText && { t: module.customText })
+      }))
     };
     
-    // Create GitHub discussion URL with minimal JSON
-    const setup = JSON.stringify(minimalExport, null, 2);
-    const title = encodeURIComponent("New Optik‑setup from OpenUC2 OptiKit");
-    const body = encodeURIComponent("```json\n" + setup + "\n```");
+    // Create very compact JSON without formatting
+    const setup = JSON.stringify(compactExport);
+    const title = encodeURIComponent("OpenUC2 OptiKit Layout");
+    const body = encodeURIComponent(`Layout data (import via OptiKit):\n\`\`\`json\n${setup}\n\`\`\``);
     
-    // Check URL length and truncate if necessary
     const baseUrl = "https://github.com/youseetoo/youseetoo.github.io/discussions/new";
     const params = `?category=setups&title=${title}&body=${body}`;
     const fullUrl = baseUrl + params;
     
-    // GitHub URL limit is around 8192 characters, but we'll be conservative
-    if (fullUrl.length > 6000) {
-      // If still too long, use a simplified version
-      const simplifiedExport = {
-        modules: state.placedModules.map(m => ({
-          id: m.moduleId,
-          pos: [m.position.x, m.position.y, m.layer],
-          rot: m.rotation
-        }))
-      };
-      const simpleSetup = JSON.stringify(simplifiedExport);
-      const simpleBody = encodeURIComponent("OpenUC2 OptiKit Layout:\n```json\n" + simpleSetup + "\n```\n\nTo import: Copy the JSON and use the Import function in OptiKit.");
-      const finalUrl = baseUrl + `?category=setups&title=${title}&body=${simpleBody}`;
-      window.open(finalUrl, "_blank");
+    // Conservative URL length limit
+    if (fullUrl.length > 4000) {
+      // If still too long, use module count summary instead
+      const moduleCount: Record<string, number> = {};
+      state.placedModules.forEach(m => {
+        moduleCount[m.moduleId] = (moduleCount[m.moduleId] || 0) + 1;
+      });
+      
+      const summary = Object.entries(moduleCount)
+        .map(([id, count]) => `${id}: ${count}`)
+        .join(', ');
+      
+      const summaryBody = encodeURIComponent(
+        `OpenUC2 OptiKit Layout Summary:\n` +
+        `Modules: ${summary}\n` +
+        `Grid size: ${state.placedModules.length} components\n\n` +
+        `Note: Layout too large for URL sharing. Use Export/Import instead.`
+      );
+      
+      const summaryUrl = baseUrl + `?category=setups&title=${title}&body=${summaryBody}`;
+      window.open(summaryUrl, "_blank");
     } else {
       window.open(fullUrl, "_blank");
     }

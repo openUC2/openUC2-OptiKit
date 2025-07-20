@@ -108,3 +108,14 @@ export interface UC2Component {
   params?: Record<string, unknown>;
   customText?: string;
 }
+
+export interface CompactModule {
+  i: string; // moduleId
+  p: [number, number, number]; // position [x, y, layer]
+  r: number; // rotation
+  t?: string; // customText
+}
+
+export interface CompactExport {
+  m: CompactModule[];
+}
