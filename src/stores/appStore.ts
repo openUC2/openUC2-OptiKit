@@ -611,20 +611,56 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   shareToGitHubDiscussions: async () => {
     const state = get();
-    // Export without screenshot to reduce URL length
-    const setup = await state.exportDataWithScreenshot('');
     
-    // Create GitHub discussion URL with encoded JSON
+    // Create a minimal export for GitHub sharing to reduce URL length
+    const minimalExport = {
+      uc2_components: state.placedModules.map((module, index) => {
+        const moduleDefinition = state.modules.find(m => m.id === module.moduleId);
+        const baseName = moduleDefinition?.name.replace(/\s+/g, '_') || 'Unknown';
+        const runningNumber = index.toString().padStart(2, '0');
+        
+        return {
+          name: `${baseName}_${runningNumber}`,
+          moduleId: module.moduleId,
+          grid_pos: [module.position.x, module.position.y, module.layer],
+          rotation: [0, module.rotation, 0],
+          ...(module.customText && { customText: module.customText })
+        };
+      }),
+      metadata: {
+        version: "1.0",
+        created: new Date().toISOString(),
+        software: "OpenUC2 OptiKit"
+      }
+    };
+    
+    // Create GitHub discussion URL with minimal JSON
+    const setup = JSON.stringify(minimalExport, null, 2);
     const title = encodeURIComponent("New Optik‑setup from OpenUC2 OptiKit");
     const body = encodeURIComponent("```json\n" + setup + "\n```");
-    const url = 
-      "https://github.com/youseetoo/youseetoo.github.io/discussions/new" +
-      "?category=setups" +
-      "&title=" + title +
-      "&body=" + body;
     
-    // Open in new tab
-    window.open(url, "_blank");
+    // Check URL length and truncate if necessary
+    const baseUrl = "https://github.com/youseetoo/youseetoo.github.io/discussions/new";
+    const params = `?category=setups&title=${title}&body=${body}`;
+    const fullUrl = baseUrl + params;
+    
+    // GitHub URL limit is around 8192 characters, but we'll be conservative
+    if (fullUrl.length > 6000) {
+      // If still too long, use a simplified version
+      const simplifiedExport = {
+        modules: state.placedModules.map(m => ({
+          id: m.moduleId,
+          pos: [m.position.x, m.position.y, m.layer],
+          rot: m.rotation
+        }))
+      };
+      const simpleSetup = JSON.stringify(simplifiedExport);
+      const simpleBody = encodeURIComponent("OpenUC2 OptiKit Layout:\n```json\n" + simpleSetup + "\n```\n\nTo import: Copy the JSON and use the Import function in OptiKit.");
+      const finalUrl = baseUrl + `?category=setups&title=${title}&body=${simpleBody}`;
+      window.open(finalUrl, "_blank");
+    } else {
+      window.open(fullUrl, "_blank");
+    }
   },
 
   downloadSTLBundle: async (password: string) => {
