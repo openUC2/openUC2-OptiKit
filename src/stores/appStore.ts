@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { Octokit } from '@octokit/rest';
 import { loadModulesFromCSV } from '../utils/moduleLoader';
 import type { 
   AppState, 
@@ -60,7 +61,7 @@ interface AppStore extends AppState {
   checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => boolean;
   exportData: () => Promise<string>;
   exportDataWithScreenshot: (screenshotDataUrl?: string) => Promise<string>;
-  shareToGitHubDiscussions: () => void;
+  saveToGitHub: () => Promise<void>;
   generateShareableLink: () => string;
   downloadSTLBundle: (password: string) => Promise<void>;
   importData: (data: string) => void;
@@ -668,51 +669,91 @@ export const useAppStore = create<AppStore>((set, get) => ({
     window.dispatchEvent(event);
   },
 
-  shareToGitHubDiscussions: async () => {
+  saveToGitHub: async () => {
     const state = get();
     
-    // Create ultra-minimal export for GitHub sharing to avoid URL length limits
-    const compactExport = {
-      m: state.placedModules.map(module => ({
-        i: module.moduleId,
-        p: [module.position.x, module.position.y, module.layer],
-        r: module.rotation,
-        ...(module.customText && { t: module.customText })
-      }))
-    };
+    // Get GitHub configuration from user
+    const token = prompt(
+      'Enter your GitHub fine-grained personal access token:\n' +
+      '(Create one at: Settings → Developer settings → Personal access tokens → Fine-grained tokens)\n' +
+      'Required permissions: Repository contents (Read and write)'
+    );
     
-    // Create very compact JSON without formatting
-    const setup = JSON.stringify(compactExport);
-    const title = encodeURIComponent("OpenUC2 OptiKit Layout");
-    const body = encodeURIComponent(`Layout data (import via OptiKit):\n\`\`\`json\n${setup}\n\`\`\``);
+    if (!token) {
+      return; // User cancelled
+    }
     
-    const baseUrl = "https://github.com/youseetoo/youseetoo.github.io/discussions/new";
-    const params = `?category=setups&title=${title}&body=${body}`;
-    const fullUrl = baseUrl + params;
+    const owner = prompt('Enter GitHub username or organization:', 'youseetoo');
+    if (!owner) return;
     
-    // Conservative URL length limit
-    if (fullUrl.length > 4000) {
-      // If still too long, use module count summary instead
-      const moduleCount: Record<string, number> = {};
-      state.placedModules.forEach(m => {
-        moduleCount[m.moduleId] = (moduleCount[m.moduleId] || 0) + 1;
+    const repo = prompt('Enter repository name for storing setups:', 'optikit-setups');
+    if (!repo) return;
+    
+    const branch = prompt('Enter branch name (optional, leave empty for default):', 'main') || 'main';
+    
+    try {
+      // Initialize Octokit with the provided token
+      const octokit = new Octokit({
+        auth: token.trim()
       });
       
-      const summary = Object.entries(moduleCount)
-        .map(([id, count]) => `${id}: ${count}`)
-        .join(', ');
+      // Create export data
+      const exportData = await state.exportData();
+      const setup = JSON.parse(exportData);
       
-      const summaryBody = encodeURIComponent(
-        `OpenUC2 OptiKit Layout Summary:\n` +
-        `Modules: ${summary}\n` +
-        `Grid size: ${state.placedModules.length} components\n\n` +
-        `Note: Layout too large for URL sharing. Use Export/Import instead.`
+      // Generate filename with timestamp
+      const timestamp = Date.now();
+      const filename = `setup-${timestamp}.json`;
+      const path = `setups/${filename}`;
+      
+      // Encode content as base64
+      const content = btoa(JSON.stringify(setup, null, 2));
+      
+      // Create commit message
+      const message = `Add OpenUC2 OptiKit setup: ${setup.uc2_components?.length || 0} components`;
+      
+      // Save to GitHub repository
+      await octokit.request("PUT /repos/{owner}/{repo}/contents/{path}", {
+        owner,
+        repo,
+        path,
+        message,
+        content,
+        ...(branch !== 'main' && { branch })
+      });
+      
+      const fileUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+      
+      alert(
+        `✅ Setup saved to GitHub successfully!\n\n` +
+        `File: ${filename}\n` +
+        `View: ${fileUrl}\n` +
+        `Raw URL: ${rawUrl}\n\n` +
+        `You can import this setup using the raw URL.`
       );
       
-      const summaryUrl = baseUrl + `?category=setups&title=${title}&body=${summaryBody}`;
-      window.open(summaryUrl, "_blank");
-    } else {
-      window.open(fullUrl, "_blank");
+    } catch (error: unknown) {
+      console.error('GitHub save error:', error);
+      
+      let errorMessage = 'Failed to save to GitHub. ';
+      
+      if (error && typeof error === 'object' && 'status' in error) {
+        const githubError = error as { status: number; message?: string };
+        if (githubError.status === 401) {
+          errorMessage += 'Invalid or expired token. Please check your personal access token.';
+        } else if (githubError.status === 403) {
+          errorMessage += 'Permission denied. Ensure your token has "Repository contents" write permission.';
+        } else if (githubError.status === 404) {
+          errorMessage += 'Repository not found. Check the owner and repository name.';
+        } else {
+          errorMessage += `Error: ${githubError.message || 'Unknown error'}`;
+        }
+      } else {
+        errorMessage += `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+      
+      alert(errorMessage);
     }
   },
 

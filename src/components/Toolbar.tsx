@@ -38,7 +38,7 @@ export const Toolbar: React.FC = () => {
     grid, 
     setGridConfig, 
     exportData, 
-    shareToGitHubDiscussions,
+    saveToGitHub,
     generateShareableLink,
     downloadSTLBundle,
     importData, 
@@ -434,10 +434,10 @@ openUC2 team via GitHub repository
               <ClearIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Share to GitHub Discussions">
+          <Tooltip title="Save to GitHub Repository">
             <IconButton 
               color="inherit"
-              onClick={shareToGitHubDiscussions}
+              onClick={saveToGitHub}
               size="small"
             >
               <GitHubIcon />
