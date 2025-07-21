@@ -672,24 +672,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
   saveToGitHub: async () => {
     const state = get();
     
-    // Get GitHub configuration from user
-    const token = prompt(
-      'Enter your GitHub fine-grained personal access token:\n' +
-      '(Create one at: Settings → Developer settings → Personal access tokens → Fine-grained tokens)\n' +
-      'Required permissions: Repository contents (Read and write)'
+    // Hardcoded repository configuration
+    const owner = 'openUC2';
+    const repo = 'openUC2-OptiKit-Store';
+    const branch = 'main';
+    
+    // Get the last 7 characters of the token from user
+    const tokenSuffix = prompt(
+      'Enter the last 7 characters of your GitHub token:\n' +
+      '(Contact us via email to get the complete token)\n' +
+      'Format: ghp_5Ir5WQHupDfY5nuKaAoAGE3EI[XXXXXXX]'
     );
     
-    if (!token) {
+    if (!tokenSuffix) {
       return; // User cancelled
     }
     
-    const owner = prompt('Enter GitHub username or organization:', 'youseetoo');
-    if (!owner) return;
+    if (tokenSuffix.length !== 7) {
+      alert('Please enter exactly 7 characters for the token suffix.');
+      return;
+    }
     
-    const repo = prompt('Enter repository name for storing setups:', 'optikit-setups');
-    if (!repo) return;
-    
-    const branch = prompt('Enter branch name (optional, leave empty for default):', 'main') || 'main';
+    // Construct the complete token
+    const tokenPrefix = 'ghp_5Ir5WQHupDfY5nuKaAoAGE3EI';
+    const token = tokenPrefix + tokenSuffix;
     
     try {
       // Initialize Octokit with the provided token
@@ -719,7 +725,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         path,
         message,
         content,
-        ...(branch !== 'main' && { branch })
+        branch
       });
       
       const fileUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
