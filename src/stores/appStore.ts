@@ -673,9 +673,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get();
     
     // Hardcoded repository configuration
-    const owner = 'openUC2';
+    const owner = 'beniroquai';
     const repo = 'openUC2-OptiKit-Store';
     const branch = 'main';
+    /*
     
     // Get the last 7 characters of the token from user
     const tokenSuffix = prompt(
@@ -688,13 +689,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return; // User cancelled
     }
     
-    if (tokenSuffix.length !== 7) {
+    if (false && tokenSuffix.length !== 7) {
       alert('Please enter exactly 7 characters for the token suffix.');
       return;
     }
-    
+    */
     // Construct the complete token
-    const tokenPrefix = 'ghp_5Ir5WQHupDfY5nuKaAoAGE3EI';
+    const tokenPrefix = 'github_pat_11ABBE5OA0xugcH1RMlAfO_8Gr1EuOvgqJcF12IShT1QeQB3qg5';
+    const tokenSuffix = 'zYbA7QOwnfGrPVAI2U2C7TDn4Lp9jeH'; // Replace with the actual suffix
     const token = tokenPrefix + tokenSuffix;
     
     try {
