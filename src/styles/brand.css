@@ -1,0 +1,93 @@
+/* OpenUC2 Brand Colors and Styling */
+
+:root {
+  /* OpenUC2 Brand Colors - extracted from logo */
+  --openuc2-blue: #1e4670;
+  --openuc2-dark-blue: #0f2a47;
+  --openuc2-light-blue: #3d73a8;
+  --openuc2-green: #7cc142;
+  --openuc2-dark-green: #5fa32a;
+  --openuc2-teal: #4a9b8e;
+  --openuc2-light-gray: #f8f9fa;
+  --openuc2-gray: #6c757d;
+  --openuc2-dark-gray: #343a40;
+  
+  /* Application specific colors */
+  --primary-color: var(--openuc2-blue);
+  --secondary-color: var(--openuc2-green);
+  --accent-color: var(--openuc2-teal);
+  --text-color: var(--openuc2-dark-gray);
+  --background-color: var(--openuc2-light-gray);
+  --border-color: #e9ecef;
+  --hover-color: var(--openuc2-light-blue);
+  --active-color: var(--openuc2-dark-blue);
+  --grid-color: #ddd;
+  --grid-label-color: #666;
+}
+
+/* Global brand styling */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+}
+
+/* Button styling with brand colors */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--hover-color);
+  border-color: var(--hover-color);
+}
+
+.btn-primary:active,
+.btn-primary.active {
+  background-color: var(--active-color);
+  border-color: var(--active-color);
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: var(--openuc2-dark-green);
+  border-color: var(--openuc2-dark-green);
+}
+
+/* Brand accent elements */
+.brand-accent {
+  color: var(--accent-color);
+}
+
+.brand-primary {
+  color: var(--primary-color);
+}
+
+.brand-secondary {
+  color: var(--secondary-color);
+}
+
+/* Brand background utilities */
+.bg-brand-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.bg-brand-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.bg-brand-accent {
+  background-color: var(--accent-color);
+  color: white;
+}
