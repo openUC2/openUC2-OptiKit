@@ -104,12 +104,19 @@ export const GridCanvas: React.FC = () => {
       const stage = stageRef.current;
       if (!stage) return;
 
-      // Get the stage position
-      const stageBox = stage.container().getBoundingClientRect();
-      const pointerPos = {
+      // Get the stage position with more robust calculations for mobile
+      const stageContainer = stage.container();
+      const stageBox = stageContainer.getBoundingClientRect();
+      
+      // Account for any parent container offsets
+      let pointerPos = {
         x: x - stageBox.left,
         y: y - stageBox.top
       };
+
+      // Ensure coordinates are within bounds
+      pointerPos.x = Math.max(0, Math.min(pointerPos.x, stageBox.width));
+      pointerPos.y = Math.max(0, Math.min(pointerPos.y, stageBox.height));
 
       // Transform the pointer position based on current viewport
       const transformedPos = {
@@ -120,7 +127,14 @@ export const GridCanvas: React.FC = () => {
       const snappedPos = snapToGrid(transformedPos);
       const gridPos = pixelToGrid(snappedPos);
       
-      placeModule(moduleId, gridPos, currentLayerIndex);
+      // Ensure grid position is valid (within bounds)
+      if (gridPos.x >= 0 && gridPos.x < GRID_SIZE && gridPos.y >= 0 && gridPos.y < GRID_SIZE) {
+        placeModule(moduleId, gridPos, currentLayerIndex);
+        
+        // Visual feedback for successful placement on mobile
+        const successEvent = new CustomEvent('module-placed-success');
+        window.dispatchEvent(successEvent);
+      }
     };
 
     window.addEventListener('resize', updateSize);
@@ -406,7 +420,13 @@ export const GridCanvas: React.FC = () => {
 
   return (
     <div
-      style={{ width: '100%', height: '100%' }}
+      style={{ 
+        width: '100%', 
+        height: '100%',
+        touchAction: 'none', // Prevent default touch behaviors
+        WebkitUserSelect: 'none',
+        userSelect: 'none'
+      }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >

@@ -24,19 +24,23 @@ import { useAppStore } from '../stores/appStore';
 export const Layout: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(!isMobile);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(!isMobile);
   const { activeRightTab, setActiveRightTab } = useAppStore();
 
   useEffect(() => {
-    // Always show sidebars when switching to desktop
-    if (!isMobile) {
+    // On mobile, close sidebars by default for better canvas space
+    if (isMobile) {
+      setLeftSidebarOpen(false);
+      setRightSidebarOpen(false);
+    } else {
+      // Always show sidebars when switching to desktop
       setLeftSidebarOpen(true);
       setRightSidebarOpen(true);
     }
   }, [isMobile]);
 
-  const sidebarWidth = 400;
+  const sidebarWidth = isMobile ? Math.min(350, window.innerWidth * 0.85) : 400;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -50,19 +54,35 @@ export const Layout: React.FC = () => {
           sx={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            p: 1, 
-            borderRadius: 0 
+            p: 1.5, 
+            borderRadius: 0,
+            bgcolor: 'primary.main',
+            color: 'white'
           }}
         >
           <IconButton 
             onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-            color="primary"
+            sx={{ 
+              color: 'white',
+              minWidth: 48,
+              minHeight: 48,
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
           >
             <PartsIcon />
           </IconButton>
           <IconButton 
             onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-            color="primary"
+            sx={{ 
+              color: 'white',
+              minWidth: 48,
+              minHeight: 48,
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
           >
             <SettingsIcon />
           </IconButton>

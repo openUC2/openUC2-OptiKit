@@ -29,6 +29,18 @@ export const PartLibrary: React.FC = () => {
 
   useEffect(() => {
     loadModules();
+    
+    // Listen for successful module placement feedback
+    const handlePlacementSuccess = () => {
+      // Visual feedback can be added here if needed
+      console.log('Module placed successfully');
+    };
+    
+    window.addEventListener('module-placed-success', handlePlacementSuccess);
+    
+    return () => {
+      window.removeEventListener('module-placed-success', handlePlacementSuccess);
+    };
   }, [loadModules]);
 
   const filteredModules = modules.filter(module => {
@@ -52,59 +64,109 @@ export const PartLibrary: React.FC = () => {
   // Touch support for mobile devices with long press
   const handleTouchStart = (e: React.TouchEvent, moduleId: string) => {
     const target = e.currentTarget as HTMLElement;
+    // Prevent default to avoid scrolling
+    e.preventDefault();
+    
     // Start long press timer
     longPressTimeout.current = window.setTimeout(() => {
       isDragging.current = true;
       target.dataset.moduleId = moduleId;
-      // Visual feedback
-      target.style.opacity = '0.7';
-      target.style.transform = 'scale(0.95)';
-    }, 350); // 350ms long press
+      // Visual feedback with better mobile styling
+      target.style.opacity = '0.8';
+      target.style.transform = 'scale(1.05)';
+      target.style.zIndex = '1000';
+      target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
+      
+      // Add haptic feedback if available
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50);
+      }
+    }, 300); // Reduced to 300ms for better responsiveness
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging.current) return; // Only drag after long press
+    if (!isDragging.current) {
+      // Clear timeout if moving before long press completes
+      if (longPressTimeout.current) {
+        window.clearTimeout(longPressTimeout.current);
+        longPressTimeout.current = null;
+      }
+      return;
+    }
+    
     e.preventDefault();
     const touch = e.touches[0];
     const target = e.currentTarget as HTMLElement;
     
+    // Update position to follow finger
+    const rect = target.getBoundingClientRect();
+    target.style.position = 'fixed';
+    target.style.left = `${touch.clientX - rect.width / 2}px`;
+    target.style.top = `${touch.clientY - rect.height / 2}px`;
+    target.style.pointerEvents = 'none';
+    
     // Check if we're over the canvas
-    const canvasElement = document.querySelector('.layout-canvas');
+    const canvasElement = document.querySelector('.MuiBox-root:has(.konvajs-content)') || 
+                         document.querySelector('.konvajs-content')?.parentElement;
     if (canvasElement) {
-      const rect = canvasElement.getBoundingClientRect();
-      const isOverCanvas = touch.clientX >= rect.left && 
-                          touch.clientX <= rect.right && 
-                          touch.clientY >= rect.top && 
-                          touch.clientY <= rect.bottom;
+      const canvasRect = canvasElement.getBoundingClientRect();
+      const isOverCanvas = touch.clientX >= canvasRect.left && 
+                          touch.clientX <= canvasRect.right && 
+                          touch.clientY >= canvasRect.top && 
+                          touch.clientY <= canvasRect.bottom;
       if (isOverCanvas) {
-        target.style.opacity = '0.5';
+        target.style.opacity = '0.6';
+        target.style.boxShadow = '0 8px 25px rgba(46, 204, 113, 0.4)';
       } else {
-        target.style.opacity = '0.7';
+        target.style.opacity = '0.8';
+        target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
       }
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (longPressTimeout.current) window.clearTimeout(longPressTimeout.current);
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+    
     const target = e.currentTarget as HTMLElement;
-    if (!isDragging.current) return; // Only drop if drag was started
+    
+    if (!isDragging.current) return;
+    
     isDragging.current = false;
     e.preventDefault();
+    
     const touch = e.changedTouches[0];
     const moduleId = target.dataset.moduleId;
+    
     // Reset visual feedback
     target.style.opacity = '1';
     target.style.transform = 'scale(1)';
+    target.style.position = 'relative';
+    target.style.left = 'auto';
+    target.style.top = 'auto';
+    target.style.zIndex = 'auto';
+    target.style.boxShadow = '';
+    target.style.pointerEvents = 'auto';
+    
     if (!moduleId) return;
+    
     // Check if we're over the canvas
-    const canvasElement = document.querySelector('.layout-canvas');
+    const canvasElement = document.querySelector('.MuiBox-root:has(.konvajs-content)') || 
+                         document.querySelector('.konvajs-content')?.parentElement;
     if (canvasElement) {
-      const rect = canvasElement.getBoundingClientRect();
-      const isOverCanvas = touch.clientX >= rect.left && 
-                          touch.clientX <= rect.right && 
-                          touch.clientY >= rect.top && 
-                          touch.clientY <= rect.bottom;
+      const canvasRect = canvasElement.getBoundingClientRect();
+      const isOverCanvas = touch.clientX >= canvasRect.left && 
+                          touch.clientX <= canvasRect.right && 
+                          touch.clientY >= canvasRect.top && 
+                          touch.clientY <= canvasRect.bottom;
       if (isOverCanvas) {
+        // Provide haptic feedback for successful drop
+        if ('vibrate' in navigator) {
+          navigator.vibrate([30, 30, 30]);
+        }
+        
         // Simulate a drop event
         const dropEvent = new CustomEvent('mobile-drop', {
           detail: {
@@ -118,9 +180,24 @@ export const PartLibrary: React.FC = () => {
     }
   };
 
-  const handleTouchCancel = () => {
-    if (longPressTimeout.current) window.clearTimeout(longPressTimeout.current);
+  const handleTouchCancel = (e: React.TouchEvent) => {
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+    
+    const target = e.currentTarget as HTMLElement;
     isDragging.current = false;
+    
+    // Reset visual state
+    target.style.opacity = '1';
+    target.style.transform = 'scale(1)';
+    target.style.position = 'relative';
+    target.style.left = 'auto';
+    target.style.top = 'auto';
+    target.style.zIndex = 'auto';
+    target.style.boxShadow = '';
+    target.style.pointerEvents = 'auto';
   };
 
   const renderModuleTile = (module: ModuleDefinition) => {
@@ -131,14 +208,26 @@ export const PartLibrary: React.FC = () => {
           cursor: 'grab',
           position: 'relative',
           height: 120,
-          transition: 'all 0.2s ease',
+          transition: 'all 0.15s ease',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          touchAction: 'manipulation',
           '&:hover': {
             transform: 'translateY(-2px)',
             boxShadow: 3,
           },
           '&:active': {
             cursor: 'grabbing',
-            transform: 'scale(0.95)',
+            transform: 'scale(0.98)',
+          },
+          // Mobile-specific styles
+          '@media (max-width: 768px)': {
+            height: 100,
+            minHeight: 44, // Minimum touch target size
+            '&:active': {
+              transform: 'scale(0.95)',
+            },
           },
         }}
         draggable

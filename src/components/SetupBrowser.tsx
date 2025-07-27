@@ -326,27 +326,71 @@ export const SetupBrowser: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ height: '100vh', overflow: 'auto', pb: 4 }}>
+    <Container 
+      maxWidth="lg" 
+      sx={{ 
+        height: '100vh', 
+        overflow: 'auto', 
+        pb: 4,
+        // Mobile-specific styles
+        '@media (max-width: 768px)': {
+          px: 1,
+          pb: 8, // Extra padding for mobile
+        }
+      }}
+    >
       <Box py={4}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Box 
+          display="flex" 
+          flexDirection={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between" 
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          gap={2}
+          mb={4}
+        >
           <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
+            <Typography 
+              variant="h4" 
+              component="h1" 
+              gutterBottom
+              sx={{
+                fontSize: { xs: '1.75rem', sm: '2.125rem' },
+              }}
+            >
               Optical Setup Browser
             </Typography>
             <Typography variant="body1" color="text.secondary">
               Browse and load pre-built optical configurations from the openUC2 community
             </Typography>
           </Box>
-          <Box display="flex" gap={1}>
+          <Box 
+            display="flex" 
+            gap={1}
+            flexDirection={{ xs: 'column', sm: 'row' }}
+            width={{ xs: '100%', sm: 'auto' }}
+          >
             <Button 
               variant="outlined" 
               startIcon={<RefreshIcon />}
               onClick={fetchSetups}
               disabled={loading}
+              fullWidth
+              sx={{
+                minHeight: { xs: 44, sm: 'auto' },
+                display: { xs: 'block', sm: 'inline-flex' }
+              }}
             >
               Refresh
             </Button>
-            <Button variant="outlined" onClick={() => navigate('/')}>
+            <Button 
+              variant="outlined" 
+              onClick={() => navigate('/')}
+              fullWidth
+              sx={{
+                minHeight: { xs: 44, sm: 'auto' },
+                display: { xs: 'block', sm: 'inline-flex' }
+              }}
+            >
               Back to Editor
             </Button>
           </Box>
@@ -355,8 +399,12 @@ export const SetupBrowser: React.FC = () => {
         <Box 
           sx={{ 
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: 3
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(auto-fill, minmax(280px, 1fr))',
+              md: 'repeat(auto-fill, minmax(300px, 1fr))'
+            },
+            gap: { xs: 2, sm: 3 }
           }}
         >
           {setups.map((setup, index) => (
@@ -367,10 +415,23 @@ export const SetupBrowser: React.FC = () => {
                   display: 'flex', 
                   flexDirection: 'column',
                   cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  minHeight: { xs: 280, sm: 320 },
+                  touchAction: 'manipulation',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
+                  },
+                  '&:active': {
+                    transform: { xs: 'scale(0.98)', sm: 'translateY(-4px) scale(0.98)' },
+                  },
+                  '@media (max-width: 768px)': {
+                    '&:hover': {
+                      transform: 'none',
+                      boxShadow: 'inherit',
+                    },
                   }
                 }}
                 onClick={() => handleSetupClick(setup)}
