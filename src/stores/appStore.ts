@@ -160,10 +160,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const moduleDefinition = state.modules.find(m => m.id === moduleId);
     if (!moduleDefinition) return;
 
-    // Check for collision
-    if (state.checkCollision(position, moduleDefinition.footprint, layer)) {
-      return; // Cannot place due to collision
-    }
+    // Allow modules to be placed at the same location - no collision checking
 
     // Save current state to history
     state.pushToHistory({
@@ -199,10 +196,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const moduleDefinition = state.modules.find(m => m.id === module.moduleId);
     if (!moduleDefinition) return;
 
-    // Check for collision (excluding the module being moved)
-    if (state.checkCollision(position, moduleDefinition.footprint, module.layer, moduleId)) {
-      return;
-    }
+    // Allow modules to be moved to the same location as other modules - no collision checking
 
     // Save current state to history
     state.pushToHistory({
@@ -226,18 +220,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           const moduleDefinition = state.modules.find(mod => mod.id === m.moduleId);
           if (!moduleDefinition) return m;
           
-          // Calculate new footprint after rotation
-          const currentFootprint = moduleDefinition.footprint;
-          const isRotated90or270 = rotation === 90 || rotation === 270;
-          const newFootprint = isRotated90or270 ? 
-            { width: currentFootprint.height, height: currentFootprint.width } : 
-            { width: currentFootprint.width, height: currentFootprint.height };
-          
-          // Check if the rotated module would collide
-          if (state.checkCollision(m.position, newFootprint, m.layer, moduleId)) {
-            return m; // Don't rotate if it would cause collision
-          }
-          
+          // Allow rotation even if it would overlap with other modules
           return { ...m, rotation };
         }
         return m;
