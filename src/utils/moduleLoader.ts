@@ -40,7 +40,9 @@ function addConfiguratorPrefix(path: string | undefined): string | undefined {
 export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
   let defaultParams = {};
   try {
-    defaultParams = JSON.parse(row.defaultParams);
+    // Handle escaped quotes in CSV (replace "" with ")
+    const cleanedParams = row.defaultParams.replace(/""/g, '"');
+    defaultParams = JSON.parse(cleanedParams);
   } catch {
     console.warn(`Invalid defaultParams for module ${row.id}:`, row.defaultParams);
   }

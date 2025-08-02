@@ -52,6 +52,7 @@ interface AppStore extends AppState {
   rotateModule: (moduleId: string, rotation: number) => void;
   removeModule: (moduleId: string) => void;
   updateModuleCustomText: (moduleId: string, customText: string) => void;
+  updateModuleParams: (moduleId: string, params: Record<string, unknown>) => void;
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
   moveAnnotation: (annotationId: string, position: Point) => void;
   removeAnnotation: (annotationId: string) => void;
@@ -249,6 +250,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set(state => ({
       placedModules: state.placedModules.map(m => 
         m.id === moduleId ? { ...m, customText } : m
+      )
+    }));
+  },
+
+  updateModuleParams: (moduleId: string, params: Record<string, unknown>) => {
+    set(state => ({
+      placedModules: state.placedModules.map(m => 
+        m.id === moduleId ? { ...m, params: { ...m.params, ...params } } : m
       )
     }));
   },

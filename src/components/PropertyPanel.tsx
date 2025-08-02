@@ -6,7 +6,6 @@ import {
   CardContent,
   Button,
   TextField,
-  Chip,
   Paper,
   FormControl,
   InputLabel,
@@ -40,6 +39,7 @@ export const PropertyPanel: React.FC = () => {
     removeAnnotation,
     rotateModule,
     updateModuleCustomText,
+    updateModuleParams,
     updateSetupMetadata,
     exportData
   } = useAppStore();
@@ -339,13 +339,36 @@ export const PropertyPanel: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 Parameters
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {Object.entries(module.params).map(([key, value]) => (
-                  <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="caption" color="textSecondary">{key}</Typography>
-                    <Chip label={String(value)} size="small" variant="outlined" />
-                  </Box>
-                ))}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {Object.entries(module.params).map(([key, value]) => {
+                  const handleParamChange = (newValue: string) => {
+                    // Try to parse as number if possible, otherwise keep as string
+                    let parsedValue: unknown = newValue;
+                    if (!isNaN(Number(newValue)) && newValue.trim() !== '') {
+                      parsedValue = Number(newValue);
+                    } else if (newValue.toLowerCase() === 'true') {
+                      parsedValue = true;
+                    } else if (newValue.toLowerCase() === 'false') {
+                      parsedValue = false;
+                    }
+                    
+                    updateModuleParams(module.id, { [key]: parsedValue });
+                  };
+
+                  return (
+                    <Box key={key}>
+                      <TextField
+                        label={key}
+                        fullWidth
+                        size="small"
+                        value={String(value)}
+                        onChange={(e) => handleParamChange(e.target.value)}
+                        variant="outlined"
+                        helperText={typeof value === 'number' ? 'Numeric value' : 'Text value'}
+                      />
+                    </Box>
+                  );
+                })}
               </Box>
             </CardContent>
           </Card>
