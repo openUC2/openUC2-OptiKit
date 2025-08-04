@@ -324,7 +324,7 @@ export const PartLibrary: React.FC = () => {
   };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box data-tour="part-library" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Paper elevation={1} sx={{ p: 2, borderRadius: 0 }}>
         <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>

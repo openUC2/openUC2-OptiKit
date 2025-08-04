@@ -29,6 +29,8 @@
     "@mui/icons-material": "^7.2.0",
     "@mui/material": "^7.2.0",
     "@octokit/rest": "^22.0.0",
+    "@types/intro.js": "^5.1.5",
+    "intro.js": "^8.3.2",
     "jszip": "^3.10.1",
     "konva": "^9.3.22",
     "react": "^19.1.0",

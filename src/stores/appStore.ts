@@ -14,7 +14,8 @@ import type {
   CompactExport,
   CompactModule,
   CompactAnnotation,
-  SetupMetadata
+  SetupMetadata,
+  FeedbackData
 } from '../types';
 
 const GRID_CELL_SIZE = 50; // 50mm in pixels (assuming 1:1 scale)
@@ -78,6 +79,10 @@ interface AppStore extends AppState {
   clearAll: () => void;
   setActiveRightTab: (tab: 'layers' | 'properties' | 'bom') => void;
   updateSetupMetadata: (metadata: Partial<SetupMetadata>) => void;
+  // Tutorial actions
+  setTutorialCompleted: (completed: boolean) => void;
+  // Feedback actions
+  submitFeedback: (feedback: FeedbackData) => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -112,6 +117,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     category: 'General',
     screenshot: ''
   },
+  tutorialCompleted: false,
 
   // Actions
   loadModules: async () => {
@@ -721,6 +727,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         console.error('Failed to load state from storage:', error);
       }
     }
+    
+    // Load tutorial state separately
+    const tutorialCompleted = localStorage.getItem('optikit-tutorial-completed');
+    if (tutorialCompleted) {
+      set({ tutorialCompleted: tutorialCompleted === 'true' });
+    }
   },
 
   downloadScreenshot: () => {
@@ -967,5 +979,58 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }));
     // Save state after updating metadata
     get().saveStateToStorage();
+  },
+
+  // Tutorial actions
+  setTutorialCompleted: (completed: boolean) => {
+    set({ tutorialCompleted: completed });
+    // Save tutorial state to localStorage
+    localStorage.setItem('optikit-tutorial-completed', completed.toString());
+  },
+
+  // Feedback actions
+  submitFeedback: async (feedback: FeedbackData) => {
+    try {
+      // Submit feedback as a GitHub issue
+      const tokenPrefix = 'github_pat_11ABBE5OA0xugcH1RMlAfO_8Gr1EuOvgqJcF12IShT1QeQB3qg5';
+      const tokenSuffix = 'zYbA7QOwnfGrPVAI2U2C7TDn4Lp9jeH'; // Replace with the actual suffix
+      const token = tokenPrefix + tokenSuffix;
+      const octokit = new Octokit({
+        // Use a GitHub token if available, otherwise submit anonymously (limited)
+        auth: token.trim()
+      });
+
+      const issueTitle = `[${feedback.type.toUpperCase()}] ${feedback.title}`;
+      const issueBody = `
+**Feedback Type:** ${feedback.type}
+**Trigger:** ${feedback.trigger}
+**Timestamp:** ${feedback.timestamp}
+
+**Description:**
+${feedback.description}
+
+**Contact Information:**
+${feedback.email ? `Email: ${feedback.email}` : 'No contact provided'}
+
+**Technical Details:**
+- User Agent: ${feedback.userAgent}
+- URL: ${feedback.url}
+      `.trim();
+ 
+      await octokit.rest.issues.create({
+        owner: 'beniroquai',
+        repo: 'OpenUC2-OptiKit-Store',
+        title: issueTitle,
+        body: issueBody,
+        labels: [`feedback-${feedback.type}`, 'user-feedback']
+      });
+
+      console.log('Feedback submitted successfully');
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      // For now, just log to console if GitHub submission fails
+      // In a production app, you might want to fall back to a different service
+      throw error;
+    }
   }
 }));

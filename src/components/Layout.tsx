@@ -19,6 +19,7 @@ import { LayerPanel } from './LayerPanel';
 import { PropertyPanel } from './PropertyPanel';
 import { BOMPanel } from './BOMPanel';
 import { Toolbar } from './Toolbar';
+import { Tutorial } from './Tutorial';
 import { useAppStore } from '../stores/appStore';
 
 export const Layout: React.FC = () => {
@@ -27,6 +28,7 @@ export const Layout: React.FC = () => {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(!isMobile);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(!isMobile);
   const { activeRightTab, setActiveRightTab } = useAppStore();
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
 
   useEffect(() => {
     // On mobile, close sidebars by default for better canvas space
@@ -40,12 +42,39 @@ export const Layout: React.FC = () => {
     }
   }, [isMobile]);
 
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setShowMobileWarning(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const sidebarWidth = isMobile ? Math.min(350, window.innerWidth * 0.85) : 400;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Toolbar */}
       <Toolbar />
+      
+      {/* Mobile Warning Banner */}
+      {showMobileWarning && (
+        <Box sx={{
+          background: '#e74c3c',
+          color: 'white',
+          padding: '12px',
+          textAlign: 'center',
+          fontWeight: 'bold',
+          zIndex: 1000,
+        }}>
+          ⚠️ This application is currently not supported on smartphones. For the best experience, please use a desktop or tablet.<br />
+          <button style={{ marginTop: 8, background: 'white', color: '#e74c3c', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setShowMobileWarning(false)}>
+            Dismiss
+          </button>
+        </Box>
+      )}
       
       {/* Mobile Controls */}
       {isMobile && (
@@ -116,6 +145,7 @@ export const Layout: React.FC = () => {
         {/* Canvas */}
         <Box 
           component="main"
+          data-tour="canvas"
           sx={{ 
             flexGrow: 1, 
             display: 'flex', 
@@ -153,9 +183,9 @@ export const Layout: React.FC = () => {
               variant="fullWidth"
               sx={{ borderBottom: 1, borderColor: 'divider' }}
             >
-              <Tab label="Layers" value="layers" />
-              <Tab label="Properties" value="properties" />
-              <Tab label="BOM" value="bom" />
+              <Tab label="Layers" value="layers" data-tour="layers-tab" />
+              <Tab label="Properties" value="properties" data-tour="properties-tab" />
+              <Tab label="BOM" value="bom" data-tour="bom-tab" />
             </Tabs>
             
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
@@ -166,6 +196,9 @@ export const Layout: React.FC = () => {
           </Box>
         </Drawer>
       </Box>
+      
+      {/* Tutorial Component */}
+      <Tutorial />
     </Box>
   );
 };

@@ -36,11 +36,15 @@ import {
   Edit as EditorIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { FeedbackDialog } from './FeedbackDialog';
 
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isEditorPage = location.pathname === '/';
+  
+  const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+  const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
   
   const { 
     grid, 
@@ -81,6 +85,10 @@ export const Toolbar: React.FC = () => {
           const writable = await fileHandle.createWritable();
           await writable.write(data);
           await writable.close();
+          
+          // Trigger feedback dialog after successful download
+          setFeedbackTrigger('download');
+          setFeedbackOpen(true);
         } catch (error) {
           // User cancelled or error occurred
           console.log('Save cancelled or failed:', error);
@@ -99,6 +107,10 @@ export const Toolbar: React.FC = () => {
       a.download = filename.endsWith('.json') ? filename : filename + '.json';
       a.click();
       URL.revokeObjectURL(url);
+      
+      // Trigger feedback dialog after download
+      setFeedbackTrigger('download');
+      setFeedbackOpen(true);
     }
   };
 
@@ -125,8 +137,15 @@ Best regards`;
     document.body.removeChild(link);
   };
 
-  const handleSaveToGitHub = () => {
-    saveToGitHub();
+  const handleSaveToGitHub = async () => {
+    try {
+      await saveToGitHub();
+      // Trigger feedback dialog after successful GitHub save
+      setFeedbackTrigger('github');
+      setFeedbackOpen(true);
+    } catch (error) {
+      console.error('Failed to save to GitHub:', error);
+    }
   };
 
   const handleExportSTL = () => {
@@ -139,7 +158,12 @@ Best regards`;
   };
 
   const handleHelp = () => {
-    const helpContent = `
+    // Check if tutorial restart function is available
+    if ((window as any).restartTutorial) {
+      (window as any).restartTutorial();
+    } else {
+      // Fallback to showing help text
+      const helpContent = `
 OpenUC2 OptiKit - 2D Grid Builder Help
 
 BASIC USAGE:
@@ -169,9 +193,12 @@ SHORTCUTS:
 • Grid toggle: Show/hide grid lines
 • Snap toggle: Enable/disable snap-to-grid
 • Undo/Redo: Navigate through changes
+
+Click this Help button again to restart the tutorial!
 `;
-    
-    alert(helpContent);
+      
+      alert(helpContent);
+    }
   };
 
   const handlePrivacy = () => {
@@ -387,46 +414,49 @@ openUC2 team via GitHub repository
           <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
           
           {/* Annotation Tools */}
-          <Tooltip title="Draw Line">
-            <IconButton 
-              color={annotationMode === 'line' ? "secondary" : "inherit"}
-              onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
-              size="small"
-            >
-              <LineIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Draw Arrow">
-            <IconButton 
-              color={annotationMode === 'arrow' ? "secondary" : "inherit"}
-              onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
-              size="small"
-            >
-              <ArrowIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Draw Optical Axis">
-            <IconButton 
-              color={annotationMode === 'optical-axis' ? "secondary" : "inherit"}
-              onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
-              size="small"
-            >
-              <OpticalAxisIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Add Text">
-            <IconButton 
-              color={annotationMode === 'text' ? "secondary" : "inherit"}
-              onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
+          <Box data-tour="toolbar-drawing" sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Draw Line">
+              <IconButton 
+                color={annotationMode === 'line' ? "secondary" : "inherit"}
+                onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
+                size="small"
+              >
+                <LineIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Draw Arrow">
+              <IconButton 
+                color={annotationMode === 'arrow' ? "secondary" : "inherit"}
+                onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
+                size="small"
+              >
+                <ArrowIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Draw Optical Axis">
+              <IconButton 
+                color={annotationMode === 'optical-axis' ? "secondary" : "inherit"}
+                onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
+                size="small"
+              >
+                <OpticalAxisIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Add Text">
+              <IconButton 
+                color={annotationMode === 'text' ? "secondary" : "inherit"}
+                onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
               size="small"
             >
               <TextIcon />
             </IconButton>
           </Tooltip>
+          </Box>
 
           <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
           {/* File Operations */}
+          <Box data-tour="toolbar-actions" sx={{ display: 'flex', gap: 0.5 }}>
           <Tooltip title="Save Layout As...">
             <IconButton 
               color="inherit"
@@ -508,6 +538,7 @@ openUC2 team via GitHub repository
               <ClearIcon />
             </IconButton>
           </Tooltip>
+          </Box>
         </Box>
           </>
         )}
@@ -541,6 +572,13 @@ openUC2 team via GitHub repository
           </Typography>
         </Box>
       </MuiToolbar>
+      
+      {/* Feedback Dialog */}
+      <FeedbackDialog 
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        trigger={feedbackTrigger}
+      />
     </AppBar>
   );
 };

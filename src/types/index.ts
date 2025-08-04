@@ -86,6 +86,17 @@ export interface SetupMetadata {
   screenshot: string;
 }
 
+export interface FeedbackData {
+  type: 'bug' | 'feature' | 'improvement' | 'other';
+  title: string;
+  description: string;
+  email?: string;
+  trigger: 'download' | 'github' | 'manual';
+  timestamp: string;
+  userAgent: string;
+  url: string;
+}
+
 export interface AppState {
   modules: ModuleDefinition[];
   placedModules: PlacedModule[];
@@ -102,6 +113,8 @@ export interface AppState {
   setupMetadata: SetupMetadata;
   // UI state
   activeRightTab: 'layers' | 'properties' | 'bom';
+  // Tutorial state
+  tutorialCompleted: boolean;
 }
 
 export interface Command {
