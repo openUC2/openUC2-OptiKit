@@ -28,6 +28,7 @@ export const Layout: React.FC = () => {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(!isMobile);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(!isMobile);
   const { activeRightTab, setActiveRightTab } = useAppStore();
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
 
   useEffect(() => {
     // On mobile, close sidebars by default for better canvas space
@@ -41,12 +42,39 @@ export const Layout: React.FC = () => {
     }
   }, [isMobile]);
 
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setShowMobileWarning(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const sidebarWidth = isMobile ? Math.min(350, window.innerWidth * 0.85) : 400;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Toolbar */}
       <Toolbar />
+      
+      {/* Mobile Warning Banner */}
+      {showMobileWarning && (
+        <Box sx={{
+          background: '#e74c3c',
+          color: 'white',
+          padding: '12px',
+          textAlign: 'center',
+          fontWeight: 'bold',
+          zIndex: 1000,
+        }}>
+          ⚠️ This application is currently not supported on smartphones. For the best experience, please use a desktop or tablet.<br />
+          <button style={{ marginTop: 8, background: 'white', color: '#e74c3c', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setShowMobileWarning(false)}>
+            Dismiss
+          </button>
+        </Box>
+      )}
       
       {/* Mobile Controls */}
       {isMobile && (
