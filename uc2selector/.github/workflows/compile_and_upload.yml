@@ -1,0 +1,27 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+  
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+      
+    - name: Push to the youseetoo Repository for displaying at https://youseetoo.github.io/uc2-selector
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB_YOUSEETOO }}
+      with:
+        source-directory: '.'
+        destination-github-username: 'youseetoo'
+        destination-repository-name: 'youseetoo.github.io'
+        target-directory: 'uc2-selector'
+        user-email: 'bene.d@gmx.de'
+        target-branch: 'main'
+        commit-message: 'Deploy React app build'

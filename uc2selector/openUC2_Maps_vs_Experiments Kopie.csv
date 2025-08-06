@@ -1,0 +1,42 @@
+;;;;;;;;Experiments;;;;
+;;;;;;;;Smartphone Microscope;Telescope (Galilei;Fluo LED;Projector;Infinity-corrected Microscope
+;;;;;;;Description;This exerpiment produces a smartphone microsocpe;A cool telescope ;use it for green;This projects a microscopic sample on the wall;This is a microscope that uses infinity space and a motirzed zstage
+;;Link;Description;Price;Image URL;;Image URL;https://openuc2.com;https://openuc2.com;https://openuc2.com;https://openuc2.com;https://openuc2.com
+Boxes;coreBOX;https://openuc2.com;blabla;100;https://openuc2.com;;;x;x;x;x;x
+;electronicsOX;https://openuc2.com;blabla;100;https://openuc2.com;;;;;x;;x
+;infinityBOX;https://openuc2.com;blabla;100;https://openuc2.com;;;;;x;;x
+;FluoBOX (LED);https://openuc2.com;blabla;100;https://openuc2.com;;;;;x;;
+;FluoBOX (LASER);https://openuc2.com;blabla;100;https://openuc2.com;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+;;;;;;;;;;;;
+Modules ;Empty Cube;;blabla;100;https://openuc2.com;;;2;2;1;1;1
+;Puzzle Piece;;blabla;100;https://openuc2.com;;;9;8;20;6;10
+;Mirror 45¡;;blabla;100;https://openuc2.com;;;2;;;;
+;Z-stage Manual;;blabla;100;https://openuc2.com;;;1;;;;
+;Eyepiece;;blabla;100;https://openuc2.com;;;1;;;;
+;smartphone adapter;;blabla;100;https://openuc2.com;;;1;;;;
+;Torch Adapter ;;blabla;100;https://openuc2.com;;;1;;;1;
+;Sample Holder ;;blabla;100;https://openuc2.com;;;1;;1;1;1
+;Lens (50mm);;blabla;100;https://openuc2.com;;;;1;;;
+;Lens (100mm);;blabla;100;https://openuc2.com;;;;;1;;
+;Lens (-50mm);;blabla;100;https://openuc2.com;;;;1;;;
+;Dichroic (520);;blabla;100;https://openuc2.com;;;;;1;;
+;CCTV 100m Lens;;blabla;100;https://openuc2.com;;;;;1;;1
+;HIK Camera (IMX 178);;blabla;100;https://openuc2.com;;;;;1;;1
+;Z-Stage Electro;;blabla;100;https://openuc2.com;;;;;1;;1
+;Electro v3 ;;blabla;100;https://openuc2.com;;;;;1;;1
+;LED Matrix ;;blabla;100;https://openuc2.com;;;;;1;;1
+;aspheric lens ;;blabla;100;https://openuc2.com;;;;;1;;
