@@ -184,20 +184,19 @@ export const CollectionView: React.FC = () => {
 
   const handleSetupClick = async (setup: SetupAnalysisData) => {
     try {
-      // For now, we'll create a temporary JSON URL based on the setup data
-      // In a real implementation, this would come from the actual setup file
-      const setupData = {
-        name: setup.name,
-        description: setup.description,
-        category: setup.category,
-        collection: setup.collection,
-        author: setup.author,
-        github_link: setup.github_link,
-        m: [] // This would contain the actual module placements
-      };
-
-      const dataUrl = 'data:application/json;base64,' + btoa(JSON.stringify(setupData));
-      const success = await importFromUrl(dataUrl);
+      // Convert GitHub blob URL to raw URL for direct JSON loading
+      let setupUrl = '';
+      
+      if (setup.filename.startsWith('http')) {
+        // If filename is already a full URL, use it
+        setupUrl = setup.filename;
+      } else {
+        // Construct the GitHub raw URL from the filename
+        setupUrl = `https://raw.githubusercontent.com/beniroquai/openUC2-OptiKit-Store/main/setups/${setup.filename}`;
+      }
+      
+      console.log('Loading setup from:', setupUrl);
+      const success = await importFromUrl(setupUrl);
       
       if (success) {
         navigate('/');
