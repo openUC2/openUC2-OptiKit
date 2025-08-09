@@ -4,19 +4,19 @@ import 'intro.js/introjs.css';
 import { useAppStore } from '../stores/appStore';
 
 export const Tutorial = () => {
-  const { tutorialCompleted, setTutorialCompleted } = useAppStore();
+  const { tutorialCompleted, setTutorialCompleted, startupDialogClosed } = useAppStore();
 
   useEffect(() => {
-    // Only show tutorial on first visit
-    if (!tutorialCompleted) {
-      // Small delay to ensure DOM is ready
+    // Only show tutorial on first visit and after startup dialog has been closed
+    if (!tutorialCompleted && startupDialogClosed) {
+      // Small delay to ensure DOM is ready after dialog closes
       const timer = setTimeout(() => {
         startTutorial();
-      }, 1000);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
-  }, [tutorialCompleted]);
+  }, [tutorialCompleted, startupDialogClosed]);
 
   const startTutorial = () => {
     const intro = introJs();

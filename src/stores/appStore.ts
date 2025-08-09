@@ -88,6 +88,7 @@ interface AppStore extends AppState {
   updateSetupMetadata: (metadata: Partial<SetupMetadata>) => void;
   // Tutorial actions
   setTutorialCompleted: (completed: boolean) => void;
+  setStartupDialogClosed: (closed: boolean) => void;
   // Feedback actions
   submitFeedback: (feedback: FeedbackData) => Promise<void>;
 }
@@ -127,6 +128,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     screenshot: ''
   },
   tutorialCompleted: false,
+  startupDialogClosed: false,
 
   // Actions
   loadModules: async () => {
@@ -1105,6 +1107,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ tutorialCompleted: completed });
     // Save tutorial state to localStorage
     localStorage.setItem('optikit-tutorial-completed', completed.toString());
+  },
+
+  setStartupDialogClosed: (closed: boolean) => {
+    set({ startupDialogClosed: closed });
   },
 
   // Feedback actions

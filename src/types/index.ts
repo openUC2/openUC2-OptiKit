@@ -125,6 +125,7 @@ export interface AppState {
   activeRightTab: 'layers' | 'properties' | 'bom';
   // Tutorial state
   tutorialCompleted: boolean;
+  startupDialogClosed: boolean;
 }
 
 export interface Command {

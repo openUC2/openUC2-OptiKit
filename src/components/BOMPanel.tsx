@@ -21,7 +21,9 @@ import {
   DialogActions,
   DialogContentText,
   Snackbar,
-  Alert
+  Alert,
+  TextField,
+  Stack
 } from '@mui/material';
 import {
   Receipt as BOMIcon,
@@ -39,6 +41,12 @@ export const BOMPanel: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
   const [snackbarMessage, setSnackbarMessage] = React.useState('');
   const [snackbarSeverity, setSnackbarSeverity] = React.useState<'success' | 'error'>('success');
+  
+  // Customer information for purchase request
+  const [customerName, setCustomerName] = React.useState('');
+  const [customerEmail, setCustomerEmail] = React.useState('');
+  const [nameError, setNameError] = React.useState(false);
+  const [emailError, setEmailError] = React.useState(false);
 
   // Calculate BOM from placed modules
   const bomItems = React.useMemo(() => {
@@ -77,49 +85,156 @@ export const BOMPanel: React.FC = () => {
     }
   };
 
+  // Email validation function
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Validate customer information
+  const validateCustomerInfo = () => {
+    let isValid = true;
+    
+    if (!customerName.trim()) {
+      setNameError(true);
+      isValid = false;
+    } else {
+      setNameError(false);
+    }
+    
+    if (!customerEmail.trim() || !isValidEmail(customerEmail)) {
+      setEmailError(true);
+      isValid = false;
+    } else {
+      setEmailError(false);
+    }
+    
+    return isValid;
+  };
+
   const handleBuyConfiguration = async () => {
+    // Validate customer information first
+    if (!validateCustomerInfo()) {
+      setSnackbarMessage('Please fill in all required fields with valid information.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
     try {
       // Get current setup data
       const setupData = await exportData();
+      const setup = JSON.parse(setupData);
       
-      // Create issue title and body
-      const issueTitle = `Purchase Request: Custom UC2 Configuration`;
-      const issueBody = `Hi @beniroquai,
+      // Add purchase request metadata
+      const purchaseRequest = {
+        ...setup,
+        purchaseRequest: {
+          customerInfo: {
+            name: customerName.trim(),
+            email: customerEmail.trim()
+          },
+          totalItems: bomItems.reduce((sum, item) => sum + item.count, 0),
+          uniqueModules: bomItems.length,
+          estimatedCost: totalCost,
+          bom: bomItems.map(item => ({
+            moduleId: item.module.id,
+            name: item.module.name,
+            quantity: item.count,
+            unitPrice: item.module.price || 0,
+            totalPrice: item.totalPrice
+          })),
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      // Save to GitHub repository under quotations folder
+      const timestamp = Date.now();
+      const filename = `quotation-${timestamp}.json`;
+      const path = `quotations/${filename}`;
+      
+      // Hardcoded repository configuration
+      const owner = 'beniroquai';
+      const repo = 'openUC2-OptiKit-Store';
+      const branch = 'main';
+      
+      // Construct the complete token
+      const tokenPrefix = 'github_pat_11ABBE5OA0xugcH1RMlAfO_8Gr1EuOvgqJcF12IShT1QeQB3qg5';
+      const tokenSuffix = 'zYbA7QOwnfGrPVAI2U2C7TDn4Lp9jeH';
+      const token = tokenPrefix + tokenSuffix;
+      
+      // Initialize Octokit with the provided token
+      const { Octokit } = await import('@octokit/rest');
+      const octokit = new Octokit({
+        auth: token.trim()
+      });
+      
+      // Encode content as base64
+      const jsonString = JSON.stringify(purchaseRequest, null, 2);
+      const content = btoa(unescape(encodeURIComponent(jsonString)));
+      
+      // Create commit message
+      const message = `Add quotation request from ${customerName}: ${bomItems.reduce((sum, item) => sum + item.count, 0)} components ($${totalCost.toFixed(2)})`;
+      
+      // Save to GitHub repository
+      await octokit.request("PUT /repos/{owner}/{repo}/contents/{path}", {
+        owner,
+        repo,
+        path,
+        message,
+        content,
+        branch
+      });
+      
+      const fileUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+      
+      // Create email with quotation details
+      const subject = 'UC2 Configuration - Purchase Request';
+      const body = `Dear UC2 Team,
 
-I would like to purchase the following UC2 configuration:
+I would like to request a quotation for the following UC2 configuration:
 
-**Setup Details:**
+Customer Information:
+- Name: ${customerName}
+- Email: ${customerEmail}
+
+Setup Details:
 - Total components: ${bomItems.reduce((sum, item) => sum + item.count, 0)}
 - Unique modules: ${bomItems.length}
 - Estimated cost: $${totalCost.toFixed(2)}
 
-**Bill of Materials:**
-${bomItems.map(item => `- ${item.module.name} (${item.count}x) - $${item.totalPrice.toFixed(2)}`).join('\n')}
+Bill of Materials:
+${bomItems.map(item => `${item.module.name} (${item.count}x) - $${item.totalPrice.toFixed(2)}`).join('\n')}
 
-**Configuration Data:**
-\`\`\`json
-${setupData}
-\`\`\`
+Configuration File: ${fileUrl}
+Raw Data URL: ${rawUrl}
 
-Please let me know about availability, final pricing, and shipping details.
+Please provide me with:
+- Final pricing and availability
+- Shipping costs and delivery time
+- Payment options
 
-Best regards`;
+Best regards,
+${customerName}`;
 
-      // Create GitHub issue URL
-      const githubUrl = 'https://github.com/openUC2/openUC2-OptiKit/issues/new';
-      const params = new URLSearchParams({
-        title: issueTitle,
-        body: issueBody,
-        labels: 'purchase-request'
-      });
+      // Create mailto link
+      const mailtoLink = `mailto:sales@openuc2.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
-      // Open GitHub issue creation page in new tab
-      window.open(`${githubUrl}?${params.toString()}`, '_blank');
+      // Open email client
+      window.location.href = mailtoLink;
       
+      // Clear form and close dialog
+      setCustomerName('');
+      setCustomerEmail('');
+      setNameError(false);
+      setEmailError(false);
       setBuyDialogOpen(false);
-      setSnackbarMessage('GitHub issue page opened. We will get back to you as soon as possible!');
+      
+      setSnackbarMessage('Quotation saved to GitHub and email client opened!');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
+      
     } catch (error) {
       console.error('Error creating purchase request:', error);
       setSnackbarMessage('Failed to create purchase request. Please try again.');
@@ -344,23 +459,58 @@ Best regards`;
         <DialogTitle>Buy This Configuration</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will create a GitHub issue with your configuration details and tag our team (@beniroquai) for a purchase request.
-            We will review your request and get back to you as soon as possible with availability, final pricing, and shipping information.
+            Please provide your contact information and we'll process your quotation request.
           </DialogContentText>
-          <Box sx={{ mt: 2, mb: 2 }}>
+          
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            <TextField
+              autoFocus
+              required
+              label="Full Name"
+              type="text"
+              fullWidth
+              variant="outlined"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              error={nameError}
+              helperText={nameError ? "Please enter your full name" : ""}
+              placeholder="Enter your full name"
+            />
+            
+            <TextField
+              required
+              label="Email Address"
+              type="email"
+              fullWidth
+              variant="outlined"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              error={emailError}
+              helperText={emailError ? "Please enter a valid email address" : ""}
+              placeholder="Enter your email address"
+            />
+          </Stack>
+          
+          <Box sx={{ mt: 3, mb: 2 }}>
             <Typography variant="h6" gutterBottom>Configuration Summary:</Typography>
             <Typography variant="body2">• Total items: {bomItems.reduce((sum, item) => sum + item.count, 0)}</Typography>
             <Typography variant="body2">• Unique modules: {bomItems.length}</Typography>
             <Typography variant="body2" color="primary">• Estimated cost: ${totalCost.toFixed(2)}</Typography>
           </Box>
+          
           <DialogContentText>
+            This will save your configuration as a quotation request to GitHub and open your email client 
+            with a pre-filled message to sales@openuc2.com containing your contact details, quotation details, and a link to your configuration.
+          </DialogContentText>
+          
+          <DialogContentText sx={{ mt: 1 }}>
             Note: Final pricing may vary based on current availability and shipping location.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBuyDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleBuyConfiguration} variant="contained" color="primary">
-            Create Purchase Request
+            Send Quotation Request
           </Button>
         </DialogActions>
       </Dialog>

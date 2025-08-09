@@ -12,8 +12,13 @@ import './styles/brand.css'
 import './App.css'
 
 function App() {
-  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo } = useAppStore();
+  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
   const [showStartupDialog, setShowStartupDialog] = useState(false);
+
+  const handleCloseStartupDialog = () => {
+    setShowStartupDialog(false);
+    setStartupDialogClosed(true);
+  };
 
   useEffect(() => {
     // Browser history integration for undo/redo
@@ -72,6 +77,9 @@ function App() {
       if (!hasVisitedBefore && isMainPage) {
         setShowStartupDialog(true);
         localStorage.setItem('optikit-visited', 'true');
+      } else {
+        // If no startup dialog is shown, mark it as closed immediately for tutorial timing
+        setStartupDialogClosed(true);
       }
       
       // Check for URL parameters to load a layout
@@ -134,7 +142,7 @@ function App() {
         {/* Startup Dialog */}
         <StartupDialog 
           open={showStartupDialog}
-          onClose={() => setShowStartupDialog(false)}
+          onClose={handleCloseStartupDialog}
         />
       </Router>
     </ThemeProvider>

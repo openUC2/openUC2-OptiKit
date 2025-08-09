@@ -58,3 +58,4 @@ rotation-stage-1x1;Rotation Stage;stages;#495057;1;1;/icons/uc2_lenspositive_1x1
 cylindrical-lens-1x1;Cylindrical lens for lightsheet;optics;#495057;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/notdefined.stl;Cylindrical lens for lightsheet;"{""resolution_deg"":1.0}";;300
 12V power supply;Power Supply for Electronics;electronics;#495057;2;1;/icons/uc2-12Vsupply.svg;/cad/notdefined.stl;Power Supply;"{""positions"":6}";;50
 uc2-controller;Controller To control motors and light;electronics;#495057;3;2;/icons/uc2-controller.svg;/cad/notdefined.stl;Controller;"{""positions"":6}";;60
+uc2-puzzle;Puzzle Piece to connect multiple cubes in xyz;stages;#495057;1;1;/icons/uc2-puzzle.svg;/cad/notdefined.stl;Puzzle;"{""positions"":6}";;2
