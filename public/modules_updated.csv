@@ -49,7 +49,7 @@ iris-1x1;Iris Diaphragm;optics;#7cc150;1;1;/icons/uc2-iris.svg;/cad/notdefined.s
 ndfilter-1x1;ND Filter Wheel;optics;#7cc150;1;1;;/cad/notdefined.stl;Selectable neutral‑density filters for precise attenuation.;"{""positions"":6,""filters"":""ND0.3,ND0.6,ND1.0""}";;50
 objective-holder-rms-1x1;Objective Holder (RMS);optics;#7cc150;1;1;;/cad/notdefined.stl;Holds RMS‑thread microscope objectives.;"{""thread"":""RMS"",""parfocal_distance_mm"":45}";;50
 objective-10x-1x1;Microscope Objective 10×;optics;#7cc150;1;1;/icons/uc2-10xobjective.svg;/cad/notdefined.stl;Achromatic objective for imaging.;"{""magnification"":10,""na"":0.25,""wd_mm"":10}";;200
-objective-20x-1x1;Microscope Objective 40×;optics;#7cc150;1;1;/icons/uc2-20xobjective.svg;/cad/notdefined.stl;Achromatic objective for imaging.;"{""magnification"":40,""na"":0.65,""wd_mm"":0.6}";;250
+objective-20x-1x1;Microscope Objective 20×;optics;#7cc150;1;1;/icons/uc2-20xobjective.svg;/cad/notdefined.stl;Achromatic objective for imaging.;"{""magnification"":20,""na"":0.65,""wd_mm"":0.6}";;250
 c-mount-adapter-1x1;C‑Mount Camera Adapter;cameras;#343a40;1;1;;/cad/notdefined.stl;Adapter for C‑mount cameras to the cube system.;"{""thread"":""C‑mount""}";;40
 tube-lens-1x1;Tube Lens;lenses;#7cc142;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/notdefined.stl;Infinity‑corrected tube lens for microscope systems.;"{""focalLength_mm"":200}";;120
 diffuser-1x1;Diffuser/Screen;illumination;#7cc149;1;1;;/cad/notdefined.stl;Opal/glass diffuser for uniform illumination.;"{""type"":""opal""}";;50
