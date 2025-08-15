@@ -1,5 +1,5 @@
 id;name;group;color;width;height;thumbnail;cadUrl;description;defaultParams;autodeskInventor;price;notification
-cube-1x1;Basic Cube;cubes;#1e4670;1;1;/icons/uc2_emptycube.svg;/cad/cube-1x1.stl;Basic 1x1 cube module for structural support;"{""height"": 50}";ASS - 2000 - CUB - V04.iam;10;"""Achtung: Nur noch wenige verfŸgbar!"""
+cube-1x1;Basic Cube;cubes;#1e4670;1;1;/icons/uc2_emptycube.svg;/cad/cube-1x1.stl;Basic 1x1 cube module for structural support;"{""height"": 50}";ASS - 2000 - CUB - V04.iam;10;"""Achtung: Nur noch wenige verfï¿½gbar!"""
 lens-pos-1x1;Lens (positive);lenses;#7cc142;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/lens-1x1.stl;Optical lens module for beam focusing;"{""focalLength"": 100}";ASS - 2021 - CUBLEND40F50 - V04.iam;100;
 lens-neg-1x1;Lens (negative);lenses;#7cc142;1;1;/icons/uc2_lensnegative_1x1.svg;/cad/lens-1x1.stl;Optical lens module for beam focusing;"{""focalLength"": -100}";ASS - 2022 - CUBLEND40F100 - V04.iam;100;
 mirror-1x1;Mirror;lenses;#4a9b8e;1;1;/icons/uc2_mirror_static.svg;/cad/mirror-1x1.stl;Mirror module for beam steering;"{""angle"": 45}";ASS - 2020 - CUBMIR45ï¿½TH2 - V04.iam;50;
