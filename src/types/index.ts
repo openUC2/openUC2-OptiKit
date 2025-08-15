@@ -23,6 +23,7 @@ export interface ModuleDefinition {
   isWildCard?: boolean;
   autodeskInventor?: string;
   price?: number;
+  notification?: string;
 }
 
 export interface PlacedModule {

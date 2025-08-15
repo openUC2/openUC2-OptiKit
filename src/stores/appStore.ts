@@ -234,6 +234,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
       selectedItemType: 'module',
       activeRightTab: 'properties'
     }));
+
+    // Show notification if module has one
+    if (moduleDefinition.notification && moduleDefinition.notification.trim()) {
+      get().addNotification({
+        type: 'warning',
+        title: `${moduleDefinition.name} Notice`,
+        message: moduleDefinition.notification,
+        duration: 6000
+      });
+    }
   },
 
   moveModule: (moduleId: string, position: Point) => {
