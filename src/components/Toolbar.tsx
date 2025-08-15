@@ -42,7 +42,7 @@ import { FeedbackDialog } from './FeedbackDialog';
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isEditorPage = location.pathname === '/';
+  const isEditorPage = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
   
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
@@ -324,7 +324,7 @@ openUC2 team via GitHub repository
             <Button
               color="inherit"
               startIcon={isEditorPage ? <SetupIcon /> : <EditorIcon />}
-              onClick={() => navigate(isEditorPage ? '/setups' : '/')}
+              onClick={() => navigate(isEditorPage ? '/configurator/setups' : '/configurator')}
               size="small"
               sx={{ 
                 textTransform: 'none',
@@ -528,7 +528,7 @@ openUC2 team via GitHub repository
               <STLIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Save to GitHub">
+          <Tooltip title="Upload to Optical Setup Browser">
             <IconButton 
               color="inherit"
               onClick={handleSaveToGitHub}

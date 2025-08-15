@@ -125,7 +125,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     githubAccount: '',
     description: '',
     category: 'General',
-    screenshot: ''
+    screenshot: '',
+    uc2_verified: false,
+    version: '1.0.0',
+    createdAt: new Date().toISOString(),
+    collection: 'General',
+    notification: ''
   },
   tutorialCompleted: false,
   startupDialogClosed: false,
@@ -500,30 +505,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   exportData: async () => {
-    // Trigger screenshot capture and wait for it
-    const screenshotPromise = new Promise<string>((resolve) => {
-      const handler = (event: CustomEvent) => {
-        window.removeEventListener('screenshot-captured', handler as EventListener);
-        resolve(event.detail);
-      };
-      window.addEventListener('screenshot-captured', handler as EventListener);
-      
-      // Set flag to indicate this is for export
-      (window as unknown as { isExportCapture?: boolean }).isExportCapture = true;
-      
-      // Trigger screenshot
-      const event = new CustomEvent('download-screenshot');
-      window.dispatchEvent(event);
-      
-      // Fallback timeout
-      setTimeout(() => {
-        window.removeEventListener('screenshot-captured', handler as EventListener);
-        resolve('');
-      }, 3000);
-    });
+    try {
+      // Try to capture screenshot, but don't block export if it fails
+      const screenshotPromise = new Promise<string>((resolve) => {
+        const handler = (event: CustomEvent) => {
+          window.removeEventListener('screenshot-captured', handler as EventListener);
+          resolve(event.detail);
+        };
+        window.addEventListener('screenshot-captured', handler as EventListener);
+        
+        // Set flag to indicate this is for export
+        (window as unknown as { isExportCapture?: boolean }).isExportCapture = true;
+        
+        // Trigger screenshot
+        const event = new CustomEvent('download-screenshot');
+        window.dispatchEvent(event);
+        
+        // Shorter timeout - don't wait too long
+        setTimeout(() => {
+          window.removeEventListener('screenshot-captured', handler as EventListener);
+          resolve(''); // Return empty string if screenshot fails
+        }, 1000);
+      });
 
-    const screenshotDataUrl = await screenshotPromise;
-    return get().exportDataWithScreenshot(screenshotDataUrl);
+      const screenshotDataUrl = await screenshotPromise;
+      return get().exportDataWithScreenshot(screenshotDataUrl);
+    } catch (error) {
+      console.warn('Screenshot capture failed during export, proceeding without screenshot:', error);
+      return get().exportDataWithScreenshot();
+    }
   },
 
   exportDataWithScreenshot: async (screenshotDataUrl?: string) => {
@@ -614,7 +624,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
             githubAccount: '',
             description: '',
             category: 'General',
-            screenshot: ''
+            screenshot: '',
+            uc2_verified: false,
+            version: '1.0.0',
+            createdAt: new Date().toISOString(),
+            collection: 'General',
+            notification: ''
           }
         });
         return;
@@ -636,14 +651,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
         set({
           placedModules,
           annotations: parsed.annotations || [],
-          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
+          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }],
+          setupMetadata: parsed.setupMetadata || parsed.meta || {
+            name: parsed.name || 'Imported Setup',
+            author: parsed.author || '',
+            githubAccount: '',
+            description: parsed.description || '',
+            category: parsed.category || 'General',
+            screenshot: parsed.screenshot || '',
+            uc2_verified: parsed.uc2_verified || false,
+            version: parsed.version || '1.0.0',
+            createdAt: parsed.createdAt || new Date().toISOString(),
+            collection: parsed.collection || 'General',
+            notification: parsed.notification || ''
+          },
         });
       } else {
         // Legacy format support
         set({
           placedModules: parsed.placedModules || [],
           annotations: parsed.annotations || [],
-          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
+          setupMetadata: parsed.setupMetadata || {
+            name: parsed.name || 'Imported Setup',
+            author: parsed.author || '',
+            githubAccount: '',
+            description: parsed.description || '',
+            category: parsed.category || 'General',
+            screenshot: parsed.screenshot || '',
+            uc2_verified: parsed.uc2_verified || false,
+            version: parsed.version || '1.0.0',
+            createdAt: parsed.createdAt || new Date().toISOString(),
+            collection: parsed.collection || 'General',
+            notification: parsed.notification || ''
+          },
+          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }],
         });
       }
     } catch (error) {

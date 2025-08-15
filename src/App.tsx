@@ -132,8 +132,13 @@ function App() {
   return (
     <ThemeProvider theme={materialTheme}>
       <CssBaseline />
-      <Router basename="/configurator">
+      <Router basename="">
         <Routes>
+          <Route path="/configurator" element={<EditorPage />} />
+          <Route path="/configurator/" element={<EditorPage />} />
+          <Route path="/configurator/setups" element={<SetupBrowser />} />
+          <Route path="/configurator/:collectionName" element={<CollectionView />} />
+          {/* Legacy routes for backward compatibility */}
           <Route path="/" element={<EditorPage />} />
           <Route path="/setups" element={<SetupBrowser />} />
           <Route path="/:collectionName" element={<CollectionView />} />

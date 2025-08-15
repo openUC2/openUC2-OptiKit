@@ -87,6 +87,12 @@ export interface SetupMetadata {
   description: string;
   category: 'General' | 'Microscopy' | 'Astronomy' | 'Spectroscopy' | 'Imaging' | 'Laser';
   screenshot: string;
+  // New required fields for collections support
+  uc2_verified?: boolean;
+  version?: string;
+  createdAt?: string;
+  collection?: string | string[]; // Support both single and multiple collections
+  notification?: string; // For safety warnings, module requirements, etc.
 }
 
 export interface FeedbackData {

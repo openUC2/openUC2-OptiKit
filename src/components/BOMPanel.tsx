@@ -51,6 +51,7 @@ export const BOMPanel: React.FC = () => {
   // Calculate BOM from placed modules
   const bomItems = React.useMemo(() => {
     const bomMap = new Map<string, { module: ModuleDefinition; count: number; totalPrice: number; moduleIds: string[] }>();
+    let totalCubes = 0;
     
     placedModules.forEach(placedModule => {
       const moduleDefinition = modules.find(m => m.id === placedModule.moduleId);
@@ -58,6 +59,11 @@ export const BOMPanel: React.FC = () => {
         const key = moduleDefinition.id;
         const existing = bomMap.get(key);
         const price = moduleDefinition.price || 0;
+        
+        // Count cubes for automatic puzzle piece calculation
+        if (moduleDefinition.group === 'cubes' || moduleDefinition.name.toLowerCase().includes('cube')) {
+          totalCubes += 1;
+        }
         
         if (existing) {
           existing.count += 1;
@@ -74,12 +80,45 @@ export const BOMPanel: React.FC = () => {
       }
     });
     
+    // Add automatic puzzle pieces (cubes x2)
+    if (totalCubes > 0) {
+      const puzzlePieceCount = totalCubes * 2;
+      
+      // Find or create puzzle piece module definition
+      let puzzleModule = modules.find(m => m.id === 'puzzle-piece' || m.name.toLowerCase().includes('puzzle'));
+      if (!puzzleModule) {
+        // Create a virtual puzzle piece module if it doesn't exist
+        puzzleModule = {
+          id: 'puzzle-piece',
+          name: 'Puzzle Piece',
+          group: 'connectors',
+          color: '#95a5a6',
+          footprint: { width: 1, height: 1 },
+          thumbnail: '/icons/puzzle-piece.svg',
+          price: 2 // Default price for puzzle pieces
+        };
+      }
+      
+      bomMap.set('auto-puzzle-pieces', {
+        module: puzzleModule,
+        count: puzzlePieceCount,
+        totalPrice: (puzzleModule.price || 0) * puzzlePieceCount,
+        moduleIds: [] // Auto-generated, no specific module IDs
+      });
+    }
+    
     return Array.from(bomMap.values()).sort((a, b) => a.module.name.localeCompare(b.module.name));
   }, [placedModules, modules]);
 
   const totalCost = bomItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   const handleDeleteModule = (moduleIds: string[], moduleName: string) => {
+    // Don't allow deletion of auto-generated items
+    if (moduleIds.length === 0) {
+      alert(`${moduleName} is automatically calculated based on cube count and cannot be deleted directly.`);
+      return;
+    }
+    
     if (confirm(`Delete all ${moduleName} modules from the layout?`)) {
       moduleIds.forEach(moduleId => removeModule(moduleId));
     }
