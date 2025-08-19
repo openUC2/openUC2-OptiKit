@@ -14,7 +14,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  IconButton
 } from '@mui/material';
 import {
   RotateRight as RotateIcon,
@@ -41,7 +42,9 @@ export const PropertyPanel: React.FC = () => {
     updateModuleCustomText,
     updateModuleParams,
     updateSetupMetadata,
-    exportData
+    exportData,
+    selectItem,
+    clearSelection
   } = useAppStore();
 
   const [isEditingText, setIsEditingText] = useState(false);
@@ -155,18 +158,137 @@ export const PropertyPanel: React.FC = () => {
                 placeholder="https://example.com/screenshot.png"
               />
               
-              <Button 
-                variant="contained" 
-                startIcon={<DownloadIcon />}
-                onClick={handleOpenMetadataDialog}
+              <TextField
+                label="Notification"
                 fullWidth
+                multiline
+                rows={2}
                 size="small"
-              >
-                Export Setup
-              </Button>
+                value={setupMetadata.notification}
+                onChange={(e) => updateSetupMetadata({ notification: e.target.value })}
+                placeholder="Safety warnings, requirements, or important notices..."
+                helperText="This message will be displayed when users import your setup"
+              />
+              
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  size="small"
+                  onClick={() => {
+                    if (setupMetadata.notification && setupMetadata.notification.trim()) {
+                      // Use addNotification from the store
+                      const { addNotification } = useAppStore.getState();
+                      addNotification({
+                        type: 'warning',
+                        title: 'Setup Notice Preview',
+                        message: setupMetadata.notification,
+                        duration: 6000
+                      });
+                    } else {
+                      alert('Enter a notification message first to preview it');
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                >
+                  Test Notification
+                </Button>
+                <Button 
+                  variant="contained" 
+                  startIcon={<DownloadIcon />}
+                  onClick={handleOpenMetadataDialog}
+                  size="small"
+                  sx={{ flex: 2 }}
+                >
+                  Export Setup
+                </Button>
+              </Box>
             </Box>
           </CardContent>
         </Card>
+        
+        {/* Drawing Elements Management */}
+        {annotations.length > 0 && (
+          <Card sx={{ mb: 2 }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                Drawing Elements
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Manage your annotations (lines, arrows, text).
+              </Typography>
+              
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 200, overflow: 'auto' }}>
+                {annotations.map((annotation) => (
+                  <Paper 
+                    key={annotation.id} 
+                    sx={{ 
+                      p: 1, 
+                      cursor: 'pointer',
+                      bgcolor: selectedItemId === annotation.id ? 'primary.light' : 'grey.50',
+                      color: selectedItemId === annotation.id ? 'primary.contrastText' : 'inherit',
+                      '&:hover': { bgcolor: selectedItemId === annotation.id ? 'primary.main' : 'grey.100' }
+                    }}
+                    onClick={() => {
+                      if (selectedItemId === annotation.id) {
+                        // Deselect if already selected
+                        clearSelection();
+                      } else {
+                        // Select this annotation
+                        selectItem(annotation.id, 'annotation');
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {annotation.type.charAt(0).toUpperCase() + annotation.type.slice(1)}
+                          {annotation.text && ` - "${annotation.text.substring(0, 20)}${annotation.text.length > 20 ? '...' : ''}"`}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          Layer {annotation.layer}
+                        </Typography>
+                      </Box>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete this ${annotation.type}?`)) {
+                            removeAnnotation(annotation.id);
+                          }
+                        }}
+                        sx={{ 
+                          color: selectedItemId === annotation.id ? 'inherit' : 'error.main',
+                          '&:hover': { bgcolor: 'error.light' }
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Paper>
+                ))}
+              </Box>
+              
+              {annotations.length > 0 && (
+                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    onClick={() => {
+                      if (confirm('Delete all drawing elements?')) {
+                        annotations.forEach(annotation => removeAnnotation(annotation.id));
+                      }
+                    }}
+                    fullWidth
+                  >
+                    Clear All
+                  </Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        )}
         
         <Paper 
           sx={{ 

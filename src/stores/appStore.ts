@@ -15,7 +15,8 @@ import type {
   CompactModule,
   CompactAnnotation,
   SetupMetadata,
-  FeedbackData
+  FeedbackData,
+  Notification
 } from '../types';
 
 const GRID_CELL_SIZE = 50; // 50mm in pixels (assuming 1:1 scale)
@@ -48,6 +49,8 @@ interface AppStore extends AppState {
   addLayer: (name: string) => void;
   removeLayer: (layerId: string) => void;
   setActiveLayer: (layerId: string) => void;
+  toggleLayerVisibility: (layerId: string, visible?: boolean) => void;
+  setAllLayersVisibility: (visible: boolean) => void;
   placeModule: (moduleId: string, position: Point, layer: number) => void;
   moveModule: (moduleId: string, position: Point) => void;
   rotateModule: (moduleId: string, rotation: number) => void;
@@ -58,6 +61,11 @@ interface AppStore extends AppState {
   moveAnnotation: (annotationId: string, position: Point) => void;
   removeAnnotation: (annotationId: string) => void;
   selectItem: (itemId: string | null, itemType: 'module' | 'annotation' | null) => void;
+  addToSelection: (itemId: string, itemType: 'module' | 'annotation') => void;
+  removeFromSelection: (itemId: string) => void;
+  clearSelection: () => void;
+  setSelectionMode: (mode: 'single' | 'multiple') => void;
+  deleteSelectedItems: () => void;
   setGridConfig: (config: Partial<AppState['grid']>) => void;
   setViewport: (config: Partial<AppState['viewport']>) => void;
   setAnnotationMode: (mode: AppState['annotationMode']) => void;
@@ -81,8 +89,13 @@ interface AppStore extends AppState {
   updateSetupMetadata: (metadata: Partial<SetupMetadata>) => void;
   // Tutorial actions
   setTutorialCompleted: (completed: boolean) => void;
+  setStartupDialogClosed: (closed: boolean) => void;
   // Feedback actions
   submitFeedback: (feedback: FeedbackData) => Promise<void>;
+  // Notification actions
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
+  removeNotification: (id: string) => void;
+  clearNotifications: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -96,6 +109,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   activeLayerId: 'layer-0',
   selectedItemId: null,
   selectedItemType: null,
+  selectedItems: [],
+  selectionMode: 'single',
   grid: {
     cellSize: GRID_CELL_SIZE,
     gridVisible: true,
@@ -115,9 +130,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     githubAccount: '',
     description: '',
     category: 'General',
-    screenshot: ''
+    screenshot: '',
+    uc2_verified: false,
+    version: '1.0.0',
+    createdAt: new Date().toISOString(),
+    collection: ['General'], // Support multiple collections as array
+    notification: ''
   },
   tutorialCompleted: false,
+  startupDialogClosed: false,
+  notifications: [],
 
   // Actions
   loadModules: async () => {
@@ -162,6 +184,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ activeLayerId: layerId });
   },
 
+  toggleLayerVisibility: (layerId: string, visible?: boolean) => {
+    set(state => ({
+      layers: state.layers.map(layer =>
+        layer.id === layerId
+          ? { ...layer, visible: visible !== undefined ? visible : !layer.visible }
+          : layer
+      )
+    }));
+  },
+
+  setAllLayersVisibility: (visible: boolean) => {
+    set(state => ({
+      layers: state.layers.map(layer => ({ ...layer, visible }))
+    }));
+  },
+
   placeModule: (moduleId: string, position: Point, layer: number) => {
     const state = get();
     const moduleDefinition = state.modules.find(m => m.id === moduleId);
@@ -174,7 +212,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       placedModules: state.placedModules,
       annotations: state.annotations,
       layers: state.layers,
-      activeLayerId: state.activeLayerId
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
     });
 
     const newModule: PlacedModule = {
@@ -193,6 +234,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
       selectedItemType: 'module',
       activeRightTab: 'properties'
     }));
+
+    // Show notification if module has one
+    if (moduleDefinition.notification && moduleDefinition.notification.trim()) {
+      get().addNotification({
+        type: 'warning',
+        title: `${moduleDefinition.name} Notice`,
+        message: moduleDefinition.notification,
+        duration: 6000
+      });
+    }
   },
 
   moveModule: (moduleId: string, position: Point) => {
@@ -210,7 +261,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       placedModules: state.placedModules,
       annotations: state.annotations,
       layers: state.layers,
-      activeLayerId: state.activeLayerId
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
     });
 
     set(state => ({
@@ -243,7 +297,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       placedModules: state.placedModules,
       annotations: state.annotations,
       layers: state.layers,
-      activeLayerId: state.activeLayerId
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
     });
 
     set(state => ({
@@ -276,7 +333,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       placedModules: state.placedModules,
       annotations: state.annotations,
       layers: state.layers,
-      activeLayerId: state.activeLayerId
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
     });
 
     const newAnnotation: Annotation = {
@@ -309,7 +369,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       placedModules: state.placedModules,
       annotations: state.annotations,
       layers: state.layers,
-      activeLayerId: state.activeLayerId
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
     });
 
     set(state => ({
@@ -319,7 +382,85 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   selectItem: (itemId: string | null, itemType: 'module' | 'annotation' | null) => {
-    set({ selectedItemId: itemId, selectedItemType: itemType });
+    const state = get();
+    if (state.selectionMode === 'multiple' && itemId && itemType) {
+      // In multiple selection mode, toggle the item
+      const isSelected = state.selectedItems.some(item => item.id === itemId);
+      if (isSelected) {
+        get().removeFromSelection(itemId);
+      } else {
+        get().addToSelection(itemId, itemType);
+      }
+    } else {
+      // Single selection mode
+      set({ 
+        selectedItemId: itemId, 
+        selectedItemType: itemType,
+        selectedItems: itemId && itemType ? [{ id: itemId, type: itemType }] : []
+      });
+    }
+  },
+
+  addToSelection: (itemId: string, itemType: 'module' | 'annotation') => {
+    set(state => {
+      const isAlreadySelected = state.selectedItems.some(item => item.id === itemId);
+      if (!isAlreadySelected) {
+        return {
+          selectedItems: [...state.selectedItems, { id: itemId, type: itemType }],
+          selectedItemId: itemId,
+          selectedItemType: itemType
+        };
+      }
+      return state;
+    });
+  },
+
+  removeFromSelection: (itemId: string) => {
+    set(state => {
+      const updatedSelection = state.selectedItems.filter(item => item.id !== itemId);
+      const lastSelected = updatedSelection[updatedSelection.length - 1];
+      return {
+        selectedItems: updatedSelection,
+        selectedItemId: lastSelected?.id || null,
+        selectedItemType: lastSelected?.type || null
+      };
+    });
+  },
+
+  clearSelection: () => {
+    set({
+      selectedItems: [],
+      selectedItemId: null,
+      selectedItemType: null
+    });
+  },
+
+  setSelectionMode: (mode: 'single' | 'multiple') => {
+    set(state => {
+      if (mode === 'single' && state.selectedItems.length > 1) {
+        // When switching to single mode, keep only the first selected item
+        const firstItem = state.selectedItems[0];
+        return {
+          selectionMode: mode,
+          selectedItems: firstItem ? [firstItem] : [],
+          selectedItemId: firstItem?.id || null,
+          selectedItemType: firstItem?.type || null
+        };
+      }
+      return { selectionMode: mode };
+    });
+  },
+
+  deleteSelectedItems: () => {
+    const state = get();
+    state.selectedItems.forEach(item => {
+      if (item.type === 'module') {
+        get().removeModule(item.id);
+      } else if (item.type === 'annotation') {
+        get().removeAnnotation(item.id);
+      }
+    });
+    get().clearSelection();
   },
 
   setGridConfig: (config: Partial<AppState['grid']>) => {
@@ -380,30 +521,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   exportData: async () => {
-    // Trigger screenshot capture and wait for it
-    const screenshotPromise = new Promise<string>((resolve) => {
-      const handler = (event: CustomEvent) => {
-        window.removeEventListener('screenshot-captured', handler as EventListener);
-        resolve(event.detail);
-      };
-      window.addEventListener('screenshot-captured', handler as EventListener);
-      
-      // Set flag to indicate this is for export
-      (window as unknown as { isExportCapture?: boolean }).isExportCapture = true;
-      
-      // Trigger screenshot
-      const event = new CustomEvent('download-screenshot');
-      window.dispatchEvent(event);
-      
-      // Fallback timeout
-      setTimeout(() => {
-        window.removeEventListener('screenshot-captured', handler as EventListener);
-        resolve('');
-      }, 3000);
-    });
+    try {
+      // Try to capture screenshot, but don't block export if it fails
+      const screenshotPromise = new Promise<string>((resolve) => {
+        const handler = (event: CustomEvent) => {
+          window.removeEventListener('screenshot-captured', handler as EventListener);
+          resolve(event.detail);
+        };
+        window.addEventListener('screenshot-captured', handler as EventListener);
+        
+        // Set flag to indicate this is for export
+        (window as unknown as { isExportCapture?: boolean }).isExportCapture = true;
+        
+        // Trigger screenshot
+        const event = new CustomEvent('download-screenshot');
+        window.dispatchEvent(event);
+        
+        // Shorter timeout - don't wait too long
+        setTimeout(() => {
+          window.removeEventListener('screenshot-captured', handler as EventListener);
+          resolve(''); // Return empty string if screenshot fails
+        }, 1000);
+      });
 
-    const screenshotDataUrl = await screenshotPromise;
-    return get().exportDataWithScreenshot(screenshotDataUrl);
+      const screenshotDataUrl = await screenshotPromise;
+      return get().exportDataWithScreenshot(screenshotDataUrl);
+    } catch (error) {
+      console.warn('Screenshot capture failed during export, proceeding without screenshot:', error);
+      return get().exportDataWithScreenshot();
+    }
   },
 
   exportDataWithScreenshot: async (screenshotDataUrl?: string) => {
@@ -483,20 +629,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
             })) 
           : [];
         
+        // Extract metadata for collection and notification handling  
+        const importedMetadata = (compactData as CompactExport & { meta?: any }).meta;
+        
         set({
           placedModules,
           annotations,
           layers: [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }],
           // Import metadata if available
-          setupMetadata: (compactData as CompactExport & { meta?: any }).meta || {
+          setupMetadata: importedMetadata || {
             name: 'Imported Setup',
             author: '',
             githubAccount: '',
             description: '',
             category: 'General',
-            screenshot: ''
+            screenshot: '',
+            uc2_verified: false,
+            version: '1.0.0',
+            createdAt: new Date().toISOString(),
+            collection: importedMetadata?.collection || ['General'],
+            notification: ''
           }
         });
+        
+        // Check for notification in imported setup metadata
+        if (importedMetadata?.notification && importedMetadata.notification.trim()) {
+          get().addNotification({
+            type: 'warning',
+            title: 'Setup Notice',
+            message: importedMetadata.notification,
+            duration: 8000 // Show for 8 seconds
+          });
+        }
+        
         return;
       }
       
@@ -516,15 +681,64 @@ export const useAppStore = create<AppStore>((set, get) => ({
         set({
           placedModules,
           annotations: parsed.annotations || [],
-          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
+          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }],
+          setupMetadata: parsed.setupMetadata || parsed.meta || {
+            name: parsed.name || 'Imported Setup',
+            author: parsed.author || '',
+            githubAccount: '',
+            description: parsed.description || '',
+            category: parsed.category || 'General',
+            screenshot: parsed.screenshot || '',
+            uc2_verified: parsed.uc2_verified || false,
+            version: parsed.version || '1.0.0',
+            createdAt: parsed.createdAt || new Date().toISOString(),
+            collection: parsed.collection || ['General'],
+            notification: parsed.notification || ''
+          },
         });
+        
+        // Check for notification in imported setup metadata
+        const importedMetadata = parsed.setupMetadata || parsed.meta;
+        const notificationMessage = importedMetadata?.notification || parsed.notification;
+        if (notificationMessage && notificationMessage.trim()) {
+          get().addNotification({
+            type: 'warning',
+            title: 'Setup Notice',
+            message: notificationMessage,
+            duration: 8000
+          });
+        }
       } else {
         // Legacy format support
         set({
           placedModules: parsed.placedModules || [],
           annotations: parsed.annotations || [],
-          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }]
+          setupMetadata: parsed.setupMetadata || {
+            name: parsed.name || 'Imported Setup',
+            author: parsed.author || '',
+            githubAccount: '',
+            description: parsed.description || '',
+            category: parsed.category || 'General',
+            screenshot: parsed.screenshot || '',
+            uc2_verified: parsed.uc2_verified || false,
+            version: parsed.version || '1.0.0',
+            createdAt: parsed.createdAt || new Date().toISOString(),
+            collection: parsed.collection || ['General'],
+            notification: parsed.notification || ''
+          },
+          layers: parsed.layers || [{ id: 'layer-0', name: 'Layer 0', index: 0, visible: true }],
         });
+        
+        // Check for notification in legacy format
+        const notificationMessage = parsed.setupMetadata?.notification || parsed.notification;
+        if (notificationMessage && notificationMessage.trim()) {
+          get().addNotification({
+            type: 'warning',
+            title: 'Setup Notice',
+            message: notificationMessage,
+            duration: 8000
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to import data:', error);
@@ -647,8 +861,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ...previousSnapshot,
         historyIndex: state.historyIndex - 1,
         history: state.history, // Keep the history
-        selectedItemId: null,
-        selectedItemType: null
+        selectionMode: state.selectionMode // Keep current selection mode
       });
     }
   },
@@ -661,8 +874,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ...nextSnapshot,
         historyIndex: state.historyIndex + 1,
         history: state.history, // Keep the history
-        selectedItemId: null,
-        selectedItemType: null
+        selectionMode: state.selectionMode // Keep current selection mode
       });
     }
   },
@@ -955,7 +1167,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       placedModules: state.placedModules,
       annotations: state.annotations,
       layers: state.layers,
-      activeLayerId: state.activeLayerId
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
     });
     
     set({
@@ -986,6 +1201,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ tutorialCompleted: completed });
     // Save tutorial state to localStorage
     localStorage.setItem('optikit-tutorial-completed', completed.toString());
+  },
+
+  setStartupDialogClosed: (closed: boolean) => {
+    set({ startupDialogClosed: closed });
   },
 
   // Feedback actions
@@ -1032,5 +1251,38 @@ ${feedback.email ? `Email: ${feedback.email}` : 'No contact provided'}
       // In a production app, you might want to fall back to a different service
       throw error;
     }
+  },
+
+  // Notification actions
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => {
+    set((state) => {
+      const newNotification: Notification = {
+        ...notification,
+        id: uuidv4(),
+        timestamp: Date.now()
+      };
+      
+      return {
+        notifications: [...state.notifications, newNotification]
+      };
+    });
+    
+    // Auto-remove notification after duration if specified
+    if (notification.duration && notification.duration > 0) {
+      const notificationId = get().notifications[get().notifications.length - 1].id;
+      setTimeout(() => {
+        get().removeNotification(notificationId);
+      }, notification.duration);
+    }
+  },
+
+  removeNotification: (id: string) => {
+    set((state) => ({
+      notifications: state.notifications.filter(n => n.id !== id)
+    }));
+  },
+
+  clearNotifications: () => {
+    set({ notifications: [] });
   }
 }));

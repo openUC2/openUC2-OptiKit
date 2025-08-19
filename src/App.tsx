@@ -1,21 +1,87 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
 import { EditorPage } from './components/EditorPage'
 import { SetupBrowser } from './components/SetupBrowser'
+import { CollectionView } from './components/CollectionView'
+import { StartupDialog } from './components/StartupDialog'
+import { NotificationDisplay } from './components/NotificationDisplay'
 import { useAppStore } from './stores/appStore'
 import { materialTheme } from './theme/materialTheme'
 import './styles/brand.css'
 import './App.css'
 
 function App() {
-  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData } = useAppStore();
+  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
+  const [showStartupDialog, setShowStartupDialog] = useState(false);
+
+  const handleCloseStartupDialog = () => {
+    setShowStartupDialog(false);
+    setStartupDialogClosed(true);
+  };
+
+  useEffect(() => {
+    // Browser history integration for undo/redo
+    let historyPosition = 0;
+    
+    const handleHistoryChange = () => {
+      const currentPosition = history.state?.position || 0;
+      
+      if (currentPosition < historyPosition) {
+        // User went back in browser history - trigger undo
+        undo();
+      } else if (currentPosition > historyPosition) {
+        // User went forward in browser history - trigger redo
+        redo();
+      }
+      
+      historyPosition = currentPosition;
+    };
+
+    window.addEventListener('popstate', handleHistoryChange);
+    
+    // Push initial state to browser history
+    if (!history.state) {
+      history.replaceState({ position: 0 }, '', window.location.href);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handleHistoryChange);
+    };
+  }, [undo, redo]);
+
+  useEffect(() => {
+    // Subscribe to app state changes to sync with browser history
+    const unsubscribe = useAppStore.subscribe((state) => {
+      // Only push to browser history when internal history changes
+      if (state.historyIndex > 0) {
+        const newPosition = state.historyIndex;
+        if (history.state?.position !== newPosition) {
+          history.pushState({ position: newPosition }, '', window.location.href);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     // Load modules and state on app start
     loadModules().then(() => {
       loadStateFromStorage();
+      
+      // Check if this is the first visit and user is on the main configurator page
+      const hasVisitedBefore = localStorage.getItem('optikit-visited');
+      const isMainPage = window.location.pathname === '/configurator' || window.location.pathname === '/configurator/';
+      
+      if (!hasVisitedBefore && isMainPage) {
+        setShowStartupDialog(true);
+        localStorage.setItem('optikit-visited', 'true');
+      } else {
+        // If no startup dialog is shown, mark it as closed immediately for tutorial timing
+        setStartupDialogClosed(true);
+      }
       
       // Check for URL parameters to load a layout
       const urlParams = new URLSearchParams(window.location.search);
@@ -67,11 +133,26 @@ function App() {
   return (
     <ThemeProvider theme={materialTheme}>
       <CssBaseline />
-      <Router basename="/configurator">
+      <Router basename="">
         <Routes>
+          <Route path="/configurator" element={<EditorPage />} />
+          <Route path="/configurator/" element={<EditorPage />} />
+          <Route path="/configurator/setups" element={<SetupBrowser />} />
+          <Route path="/configurator/:collectionName" element={<CollectionView />} />
+          {/* Legacy routes for backward compatibility */}
           <Route path="/" element={<EditorPage />} />
           <Route path="/setups" element={<SetupBrowser />} />
+          <Route path="/:collectionName" element={<CollectionView />} />
         </Routes>
+        
+        {/* Startup Dialog */}
+        <StartupDialog 
+          open={showStartupDialog}
+          onClose={handleCloseStartupDialog}
+        />
+        
+        {/* Notification Display */}
+        <NotificationDisplay />
       </Router>
     </ThemeProvider>
   )

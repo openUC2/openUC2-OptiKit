@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -19,7 +19,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Fab
+  Fab,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { Add as AddIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -34,12 +36,38 @@ interface SetupMetadata {
   url: string;
 }
 
+interface CollectionMetadata {
+  name: string;
+  description: string;
+  image?: string;
+  setupCount: number;
+  color: string;
+}
+
+interface SetupAnalysisData {
+  filename: string;
+  name: string;
+  uc2_verified: boolean;
+  collection: string | string[]; // Support both single and multiple collections
+  author: string;
+  github_link: string;
+  description: string;
+  category: string;
+  version: string;
+  createdAt: string;
+  total_components: number;
+  notification?: string; // For safety warnings, module requirements, etc.
+  [key: string]: string | number | boolean | string[] | undefined; // For component columns
+}
+
 export const SetupBrowser: React.FC = () => {
   const navigate = useNavigate();
   const { importFromUrl, exportData } = useAppStore();
   const [setups, setSetups] = useState<SetupMetadata[]>([]);
+  const [collections, setCollections] = useState<CollectionMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
   const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
   const [metadataForm, setMetadataForm] = useState({
     name: '',
@@ -48,9 +76,174 @@ export const SetupBrowser: React.FC = () => {
     screenshot: ''
   });
 
+  const parseCsvLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ';' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    result.push(current.trim());
+    return result;
+  };
+
+  const parseSetupAnalysisCsv = (csvText: string): SetupAnalysisData[] => {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+    
+    const headers = parseCsvLine(lines[0]);
+    const data: SetupAnalysisData[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCsvLine(lines[i]);
+      if (values.length >= headers.length) {
+        const row: Record<string, string | number | boolean> = {};
+        headers.forEach((header, index) => {
+          const value = values[index] || '';
+          // Convert specific fields to appropriate types
+          if (header === 'uc2_verified') {
+            row[header] = value.toLowerCase() === 'true';
+          } else if (header === 'total_components') {
+            row[header] = parseInt(value) || 0;
+          } else if (header.startsWith('component_')) {
+            row[header] = parseInt(value) || 0;
+          } else {
+            row[header] = value;
+          }
+        });
+        data.push(row as SetupAnalysisData);
+      }
+    }
+    
+    return data;
+  };
+
+  const fetchCollections = useCallback(async () => {
+    try {
+      // Try to fetch the setups_analysis.csv from the repository
+      const csvUrl = 'https://raw.githubusercontent.com/beniroquai/openUC2-OptiKit-Store/main/setups_analysis.csv';
+      const response = await fetch(csvUrl);
+      
+      if (response.ok) {
+        const csvText = await response.text();
+        const analysisData = parseSetupAnalysisCsv(csvText);
+        
+        // Group setups by collection (supporting multiple collections per setup)
+        const collectionGroups = analysisData.reduce((acc, setup) => {
+          // Handle both single string and array formats for collections
+          let collections: string[];
+          if (Array.isArray(setup.collection)) {
+            collections = setup.collection;
+          } else if (typeof setup.collection === 'string') {
+            // Check if it's a JSON array string or comma-separated values
+            try {
+              const parsed = JSON.parse(setup.collection);
+              collections = Array.isArray(parsed) ? parsed : [setup.collection];
+            } catch {
+              // Handle comma-separated values
+              collections = setup.collection.split(',').map(c => c.trim());
+            }
+          } else {
+            collections = ['General'];
+          }
+          
+          // Add setup to each collection it belongs to
+          collections.forEach(collection => {
+            if (!acc[collection]) {
+              acc[collection] = [];
+            }
+            acc[collection].push(setup);
+          });
+          
+          return acc;
+        }, {} as Record<string, SetupAnalysisData[]>);
+        
+        // Create collection metadata
+        const collectionMetadata: CollectionMetadata[] = Object.entries(collectionGroups).map(([name, setups]) => ({
+          name,
+          description: getCollectionDescription(name),
+          image: getCollectionImage(name),
+          setupCount: setups.length,
+          color: getCollectionColor(name)
+        }));
+        
+        setCollections(collectionMetadata);
+      } else {
+        // Fallback to sample collections
+        setCollections(getSampleCollections());
+      }
+    } catch (error) {
+      console.warn('Failed to fetch collections, using sample data:', error);
+      setCollections(getSampleCollections());
+    }
+  }, []);
+
   useEffect(() => {
     fetchSetups();
-  }, []);
+    fetchCollections();
+  }, [fetchCollections]);
+
+  const getCollectionDescription = (collectionName: string): string => {
+    const descriptions: Record<string, string> = {
+      'quantumBOX': 'Educational quantum optics experiments and demonstrations for schools and universities.',
+      'coreBOX': 'Essential optical components and basic setups for fundamental optics education.',
+      'FRAME': 'Advanced optical frames and mounting systems for precision experiments.',
+      'General': 'Miscellaneous optical setups and experimental configurations.'
+    };
+    return descriptions[collectionName] || `Collection of ${collectionName} optical setups and experiments.`;
+  };
+
+  const getCollectionImage = (collectionName: string): string => {
+    const images: Record<string, string> = {
+      'quantumBOX': '/images/quantumbox.jpg',
+      'coreBOX': '/images/corebox.jpg', 
+      'FRAME': '/images/frame.jpg',
+      'General': '/images/general.jpg'
+    };
+    return images[collectionName] || '/images/default-collection.jpg';
+  };
+
+  const getCollectionColor = (collectionName: string): string => {
+    const colors: Record<string, string> = {
+      'quantumBOX': '#6a1b9a',
+      'coreBOX': '#1976d2',
+      'FRAME': '#f57c00',
+      'General': '#616161'
+    };
+    return colors[collectionName] || '#616161';
+  };
+
+  const getSampleCollections = (): CollectionMetadata[] => [
+    {
+      name: 'quantumBOX',
+      description: 'Educational quantum optics experiments and demonstrations for schools and universities.',
+      setupCount: 5,
+      color: '#6a1b9a'
+    },
+    {
+      name: 'coreBOX', 
+      description: 'Essential optical components and basic setups for fundamental optics education.',
+      setupCount: 8,
+      color: '#1976d2'
+    },
+    {
+      name: 'FRAME',
+      description: 'Advanced optical frames and mounting systems for precision experiments.',
+      setupCount: 3,
+      color: '#f57c00'
+    }
+  ];
 
   const fetchSetups = async () => {
     try {
@@ -242,6 +435,15 @@ export const SetupBrowser: React.FC = () => {
     }
   };
 
+  const handleCollectionClick = (collectionName: string) => {
+    // Navigate to collection-specific page
+    navigate(`/${collectionName}`);
+  };
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
       'Microscopy': '#e74c3c',
@@ -372,7 +574,10 @@ export const SetupBrowser: React.FC = () => {
             <Button 
               variant="outlined" 
               startIcon={<RefreshIcon />}
-              onClick={fetchSetups}
+              onClick={() => {
+                fetchSetups();
+                fetchCollections();
+              }}
               disabled={loading}
               fullWidth
               sx={{
@@ -396,148 +601,311 @@ export const SetupBrowser: React.FC = () => {
           </Box>
         </Box>
 
-        <Box 
-          sx={{ 
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              sm: 'repeat(auto-fill, minmax(280px, 1fr))',
-              md: 'repeat(auto-fill, minmax(300px, 1fr))'
-            },
-            gap: { xs: 2, sm: 3 }
-          }}
-        >
-          {setups.map((setup, index) => (
-            <Box key={index}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  cursor: 'pointer',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  minHeight: { xs: 280, sm: 320 },
-                  touchAction: 'manipulation',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                  '&:active': {
-                    transform: { xs: 'scale(0.98)', sm: 'translateY(-4px) scale(0.98)' },
-                  },
-                  '@media (max-width: 768px)': {
-                    '&:hover': {
-                      transform: 'none',
-                      boxShadow: 'inherit',
-                    },
-                  }
-                }}
-                onClick={() => handleSetupClick(setup)}
-              >
-                <CardMedia
-                  component="div"
-                  sx={{
-                    height: 200,
-                    backgroundColor: '#f5f5f5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative'
-                  }}
-                >
-                  {setup.screenshot ? (
-                    <img
-                      src={setup.screenshot}
-                      alt={setup.name}
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain'
-                      }}
-                      onError={(e) => {
-                        // Hide broken images and show placeholder
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : null}
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'rgba(0,0,0,0.1)',
-                      color: 'text.secondary'
-                    }}
-                  >
-                    {!setup.screenshot && (
-                      <Typography variant="h6">
-                        🔬 {setup.name}
-                      </Typography>
-                    )}
-                  </Box>
-                </CardMedia>
-                <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                  <Box mb={1}>
-                    <Chip
-                      label={setup.category}
-                      size="small"
-                      sx={{
-                        backgroundColor: getCategoryColor(setup.category),
-                        color: 'white',
-                        mb: 1
-                      }}
-                    />
-                  </Box>
-                  <Typography variant="h6" component="h2" gutterBottom>
-                    {setup.name}
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary" 
-                    sx={{ 
-                      flexGrow: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical'
-                    }}
-                  >
-                    {setup.description}
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    size="small" 
-                    sx={{ mt: 2, alignSelf: 'flex-start' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSetupClick(setup);
-                    }}
-                  >
-                    Load Setup
-                  </Button>
-                </CardContent>
-              </Card>
-            </Box>
-          ))}
+        {/* Tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="setup browser tabs">
+            <Tab label="Individual Setups" />
+            <Tab label="Available Collections" />
+          </Tabs>
         </Box>
 
-        {setups.length === 0 && (
-          <Box textAlign="center" py={8}>
-            <Typography variant="h6" color="text.secondary">
-              No setups found
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              The setup repository might be empty or unavailable.
-            </Typography>
-          </Box>
+        {/* Tab Content */}
+        {tabValue === 0 && (
+          // Individual Setups Tab Content
+          <>
+            <Box 
+              sx={{ 
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  sm: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  md: 'repeat(auto-fill, minmax(300px, 1fr))'
+                },
+                gap: { xs: 2, sm: 3 }
+              }}
+            >
+              {setups.map((setup, index) => (
+                <Box key={index}>
+                  <Card 
+                    sx={{ 
+                      height: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      cursor: 'pointer',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                      minHeight: { xs: 280, sm: 320 },
+                      touchAction: 'manipulation',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                      },
+                      '&:active': {
+                        transform: { xs: 'scale(0.98)', sm: 'translateY(-4px) scale(0.98)' },
+                      },
+                      '@media (max-width: 768px)': {
+                        '&:hover': {
+                          transform: 'none',
+                          boxShadow: 'inherit',
+                        },
+                      }
+                    }}
+                    onClick={() => handleSetupClick(setup)}
+                  >
+                    <CardMedia
+                      component="div"
+                      sx={{
+                        height: 200,
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative'
+                      }}
+                    >
+                      {setup.screenshot ? (
+                        <img
+                          src={setup.screenshot}
+                          alt={setup.name}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain'
+                          }}
+                          onError={(e) => {
+                            // Hide broken images and show placeholder
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : null}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          color: 'text.secondary'
+                        }}
+                      >
+                        {!setup.screenshot && (
+                          <Typography variant="h6">
+                            🔬 {setup.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </CardMedia>
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                      <Box mb={1}>
+                        <Chip
+                          label={setup.category}
+                          size="small"
+                          sx={{
+                            backgroundColor: getCategoryColor(setup.category),
+                            color: 'white',
+                            mb: 1
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="h6" component="h2" gutterBottom>
+                        {setup.name}
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                          flexGrow: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical'
+                        }}
+                      >
+                        {setup.description}
+                      </Typography>
+                      <Button 
+                        variant="contained" 
+                        size="small" 
+                        sx={{ mt: 2, alignSelf: 'flex-start' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSetupClick(setup);
+                        }}
+                      >
+                        Load Setup
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Box>
+              ))}
+            </Box>
+
+            {setups.length === 0 && !loading && (
+              <Box textAlign="center" py={8}>
+                <Typography variant="h6" color="text.secondary">
+                  No setups found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  The setup repository might be empty or unavailable.
+                </Typography>
+              </Box>
+            )}
+          </>
+        )}
+
+        {tabValue === 1 && (
+          // Collections Tab Content
+          <>
+            <Box 
+              sx={{ 
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  sm: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  md: 'repeat(auto-fill, minmax(320px, 1fr))'
+                },
+                gap: { xs: 2, sm: 3 }
+              }}
+            >
+              {collections.map((collection, index) => (
+                <Box key={index}>
+                  <Card 
+                    sx={{ 
+                      height: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      cursor: 'pointer',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                      minHeight: { xs: 320, sm: 360 },
+                      touchAction: 'manipulation',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                      },
+                      '&:active': {
+                        transform: { xs: 'scale(0.98)', sm: 'translateY(-4px) scale(0.98)' },
+                      },
+                      '@media (max-width: 768px)': {
+                        '&:hover': {
+                          transform: 'none',
+                          boxShadow: 'inherit',
+                        },
+                      }
+                    }}
+                    onClick={() => handleCollectionClick(collection.name)}
+                  >
+                    <CardMedia
+                      component="div"
+                      sx={{
+                        height: 200,
+                        backgroundColor: collection.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        backgroundImage: `linear-gradient(45deg, ${collection.color}cc, ${collection.color})`
+                      }}
+                    >
+                      {collection.image ? (
+                        <img
+                          src={collection.image}
+                          alt={collection.name}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain'
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : null}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: 'rgba(0,0,0,0.2)',
+                          color: 'white'
+                        }}
+                      >
+                        <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                          {collection.name}
+                        </Typography>
+                      </Box>
+                    </CardMedia>
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                      <Box mb={2}>
+                        <Chip
+                          label={`${collection.setupCount} setups`}
+                          size="small"
+                          sx={{
+                            backgroundColor: collection.color,
+                            color: 'white'
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="h6" component="h3" gutterBottom>
+                        {collection.name} Collection
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                          flexGrow: 1,
+                          mb: 2
+                        }}
+                      >
+                        {collection.description}
+                      </Typography>
+                      <Button 
+                        variant="contained" 
+                        size="medium" 
+                        sx={{ 
+                          mt: 'auto',
+                          backgroundColor: collection.color,
+                          '&:hover': {
+                            backgroundColor: collection.color,
+                            filter: 'brightness(0.9)'
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCollectionClick(collection.name);
+                        }}
+                      >
+                        Explore {collection.name}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Box>
+              ))}
+            </Box>
+
+            {collections.length === 0 && !loading && (
+              <Box textAlign="center" py={8}>
+                <Typography variant="h6" color="text.secondary">
+                  No collections found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Collections data might be unavailable.
+                </Typography>
+              </Box>
+            )}
+          </>
         )}
 
         {/* Floating Action Button for creating new setup metadata */}

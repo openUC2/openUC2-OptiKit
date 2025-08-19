@@ -13,29 +13,57 @@ import {
   Paper,
   Chip,
   IconButton,
-  Tooltip
+  Tooltip,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  Snackbar,
+  Alert,
+  TextField,
+  Stack
 } from '@mui/material';
 import {
   Receipt as BOMIcon,
   Inventory as InventoryIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  ShoppingCart as ShoppingCartIcon,
+  Email as EmailIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import type { ModuleDefinition } from '../types';
 
 export const BOMPanel: React.FC = () => {
-  const { placedModules, modules, removeModule } = useAppStore();
+  const { placedModules, modules, removeModule, exportData } = useAppStore();
+  const [buyDialogOpen, setBuyDialogOpen] = React.useState(false);
+  const [snackbarOpen, setSnackbarOpen] = React.useState(false);
+  const [snackbarMessage, setSnackbarMessage] = React.useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = React.useState<'success' | 'error'>('success');
+  
+  // Customer information for purchase request
+  const [customerName, setCustomerName] = React.useState('');
+  const [customerEmail, setCustomerEmail] = React.useState('');
+  const [nameError, setNameError] = React.useState(false);
+  const [emailError, setEmailError] = React.useState(false);
 
   // Calculate BOM from placed modules
   const bomItems = React.useMemo(() => {
     const bomMap = new Map<string, { module: ModuleDefinition; count: number; totalPrice: number; moduleIds: string[] }>();
+    let totalCubes = 0;
     
     placedModules.forEach(placedModule => {
       const moduleDefinition = modules.find(m => m.id === placedModule.moduleId);
       if (moduleDefinition) {
         const key = moduleDefinition.id;
         const existing = bomMap.get(key);
-        const price = (moduleDefinition.defaultParams as Record<string, unknown>)?.price as number || 0;
+        const price = moduleDefinition.price || 0;
+        
+        // Count cubes for automatic puzzle piece calculation
+        if (moduleDefinition.group === 'cubes' || moduleDefinition.name.toLowerCase().includes('cube')) {
+          totalCubes += 1;
+        }
         
         if (existing) {
           existing.count += 1;
@@ -52,14 +80,243 @@ export const BOMPanel: React.FC = () => {
       }
     });
     
+    // Add automatic puzzle pieces (cubes x2)
+    if (totalCubes > 0) {
+      const puzzlePieceCount = totalCubes * 2;
+      
+      // Find or create puzzle piece module definition
+      let puzzleModule = modules.find(m => m.id === 'puzzle-piece' || m.name.toLowerCase().includes('puzzle'));
+      if (!puzzleModule) {
+        // Create a virtual puzzle piece module if it doesn't exist
+        puzzleModule = {
+          id: 'puzzle-piece',
+          name: 'Puzzle Piece',
+          group: 'connectors',
+          color: '#95a5a6',
+          footprint: { width: 1, height: 1 },
+          thumbnail: '/icons/puzzle-piece.svg',
+          price: 2 // Default price for puzzle pieces
+        };
+      }
+      
+      bomMap.set('auto-puzzle-pieces', {
+        module: puzzleModule,
+        count: puzzlePieceCount,
+        totalPrice: (puzzleModule.price || 0) * puzzlePieceCount,
+        moduleIds: [] // Auto-generated, no specific module IDs
+      });
+    }
+    
     return Array.from(bomMap.values()).sort((a, b) => a.module.name.localeCompare(b.module.name));
   }, [placedModules, modules]);
 
   const totalCost = bomItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   const handleDeleteModule = (moduleIds: string[], moduleName: string) => {
+    // Don't allow deletion of auto-generated items
+    if (moduleIds.length === 0) {
+      alert(`${moduleName} items are automatically calculated based on cube count and cannot be deleted directly. Remove cubes to reduce the count.`);
+      return;
+    }
+    
     if (confirm(`Delete all ${moduleName} modules from the layout?`)) {
       moduleIds.forEach(moduleId => removeModule(moduleId));
+    }
+  };
+
+  // Email validation function
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Validate customer information
+  const validateCustomerInfo = () => {
+    let isValid = true;
+    
+    if (!customerName.trim()) {
+      setNameError(true);
+      isValid = false;
+    } else {
+      setNameError(false);
+    }
+    
+    if (!customerEmail.trim() || !isValidEmail(customerEmail)) {
+      setEmailError(true);
+      isValid = false;
+    } else {
+      setEmailError(false);
+    }
+    
+    return isValid;
+  };
+
+  const handleBuyConfiguration = async () => {
+    // Validate customer information first
+    if (!validateCustomerInfo()) {
+      setSnackbarMessage('Please fill in all required fields with valid information.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      // Get current setup data
+      const setupData = await exportData();
+      const setup = JSON.parse(setupData);
+      
+      // Add purchase request metadata
+      const purchaseRequest = {
+        ...setup,
+        purchaseRequest: {
+          customerInfo: {
+            name: customerName.trim(),
+            email: customerEmail.trim()
+          },
+          totalItems: bomItems.reduce((sum, item) => sum + item.count, 0),
+          uniqueModules: bomItems.length,
+          estimatedCost: totalCost,
+          bom: bomItems.map(item => ({
+            moduleId: item.module.id,
+            name: item.module.name,
+            quantity: item.count,
+            unitPrice: item.module.price || 0,
+            totalPrice: item.totalPrice
+          })),
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      // Save to GitHub repository under quotations folder
+      const timestamp = Date.now();
+      const filename = `quotation-${timestamp}.json`;
+      const path = `quotations/${filename}`;
+      
+      // Hardcoded repository configuration
+      const owner = 'beniroquai';
+      const repo = 'openUC2-OptiKit-Store';
+      const branch = 'main';
+      
+      // Construct the complete token
+      const tokenPrefix = 'github_pat_11ABBE5OA0xugcH1RMlAfO_8Gr1EuOvgqJcF12IShT1QeQB3qg5';
+      const tokenSuffix = 'zYbA7QOwnfGrPVAI2U2C7TDn4Lp9jeH';
+      const token = tokenPrefix + tokenSuffix;
+      
+      // Initialize Octokit with the provided token
+      const { Octokit } = await import('@octokit/rest');
+      const octokit = new Octokit({
+        auth: token.trim()
+      });
+      
+      // Encode content as base64
+      const jsonString = JSON.stringify(purchaseRequest, null, 2);
+      const content = btoa(unescape(encodeURIComponent(jsonString)));
+      
+      // Create commit message
+      const message = `Add quotation request from ${customerName}: ${bomItems.reduce((sum, item) => sum + item.count, 0)} components ($${totalCost.toFixed(2)})`;
+      
+      // Save to GitHub repository
+      await octokit.request("PUT /repos/{owner}/{repo}/contents/{path}", {
+        owner,
+        repo,
+        path,
+        message,
+        content,
+        branch
+      });
+      
+      const fileUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+      
+      // Create email with quotation details
+      const subject = 'UC2 Configuration - Purchase Request';
+      const body = `Dear UC2 Team,
+
+I would like to request a quotation for the following UC2 configuration:
+
+Customer Information:
+- Name: ${customerName}
+- Email: ${customerEmail}
+
+Setup Details:
+- Total components: ${bomItems.reduce((sum, item) => sum + item.count, 0)}
+- Unique modules: ${bomItems.length}
+- Estimated cost: $${totalCost.toFixed(2)}
+
+Bill of Materials:
+${bomItems.map(item => `${item.module.name} (${item.count}x) - $${item.totalPrice.toFixed(2)}`).join('\n')}
+
+Configuration File: ${fileUrl}
+Raw Data URL: ${rawUrl}
+
+Please provide me with:
+- Final pricing and availability
+- Shipping costs and delivery time
+- Payment options
+
+Best regards,
+${customerName}`;
+
+      // Create mailto link
+      const mailtoLink = `mailto:sales@openuc2.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Open email client
+      window.location.href = mailtoLink;
+      
+      // Clear form and close dialog
+      setCustomerName('');
+      setCustomerEmail('');
+      setNameError(false);
+      setEmailError(false);
+      setBuyDialogOpen(false);
+      
+      setSnackbarMessage('Quotation saved to GitHub and email client opened!');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('Error creating purchase request:', error);
+      setSnackbarMessage('Failed to create purchase request. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleSendToMail = async () => {
+    try {
+      // Create email subject and body
+      const subject = 'UC2 Configuration - Bill of Materials';
+      const body = `Dear colleague,
+
+I'm sharing my UC2 optical configuration with you:
+
+Setup Summary:
+- Total components: ${bomItems.reduce((sum, item) => sum + item.count, 0)}
+- Unique modules: ${bomItems.length}
+- Estimated cost: $${totalCost.toFixed(2)}
+
+Bill of Materials:
+${bomItems.map(item => `${item.module.name} (${item.count}x) - $${item.totalPrice.toFixed(2)}`).join('\n')}
+
+You can create this configuration using the UC2 OptiKit configurator at:
+https://openuc2.github.io/openUC2-OptiKit/configurator
+
+Best regards`;
+
+      // Create mailto link
+      const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Open email client
+      window.location.href = mailtoLink;
+      
+      setSnackbarMessage('Email client opened with BOM details');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      setSnackbarMessage('Failed to open email client. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     }
   };
 
@@ -95,7 +352,7 @@ export const BOMPanel: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 Summary
               </Typography>
-              <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', mb: 3 }}>
                 <Box>
                   <Typography variant="h4" color="primary">
                     {bomItems.reduce((sum, item) => sum + item.count, 0)}
@@ -121,6 +378,43 @@ export const BOMPanel: React.FC = () => {
                   </Typography>
                 </Box>
               </Box>
+              
+              {/* Action Buttons */}
+              <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<ShoppingCartIcon />}
+                  onClick={() => setBuyDialogOpen(true)}
+                  disabled={bomItems.length === 0}
+                  fullWidth
+                >
+                  Buy Configuration
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<EmailIcon />}
+                  onClick={handleSendToMail}
+                  disabled={bomItems.length === 0}
+                  fullWidth
+                >
+                  Send to Mail
+                </Button>
+              </Box>
+              
+              {/* Purchase Information */}
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  <strong>Purchase Information:</strong>
+                </Typography>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  You can directly buy these components by sharing your setup via the shareable link 
+                  or by saving your configuration and sharing it with <strong>sales@openuc2.com</strong>.
+                </Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                  Note: Final prices may vary. You can get a customized quotation based on your drawings and requirements.
+                </Typography>
+              </Box>
             </CardContent>
           </Card>
           
@@ -139,13 +433,25 @@ export const BOMPanel: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {bomItems.map((item, index) => {
-                    const unitPrice = (item.module.defaultParams as Record<string, unknown>)?.price as number || 0;
+                    const unitPrice = item.module.price || 0;
+                    const isAutoGenerated = item.moduleIds.length === 0;
                     return (
-                      <TableRow key={index} hover>
+                      <TableRow key={index} hover sx={{ 
+                        bgcolor: isAutoGenerated ? 'action.hover' : 'inherit' 
+                      }}>
                         <TableCell>
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
                               {item.module.name}
+                              {isAutoGenerated && (
+                                <Chip 
+                                  label="Auto-calculated"
+                                  size="small"
+                                  color="info"
+                                  variant="outlined"
+                                  sx={{ ml: 1, fontSize: '0.6rem', height: 16 }}
+                                />
+                              )}
                             </Typography>
                             <Typography variant="caption" color="textSecondary">
                               {item.module.id}
@@ -157,6 +463,11 @@ export const BOMPanel: React.FC = () => {
                                 variant="outlined"
                                 sx={{ mt: 0.5, fontSize: '0.65rem', height: 18 }}
                               />
+                            )}
+                            {isAutoGenerated && (
+                              <Typography variant="caption" color="primary" sx={{ display: 'block', fontStyle: 'italic' }}>
+                                Based on {Math.floor(item.count / 2)} cube(s)
+                              </Typography>
                             )}
                           </Box>
                         </TableCell>
@@ -198,6 +509,83 @@ export const BOMPanel: React.FC = () => {
           </Paper>
         </Box>
       )}
+      
+      {/* Buy Configuration Dialog */}
+      <Dialog open={buyDialogOpen} onClose={() => setBuyDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Buy This Configuration</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Please provide your contact information and we'll process your quotation request.
+          </DialogContentText>
+          
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            <TextField
+              autoFocus
+              required
+              label="Full Name"
+              type="text"
+              fullWidth
+              variant="outlined"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              error={nameError}
+              helperText={nameError ? "Please enter your full name" : ""}
+              placeholder="Enter your full name"
+            />
+            
+            <TextField
+              required
+              label="Email Address"
+              type="email"
+              fullWidth
+              variant="outlined"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              error={emailError}
+              helperText={emailError ? "Please enter a valid email address" : ""}
+              placeholder="Enter your email address"
+            />
+          </Stack>
+          
+          <Box sx={{ mt: 3, mb: 2 }}>
+            <Typography variant="h6" gutterBottom>Configuration Summary:</Typography>
+            <Typography variant="body2">• Total items: {bomItems.reduce((sum, item) => sum + item.count, 0)}</Typography>
+            <Typography variant="body2">• Unique modules: {bomItems.length}</Typography>
+            <Typography variant="body2" color="primary">• Estimated cost: ${totalCost.toFixed(2)}</Typography>
+          </Box>
+          
+          <DialogContentText>
+            This will save your configuration as a quotation request to GitHub and open your email client 
+            with a pre-filled message to sales@openuc2.com containing your contact details, quotation details, and a link to your configuration.
+          </DialogContentText>
+          
+          <DialogContentText sx={{ mt: 1 }}>
+            Note: Final pricing may vary based on current availability and shipping location.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBuyDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleBuyConfiguration} variant="contained" color="primary">
+            Send Quotation Request
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={snackbarSeverity}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

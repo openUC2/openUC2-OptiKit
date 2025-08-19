@@ -18,13 +18,23 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     annotationMode, 
     addAnnotation, 
     moveAnnotation,
+    removeAnnotation,
     selectItem, 
     selectedItemId,
-    setAnnotationMode 
+    setAnnotationMode,
+    layers
   } = useAppStore();
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
+
+  const handleContextMenu = (e: KonvaEventObject<MouseEvent>, annotationId: string) => {
+    e.evt.preventDefault();
+    const confirmDelete = window.confirm('Delete this annotation?');
+    if (confirmDelete) {
+      removeAnnotation(annotationId);
+    }
+  };
 
   const handleCanvasClick = (e: KonvaEventObject<MouseEvent>) => {
     if (annotationMode === 'none') return;
@@ -114,7 +124,10 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   };
 
   const renderAnnotations = () => {
-    const layerAnnotations = annotations.filter(ann => ann.layer === currentLayerIndex);
+    const layerAnnotations = annotations.filter(ann => {
+      const annotationLayer = layers.find(layer => layer.index === ann.layer);
+      return annotationLayer && annotationLayer.visible;
+    });
     
     return layerAnnotations.map(annotation => {
       const isSelected = selectedItemId === annotation.id;
@@ -133,6 +146,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             fill={strokeColor}
             draggable
             onClick={() => selectItem(annotation.id, 'annotation')}
+            onContextMenu={(e) => handleContextMenu(e, annotation.id)}
             onDragEnd={(e) => {
               const pos = e.target.position();
               moveAnnotation(annotation.id, pos);
@@ -153,6 +167,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               strokeWidth={strokeWidth}
               fill={strokeColor}
               onClick={() => selectItem(annotation.id, 'annotation')}
+              onContextMenu={(e) => handleContextMenu(e, annotation.id)}
             />
           );
         } else if (annotation.type === 'optical-axis') {
@@ -164,6 +179,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               strokeWidth={strokeWidth}
               dash={[10, 5]}
               onClick={() => selectItem(annotation.id, 'annotation')}
+              onContextMenu={(e) => handleContextMenu(e, annotation.id)}
             />
           );
         } else {
@@ -174,6 +190,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               stroke={strokeColor}
               strokeWidth={strokeWidth}
               onClick={() => selectItem(annotation.id, 'annotation')}
+              onContextMenu={(e) => handleContextMenu(e, annotation.id)}
             />
           );
         }

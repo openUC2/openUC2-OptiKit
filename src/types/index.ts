@@ -23,6 +23,7 @@ export interface ModuleDefinition {
   isWildCard?: boolean;
   autodeskInventor?: string;
   price?: number;
+  notification?: string;
 }
 
 export interface PlacedModule {
@@ -74,6 +75,9 @@ export interface StateSnapshot {
   annotations: Annotation[];
   layers: Layer[];
   activeLayerId: string;
+  selectedItems: SelectedItem[];
+  selectedItemId: string | null;
+  selectedItemType: 'module' | 'annotation' | null;
 }
 
 // Setup metadata interface
@@ -84,6 +88,12 @@ export interface SetupMetadata {
   description: string;
   category: 'General' | 'Microscopy' | 'Astronomy' | 'Spectroscopy' | 'Imaging' | 'Laser';
   screenshot: string;
+  // New required fields for collections support
+  uc2_verified?: boolean;
+  version?: string;
+  createdAt?: string;
+  collection?: string | string[]; // Support both single and multiple collections
+  notification?: string; // For safety warnings, module requirements, etc.
 }
 
 export interface FeedbackData {
@@ -97,6 +107,20 @@ export interface FeedbackData {
   url: string;
 }
 
+export interface Notification {
+  id: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  title: string;
+  message: string;
+  duration?: number; // in milliseconds, 0 for persistent
+  timestamp: number;
+}
+
+export interface SelectedItem {
+  id: string;
+  type: 'module' | 'annotation';
+}
+
 export interface AppState {
   modules: ModuleDefinition[];
   placedModules: PlacedModule[];
@@ -105,6 +129,8 @@ export interface AppState {
   activeLayerId: string;
   selectedItemId: string | null;
   selectedItemType: 'module' | 'annotation' | null;
+  selectedItems: SelectedItem[]; // For multiple selection
+  selectionMode: 'single' | 'multiple';
   grid: GridConfig;
   viewport: ViewportConfig;
   history: StateSnapshot[]; // Command history for undo/redo
@@ -113,8 +139,10 @@ export interface AppState {
   setupMetadata: SetupMetadata;
   // UI state
   activeRightTab: 'layers' | 'properties' | 'bom';
+  notifications: Notification[];
   // Tutorial state
   tutorialCompleted: boolean;
+  startupDialogClosed: boolean;
 }
 
 export interface Command {

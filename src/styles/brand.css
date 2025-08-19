@@ -91,3 +91,89 @@ body {
   background-color: var(--accent-color);
   color: white;
 }
+
+/* Fix intro.js button sizing and tooltip box */
+.introjs-tooltip {
+  max-width: 400px !important;
+  min-width: 300px !important;
+  min-height: 200px !important;
+  padding: 0 !important;
+}
+
+.introjs-tooltiptext {
+  padding: 20px !important;
+  line-height: 1.5 !important;
+  font-size: 14px !important;
+}
+
+.introjs-tooltipbuttons {
+  text-align: center;
+  padding: 15px 20px !important;
+  min-height: 70px !important;
+  border-top: 1px solid #e0e0e0 !important;
+  background-color: #f9f9f9 !important;
+  margin: 0 !important;
+}
+
+.introjs-button {
+  padding: 10px 20px !important;
+  margin: 0 8px !important;
+  min-width: 100px !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  border-radius: 4px !important;
+  border: 1px solid #ddd !important;
+  background-color: white !important;
+  cursor: pointer !important;
+}
+
+.introjs-nextbutton {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
+.introjs-skipbutton {
+  background-color: #6c757d !important;
+  color: white !important;
+  border-color: #6c757d !important;
+}
+
+.introjs-donebutton {
+  background-color: var(--accent-color) !important;
+  color: white !important;
+  border-color: var(--accent-color) !important;
+}
+
+/* Ensure tooltip doesn't get cut off at screen edges */
+.introjs-tooltip {
+  box-sizing: border-box !important;
+}
+
+.introjs-arrow {
+  border-color: transparent !important;
+}
+
+/* Responsive tooltip sizing for mobile */
+@media (max-width: 768px) {
+  .introjs-tooltip {
+    max-width: 90vw !important;
+    min-width: 280px !important;
+  }
+  
+  .introjs-tooltiptext {
+    padding: 15px !important;
+    font-size: 13px !important;
+  }
+  
+  .introjs-tooltipbuttons {
+    padding: 12px 15px !important;
+  }
+  
+  .introjs-button {
+    padding: 8px 15px !important;
+    margin: 0 4px !important;
+    min-width: 80px !important;
+    font-size: 13px !important;
+  }
+}

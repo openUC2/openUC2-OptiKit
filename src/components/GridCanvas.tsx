@@ -23,6 +23,8 @@ export const GridCanvas: React.FC = () => {
     layers,
     activeLayerId,
     selectedItemId,
+    selectedItems,
+    selectionMode,
     modules,
     placeModule,
     moveModule,
@@ -342,7 +344,10 @@ export const GridCanvas: React.FC = () => {
   // Render placed modules
   const renderPlacedModules = () => {
     return placedModules
-      .filter(module => module.layer === currentLayerIndex)
+      .filter(module => {
+        const moduleLayer = layers.find(layer => layer.index === module.layer);
+        return moduleLayer && moduleLayer.visible;
+      })
       .map(module => {
         const moduleDefinition = modules.find(m => m.id === module.moduleId);
         if (!moduleDefinition) return null;
@@ -359,6 +364,7 @@ export const GridCanvas: React.FC = () => {
         const width = actualFootprint.width * cellSize;
         const height = actualFootprint.height * cellSize;
         const moduleImage = moduleImages[module.moduleId];
+        const isSelected = selectedItemId === module.id || selectedItems.some(item => item.id === module.id);
 
         return (
           <Group
@@ -368,7 +374,19 @@ export const GridCanvas: React.FC = () => {
             draggable
             onDragStart={handleModuleDragStart}
             onDragEnd={(e) => handleModuleDragEnd(module.id, e)}
-            onClick={() => selectItem(module.id, 'module')}
+            onClick={(e) => {
+              if (selectionMode === 'multiple' && e.evt.ctrlKey) {
+                // Ctrl+click in multiple mode: toggle selection
+                const isSelected = selectedItems.some(item => item.id === module.id);
+                if (isSelected) {
+                  useAppStore.getState().removeFromSelection(module.id);
+                } else {
+                  useAppStore.getState().addToSelection(module.id, 'module');
+                }
+              } else {
+                selectItem(module.id, 'module');
+              }
+            }}
           >
             <Group
               rotation={module.rotation}
@@ -382,8 +400,8 @@ export const GridCanvas: React.FC = () => {
                   image={moduleImage}
                   width={moduleDefinition.footprint.width * cellSize}
                   height={moduleDefinition.footprint.height * cellSize}
-                  stroke={selectedItemId === module.id ? '#2980b9' : '#34495e'}
-                  strokeWidth={(selectedItemId === module.id ? 3 : 1) / viewport.zoom}
+                  stroke={isSelected ? '#2980b9' : '#34495e'}
+                  strokeWidth={(isSelected ? 3 : 1) / viewport.zoom}
                   opacity={0.9}
                 />
               ) : (
@@ -391,8 +409,8 @@ export const GridCanvas: React.FC = () => {
                   width={moduleDefinition.footprint.width * cellSize}
                   height={moduleDefinition.footprint.height * cellSize}
                   fill={moduleDefinition.color}
-                  stroke={selectedItemId === module.id ? '#2980b9' : '#34495e'}
-                  strokeWidth={(selectedItemId === module.id ? 3 : 1) / viewport.zoom}
+                  stroke={isSelected ? '#2980b9' : '#34495e'}
+                  strokeWidth={(isSelected ? 3 : 1) / viewport.zoom}
                   opacity={0.8}
                 />
               )}

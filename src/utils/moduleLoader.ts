@@ -13,6 +13,7 @@ export interface ModuleCSVRow {
   defaultParams: string;
   autodeskInventor?: string;
   price?: string;
+  notification?: string;
 }
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
@@ -56,6 +57,13 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
     console.warn(`Invalid defaultParams for module ${row.id}:`, row.defaultParams);
   }
 
+  // Parse notification field
+  let notification = '';
+  if (row.notification && row.notification.trim()) {
+    // Remove quotes and handle escaped quotes
+    notification = row.notification.replace(/^"(.+)"$/, '$1').replace(/""/g, '"');
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -71,7 +79,8 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
     defaultParams,
     isWildCard: (defaultParams as { isWildCard?: boolean }).isWildCard || false,
     autodeskInventor: row.autodeskInventor,
-    price: row.price ? parseFloat(row.price) : undefined
+    price: row.price ? parseFloat(row.price) : undefined,
+    notification: notification || undefined
   };
 }
 

@@ -13,8 +13,6 @@ import {
 import {
   Undo as UndoIcon,
   Redo as RedoIcon,
-  GridOn as GridIcon,
-  CropFree as SnapIcon,
   CenterFocusStrong as CenterIcon,
   Timeline as LineIcon,
   ArrowForward as ArrowIcon,
@@ -33,7 +31,10 @@ import {
   Clear as ClearIcon,
   Link as LinkIcon,
   Dashboard as SetupIcon,
-  Edit as EditorIcon
+  Edit as EditorIcon,
+  Forum as ForumIcon,
+  SelectAll as SelectIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import { FeedbackDialog } from './FeedbackDialog';
@@ -41,14 +42,12 @@ import { FeedbackDialog } from './FeedbackDialog';
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isEditorPage = location.pathname === '/';
+  const isEditorPage = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
   
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
   
   const { 
-    grid, 
-    setGridConfig, 
     exportData, 
     saveToGitHub,
     generateShareableLink,
@@ -61,7 +60,11 @@ export const Toolbar: React.FC = () => {
     annotationMode,
     setAnnotationMode,
     downloadScreenshot,
-    clearAll
+    clearAll,
+    selectionMode,
+    setSelectionMode,
+    deleteSelectedItems,
+    selectedItems
   } = useAppStore();
 
   const handleExport = async () => {
@@ -190,7 +193,6 @@ EXPORT/IMPORT:
 • Screenshot: Download PNG image of assembly
 
 SHORTCUTS:
-• Grid toggle: Show/hide grid lines
 • Snap toggle: Enable/disable snap-to-grid
 • Undo/Redo: Navigate through changes
 
@@ -226,6 +228,10 @@ openUC2 team via GitHub repository
 `;
     
     alert(privacyContent);
+  };
+
+  const handleForum = () => {
+    window.open('https://openuc2.discourse.group', '_blank');
   };
 
   const handleImport = () => {
@@ -318,7 +324,7 @@ openUC2 team via GitHub repository
             <Button
               color="inherit"
               startIcon={isEditorPage ? <SetupIcon /> : <EditorIcon />}
-              onClick={() => navigate(isEditorPage ? '/setups' : '/')}
+              onClick={() => navigate(isEditorPage ? '/configurator/setups' : '/configurator')}
               size="small"
               sx={{ 
                 textTransform: 'none',
@@ -379,22 +385,13 @@ openUC2 team via GitHub repository
 
           {/* Grid Controls - Hidden on small mobile */}
           <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.5 }}>
-            <Tooltip title="Toggle Grid">
+            <Tooltip title={`Selection Mode: ${selectionMode === 'single' ? 'Single' : 'Multiple'}`}>
               <IconButton 
-                color={grid.gridVisible ? "secondary" : "inherit"}
-                onClick={() => setGridConfig({ gridVisible: !grid.gridVisible })}
+                color={selectionMode === 'multiple' ? "secondary" : "inherit"}
+                onClick={() => setSelectionMode(selectionMode === 'single' ? 'multiple' : 'single')}
                 size="small"
               >
-                <GridIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Toggle Snap to Grid">
-              <IconButton 
-                color={grid.snapEnabled ? "secondary" : "inherit"}
-                onClick={() => setGridConfig({ snapEnabled: !grid.snapEnabled })}
-                size="small"
-              >
-                <SnapIcon />
+                <SelectIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Center View">
@@ -406,6 +403,17 @@ openUC2 team via GitHub repository
                 <CenterIcon />
               </IconButton>
             </Tooltip>
+            {selectedItems.length > 1 && (
+              <Tooltip title={`Delete ${selectedItems.length} selected items`}>
+                <IconButton 
+                  color="error"
+                  onClick={deleteSelectedItems}
+                  size="small"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
         </Box>
 
@@ -520,7 +528,7 @@ openUC2 team via GitHub repository
               <STLIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Save to GitHub">
+          <Tooltip title="Upload to Optical Setup Browser">
             <IconButton 
               color="inherit"
               onClick={handleSaveToGitHub}
@@ -545,6 +553,15 @@ openUC2 team via GitHub repository
 
         {/* Help Section - Minimal on mobile */}
         <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.5, ml: 'auto' }}>
+          <Tooltip title="Forum Support">
+            <IconButton 
+              color="inherit"
+              onClick={handleForum}
+              size="small"
+            >
+              <ForumIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Help">
             <IconButton 
               color="inherit"
