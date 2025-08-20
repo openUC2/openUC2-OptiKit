@@ -12,7 +12,7 @@ filter-bandpass;Bandpass Filter;fluorescence;#4a9b8e;1;1;/icons/uc2_filter_1x1.s
 filter-dichroic;Dichroic Mirror;fluorescence;#6c757d;1;1;/icons/uc2_dichroicmirror_1x1.svg;/cad/filter-dichroic.stl;Dichroic mirror for fluorescence separation;"{""cutoff"": 510}";ASS - 2027 - CUBDICSPL+EMIFIL_WLS532 - A.iam;250;
 camera-usb;USB Camera with tube lens (CMOUNT);cameras;#343a40;1;2;/icons/uc2_cctvcam_1x2.svg;/cad/camera-usb.stl;USB camera module for imaging;"{""resolution"": ""1920x1080""}";ASS - 2045 - CUBCAM_RASPBERRY - V04.iam;600;
 stage-z;Z Stage;stages;#495057;2;2;/icons/uc2_zstage_1x2.svg;/cad/stage-z.stl;Z-axis focus stage;"{""range"": 10}";ASS - 3004 - CUBMANSTGR10 - V04.iam;100;
-stage-z-motorized;Z Stage (motorized);stages;#495057;2;2;/icons/uc2_motorized_2x2.svg;/cad/stage-z.stl;Z-axis focus stage motorized;"{""range"": 10}";ASS - 3004 - CUBMANSTGR10 - V04.iam;250;
+stage-z-motorized;Z Stage (motorized);stages;#495057;2;2;/icons/uc2_motorized_z_2x2.svg;/cad/stage-z.stl;Z-axis focus stage motorized;"{""range"": 10}";ASS - 3004 - CUBMANSTGR10 - V04.iam;250;
 laser-405nm;Laser 405nm;fluorescence;#6610f2;1;1;/icons/uc2_laser_1x1.svg;/cad/laser-405nm.stl;405nm laser diode module;"{""power"": 5}";ASS - 2018 - CUBLAS520 - V04.iam;200;
 laser-532nm;Laser 532nm;fluorescence;#198754;1;1;/icons/uc2_laser_1x1.svg;/cad/laser-532nm.stl;532nm laser diode module;"{""power"": 10}";ASS - 2018 - CUBLAS520 - V04.iam;150;
 photodiode;Photodiode Detector;detector;#198754;2;1;/icons/uc2_photodiode_1x1.svg;/cad/laser-532nm.stl;Silicon photodiode detector for power measurement and alignment.;"{""activeArea"": 10, ""wavelengthRange"": ""400-1100""}";ASS - 2019 - CUBPHOSEN+LEND16F28 - V04.iam;75;
