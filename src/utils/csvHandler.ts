@@ -6,6 +6,7 @@ interface CustomModuleData {
   metadata: ModuleMetadata;
   moduleSize: { width: number; height: number };
   drawingElements: DrawingElement[];
+  canvasImageData?: string;
 }
 
 export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promise<boolean> {
@@ -29,8 +30,18 @@ export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promi
     const timestamp = Date.now();
     const moduleId = `custom-${timestamp}`;
 
+    // Upload icon to GitHub if canvas image data is provided
+    let iconUrl = '';
+    if (moduleData.canvasImageData) {
+      try {
+        iconUrl = await uploadIconToGitHub(octokit, owner, repo, branch, moduleId, moduleData.canvasImageData);
+      } catch (iconError) {
+        console.warn('Failed to upload icon, proceeding without icon:', iconError);
+      }
+    }
+
     // Prepare the CSV row data
-    const csvRow = createCSVRowFromModule(moduleId, moduleData);
+    const csvRow = createCSVRowFromModule(moduleId, moduleData, iconUrl);
 
     // Try to get existing CSV file
     let existingContent = '';
@@ -96,7 +107,38 @@ export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promi
   }
 }
 
-function createCSVRowFromModule(moduleId: string, moduleData: CustomModuleData): string {
+async function uploadIconToGitHub(
+  octokit: Octokit, 
+  owner: string, 
+  repo: string, 
+  branch: string, 
+  moduleId: string, 
+  canvasImageData: string
+): Promise<string> {
+  try {
+    // Convert data URL to base64 content
+    const base64Data = canvasImageData.split(',')[1];
+    const iconPath = `icon/${moduleId}.png`;
+    
+    // Upload the icon file
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: iconPath,
+      message: `Add icon for custom module: ${moduleId}`,
+      content: base64Data,
+      branch
+    });
+    
+    // Return the URL to the uploaded icon
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${iconPath}`;
+  } catch (error) {
+    console.error('Failed to upload icon to GitHub:', error);
+    throw error;
+  }
+}
+
+function createCSVRowFromModule(moduleId: string, moduleData: CustomModuleData, iconUrl: string = ''): string {
   const { metadata, moduleSize, drawingElements } = moduleData;
   
   // Escape quotes in strings for CSV
@@ -125,7 +167,7 @@ function createCSVRowFromModule(moduleId: string, moduleData: CustomModuleData):
     escapeCSVField(metadata.color),
     moduleSize.width.toString(),
     moduleSize.height.toString(),
-    '', // thumbnail - could be generated from drawing in the future
+    iconUrl, // Use the uploaded icon URL
     '', // cadUrl - custom modules don't have CAD files initially
     escapeCSVField(metadata.description),
     escapeCSVField(defaultParams),

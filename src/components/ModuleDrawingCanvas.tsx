@@ -38,16 +38,21 @@ interface ModuleDrawingCanvasProps {
   moduleSize: { width: number; height: number };
   elements: DrawingElement[];
   onElementsChange: (elements: DrawingElement[]) => void;
+  onCanvasExport?: (dataUrl: string) => void;
 }
 
 const CELL_SIZE = 80; // Size of each grid cell in pixels
 const COLORS = ['#000000', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
 
-export const ModuleDrawingCanvas: React.FC<ModuleDrawingCanvasProps> = ({
+export const ModuleDrawingCanvas = React.forwardRef<
+  { exportAsImage: () => string | null },
+  ModuleDrawingCanvasProps
+>(({
   moduleSize,
   elements,
-  onElementsChange
-}) => {
+  onElementsChange,
+  onCanvasExport
+}, ref) => {
   const [activeTool, setActiveTool] = useState<DrawingTool>('freehand');
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentElement, setCurrentElement] = useState<DrawingElement | null>(null);
@@ -88,6 +93,32 @@ export const ModuleDrawingCanvas: React.FC<ModuleDrawingCanvasProps> = ({
       onElementsChange(history[newIndex]);
     }
   }, [historyIndex, history, onElementsChange]);
+
+  // Export canvas as image
+  const exportCanvasAsImage = useCallback(() => {
+    if (stageRef.current) {
+      try {
+        const dataUrl = stageRef.current.toDataURL({
+          pixelRatio: 2, // Higher resolution
+          mimeType: 'image/png',
+          quality: 1
+        });
+        if (onCanvasExport) {
+          onCanvasExport(dataUrl);
+        }
+        return dataUrl;
+      } catch (error) {
+        console.error('Failed to export canvas:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [onCanvasExport]);
+
+  // Expose export function to parent
+  React.useImperativeHandle(ref, () => ({
+    exportAsImage: exportCanvasAsImage
+  }));
 
   // Initialize history with current elements
   React.useEffect(() => {
@@ -463,4 +494,4 @@ export const ModuleDrawingCanvas: React.FC<ModuleDrawingCanvasProps> = ({
       </Typography>
     </Box>
   );
-};
+});

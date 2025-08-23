@@ -13,7 +13,9 @@ import {
   InputAdornment,
   Paper,
   Button,
-  Divider
+  Divider,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -29,11 +31,29 @@ export const PartLibrary: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [showWizard, setShowWizard] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0 for all modules, 1 for user created
   const longPressTimeout = useRef<number | null>(null);
   const isDragging = useRef(false);
 
   useEffect(() => {
     loadModules();
+    
+    // Load external sources from GitHub on each page load
+    const loadExternalSources = async () => {
+      try {
+        // Load modules from external GitHub repository
+        const externalResponse = await fetch('https://raw.githubusercontent.com/beniroquai/openUC2-OptiKit-Store/main/parts/parts.csv');
+        if (externalResponse.ok) {
+          await externalResponse.text();
+          console.log('External sources loaded successfully');
+          // The CSV will be processed by the existing loadModules function
+        }
+      } catch (error) {
+        console.warn('Failed to load external sources:', error);
+      }
+    };
+    
+    loadExternalSources();
     
     // Listen for successful module placement feedback
     const handlePlacementSuccess = () => {
@@ -50,14 +70,22 @@ export const PartLibrary: React.FC = () => {
 
   const filteredModules = modules.filter(module => {
     try {
-    const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesGroup = selectedGroup === 'all' || module.group === selectedGroup;
-    return matchesSearch && matchesGroup;
-  } catch (error) {
-    console.error('Error filtering modules:', error);
-    return false; // Skip this module if there's an error
-  }
-});
+      const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesGroup = selectedGroup === 'all' || module.group === selectedGroup;
+      
+      // Filter by tab: 0 = all modules, 1 = user created only
+      const isUserCreated = module.defaultParams && 
+        typeof module.defaultParams === 'object' && 
+        (module.defaultParams as any)?.isCustom === true;
+      
+      const matchesTab = activeTab === 0 || (activeTab === 1 && isUserCreated);
+      
+      return matchesSearch && matchesGroup && matchesTab;
+    } catch (error) {
+      console.error('Error filtering modules:', error);
+      return false; // Skip this module if there's an error
+    }
+  });
 
   const groups = ['all', ...new Set(modules.map(m => m.group))];
 
@@ -336,6 +364,17 @@ export const PartLibrary: React.FC = () => {
           Part Library
         </Typography>
         
+        {/* Tabs for All Parts vs User Created */}
+        <Tabs 
+          value={activeTab} 
+          onChange={(_, newValue) => setActiveTab(newValue)}
+          sx={{ mb: 2 }}
+          variant="fullWidth"
+        >
+          <Tab label="All Parts" />
+          <Tab label="User Created" />
+        </Tabs>
+        
         <TextField
           fullWidth
           size="small"
@@ -428,9 +467,11 @@ export const PartLibrary: React.FC = () => {
         open={showWizard}
         onClose={() => setShowWizard(false)}
         onModuleCreated={(module) => {
-          // Module created successfully
+          // Module created successfully - reload modules to show new user-created module
+          loadModules();
+          // Switch to User Created tab to show the new module
+          setActiveTab(1);
           console.log('Custom module created:', module);
-          // Could trigger a reload of modules here
         }}
       />
     </Box>

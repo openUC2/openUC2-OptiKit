@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -54,6 +54,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   const [activeStep, setActiveStep] = useState(0);
   const [moduleSize, setModuleSize] = useState({ width: 1, height: 1 });
   const [drawingElements, setDrawingElements] = useState<DrawingElement[]>([]);
+  const [canvasImageData, setCanvasImageData] = useState<string>('');
   const [metadata, setMetadata] = useState<ModuleMetadata>({
     name: '',
     group: 'custom',
@@ -65,6 +66,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   });
   const [isCreating, setIsCreating] = useState(false);
   const { loadModules } = useAppStore();
+  const drawingCanvasRef = useRef<any>(null);
 
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -78,6 +80,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
     setActiveStep(0);
     setModuleSize({ width: 1, height: 1 });
     setDrawingElements([]);
+    setCanvasImageData('');
     setMetadata({
       name: '',
       group: 'custom',
@@ -105,11 +108,20 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   const handleCreateModule = async () => {
     setIsCreating(true);
     try {
-      // Save module to GitHub CSV
+      // Capture canvas image before saving
+      if (drawingCanvasRef.current && drawingCanvasRef.current.exportAsImage) {
+        const imageData = drawingCanvasRef.current.exportAsImage();
+        if (imageData) {
+          setCanvasImageData(imageData);
+        }
+      }
+
+      // Save module to GitHub CSV with icon
       const success = await saveModuleToGitHubCSV({
         metadata,
         moduleSize,
-        drawingElements
+        drawingElements,
+        canvasImageData: canvasImageData || ''
       });
 
       if (success) {
@@ -174,9 +186,11 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
       case 1:
         return (
           <ModuleDrawingCanvas
+            ref={drawingCanvasRef}
             moduleSize={moduleSize}
             elements={drawingElements}
             onElementsChange={setDrawingElements}
+            onCanvasExport={setCanvasImageData}
           />
         );
       case 2:

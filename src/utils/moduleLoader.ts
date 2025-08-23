@@ -88,12 +88,28 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
 
 export async function loadModulesFromCSV(csvUrl: string = '/configurator/modules_updated.csv'): Promise<ModuleDefinition[]> {
   try {
-    const response = await fetch(csvUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to load modules CSV: ${response.status}`);
+    // First try to load from external GitHub repository
+    let response;
+    let csvText;
+    
+    try {
+      response = await fetch('https://raw.githubusercontent.com/beniroquai/openUC2-OptiKit-Store/main/parts/parts.csv');
+      if (response.ok) {
+        csvText = await response.text();
+        console.log('Loaded modules from external GitHub repository');
+      } else {
+        throw new Error('External repository not available');
+      }
+    } catch (externalError) {
+      console.warn('Failed to load from external repository, falling back to local CSV:', externalError);
+      // Fallback to local CSV
+      response = await fetch(csvUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load modules CSV: ${response.status}`);
+      }
+      csvText = await response.text();
     }
     
-    const csvText = await response.text();
     const csvRows = parseCSV(csvText);
     return csvRows.map(csvRowToModuleDefinition);
   } catch (error) {
