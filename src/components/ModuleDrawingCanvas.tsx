@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { Stage, Layer, Line, Rect, Circle, Ellipse, Text, Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import Konva from 'konva';
 
 export type DrawingTool = 'freehand' | 'rectangle' | 'circle' | 'ellipse' | 'text';
 
@@ -45,7 +46,7 @@ const CELL_SIZE = 80; // Size of each grid cell in pixels
 const COLORS = ['#000000', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
 
 export const ModuleDrawingCanvas = React.forwardRef<
-  { exportAsImage: () => string | null },
+  { exportAsImage: () => string | null; exportAsSVG: () => string | null },
   ModuleDrawingCanvasProps
 >(({
   moduleSize,
@@ -62,7 +63,7 @@ export const ModuleDrawingCanvas = React.forwardRef<
   const [selectMode, setSelectMode] = useState(false);
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const stageRef = useRef<any>(null);
+  const stageRef = useRef<Konva.Stage>(null);
 
   const canvasWidth = moduleSize.width * CELL_SIZE;
   const canvasHeight = moduleSize.height * CELL_SIZE;
@@ -94,30 +95,95 @@ export const ModuleDrawingCanvas = React.forwardRef<
     }
   }, [historyIndex, history, onElementsChange]);
 
-  // Export canvas as image
-  const exportCanvasAsImage = useCallback(() => {
-    if (stageRef.current) {
-      try {
-        const dataUrl = stageRef.current.toDataURL({
-          pixelRatio: 2, // Higher resolution
-          mimeType: 'image/png',
-          quality: 1
-        });
-        if (onCanvasExport) {
-          onCanvasExport(dataUrl);
-        }
-        return dataUrl;
-      } catch (error) {
-        console.error('Failed to export canvas:', error);
-        return null;
-      }
+  // Generate SVG from drawing elements
+  const generateSVGFromElements = useCallback((elements: DrawingElement[], width: number, height: number): string => {
+    const svgElements: string[] = [];
+    
+    // Add grid background
+    const gridLines: string[] = [];
+    // Vertical lines
+    for (let i = 0; i <= moduleSize.width; i++) {
+      const x = i * CELL_SIZE;
+      gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="#ddd" stroke-width="1"/>`);
     }
-    return null;
-  }, [onCanvasExport]);
+    // Horizontal lines
+    for (let i = 0; i <= moduleSize.height; i++) {
+      const y = i * CELL_SIZE;
+      gridLines.push(`<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="#ddd" stroke-width="1"/>`);
+    }
+    
+    svgElements.push(...gridLines);
+    
+    // Convert each drawing element to SVG
+    elements.forEach((element) => {
+      switch (element.type) {
+        case 'freehand': {
+          if (element.points && element.points.length >= 4) {
+            let pathData = `M ${element.points[0]} ${element.points[1]}`;
+            for (let i = 2; i < element.points.length; i += 2) {
+              pathData += ` L ${element.points[i]} ${element.points[i + 1]}`;
+            }
+            svgElements.push(
+              `<path d="${pathData}" stroke="${element.stroke || '#000'}" stroke-width="${element.strokeWidth || 2}" fill="none" stroke-linecap="round"/>`
+            );
+          }
+          break;
+        }
+        
+        case 'rectangle':
+          svgElements.push(
+            `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" stroke="${element.stroke || '#000'}" stroke-width="${element.strokeWidth || 2}" fill="transparent"/>`
+          );
+          break;
+        
+        case 'circle':
+          svgElements.push(
+            `<circle cx="${element.x}" cy="${element.y}" r="${element.radius}" stroke="${element.stroke || '#000'}" stroke-width="${element.strokeWidth || 2}" fill="transparent"/>`
+          );
+          break;
+        
+        case 'ellipse':
+          svgElements.push(
+            `<ellipse cx="${element.x}" cy="${element.y}" rx="${element.radiusX || 0}" ry="${element.radiusY || 0}" stroke="${element.stroke || '#000'}" stroke-width="${element.strokeWidth || 2}" fill="transparent"/>`
+          );
+          break;
+        
+        case 'text':
+          svgElements.push(
+            `<text x="${element.x}" y="${element.y}" fill="${element.fill || '#000'}" font-size="16" font-family="Arial">${element.text || ''}</text>`
+          );
+          break;
+      }
+    });
+    
+    return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+${svgElements.join('\n')}
+</svg>`;
+  }, [moduleSize]);
+
+  // Export canvas as SVG
+  const exportCanvasAsSVG = useCallback(() => {
+    try {
+      const svg = generateSVGFromElements(elements, canvasWidth, canvasHeight);
+      if (onCanvasExport) {
+        onCanvasExport(svg);
+      }
+      return svg;
+    } catch (error) {
+      console.error('Failed to export canvas as SVG:', error);
+      return null;
+    }
+  }, [elements, canvasWidth, canvasHeight, onCanvasExport, generateSVGFromElements]);
+
+  // Export canvas as image (kept for backward compatibility)
+  const exportCanvasAsImage = useCallback(() => {
+    return exportCanvasAsSVG();
+  }, [exportCanvasAsSVG]);
 
   // Expose export function to parent
   React.useImperativeHandle(ref, () => ({
-    exportAsImage: exportCanvasAsImage
+    exportAsImage: exportCanvasAsImage,
+    exportAsSVG: exportCanvasAsSVG
   }));
 
   // Initialize history with current elements

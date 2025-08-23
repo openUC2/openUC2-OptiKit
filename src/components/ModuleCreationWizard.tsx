@@ -38,10 +38,27 @@ interface DrawingElement {
 
 export type { DrawingElement };
 
+interface CustomModule {
+  id: string;
+  name: string;
+  group: string;
+  color: string;
+  width: string;
+  height: string;
+  thumbnail: string;
+  cadUrl: string;
+  description: string;
+  defaultParams: string;
+  price: string;
+  notification: string;
+  linkUrl: string;
+  isCustom: boolean;
+}
+
 interface ModuleCreationWizardProps {
   open: boolean;
   onClose: () => void;
-  onModuleCreated?: (module: any) => void;
+  onModuleCreated?: (module: CustomModule) => void;
 }
 
 const steps = ['Module Size', 'Draw Design', 'Module Details', 'Review & Save'];
@@ -54,7 +71,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   const [activeStep, setActiveStep] = useState(0);
   const [moduleSize, setModuleSize] = useState({ width: 1, height: 1 });
   const [drawingElements, setDrawingElements] = useState<DrawingElement[]>([]);
-  const [canvasImageData, setCanvasImageData] = useState<string>('');
+  const [canvasSVGData, setCanvasSVGData] = useState<string>('');
   const [metadata, setMetadata] = useState<ModuleMetadata>({
     name: '',
     group: 'custom',
@@ -66,7 +83,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   });
   const [isCreating, setIsCreating] = useState(false);
   const { loadModules } = useAppStore();
-  const drawingCanvasRef = useRef<any>(null);
+  const drawingCanvasRef = useRef<{ exportAsImage: () => string | null; exportAsSVG: () => string | null } | null>(null);
 
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -80,7 +97,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
     setActiveStep(0);
     setModuleSize({ width: 1, height: 1 });
     setDrawingElements([]);
-    setCanvasImageData('');
+    setCanvasSVGData('');
     setMetadata({
       name: '',
       group: 'custom',
@@ -108,20 +125,20 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   const handleCreateModule = async () => {
     setIsCreating(true);
     try {
-      // Capture canvas image before saving
-      if (drawingCanvasRef.current && drawingCanvasRef.current.exportAsImage) {
-        const imageData = drawingCanvasRef.current.exportAsImage();
-        if (imageData) {
-          setCanvasImageData(imageData);
+      // Capture canvas SVG before saving
+      if (drawingCanvasRef.current && drawingCanvasRef.current.exportAsSVG) {
+        const svgData = drawingCanvasRef.current.exportAsSVG();
+        if (svgData) {
+          setCanvasSVGData(svgData);
         }
       }
 
-      // Save module to GitHub CSV with icon
+      // Save module to GitHub CSV with SVG icon
       const success = await saveModuleToGitHubCSV({
         metadata,
         moduleSize,
         drawingElements,
-        canvasImageData: canvasImageData || ''
+        canvasSVGData: canvasSVGData || ''
       });
 
       if (success) {
@@ -132,7 +149,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
         const moduleId = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
         // Create module data structure for callback
-        const customModule = {
+        const customModule: CustomModule = {
           id: moduleId,
           name: metadata.name,
           group: metadata.group,
@@ -190,7 +207,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
             moduleSize={moduleSize}
             elements={drawingElements}
             onElementsChange={setDrawingElements}
-            onCanvasExport={setCanvasImageData}
+            onCanvasExport={setCanvasSVGData}
           />
         );
       case 2:

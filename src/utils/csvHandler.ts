@@ -6,7 +6,7 @@ interface CustomModuleData {
   metadata: ModuleMetadata;
   moduleSize: { width: number; height: number };
   drawingElements: DrawingElement[];
-  canvasImageData?: string;
+  canvasSVGData?: string;
 }
 
 export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promise<boolean> {
@@ -30,13 +30,13 @@ export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promi
     const timestamp = Date.now();
     const moduleId = `custom-${timestamp}`;
 
-    // Upload icon to GitHub if canvas image data is provided
+    // Upload SVG icon to GitHub if canvas SVG data is provided
     let iconUrl = '';
-    if (moduleData.canvasImageData) {
+    if (moduleData.canvasSVGData) {
       try {
-        iconUrl = await uploadIconToGitHub(octokit, owner, repo, branch, moduleId, moduleData.canvasImageData);
+        iconUrl = await uploadSVGIconToGitHub(octokit, owner, repo, branch, moduleId, moduleData.canvasSVGData);
       } catch (iconError) {
-        console.warn('Failed to upload icon, proceeding without icon:', iconError);
+        console.warn('Failed to upload SVG icon, proceeding without icon:', iconError);
       }
     }
 
@@ -59,9 +59,9 @@ export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promi
         existingContent = atob(fileData.content);
         fileSha = fileData.sha;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // File doesn't exist, create header
-      if (error.status === 404) {
+      if ((error as { status?: number }).status === 404) {
         existingContent = 'id;name;group;color;width;height;thumbnail;cadUrl;description;defaultParams;autodeskInventor;price;notification;linkUrl\n';
       } else {
         throw error;
@@ -107,33 +107,33 @@ export async function saveModuleToGitHubCSV(moduleData: CustomModuleData): Promi
   }
 }
 
-async function uploadIconToGitHub(
+async function uploadSVGIconToGitHub(
   octokit: Octokit, 
   owner: string, 
   repo: string, 
   branch: string, 
   moduleId: string, 
-  canvasImageData: string
+  canvasSVGData: string
 ): Promise<string> {
   try {
-    // Convert data URL to base64 content
-    const base64Data = canvasImageData.split(',')[1];
-    const iconPath = `icon/${moduleId}.png`;
+    // Convert SVG string to base64
+    const base64Data = btoa(unescape(encodeURIComponent(canvasSVGData)));
+    const iconPath = `icons/${moduleId}.svg`;
     
-    // Upload the icon file
+    // Upload the SVG icon file
     await octokit.rest.repos.createOrUpdateFileContents({
       owner,
       repo,
       path: iconPath,
-      message: `Add icon for custom module: ${moduleId}`,
+      message: `Add SVG icon for custom module: ${moduleId}`,
       content: base64Data,
       branch
     });
     
-    // Return the URL to the uploaded icon
+    // Return the URL to the uploaded SVG icon
     return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${iconPath}`;
   } catch (error) {
-    console.error('Failed to upload icon to GitHub:', error);
+    console.error('Failed to upload SVG icon to GitHub:', error);
     throw error;
   }
 }
