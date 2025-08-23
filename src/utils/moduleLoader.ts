@@ -88,33 +88,45 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
 
 export async function loadModulesFromCSV(csvUrl: string = '/configurator/modules_updated.csv'): Promise<ModuleDefinition[]> {
   try {
-    // First try to load from external GitHub repository
-    let response;
-    let csvText;
-    
+    // Always load local CSV first (contains standard modules)
+    let standardModules: ModuleDefinition[] = [];
     try {
-      response = await fetch('https://raw.githubusercontent.com/beniroquai/openUC2-OptiKit-Store/main/parts/parts.csv');
-      if (response.ok) {
-        csvText = await response.text();
-        console.log('Loaded modules from external GitHub repository');
+      const localResponse = await fetch(csvUrl);
+      if (localResponse.ok) {
+        const localCsvText = await localResponse.text();
+        const localCsvRows = parseCSV(localCsvText);
+        standardModules = localCsvRows.map(csvRowToModuleDefinition);
+        console.log('Loaded standard modules from local CSV:', standardModules.length);
       } else {
-        throw new Error('External repository not available');
+        console.warn('Failed to load local CSV, using fallback modules');
+        standardModules = getFallbackModules();
       }
-    } catch (externalError) {
-      console.warn('Failed to load from external repository, falling back to local CSV:', externalError);
-      // Fallback to local CSV
-      response = await fetch(csvUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to load modules CSV: ${response.status}`);
-      }
-      csvText = await response.text();
+    } catch (localError) {
+      console.warn('Failed to load local CSV, using fallback modules:', localError);
+      standardModules = getFallbackModules();
     }
     
-    const csvRows = parseCSV(csvText);
-    return csvRows.map(csvRowToModuleDefinition);
+    // Try to load user-created modules from external GitHub repository
+    let userModules: ModuleDefinition[] = [];
+    try {
+      const externalResponse = await fetch('https://raw.githubusercontent.com/beniroquai/openUC2-OptiKit-Store/main/parts/parts.csv');
+      if (externalResponse.ok) {
+        const externalCsvText = await externalResponse.text();
+        const externalCsvRows = parseCSV(externalCsvText);
+        userModules = externalCsvRows.map(csvRowToModuleDefinition);
+        console.log('Loaded user-created modules from external GitHub repository:', userModules.length);
+      }
+    } catch (externalError) {
+      console.warn('Failed to load from external repository (this is optional):', externalError);
+    }
+    
+    // Merge standard modules and user-created modules
+    const allModules = [...standardModules, ...userModules];
+    console.log('Total modules loaded:', allModules.length, '(standard:', standardModules.length, ', user-created:', userModules.length, ')');
+    return allModules;
   } catch (error) {
     console.error('Error loading modules from CSV:', error);
-    // Return fallback modules if CSV fails to load
+    // Return fallback modules if everything fails
     return getFallbackModules();
   }
 }
