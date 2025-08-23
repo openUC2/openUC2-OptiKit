@@ -22,6 +22,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     selectItem, 
     selectedItemId,
     setAnnotationMode,
+    setActiveRightTab,
     layers
   } = useAppStore();
   
@@ -68,6 +69,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             fontFamily: 'Arial'
           }
         });
+        
+        // Switch to annotations tab to show the new annotation
+        setActiveRightTab('annotations');
       }
       setAnnotationMode('none');
       return;
@@ -97,6 +101,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
           points: newPoints,
           style
         });
+        
+        // Switch to annotations tab to show the new annotation
+        setActiveRightTab('annotations');
         
         setIsDrawing(false);
         setCurrentPoints([]);

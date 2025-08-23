@@ -380,7 +380,7 @@ Best regards`;
                   disabled={bomItems.length === 0}
                   fullWidth
                 >
-                  Buy Configuration
+                  Place Quotation
                 </Button>
                 <Button
                   variant="outlined"
@@ -513,7 +513,7 @@ Best regards`;
       
       {/* Buy Configuration Dialog */}
       <Dialog open={buyDialogOpen} onClose={() => setBuyDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Buy This Configuration</DialogTitle>
+        <DialogTitle>Place Quotation</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Please provide your contact information and we'll process your quotation request.

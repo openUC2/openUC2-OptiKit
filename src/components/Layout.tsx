@@ -18,6 +18,7 @@ import { GridCanvas } from './GridCanvas';
 import { LayerPanel } from './LayerPanel';
 import { PropertyPanel } from './PropertyPanel';
 import { BOMPanel } from './BOMPanel';
+import { AnnotationPanel } from './AnnotationPanel';
 import { Toolbar } from './Toolbar';
 import { Tutorial } from './Tutorial';
 import { useAppStore } from '../stores/appStore';
@@ -185,12 +186,14 @@ export const Layout: React.FC = () => {
             >
               <Tab label="Layers" value="layers" data-tour="layers-tab" />
               <Tab label="Properties" value="properties" data-tour="properties-tab" />
+              <Tab label="Annotations" value="annotations" data-tour="annotations-tab" />
               <Tab label="BOM" value="bom" data-tour="bom-tab" />
             </Tabs>
             
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
               {activeRightTab === 'layers' && <LayerPanel />}
               {activeRightTab === 'properties' && <PropertyPanel />}
+              {activeRightTab === 'annotations' && <AnnotationPanel />}
               {activeRightTab === 'bom' && <BOMPanel />}
             </Box>
           </Box>
