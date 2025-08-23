@@ -73,12 +73,13 @@ export const PartLibrary: React.FC = () => {
       const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesGroup = selectedGroup === 'all' || module.group === selectedGroup;
       
-      // Filter by tab: 0 = all modules, 1 = user created only
+      // Filter by tab: 0 = all parts (non-user-created), 1 = user created only
       const isUserCreated = module.defaultParams && 
         typeof module.defaultParams === 'object' && 
         (module.defaultParams as any)?.isCustom === true;
       
-      const matchesTab = activeTab === 0 || (activeTab === 1 && isUserCreated);
+      // Fixed logic: All Parts shows non-user-created, User Created shows user-created
+      const matchesTab = activeTab === 0 ? !isUserCreated : isUserCreated;
       
       return matchesSearch && matchesGroup && matchesTab;
     } catch (error) {
