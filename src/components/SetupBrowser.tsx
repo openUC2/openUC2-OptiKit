@@ -21,9 +21,14 @@ import {
   MenuItem,
   Fab,
   Tabs,
-  Tab
+  Tab,
+  IconButton,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Divider
 } from '@mui/material';
-import { Add as AddIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import { Add as AddIcon, Refresh as RefreshIcon, Edit as EditIcon, Delete as DeleteIcon, MoreVert as MoreVertIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
 
@@ -70,6 +75,15 @@ export const SetupBrowser: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
   const [metadataForm, setMetadataForm] = useState({
+    name: '',
+    category: 'General',
+    description: '',
+    screenshot: ''
+  });
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedSetup, setSelectedSetup] = useState<SetupMetadata | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
     name: '',
     category: 'General',
     description: '',
@@ -497,6 +511,62 @@ export const SetupBrowser: React.FC = () => {
     handleCloseMetadataDialog();
   };
 
+  const handleSetupMenuOpen = (event: React.MouseEvent<HTMLElement>, setup: SetupMetadata) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuAnchorEl(event.currentTarget);
+    setSelectedSetup(setup);
+  };
+
+  const handleSetupMenuClose = () => {
+    setMenuAnchorEl(null);
+    setSelectedSetup(null);
+  };
+
+  const handleEditSetup = () => {
+    if (selectedSetup) {
+      setEditForm({
+        name: selectedSetup.name,
+        category: selectedSetup.category,
+        description: selectedSetup.description,
+        screenshot: selectedSetup.screenshot || ''
+      });
+      setEditDialogOpen(true);
+      handleSetupMenuClose();
+    }
+  };
+
+  const handleDeleteSetup = () => {
+    if (selectedSetup) {
+      const confirmDelete = window.confirm(`Are you sure you want to delete the setup "${selectedSetup.name}"? This action cannot be undone.`);
+      if (confirmDelete) {
+        // Filter out the deleted setup
+        setSetups(prevSetups => prevSetups.filter(setup => setup.path !== selectedSetup.path));
+        alert(`Setup "${selectedSetup.name}" has been removed from the browser. Note: This only removes it locally - to permanently delete from the store, please contact the repository maintainers.`);
+      }
+      handleSetupMenuClose();
+    }
+  };
+
+  const handleSaveEditedSetup = () => {
+    if (selectedSetup) {
+      // Update the setup in the local list
+      setSetups(prevSetups => prevSetups.map(setup => 
+        setup.path === selectedSetup.path 
+          ? { ...setup, 
+              name: editForm.name, 
+              category: editForm.category, 
+              description: editForm.description, 
+              screenshot: editForm.screenshot 
+            }
+          : setup
+      ));
+      
+      alert(`Setup "${editForm.name}" has been updated locally. Note: Changes are only visible in this session - to permanently update the setup in the store, please contact the repository maintainers.`);
+      setEditDialogOpen(false);
+    }
+  };
+
   const categories = ['General', 'Microscopy', 'Astronomy', 'Spectroscopy', 'Imaging', 'Laser'];
 
   if (loading) {
@@ -664,6 +734,24 @@ export const SetupBrowser: React.FC = () => {
                         position: 'relative'
                       }}
                     >
+                      {/* Menu Button */}
+                      <IconButton
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          },
+                          zIndex: 1
+                        }}
+                        size="small"
+                        onClick={(e) => handleSetupMenuOpen(e, setup)}
+                      >
+                        <MoreVertIcon />
+                      </IconButton>
+                      
                       {setup.screenshot ? (
                         <img
                           src={setup.screenshot}
@@ -981,6 +1069,89 @@ export const SetupBrowser: React.FC = () => {
               disabled={!metadataForm.name.trim()}
             >
               Export Setup
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Setup Management Menu */}
+        <Menu
+          anchorEl={menuAnchorEl}
+          open={Boolean(menuAnchorEl)}
+          onClose={handleSetupMenuClose}
+        >
+          <MenuItem onClick={handleEditSetup}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Edit Setup</ListItemText>
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={handleDeleteSetup} sx={{ color: 'error.main' }}>
+            <ListItemIcon>
+              <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+            </ListItemIcon>
+            <ListItemText>Delete Setup</ListItemText>
+          </MenuItem>
+        </Menu>
+
+        {/* Edit Setup Dialog */}
+        <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Edit Setup</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+              <TextField
+                autoFocus
+                required
+                label="Setup Name"
+                fullWidth
+                variant="outlined"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Enter setup name"
+              />
+              <FormControl fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={editForm.category}
+                  label="Category"
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                >
+                  {categories.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Description"
+                multiline
+                rows={4}
+                fullWidth
+                variant="outlined"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="Describe your optical setup, its purpose, and key features..."
+              />
+              <TextField
+                label="Screenshot URL (optional)"
+                fullWidth
+                variant="outlined"
+                value={editForm.screenshot}
+                onChange={(e) => setEditForm({ ...editForm, screenshot: e.target.value })}
+                placeholder="https://example.com/screenshot.png"
+                helperText="Provide a URL to an image showing your setup"
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSaveEditedSetup} 
+              variant="contained"
+              disabled={!editForm.name.trim()}
+            >
+              Save Changes
             </Button>
           </DialogActions>
         </Dialog>

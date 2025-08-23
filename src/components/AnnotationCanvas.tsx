@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line, Arrow, Text, Group, Rect } from 'react-konva';
 import { useAppStore } from '../stores/appStore';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -22,11 +22,20 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     selectItem, 
     selectedItemId,
     setAnnotationMode,
+    setActiveRightTab,
     layers
   } = useAppStore();
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
+
+  // Reset drawing state when annotation mode changes
+  useEffect(() => {
+    if (annotationMode === 'none') {
+      setIsDrawing(false);
+      setCurrentPoints([]);
+    }
+  }, [annotationMode]);
 
   const handleContextMenu = (e: KonvaEventObject<MouseEvent>, annotationId: string) => {
     e.evt.preventDefault();
@@ -38,6 +47,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
   const handleCanvasClick = (e: KonvaEventObject<MouseEvent>) => {
     if (annotationMode === 'none') return;
+
+    // Check if the click target is the invisible background rect - only accept those clicks
+    if (e.target.attrs.name !== 'annotation-background') return;
 
     // Stop event propagation to prevent canvas click
     e.cancelBubble = true;
@@ -68,6 +80,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             fontFamily: 'Arial'
           }
         });
+        
+        // Switch to annotations tab to show the new annotation
+        setActiveRightTab('annotations');
       }
       setAnnotationMode('none');
       return;
@@ -98,6 +113,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
           style
         });
         
+        // Switch to annotations tab to show the new annotation
+        setActiveRightTab('annotations');
+        
         setIsDrawing(false);
         setCurrentPoints([]);
         setAnnotationMode('none');
@@ -107,6 +125,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
   const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
     if (!isDrawing || currentPoints.length === 0) return;
+    
+    // Only respond to mouse move on the annotation background
+    if (e.target.attrs.name !== 'annotation-background') return;
 
     const stage = e.target.getStage();
     if (!stage) return;
@@ -149,7 +170,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             onContextMenu={(e) => handleContextMenu(e, annotation.id)}
             onDragEnd={(e) => {
               const pos = e.target.position();
-              moveAnnotation(annotation.id, pos);
+              moveAnnotation(annotation.id, { x: pos.x, y: pos.y });
             }}
           />
         );
@@ -166,8 +187,27 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               stroke={strokeColor}
               strokeWidth={strokeWidth}
               fill={strokeColor}
+              draggable
               onClick={() => selectItem(annotation.id, 'annotation')}
               onContextMenu={(e) => handleContextMenu(e, annotation.id)}
+              onDragEnd={(e) => {
+                const pos = e.target.position();
+                const deltaX = pos.x;
+                const deltaY = pos.y;
+                
+                // Move all points by the delta
+                if (annotation.points) {
+                  const newPoints = annotation.points.map(p => ({
+                    x: p.x + deltaX,
+                    y: p.y + deltaY
+                  }));
+                  
+                  moveAnnotation(annotation.id, newPoints);
+                }
+                
+                // Reset position to avoid double transformation
+                e.target.position({ x: 0, y: 0 });
+              }}
             />
           );
         } else if (annotation.type === 'optical-axis') {
@@ -178,8 +218,27 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               stroke={strokeColor}
               strokeWidth={strokeWidth}
               dash={[10, 5]}
+              draggable
               onClick={() => selectItem(annotation.id, 'annotation')}
               onContextMenu={(e) => handleContextMenu(e, annotation.id)}
+              onDragEnd={(e) => {
+                const pos = e.target.position();
+                const deltaX = pos.x;
+                const deltaY = pos.y;
+                
+                // Move all points by the delta
+                if (annotation.points) {
+                  const newPoints = annotation.points.map(p => ({
+                    x: p.x + deltaX,
+                    y: p.y + deltaY
+                  }));
+                  
+                  moveAnnotation(annotation.id, newPoints);
+                }
+                
+                // Reset position to avoid double transformation
+                e.target.position({ x: 0, y: 0 });
+              }}
             />
           );
         } else {
@@ -189,8 +248,27 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               points={points}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
+              draggable
               onClick={() => selectItem(annotation.id, 'annotation')}
               onContextMenu={(e) => handleContextMenu(e, annotation.id)}
+              onDragEnd={(e) => {
+                const pos = e.target.position();
+                const deltaX = pos.x;
+                const deltaY = pos.y;
+                
+                // Move all points by the delta
+                if (annotation.points) {
+                  const newPoints = annotation.points.map(p => ({
+                    x: p.x + deltaX,
+                    y: p.y + deltaY
+                  }));
+                  
+                  moveAnnotation(annotation.id, newPoints);
+                }
+                
+                // Reset position to avoid double transformation
+                e.target.position({ x: 0, y: 0 });
+              }}
             />
           );
         }
@@ -244,6 +322,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       {/* Invisible background to capture mouse events - only when in annotation mode */}
       {annotationMode !== 'none' && (
         <Rect
+          name="annotation-background"
           x={-5000}
           y={-5000}
           width={10000}
