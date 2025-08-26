@@ -24,6 +24,7 @@ export interface ModuleDefinition {
   autodeskInventor?: string;
   price?: number;
   notification?: string;
+  linkUrl?: string;
 }
 
 export interface PlacedModule {
