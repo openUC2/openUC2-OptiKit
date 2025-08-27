@@ -139,7 +139,7 @@ export interface AppState {
   annotationMode: 'none' | 'line' | 'arrow' | 'text' | 'optical-axis';
   setupMetadata: SetupMetadata;
   // UI state
-  activeRightTab: 'layers' | 'properties' | 'bom';
+  activeRightTab: 'layers' | 'properties' | 'bom' | 'annotations';
   notifications: Notification[];
   // Tutorial state
   tutorialCompleted: boolean;

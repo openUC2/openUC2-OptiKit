@@ -234,7 +234,7 @@ export const AnnotationPanel: React.FC = () => {
           </Paper>
         ) : (
           <List dense>
-            {visibleAnnotations.map((annotation, index) => (
+            {visibleAnnotations.map((annotation) => (
               <ListItem
                 key={annotation.id}
                 sx={{
