@@ -5,10 +5,12 @@ import App from './App.tsx'
 
 // Import direct SVG test for debugging
 import { testDirectSVGUpload } from './utils/directSVGTest'
+import { testStatisticsCollection } from './utils/testStatistics'
 
 // Add debugging functions to window
 if (typeof window !== 'undefined') {
   (window as any).testDirectSVGUpload = testDirectSVGUpload;
+  (window as any).testStatistics = testStatisticsCollection;
   
   // Debug function to check what's in localStorage or session
   (window as any).debugModuleCreation = () => {
@@ -22,6 +24,7 @@ if (typeof window !== 'undefined') {
   
   console.log('🚀 Debug functions available:');
   console.log('- testDirectSVGUpload() - Tests direct SVG upload to GitHub');
+  console.log('- testStatistics() - Tests user statistics collection');
   console.log('- debugModuleCreation() - Shows debugging info');
 }
 

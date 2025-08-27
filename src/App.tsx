@@ -9,6 +9,7 @@ import { StartupDialog } from './components/StartupDialog'
 import { NotificationDisplay } from './components/NotificationDisplay'
 import { useAppStore } from './stores/appStore'
 import { materialTheme } from './theme/materialTheme'
+import { trackUserVisit } from './utils/statisticsHandler'
 import './styles/brand.css'
 import './App.css'
 
@@ -71,6 +72,11 @@ function App() {
     loadModules().then(() => {
       loadStateFromStorage();
       
+      // Track user visit for statistics
+      trackUserVisit().catch(error => {
+        console.error('Failed to track user visit:', error);
+      });
+      
       // Check if this is the first visit and user is on the main configurator page
       const hasVisitedBefore = localStorage.getItem('optikit-visited');
       const isMainPage = window.location.pathname === '/configurator' || window.location.pathname === '/configurator/';
@@ -128,7 +134,7 @@ function App() {
       clearInterval(saveInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData]);
+  }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, setStartupDialogClosed]);
 
   return (
     <ThemeProvider theme={materialTheme}>
