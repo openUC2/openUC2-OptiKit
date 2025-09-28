@@ -1376,9 +1376,12 @@ ${feedback.email ? `Email: ${feedback.email}` : 'No contact provided'}
         sessionId: state.chat.currentSession.sessionId
       };
 
-      // Get current configuration data as attachment for user messages
-      const exportData = await state.exportData();
-      chatMessage.attachment = exportData;
+      // Get current configuration data as attachment for user messages (exclude screenshot)
+      const exportData = await state.exportDataWithScreenshot();
+      const parsedData = JSON.parse(exportData);
+      // Remove screenshot to reduce attachment size
+      delete parsedData.screenshot;
+      chatMessage.attachment = JSON.stringify(parsedData, null, 2);
 
       // Save message to GitHub
       await saveChatMessageToGitHub(chatMessage);
@@ -1623,7 +1626,15 @@ async function loadChatMessagesFromGitHub(sessionId: string): Promise<ChatMessag
         const isValidMessageRow = fields.length === 5 && 
                                  fields[0].length > 10 && 
                                  (fields[1] === 'user' || fields[1] === 'bot') &&
-                                 fields[4].includes('T') && fields[4].includes('Z'); // timestamp format check
+                                 fields[4] && (fields[4].includes('T') || fields[4].includes('Z')); // timestamp format check
+        
+        console.log('🔍 Validation check:', {
+          fieldCount: fields.length,
+          firstFieldLength: fields[0]?.length,
+          chatPartner: fields[1],
+          hasTimestamp: fields[4]?.includes('T') || fields[4]?.includes('Z'),
+          isValid: isValidMessageRow
+        });
         
         if (isValidMessageRow) {
           console.log('🔍 ✅ Valid message row found');
@@ -1680,18 +1691,20 @@ async function loadChatMessagesFromGitHub(sessionId: string): Promise<ChatMessag
   }
 }
 
-// Helper function to parse CSV line with quoted fields
+// Helper function to parse CSV line with quoted fields - improved to handle complex JSON
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
   let inQuotes = false;
+  let quoteCount = 0;
   
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     
     if (char === '"') {
+      quoteCount++;
       if (inQuotes && line[i + 1] === '"') {
-        // Escaped quote
+        // Escaped quote within quoted field
         current += '"';
         i++; // Skip next quote
       } else {
@@ -1699,6 +1712,7 @@ function parseCsvLine(line: string): string[] {
         inQuotes = !inQuotes;
       }
     } else if (char === ',' && !inQuotes) {
+      // Only treat comma as field separator when not inside quotes
       result.push(current);
       current = '';
     } else {
@@ -1706,6 +1720,27 @@ function parseCsvLine(line: string): string[] {
     }
   }
   
+  // Add the last field
   result.push(current);
+  
+  // Post-process to ensure we have exactly 5 fields for a valid message
+  // If we have more than 5 fields, it means the JSON attachment was split incorrectly
+  if (result.length > 5) {
+    console.log('🔍 CSV line has too many fields, attempting to reconstruct JSON attachment');
+    // Keep the first 3 fields (id, chat_partner, message) and last field (timestamp)
+    // Combine everything in between as the attachment field
+    if (result.length >= 5) {
+      const reconstructed = [
+        result[0], // message_id
+        result[1], // chat_partner  
+        result[2], // message
+        result.slice(3, -1).join(','), // attachment (reconstructed)
+        result[result.length - 1] // timestamp
+      ];
+      console.log('🔍 Reconstructed to 5 fields:', reconstructed.length);
+      return reconstructed;
+    }
+  }
+  
   return result;
 }
