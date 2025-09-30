@@ -34,10 +34,12 @@ import {
   Edit as EditorIcon,
   Forum as ForumIcon,
   SelectAll as SelectIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Memory as ImSwitchIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import { FeedbackDialog } from './FeedbackDialog';
+import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
@@ -46,6 +48,7 @@ export const Toolbar: React.FC = () => {
   
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
+  const [imSwitchWizardOpen, setImSwitchWizardOpen] = React.useState(false);
   
   const { 
     exportData, 
@@ -528,6 +531,15 @@ openUC2 team via GitHub repository
               <STLIcon />
             </IconButton>
           </Tooltip>
+          <Tooltip title="Export ImSwitch Configuration">
+            <IconButton 
+              color="inherit"
+              onClick={() => setImSwitchWizardOpen(true)}
+              size="small"
+            >
+              <ImSwitchIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Upload to Optical Setup Browser">
             <IconButton 
               color="inherit"
@@ -595,6 +607,12 @@ openUC2 team via GitHub repository
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         trigger={feedbackTrigger}
+      />
+      
+      {/* ImSwitch Configuration Wizard */}
+      <ImSwitchConfigWizard 
+        open={imSwitchWizardOpen}
+        onClose={() => setImSwitchWizardOpen(false)}
       />
     </AppBar>
   );

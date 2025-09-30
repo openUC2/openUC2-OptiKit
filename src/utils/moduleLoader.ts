@@ -15,6 +15,7 @@ export interface ModuleCSVRow {
   price?: string;
   notification?: string;
   linkUrl?: string;
+  ImSwitch?: string; // ImSwitch configuration data
 }
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
@@ -90,7 +91,8 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
     autodeskInventor: row.autodeskInventor,
     price: row.price ? parseFloat(row.price) : undefined,
     notification: notification || undefined,
-    linkUrl: row.linkUrl || undefined
+    linkUrl: row.linkUrl || undefined,
+    imSwitchConfig: row.ImSwitch || undefined // Add ImSwitch configuration
   };
 }
 

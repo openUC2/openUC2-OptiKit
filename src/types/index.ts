@@ -25,6 +25,7 @@ export interface ModuleDefinition {
   price?: number;
   notification?: string;
   linkUrl?: string;
+  imSwitchConfig?: string; // Raw ImSwitch configuration string from CSV
 }
 
 export interface PlacedModule {
@@ -206,4 +207,123 @@ export interface ChatState {
   isLoading: boolean;
   isSending: boolean;
   error: string | null;
+}
+
+// ImSwitch Configuration types
+export interface ImSwitchManagerProperties {
+  [key: string]: unknown;
+}
+
+export interface ImSwitchLaser {
+  managerName: string;
+  managerProperties: ImSwitchManagerProperties;
+  valueRangeMin: number;
+  valueRangeMax: number;
+  wavelength: number;
+  valueRangeStep: number;
+  analogChannel?: null;
+  digitalLine?: null;
+  freqRangeMin?: number;
+  freqRangeMax?: number;
+  freqRangeInit?: number;
+}
+
+export interface ImSwitchDetector {
+  managerName: string;
+  managerProperties: ImSwitchManagerProperties;
+  forAcquisition: boolean;
+  forFocusLock: boolean;
+  analogChannel?: null;
+  digitalLine?: null;
+}
+
+export interface ImSwitchPositioner {
+  managerName: string;
+  managerProperties: ImSwitchManagerProperties;
+  axes: string[];
+  isPositiveDirection: boolean;
+  forPositioning: boolean;
+  forScanning: boolean;
+  resetOnClose: boolean;
+  stageOffsets: Record<string, number>;
+  analogChannel?: null;
+  digitalLine?: null;
+}
+
+export interface ImSwitchRs232Device {
+  managerName: string;
+  managerProperties: ImSwitchManagerProperties;
+}
+
+export interface ImSwitchFocusLock {
+  camera: string;
+  positioner: string;
+  updateFreq: number;
+  cropCenter: [number, number];
+  cropSize: number;
+  piKp: number;
+  piKi: number;
+  focusLockMetric: string;
+  laserName: string;
+  laserValue: number;
+  fovWidth: number;
+  fovCenter: [null, null];
+}
+
+export interface ImSwitchConfiguration {
+  detectors?: Record<string, ImSwitchDetector>;
+  lasers?: Record<string, ImSwitchLaser>;
+  LEDs?: Record<string, unknown>;
+  LEDMatrixs?: Record<string, unknown>;
+  positioners?: Record<string, ImSwitchPositioner>;
+  rs232devices?: Record<string, ImSwitchRs232Device>;
+  slm?: null;
+  sim?: null;
+  dpc?: null;
+  objective?: Record<string, unknown>;
+  mct?: Record<string, unknown>;
+  nidaq?: Record<string, unknown>;
+  roiscan?: null;
+  lightsheet?: null;
+  webrtc?: null;
+  hypha?: null;
+  mockxx?: null;
+  jetsonnano?: null;
+  Stresstest?: null;
+  HistoScan?: Record<string, unknown>;
+  Workflow?: null;
+  FlowStop?: null;
+  Lepmon?: null;
+  Flatfield?: null;
+  PixelCalibration?: Record<string, unknown>;
+  experiment?: null;
+  uc2Config?: null;
+  ism?: null;
+  focusLock?: ImSwitchFocusLock;
+  arkitekt?: null;
+  fovLock?: null;
+  autofocus?: Record<string, unknown>;
+  scan?: null;
+  etSTED?: null;
+  rotators?: null;
+  microscopeStand?: null;
+  pulseStreamer?: Record<string, unknown>;
+  pyroServerInfo?: Record<string, unknown>;
+  rois?: Record<string, unknown>;
+  ledPresets?: Record<string, unknown>;
+  defaultLEDPresetForScan?: null;
+  laserPresets?: Record<string, unknown>;
+  stageOffsets?: Record<string, unknown>;
+  defaultLaserPresetForScan?: null;
+  availableWidgets?: string[];
+  nonAvailableWidgets?: string[];
+}
+
+export interface AvailableController {
+  id: string;
+  name: string;
+  description: string;
+  category: 'widget' | 'hardware';
+  dependencies?: string[];
+  configTemplate?: Record<string, unknown>;
 }
