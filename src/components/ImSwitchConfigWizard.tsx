@@ -206,17 +206,37 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   // Parse ImSwitch data from module CSV
   const parseImSwitchData = (imSwitchString: string): Partial<ImSwitchConfiguration> => {
     try {
-      // Clean up the string - remove extra quotes and fix JSON format
-      const cleanedString = imSwitchString
-        .replace(/^"""/, '"')
-        .replace(/"""$/, '"')
-        .replace(/""/g, '"');
+      if (!imSwitchString || imSwitchString.trim() === '') {
+        return {};
+      }
+
+      let cleanedString = imSwitchString.trim();
+      console.log('Original ImSwitch string:', cleanedString);
+      
+      // Handle the specific format from CSV: """key"":{""prop"":""value""}
+      // First remove the outer triple quotes if they exist
+      if (cleanedString.startsWith('"""') && cleanedString.endsWith('"""')) {
+        cleanedString = cleanedString.slice(3, -3);
+      }
+      
+      // Replace all instances of double quotes with single quotes
+      // This handles the CSV escaping where " becomes ""
+      cleanedString = cleanedString.replace(/""/g, '"');
+      
+      // Ensure it's wrapped in curly braces for valid JSON
+      if (!cleanedString.startsWith('{')) {
+        cleanedString = `{${cleanedString}}`;
+      }
+      
+      console.log('Cleaned ImSwitch string:', cleanedString);
       
       // Parse as JSON
-      const parsed = JSON.parse(`{${cleanedString}}`);
+      const parsed = JSON.parse(cleanedString);
+      console.log('Successfully parsed ImSwitch config:', parsed);
       return parsed;
     } catch (error) {
-      console.warn('Failed to parse ImSwitch data:', imSwitchString, error);
+      console.warn('Failed to parse ImSwitch data:', imSwitchString);
+      console.warn('Parse error:', error);
       return {};
     }
   };
@@ -244,10 +264,13 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
       if (!moduleDefinition) return;
 
       // Get ImSwitch data from the module definition
-      const imSwitchData = (moduleDefinition as any).imSwitchConfig;
+      const imSwitchData = moduleDefinition.imSwitchConfig;
+      console.log('Checking module:', moduleDefinition.name, 'ImSwitch data:', imSwitchData);
+      
       if (!imSwitchData) return;
 
       const parsedConfig = parseImSwitchData(imSwitchData);
+      console.log('Parsed ImSwitch config for', moduleDefinition.name, ':', parsedConfig);
       
       // Merge configurations
       if (parsedConfig.detectors) {
