@@ -15,7 +15,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton
+  IconButton,
+  Slider,
+  Chip,
+  Divider
 } from '@mui/material';
 import {
   RotateRight as RotateIcon,
@@ -24,9 +27,12 @@ import {
   Save as SaveIcon,
   Cancel as CancelIcon,
   Settings as SettingsIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  Science as SimulationIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { useSimulationStore } from '../stores/simulationStore';
+import { getSimulationModel, getElementTypeName } from '../utils/sceneBuilder';
 
 export const PropertyPanel: React.FC = () => {
   const { 
@@ -495,7 +501,364 @@ export const PropertyPanel: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Optical Simulation Properties */}
+        {renderOpticalProperties(module)}
       </Box>
+    );
+  };
+
+  // Render optical simulation properties for a module
+  const renderOpticalProperties = (module: typeof placedModules[0]) => {
+    const simModel = getSimulationModel(module.moduleId);
+    const simConfig = useSimulationStore.getState().config;
+    
+    if (!simModel || !simConfig.enabled) return null;
+    
+    const elementType = simModel.elementType;
+    const typeName = getElementTypeName(elementType);
+    
+    // Get current simulation parameters from module params or defaults
+    const getSimParam = (key: string, defaultVal: number) => {
+      if (module.params?.[key] !== undefined) return module.params[key] as number;
+      if (simModel.defaultParams?.[key as keyof typeof simModel.defaultParams] !== undefined) {
+        return simModel.defaultParams[key as keyof typeof simModel.defaultParams] as number;
+      }
+      return defaultVal;
+    };
+    
+    const handleSimParamChange = (key: string, value: number) => {
+      updateModuleParams(module.id, { [key]: value });
+      // Trigger auto-run if enabled
+      if (simConfig.autoRun) {
+        useSimulationStore.getState().scheduleAutoRun();
+      }
+    };
+    
+    return (
+      <Card>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <SimulationIcon color="primary" />
+            <Typography variant="h6">
+              Optical Properties
+            </Typography>
+            <Chip size="small" label={typeName} color="primary" variant="outlined" />
+          </Box>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Lens properties */}
+            {elementType === 'lens' && (
+              <>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Focal Length: {getSimParam('focalLength', 100)} mm
+                  </Typography>
+                  <Slider
+                    value={getSimParam('focalLength', 100)}
+                    onChange={(_, v) => handleSimParamChange('focalLength', v as number)}
+                    min={-500}
+                    max={500}
+                    step={5}
+                    marks={[
+                      { value: -200, label: '-200' },
+                      { value: 0, label: '0' },
+                      { value: 200, label: '200' }
+                    ]}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {getSimParam('focalLength', 100) > 0 ? 'Converging lens' : 'Diverging lens'}
+                  </Typography>
+                </Box>
+              </>
+            )}
+            
+            {/* Mirror properties */}
+            {elementType === 'mirror' && (
+              <>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Mirror Angle: {getSimParam('angle', 45)}°
+                  </Typography>
+                  <Slider
+                    value={getSimParam('angle', 45)}
+                    onChange={(_, v) => handleSimParamChange('angle', v as number)}
+                    min={0}
+                    max={90}
+                    step={1}
+                    marks={[
+                      { value: 0, label: '0°' },
+                      { value: 45, label: '45°' },
+                      { value: 90, label: '90°' }
+                    ]}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Reflectivity: {Math.round(getSimParam('reflectivity', 0.99) * 100)}%
+                  </Typography>
+                  <Slider
+                    value={getSimParam('reflectivity', 0.99)}
+                    onChange={(_, v) => handleSimParamChange('reflectivity', v as number)}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    size="small"
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(v) => `${Math.round(v * 100)}%`}
+                  />
+                </Box>
+              </>
+            )}
+            
+            {/* Beam splitter properties */}
+            {elementType === 'beamsplitter' && (
+              <>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Split Ratio (T/R): {Math.round(getSimParam('splitRatio', 0.5) * 100)}% / {Math.round((1 - getSimParam('splitRatio', 0.5)) * 100)}%
+                  </Typography>
+                  <Slider
+                    value={getSimParam('splitRatio', 0.5)}
+                    onChange={(_, v) => handleSimParamChange('splitRatio', v as number)}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    marks={[
+                      { value: 0, label: '0/100' },
+                      { value: 0.5, label: '50/50' },
+                      { value: 1, label: '100/0' }
+                    ]}
+                    size="small"
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(v) => `${Math.round(v * 100)}%T`}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Surface Angle: {getSimParam('angle', 45)}°
+                  </Typography>
+                  <Slider
+                    value={getSimParam('angle', 45)}
+                    onChange={(_, v) => handleSimParamChange('angle', v as number)}
+                    min={0}
+                    max={90}
+                    step={1}
+                    marks={[
+                      { value: 0, label: '0°' },
+                      { value: 45, label: '45°' },
+                      { value: 90, label: '90°' }
+                    ]}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    45° reflects horizontal rays vertically (90° deflection)
+                  </Typography>
+                </Box>
+              </>
+            )}
+            
+            {/* Dichroic properties */}
+            {elementType === 'dichroic' && (
+              <>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Cutoff Wavelength: {getSimParam('cutoffWavelength', 510)} nm
+                  </Typography>
+                  <Slider
+                    value={getSimParam('cutoffWavelength', 510)}
+                    onChange={(_, v) => handleSimParamChange('cutoffWavelength', v as number)}
+                    min={400}
+                    max={700}
+                    step={5}
+                    size="small"
+                    valueLabelDisplay="auto"
+                    sx={{
+                      '& .MuiSlider-track': {
+                        background: 'linear-gradient(to right, violet, blue, cyan, green, yellow, orange, red)'
+                      }
+                    }}
+                  />
+                </Box>
+              </>
+            )}
+            
+            {/* Source properties (laser/LED) */}
+            {(elementType === 'laser' || elementType === 'led') && (
+              <>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Wavelength: {getSimParam('wavelength', 532)} nm
+                  </Typography>
+                  <Slider
+                    value={getSimParam('wavelength', 532)}
+                    onChange={(_, v) => handleSimParamChange('wavelength', v as number)}
+                    min={380}
+                    max={780}
+                    step={5}
+                    size="small"
+                    valueLabelDisplay="auto"
+                    sx={{
+                      '& .MuiSlider-track': {
+                        background: 'linear-gradient(to right, violet, blue, cyan, green, yellow, orange, red)'
+                      }
+                    }}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Beam Diameter: {getSimParam('beamDiameter', 2)} mm
+                  </Typography>
+                  <Slider
+                    value={getSimParam('beamDiameter', 2)}
+                    onChange={(_, v) => handleSimParamChange('beamDiameter', v as number)}
+                    min={0.5}
+                    max={20}
+                    step={0.5}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                </Box>
+                {elementType === 'led' && (
+                  <Box>
+                    <Typography variant="body2" gutterBottom>
+                      Divergence: {getSimParam('divergence', 30)}°
+                    </Typography>
+                    <Slider
+                      value={getSimParam('divergence', 30)}
+                      onChange={(_, v) => handleSimParamChange('divergence', v as number)}
+                      min={0}
+                      max={60}
+                      step={1}
+                      size="small"
+                      valueLabelDisplay="auto"
+                    />
+                  </Box>
+                )}
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Ray Count: {getSimParam('rayCount', 5)}
+                  </Typography>
+                  <Slider
+                    value={getSimParam('rayCount', 5)}
+                    onChange={(_, v) => handleSimParamChange('rayCount', v as number)}
+                    min={1}
+                    max={20}
+                    step={1}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                </Box>
+              </>
+            )}
+            
+            {/* Aperture properties */}
+            {elementType === 'aperture' && (
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  Aperture Diameter: {getSimParam('aperture', 5)} mm
+                </Typography>
+                <Slider
+                  value={getSimParam('aperture', 5)}
+                  onChange={(_, v) => handleSimParamChange('aperture', v as number)}
+                  min={0.01}
+                  max={25}
+                  step={0.1}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+            )}
+            
+            {/* Filter properties */}
+            {elementType === 'filter' && (
+              <>
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    Transmission: {Math.round(getSimParam('transmission', 0.5) * 100)}%
+                  </Typography>
+                  <Slider
+                    value={getSimParam('transmission', 0.5)}
+                    onChange={(_, v) => handleSimParamChange('transmission', v as number)}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    size="small"
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(v) => `${Math.round(v * 100)}%`}
+                  />
+                </Box>
+                {getSimParam('bandpassCenter', 0) > 0 && (
+                  <>
+                    <Box>
+                      <Typography variant="body2" gutterBottom>
+                        Center Wavelength: {getSimParam('bandpassCenter', 525)} nm
+                      </Typography>
+                      <Slider
+                        value={getSimParam('bandpassCenter', 525)}
+                        onChange={(_, v) => handleSimParamChange('bandpassCenter', v as number)}
+                        min={400}
+                        max={700}
+                        step={5}
+                        size="small"
+                        valueLabelDisplay="auto"
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" gutterBottom>
+                        Bandwidth (FWHM): {getSimParam('bandpassWidth', 50)} nm
+                      </Typography>
+                      <Slider
+                        value={getSimParam('bandpassWidth', 50)}
+                        onChange={(_, v) => handleSimParamChange('bandpassWidth', v as number)}
+                        min={5}
+                        max={100}
+                        step={5}
+                        size="small"
+                        valueLabelDisplay="auto"
+                      />
+                    </Box>
+                  </>
+                )}
+              </>
+            )}
+            
+            {/* Detector properties */}
+            {elementType === 'detector' && (
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  Sensor Width: {getSimParam('width', 12)} mm
+                </Typography>
+                <Slider
+                  value={getSimParam('width', 12)}
+                  onChange={(_, v) => handleSimParamChange('width', v as number)}
+                  min={1}
+                  max={50}
+                  step={0.5}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+            )}
+          </Box>
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => useSimulationStore.getState().runSimulation()}
+            fullWidth
+          >
+            Run Simulation
+          </Button>
+        </CardContent>
+      </Card>
     );
   };
 

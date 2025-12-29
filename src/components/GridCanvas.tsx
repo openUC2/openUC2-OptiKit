@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Line, Rect, Text, Group, Image } from 'react-konva';
 import { useAppStore } from '../stores/appStore';
 import { AnnotationCanvas } from './AnnotationCanvas';
+import { RayOverlay } from './RayOverlay';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Point } from '../types';
 import type Konva from 'konva';
@@ -514,6 +515,13 @@ export const GridCanvas: React.FC = () => {
           )}
           {/* Placed modules */}
           {renderPlacedModules()}
+        </Layer>
+        {/* Ray tracing overlay */}
+        <Layer listening={false}>
+          <RayOverlay 
+            viewport={viewport}
+            gridCellSize={grid.cellSize}
+          />
         </Layer>
         {/* Annotations always on top */}
         <Layer listening={annotationMode !== 'none'}>

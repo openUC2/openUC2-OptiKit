@@ -87,7 +87,7 @@ interface AppStore extends AppState {
   loadStateFromStorage: () => void;
   downloadScreenshot: () => void;
   clearAll: () => void;
-  setActiveRightTab: (tab: 'layers' | 'properties' | 'bom' | 'annotations' | 'chat') => void;
+  setActiveRightTab: (tab: 'layers' | 'properties' | 'simulation' | 'bom' | 'annotations' | 'chat') => void;
   updateSetupMetadata: (metadata: Partial<SetupMetadata>) => void;
   // Tutorial actions
   setTutorialCompleted: (completed: boolean) => void;
@@ -1208,7 +1208,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveStateToStorage();
   },
 
-  setActiveRightTab: (tab: 'layers' | 'properties' | 'bom' | 'annotations' | 'chat') => {
+  setActiveRightTab: (tab: 'layers' | 'properties' | 'simulation' | 'bom' | 'annotations' | 'chat') => {
     set({ activeRightTab: tab });
   },
 

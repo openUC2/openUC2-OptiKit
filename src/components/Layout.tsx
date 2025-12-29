@@ -20,6 +20,7 @@ import { PropertyPanel } from './PropertyPanel';
 import { BOMPanel } from './BOMPanel';
 import { AnnotationPanel } from './AnnotationPanel';
 import { ChatPanel } from './ChatPanel';
+import { SimulationPanel } from './SimulationPanel';
 import { Toolbar } from './Toolbar';
 import { Tutorial } from './Tutorial';
 import { useAppStore } from '../stores/appStore';
@@ -187,6 +188,7 @@ export const Layout: React.FC = () => {
             >
               <Tab label="Layers" value="layers" data-tour="layers-tab" />
               <Tab label="Properties" value="properties" data-tour="properties-tab" />
+              <Tab label="Simulation" value="simulation" data-tour="simulation-tab" />
               <Tab label="Annotations" value="annotations" data-tour="annotations-tab" />
               <Tab label="BOM/Quote" value="bom" data-tour="bom-tab" />
               <Tab label="Chat" value="chat" data-tour="chat-tab" />
@@ -195,6 +197,7 @@ export const Layout: React.FC = () => {
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
               {activeRightTab === 'layers' && <LayerPanel />}
               {activeRightTab === 'properties' && <PropertyPanel />}
+              {activeRightTab === 'simulation' && <SimulationPanel />}
               {activeRightTab === 'annotations' && <AnnotationPanel />}
               {activeRightTab === 'bom' && <BOMPanel />}
               {activeRightTab === 'chat' && <ChatPanel />}

@@ -30,6 +30,10 @@
     "@mui/material": "^7.2.0",
     "@octokit/rest": "^22.0.0",
     "@types/intro.js": "^5.1.5",
+    "bezier-js": "^6.1.4",
+    "canvas2svg": "^1.0.16",
+    "file-saver": "^2.0.5",
+    "i18next": "^25.7.3",
     "intro.js": "^8.3.2",
     "jszip": "^3.10.1",
     "konva": "^9.3.22",
@@ -37,6 +41,7 @@
     "react-dom": "^19.1.0",
     "react-konva": "^19.0.7",
     "react-router-dom": "^7.7.1",
+    "seedrandom": "^3.0.5",
     "uuid": "^11.1.0",
     "zustand": "^5.0.6"
   },

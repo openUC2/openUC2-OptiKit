@@ -35,9 +35,11 @@ import {
   Forum as ForumIcon,
   SelectAll as SelectIcon,
   Delete as DeleteIcon,
-  Memory as ImSwitchIcon
+  Memory as ImSwitchIcon,
+  Science as SimulationIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { useSimulationStore } from '../stores/simulationStore';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 
@@ -426,6 +428,15 @@ openUC2 team via GitHub repository
           
           {/* Annotation Tools */}
           <Box data-tour="toolbar-drawing" sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title={useSimulationStore.getState().config.enabled ? "Disable Ray Simulation" : "Enable Ray Simulation"}>
+              <IconButton 
+                color={useSimulationStore.getState().config.enabled ? "secondary" : "inherit"}
+                onClick={() => useSimulationStore.getState().toggleSimulation()}
+                size="small"
+              >
+                <SimulationIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Draw Line">
               <IconButton 
                 color={annotationMode === 'line' ? "secondary" : "inherit"}
