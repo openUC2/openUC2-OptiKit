@@ -396,6 +396,7 @@ export interface OpticalElement {
 export interface OpticalElementParams {
   // Common
   aperture?: number;         // Clear aperture in mm
+  angle?: number;            // Surface angle in degrees (for mirrors, beamsplitters)
   
   // Lens parameters
   focalLength?: number;      // mm (positive = converging, negative = diverging)
