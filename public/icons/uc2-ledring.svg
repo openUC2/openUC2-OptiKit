@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="#ffc107" stroke-width="2">
+  <circle cx="50" cy="45" r="28" fill="#fff3e0" stroke="#ffc107"/>
+  <circle cx="50" cy="45" r="20" fill="#fff" stroke="#ffc107" stroke-width="1"/>
+  <g fill="#ffc107">
+    <circle cx="50" cy="25" r="3"/>
+    <circle cx="38" cy="29" r="3"/>
+    <circle cx="30" cy="38" r="3"/>
+    <circle cx="28" cy="50" r="3"/>
+    <circle cx="30" cy="58" r="3"/>
+    <circle cx="38" cy="64" r="3"/>
+    <circle cx="50" cy="67" r="3"/>
+    <circle cx="62" cy="64" r="3"/>
+    <circle cx="70" cy="58" r="3"/>
+    <circle cx="72" cy="50" r="3"/>
+    <circle cx="70" cy="38" r="3"/>
+    <circle cx="62" cy="29" r="3"/>
+  </g>
+  <circle cx="50" cy="45" r="10" fill="none" stroke="#f57f17" stroke-dasharray="2 2"/>
+  <text x="50" y="95" text-anchor="middle" font-size="6" fill="#333">LED RING</text>
+</svg>

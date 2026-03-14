@@ -5,6 +5,7 @@ import { CssBaseline } from '@mui/material'
 import { EditorPage } from './components/EditorPage'
 import { SetupBrowser } from './components/SetupBrowser'
 import { CollectionView } from './components/CollectionView'
+import { FrameWizardPage } from './components/FrameWizardPage'
 import { StartupDialog } from './components/StartupDialog'
 import { NotificationDisplay } from './components/NotificationDisplay'
 import { useAppStore } from './stores/appStore'
@@ -143,6 +144,7 @@ function App() {
         <Routes>
           <Route path="/configurator" element={<EditorPage />} />
           <Route path="/configurator/" element={<EditorPage />} />
+          <Route path="/configurator/frame" element={<FrameWizardPage />} />
           <Route path="/configurator/setups" element={<SetupBrowser />} />
           <Route path="/configurator/:collectionName" element={<CollectionView />} />
           {/* Legacy routes for backward compatibility */}

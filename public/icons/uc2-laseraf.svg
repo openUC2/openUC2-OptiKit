@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="#e91e63" stroke-width="2">
+  <rect x="15" y="25" width="70" height="40" rx="4" fill="#fce4ec" stroke="#e91e63"/>
+  <line x1="20" y1="45" x2="40" y2="45" stroke="#e91e63" stroke-width="3"/>
+  <circle cx="50" cy="45" r="8" fill="#fff" stroke="#e91e63"/>
+  <line x1="50" y1="37" x2="50" y2="53" stroke="#e91e63" stroke-width="1"/>
+  <line x1="42" y1="45" x2="58" y2="45" stroke="#e91e63" stroke-width="1"/>
+  <line x1="60" y1="45" x2="80" y2="45" stroke="#e91e63" stroke-width="1" stroke-dasharray="3 2"/>
+  <rect x="30" y="70" width="40" height="12" rx="3" fill="#fce4ec" stroke="#e91e63"/>
+  <text x="50" y="79" text-anchor="middle" font-size="6" fill="#c62828">785nm</text>
+  <text x="50" y="95" text-anchor="middle" font-size="6" fill="#333">LASER AF</text>
+</svg>

@@ -1,0 +1,13 @@
+id;name;manufacturer;sensor;resolution;pixelSize_um;sensorSize_mm;fps_max;interface;bitDepth;quantumEfficiency;mountType;cooled;price;thumbnail;docsUrl;partNumber
+cam-hik-mv-cs050;HIK MV-CS050-10UC;Hikrobot;IMX264;2448x2048;3.45;8.45x7.07;24;USB3;12;72;C-mount;false;500;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/hik-cs050;MV-CS050-10UC
+cam-hik-mv-cs200;HIK MV-CS200-10UC;Hikrobot;IMX183;5472x3648;2.4;13.13x8.76;20;USB3;12;84;C-mount;false;800;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/hik-cs200;MV-CS200-10UC
+cam-daheng-mer-503;Daheng MER-503-36U3C;Daheng;IMX264;2448x2048;3.45;8.45x7.07;36;USB3;12;72;C-mount;false;450;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/daheng-503;MER-503-36U3C
+cam-daheng-mer-2000;Daheng MER-2000-19U3C;Daheng;IMX183;5472x3648;2.4;13.13x8.76;19;USB3;12;84;C-mount;false;750;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/daheng-2000;MER-2000-19U3C
+cam-thorlabs-cs165mu;Thorlabs CS165MU;Thorlabs;IMX273;1440x1080;3.45;4.97x3.73;61;USB3;10;70;C-mount;false;600;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/thorlabs-cs165;CS165MU
+cam-thorlabs-cs505mu;Thorlabs CS505MU;Thorlabs;IMX264;2448x2048;3.45;8.45x7.07;35;USB3;12;72;C-mount;false;950;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/thorlabs-cs505;CS505MU
+cam-allied-alvium-1800u-158;Allied Vision Alvium 1800 U-158;Allied Vision;IMX273;1456x1088;3.45;5.02x3.75;60;USB3;12;70;C-mount;false;650;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/allied-158;1800U-158
+cam-raspberrypi-hq;Raspberry Pi HQ Camera;Raspberry Pi Foundation;IMX477;4056x3040;1.55;6.29x4.71;30;CSI-2;12;45;CS-mount;false;50;/icons/uc2-raspicam.svg;https://docs.openuc2.com/cameras/rpi-hq;RPI-HQ
+cam-raspberrypi-gs;Raspberry Pi GS Camera;Raspberry Pi Foundation;IMX296;1456x1088;3.45;5.02x3.75;60;CSI-2;10;72;CS-mount;false;65;/icons/uc2-raspicam.svg;https://docs.openuc2.com/cameras/rpi-gs;RPI-GS
+cam-esp32-ov2640;ESP32-CAM OV2640;Espressif;OV2640;1600x1200;2.2;3.52x2.64;15;WiFi;8;30;fixed;false;8;/icons/uc2-raspicam.svg;https://docs.openuc2.com/cameras/esp32-cam;ESP32-CAM
+cam-flir-bfs-u3-50s5;FLIR BFS-U3-50S5M;Teledyne FLIR;IMX264;2448x2048;3.45;8.45x7.07;35;USB3;12;72;C-mount;false;900;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/flir-bfs-50s5;BFS-U3-50S5M
+cam-flir-bfs-u3-200s6;FLIR BFS-U3-200S6M;Teledyne FLIR;IMX183;5472x3648;2.4;13.13x8.76;18;USB3;12;84;C-mount;false;1500;/icons/uc2_cctvcam_1x2.svg;https://docs.openuc2.com/cameras/flir-bfs-200s6;BFS-U3-200S6M

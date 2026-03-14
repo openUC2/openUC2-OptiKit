@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="#9c27b0" stroke-width="2">
+  <rect x="20" y="20" width="60" height="60" rx="3" fill="#f3e5f5" stroke="#9c27b0"/>
+  <line x1="20" y1="80" x2="80" y2="20" stroke="#9c27b0" stroke-width="2"/>
+  <path d="M25 75 L50 50" stroke="#7b1fa2" stroke-width="3" opacity="0.5"/>
+  <path d="M50 50 L75 25" stroke="#e91e63" stroke-width="3" opacity="0.5"/>
+  <circle cx="50" cy="50" r="4" fill="#9c27b0"/>
+  <text x="30" y="45" font-size="6" fill="#7b1fa2">Ex</text>
+  <text x="60" y="65" font-size="6" fill="#e91e63">Em</text>
+  <text x="50" y="95" text-anchor="middle" font-size="5" fill="#333">DICHROIC</text>
+</svg>

@@ -1,0 +1,23 @@
+id;name;dyeName;excitationPeak_nm;excitationRange_nm;emissionPeak_nm;emissionRange_nm;lightSourceType;lightSourceWavelength_nm;excitationFilterCenter_nm;excitationFilterBandwidth_nm;dichroicEdge_nm;emissionFilterCenter_nm;emissionFilterBandwidth_nm;color;commonApplications;price_filterSet
+fluor-dapi;DAPI;DAPI;360;340-380;461;430-490;LED;365;377;50;409;447;60;#2196f3;Nuclear staining, DNA;350
+fluor-hoechst;Hoechst 33342;Hoechst;350;330-370;461;430-490;LED;365;377;50;409;447;60;#2196f3;Nuclear staining, live cells;350
+fluor-gfp;GFP;GFP;488;460-510;509;500-540;LED;470;470;40;495;525;50;#4caf50;Reporter gene, live cell imaging;400
+fluor-alexa488;Alexa Fluor 488;Alexa Fluor 488;495;470-510;519;505-545;LED;470;470;40;495;525;50;#4caf50;Immunofluorescence, general;400
+fluor-fitc;FITC;FITC;494;470-510;521;505-545;LED;470;470;40;495;525;50;#4caf50;Immunofluorescence;400
+fluor-yfp;YFP;YFP;514;490-530;527;515-555;LED;505;510;25;520;542;27;#cddc39;Reporter gene;450
+fluor-cy3;Cy3;Cy3;550;530-570;570;560-600;LED;530;546;10;560;575;25;#ff9800;FISH, immunofluorescence;400
+fluor-tritc;TRITC;TRITC;557;535-570;576;560-600;LED;530;546;10;560;575;25;#ff9800;Immunofluorescence;400
+fluor-dsred;DsRed;DsRed;558;535-575;583;570-610;LED;530;546;10;560;580;40;#ff5722;Reporter gene;400
+fluor-rhodamine;Rhodamine 6G;Rhodamine;528;510-545;551;540-575;LED;530;520;35;545;565;30;#ff5722;Laser dye, tracing;380
+fluor-texas-red;Texas Red;Texas Red;596;575-610;615;605-640;LED;625;596;15;612;630;30;#f44336;Immunofluorescence;400
+fluor-mcherry;mCherry;mCherry;587;565-600;610;595-640;LED;590;578;21;596;641;75;#f44336;Reporter gene, live imaging;420
+fluor-cy5;Cy5;Cy5;649;630-660;670;660-700;LED;625;640;30;660;690;50;#9c27b0;FISH, far-red IF;420
+fluor-alexa647;Alexa Fluor 647;Alexa Fluor 647;650;630-660;668;660-700;LED;625;640;30;660;690;50;#9c27b0;Super-resolution, STORM;420
+fluor-draq5;DRAQ5;DRAQ5;647;620-660;681;670-710;LED;625;640;30;660;700;50;#9c27b0;Nuclear staining, far-red;420
+fluor-dapi-laser;DAPI (Laser);DAPI;360;355-365;461;430-490;Laser;405;405;10;409;447;60;#2196f3;Nuclear staining, confocal;500
+fluor-gfp-laser;GFP (Laser);GFP;488;483-493;509;500-540;Laser;488;488;10;495;525;50;#4caf50;Confocal, live imaging;550
+fluor-cy3-laser;Cy3 (Laser);Cy3;550;527-537;570;560-600;Laser;532;532;10;560;575;25;#ff9800;Confocal FISH;550
+fluor-cy5-laser;Cy5 (Laser);Cy5;649;630-640;670;660-700;Laser;635;635;10;660;690;50;#9c27b0;Confocal, far-red;550
+fluor-multiband-dapi-gfp;Multiband DAPI+GFP;DAPI+GFP;360/488;340-510;461/509;430-540;LED;365/470;;;multiband-405/495;multiband-447/525;;#00bcd4;Dual nuclear + reporter;800
+fluor-multiband-dapi-gfp-txred;Multiband DAPI+GFP+TexasRed;DAPI+GFP+Texas Red;360/488/596;340-610;461/509/615;430-640;LED;365/470/625;;;multiband-405/495/612;multiband-447/525/630;;#ff5722;Triple staining;1200
+fluor-multiband-quad;Quadband DAPI+FITC+TRITC+Cy5;DAPI+FITC+TRITC+Cy5;360/494/557/649;340-660;461/521/576/670;430-700;Laser;405/488/532/635;;;quadband;quadband;;#607d8b;4-color imaging;2000

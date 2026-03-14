@@ -1,0 +1,19 @@
+id;name;manufacturer;type;focalLength_mm;diameter_mm;coating;wavelengthRange_nm;mountType;price;thumbnail;optilandJson;docsUrl;partNumber
+lens-thorlabs-ac254-050;Thorlabs AC254-050-A-ML;Thorlabs;achromatic-doublet;50;25.4;A (350-700nm);350-700;SM1;95;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ac254-050;AC254-050-A-ML
+lens-thorlabs-ac254-075;Thorlabs AC254-075-A-ML;Thorlabs;achromatic-doublet;75;25.4;A (350-700nm);350-700;SM1;95;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ac254-075;AC254-075-A-ML
+lens-thorlabs-ac254-100;Thorlabs AC254-100-A-ML;Thorlabs;achromatic-doublet;100;25.4;A (350-700nm);350-700;SM1;95;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ac254-100;AC254-100-A-ML
+lens-thorlabs-ac254-150;Thorlabs AC254-150-A-ML;Thorlabs;achromatic-doublet;150;25.4;A (350-700nm);350-700;SM1;95;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ac254-150;AC254-150-A-ML
+lens-thorlabs-ac254-200;Thorlabs AC254-200-A-ML;Thorlabs;achromatic-doublet;200;25.4;A (350-700nm);350-700;SM1;95;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ac254-200;AC254-200-A-ML
+lens-thorlabs-ac508-200;Thorlabs AC508-200-A-ML;Thorlabs;achromatic-doublet;200;50.8;A (350-700nm);350-700;SM2;175;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ac508-200;AC508-200-A-ML
+lens-thorlabs-ttl200mp;Thorlabs TTL200-MP;Thorlabs;tube-lens;200;30;broadband;400-700;SM1.5;650;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-ttl200mp;TTL200-MP
+lens-thorlabs-itl200;Thorlabs ITL200;Thorlabs;tube-lens;200;30;broadband;400-700;SM1.5;750;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/thorlabs-itl200;ITL200
+lens-edmund-45-806;Edmund #45-806 Tube Lens;Edmund Optics;tube-lens;200;25.4;MgF2;400-700;none;350;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/edmund-45-806;45-806
+lens-edmund-49-290;Edmund #49-290 f=50mm;Edmund Optics;achromatic-doublet;50;25.4;MgF2;400-700;none;65;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/edmund-49-290;49-290
+lens-edmund-49-293;Edmund #49-293 f=100mm;Edmund Optics;achromatic-doublet;100;25.4;MgF2;400-700;none;65;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/edmund-49-293;49-293
+lens-edmund-49-296;Edmund #49-296 f=150mm;Edmund Optics;achromatic-doublet;150;25.4;MgF2;400-700;none;65;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/edmund-49-296;49-296
+lens-edmund-49-299;Edmund #49-299 f=200mm;Edmund Optics;achromatic-doublet;200;25.4;MgF2;400-700;none;65;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/edmund-49-299;49-299
+lens-uc2-40mm-f50;UC2 40mm f=50mm;openUC2;plano-convex;50;40;none;400-700;UC2-insert;10;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/uc2-f50;UC2-L50
+lens-uc2-40mm-f75;UC2 40mm f=75mm;openUC2;plano-convex;75;40;none;400-700;UC2-insert;10;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/uc2-f75;UC2-L75
+lens-uc2-40mm-f100;UC2 40mm f=100mm;openUC2;plano-convex;100;40;none;400-700;UC2-insert;12;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/uc2-f100;UC2-L100
+lens-uc2-40mm-fn50;UC2 40mm f=-50mm;openUC2;plano-concave;-50;40;none;400-700;UC2-insert;10;/icons/uc2_lensnegative_1x1.svg;;https://docs.openuc2.com/lenses/uc2-fn50;UC2-LN50
+lens-uc2-tubef180;UC2 Tube Lens f=180mm;openUC2;achromatic-doublet;180;25.4;none;400-700;UC2-insert;80;/icons/uc2_lenspositive_1x1.svg;;https://docs.openuc2.com/lenses/uc2-tube180;UC2-TL180

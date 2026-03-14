@@ -26,6 +26,10 @@ export interface ModuleDefinition {
   notification?: string;
   linkUrl?: string;
   imSwitchConfig?: string; // Raw ImSwitch configuration string from CSV
+  frameOnly?: boolean;
+  framePosition?: string;
+  frameOrientation?: string;
+  docsUrl?: string;
 }
 
 export interface PlacedModule {

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="#495057" stroke-width="2">
+  <circle cx="50" cy="50" r="38" fill="#e8eaed"/>
+  <circle cx="50" cy="50" r="28" fill="#fff" stroke="#495057" stroke-width="1.5"/>
+  <circle cx="50" cy="50" r="18" fill="#e8eaed" stroke="#495057" stroke-width="1"/>
+  <circle cx="50" cy="35" r="6" fill="#fff" stroke="#333"/>
+  <circle cx="50" cy="65" r="6" fill="#fff" stroke="#333"/>
+  <line x1="50" y1="12" x2="50" y2="88" stroke="#ccc" stroke-dasharray="3 3"/>
+  <path d="M35 25 A25 25 0 0 1 65 25" fill="none" stroke="#ff5722" stroke-width="2"/>
+  <text x="50" y="95" text-anchor="middle" font-size="8" fill="#333">REVOLVER</text>
+</svg>

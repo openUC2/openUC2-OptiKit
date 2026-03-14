@@ -16,6 +16,10 @@ export interface ModuleCSVRow {
   notification?: string;
   linkUrl?: string;
   ImSwitch?: string; // ImSwitch configuration data
+  frameOnly?: string;
+  framePosition?: string;
+  frameOrientation?: string;
+  docsUrl?: string;
 }
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
@@ -92,7 +96,11 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
     price: row.price ? parseFloat(row.price) : undefined,
     notification: notification || undefined,
     linkUrl: row.linkUrl || undefined,
-    imSwitchConfig: row.ImSwitch || undefined // Add ImSwitch configuration
+    imSwitchConfig: row.ImSwitch || undefined, // Add ImSwitch configuration
+    frameOnly: row.frameOnly === 'TRUE' || row.frameOnly === 'true',
+    framePosition: row.framePosition || undefined,
+    frameOrientation: row.frameOrientation || undefined,
+    docsUrl: row.docsUrl || undefined,
   };
 }
 
