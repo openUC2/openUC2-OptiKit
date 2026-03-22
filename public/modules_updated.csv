@@ -56,9 +56,10 @@ objective-10x-1x1;Microscope Objective 10×;optics;#7cc150;1;1;/icons/uc2-10xobj
 objective-4x-1x1;Microscope Objective 4×;optics;#7cc150;1;1;/icons/uc2-4xobjective.svg;/cad/notdefined.stl;Achromatic objective for imaging.;"{""magnification"":4,""na"":0.25,""wd_mm"":10}";;200;;;;false
 objective-20x-1x1;Microscope Objective 40×;optics;#7cc150;1;1;/icons/uc2-20xobjective.svg;/cad/notdefined.stl;Achromatic objective for imaging.;"{""magnification"":20,""na"":0.65,""wd_mm"":0.6}";;250;;;;false
 c-mount-adapter-1x1;C‑Mount Camera Adapter;cameras;#343a40;1;1;;/cad/notdefined.stl;Adapter for C‑mount cameras to the cube system.;"{""thread"":""C‑mount""}";ASS - 2055 - CUBCMOUNTMNT - V04.iam;40;;;;false
+HIK-cmos-camera;C-Mount CMOS Camera monochrome;cameras;;/cad/notdefined.stl;CMount CMOS monocrhome camera;"{""thread"":""C‑mount""}";ASS - 2055 - CUBCMOUNTMNT - V04.iam;40;;;;false
 tube-lens-1x1;Tube Lens;lenses;#7cc142;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/notdefined.stl;Infinity‑corrected tube lens for microscope systems.;"{""focalLength_mm"":200}";ASS - 2022 - CUBLEND40F100 - V04.iam;200;;;;false
 diffuser-1x1;Diffuser/Screen;illumination;#7cc149;1;1;;/cad/notdefined.stl;Opal/glass diffuser for uniform illumination.;"{""type"":""opal""}";ASS - 2049 - CUBREDFIL - V04.iam;50;;Not done yet;;false
-filter-1x1;Filter Wheel;optics;#7cc150;1;1;;/cad/notdefined.stl;Holds multiple filters for rapid switching.;"{""positions"":6}";ASS - 2053 - CUBREMOVAEMIFIL - V04.iam;100;;Not done yet;;false
+filter-1x1;Filter Wheel;optics;#7cc150;1;1;/icons/uc2-hik-cmos.svg;/cad/notdefined.stl;Holds multiple filters for rapid switching.;"{""positions"":6}";ASS - 2053 - CUBREMOVAEMIFIL - V04.iam;100;;Not done yet;;false
 rotation-stage-1x1;Rotation Stage;stages;#495057;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/notdefined.stl;360° rotation with vernier for polarizer/optic alignment.;;;340;;Not done yet ;;false
 cylindrical-lens-1x1;Cylindrical lens for lightsheet;optics;#495057;1;1;/icons/uc2_lenspositive_1x1.svg;/cad/notdefined.stl;Cylindrical lens for lightsheet;"{""resolution_deg"":1.0}";ASS - 2054 - CUBLENCYL30x32F100 - V04.iam;300;;;;false
 12V power supply;Power Supply for Electronics;electronics;#495057;2;1;/icons/uc2-12Vsupply.svg;/cad/notdefined.stl;Power Supply;"{""positions"":6}";;30;;;;false
