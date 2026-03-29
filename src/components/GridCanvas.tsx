@@ -34,6 +34,11 @@ export const GridCanvas: React.FC = () => {
   const [isDraggingModule, setIsDraggingModule] = useState(false);
   const annotationMode = useAppStore((state) => state.annotationMode);
 
+  // Touch pinch-zoom support
+  const touchDistRef = useRef<number | null>(null);
+  // Keep a synchronously-updated viewport ref to avoid stale closures in touch handlers
+  const viewportRef = useRef({ zoom: 1, pan: { x: 0, y: 0 } });
+
   // Context-menu state (position in screen pixels)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; moduleId: string | null } | null>(null);
 
@@ -69,6 +74,11 @@ export const GridCanvas: React.FC = () => {
 
   const activeLayer = layers.find(layer => layer.id === activeLayerId);
   const currentLayerIndex = activeLayer?.index ?? 0;
+
+  // Keep viewportRef in sync so touch handlers always read up-to-date values
+  useEffect(() => {
+    viewportRef.current = { zoom: viewport.zoom, pan: { ...viewport.pan } };
+  }, [viewport]);
 
   // Snap position to grid
   const snapToGrid = useCallback((pos: Point): Point => {
@@ -176,12 +186,8 @@ export const GridCanvas: React.FC = () => {
 
     window.addEventListener('resize', updateSize);
     window.addEventListener('download-screenshot', handleScreenshotDownload);
-    
-    // Add mobile drop event listener
-    const canvasElement = stageRef.current?.container();
-    if (canvasElement) {
-      canvasElement.addEventListener('mobile-drop', handleMobileDrop as EventListener);
-    }
+    // Listen on window so PartLibrary can reliably dispatch mobile-drop regardless of DOM structure
+    window.addEventListener('mobile-drop', handleMobileDrop as EventListener);
     
     // Use ResizeObserver for accurate sizing of the wrapper div
     const wrapper = wrapperRef.current;
@@ -196,9 +202,7 @@ export const GridCanvas: React.FC = () => {
     return () => {
       window.removeEventListener('resize', updateSize);
       window.removeEventListener('download-screenshot', handleScreenshotDownload);
-      if (canvasElement) {
-        canvasElement.removeEventListener('mobile-drop', handleMobileDrop as EventListener);
-      }
+      window.removeEventListener('mobile-drop', handleMobileDrop as EventListener);
       resizeObserver?.disconnect();
     };
   }, [viewport.pan.x, viewport.pan.y, viewport.zoom, currentLayerIndex, placeModule, pixelToGrid, snapToGrid]);
@@ -698,6 +702,58 @@ export const GridCanvas: React.FC = () => {
               pan: newPos
             });
           }
+        }}
+        onTouchStart={(e) => {
+          // When two fingers touch, stop any ongoing drag and record pinch distance
+          if (e.evt.touches.length === 2) {
+            e.evt.preventDefault();
+            stageRef.current?.stopDrag();
+            const t1 = e.evt.touches[0];
+            const t2 = e.evt.touches[1];
+            touchDistRef.current = Math.hypot(
+              t2.clientX - t1.clientX,
+              t2.clientY - t1.clientY
+            );
+          } else {
+            touchDistRef.current = null;
+          }
+        }}
+        onTouchMove={(e) => {
+          // Pinch-to-zoom: only process when exactly two fingers are down
+          if (e.evt.touches.length !== 2 || touchDistRef.current === null) return;
+          e.evt.preventDefault();
+          const stage = stageRef.current;
+          if (!stage) return;
+
+          const t1 = e.evt.touches[0];
+          const t2 = e.evt.touches[1];
+          const newDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+          // Pinch centre in stage-container-local coordinates
+          const stageBox = stage.container().getBoundingClientRect();
+          const cx = (t1.clientX + t2.clientX) / 2 - stageBox.left;
+          const cy = (t1.clientY + t2.clientY) / 2 - stageBox.top;
+
+          const { zoom: oldScale, pan } = viewportRef.current;
+          const scaleBy = newDist / touchDistRef.current;
+          const newScale = Math.max(0.1, Math.min(3, oldScale * scaleBy));
+
+          const pt = {
+            x: (cx - pan.x) / oldScale,
+            y: (cy - pan.y) / oldScale,
+          };
+          const newPos = {
+            x: cx - pt.x * newScale,
+            y: cy - pt.y * newScale,
+          };
+
+          // Update ref synchronously so next event sees the latest values
+          viewportRef.current = { zoom: newScale, pan: newPos };
+          setViewport({ zoom: newScale, pan: newPos });
+          touchDistRef.current = newDist;
+        }}
+        onTouchEnd={() => {
+          touchDistRef.current = null;
         }}
         draggable={annotationMode === 'none' && !isBoxSelecting.current}
         onDragStart={(e) => {

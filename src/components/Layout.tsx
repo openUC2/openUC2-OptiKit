@@ -6,12 +6,15 @@ import {
   Tab, 
   IconButton, 
   Paper,
+  Tooltip,
   useTheme,
   useMediaQuery 
 } from '@mui/material';
 import {
   Inventory as PartsIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 import { PartLibrary } from './PartLibrary';
 import { GridCanvas } from './GridCanvas';
@@ -27,97 +30,79 @@ import { useAppStore } from '../stores/appStore';
 
 export const Layout: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  // md = 900 px; sm = 600 px
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));  // tablets portrait + phones
+  const isPhone = useMediaQuery(theme.breakpoints.down('sm'));   // phones only
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(!isMobile);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(!isMobile);
   const { activeRightTab, setActiveRightTab } = useAppStore();
-  const [showMobileWarning, setShowMobileWarning] = useState(false);
 
   useEffect(() => {
-    // On mobile, close sidebars by default for better canvas space
+    // Collapse both panels automatically when the screen becomes narrow
     if (isMobile) {
       setLeftSidebarOpen(false);
       setRightSidebarOpen(false);
     } else {
-      // Always show sidebars when switching to desktop
       setLeftSidebarOpen(true);
       setRightSidebarOpen(true);
     }
   }, [isMobile]);
 
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      setShowMobileWarning(mobile);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const sidebarWidth = isMobile ? Math.min(350, window.innerWidth * 0.85) : 400;
+  const sidebarWidth = isPhone
+    ? Math.min(300, window.innerWidth * 0.9)
+    : isMobile
+    ? Math.min(350, window.innerWidth * 0.85)
+    : 400;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Toolbar */}
       <Toolbar />
       
-      {/* Mobile Warning Banner */}
-      {showMobileWarning && (
-        <Box sx={{
-          background: '#e74c3c',
-          color: 'white',
-          padding: '12px',
-          textAlign: 'center',
-          fontWeight: 'bold',
-          zIndex: 1000,
-        }}>
-          ⚠️ This application is currently not supported on smartphones. For the best experience, please use a desktop or tablet.<br />
-          <button style={{ marginTop: 8, background: 'white', color: '#e74c3c', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setShowMobileWarning(false)}>
-            Dismiss
-          </button>
-        </Box>
-      )}
-      
-      {/* Mobile Controls */}
+      {/* Mobile Controls bar – shown on screens narrower than md (< 900 px) */}
       {isMobile && (
         <Paper 
           elevation={1} 
           sx={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            p: 1.5, 
+            p: 1, 
             borderRadius: 0,
             bgcolor: 'primary.main',
             color: 'white'
           }}
         >
-          <IconButton 
-            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-            sx={{ 
-              color: 'white',
-              minWidth: 48,
-              minHeight: 48,
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)'
-              }
+          <Tooltip title={leftSidebarOpen ? 'Close parts library' : 'Open parts library'}>
+            <IconButton 
+              onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+              sx={{ 
+                color: leftSidebarOpen ? 'rgba(255,255,255,0.5)' : 'white',
+                minWidth: 44,
+                minHeight: 44,
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
             }}
+            aria-label="Toggle parts library"
           >
             <PartsIcon />
           </IconButton>
-          <IconButton 
-            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-            sx={{ 
-              color: 'white',
-              minWidth: 48,
-              minHeight: 48,
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)'
-              }
-            }}
-          >
-            <SettingsIcon />
-          </IconButton>
+          </Tooltip>
+
+          <Box sx={{ flex: 1 }} />
+
+          <Tooltip title={rightSidebarOpen ? 'Close settings panel' : 'Open settings panel'}>
+            <IconButton 
+              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+              sx={{ 
+                color: rightSidebarOpen ? 'rgba(255,255,255,0.5)' : 'white',
+                minWidth: 44,
+                minHeight: 44,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
+              }}
+              aria-label="Toggle settings panel"
+            >
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
         </Paper>
       )}
       
@@ -145,7 +130,7 @@ export const Layout: React.FC = () => {
           <PartLibrary />
         </Drawer>
         
-        {/* Canvas */}
+        {/* Canvas + panel toggle buttons */}
         <Box 
           component="main"
           data-tour="canvas"
@@ -154,10 +139,65 @@ export const Layout: React.FC = () => {
             display: 'flex', 
             flexDirection: 'column',
             overflow: 'hidden',
-            bgcolor: 'background.default'
+            bgcolor: 'background.default',
+            position: 'relative',
           }}
         >
+          {/* Left panel toggle – visible on all screen sizes */}
+          <Tooltip title={leftSidebarOpen ? 'Collapse parts library' : 'Expand parts library'} placement="right">
+            <IconButton
+              onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+              size="small"
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 100,
+                bgcolor: 'primary.main',
+                color: 'white',
+                borderRadius: '0 6px 6px 0',
+                width: 18,
+                height: 52,
+                minWidth: 0,
+                p: 0,
+                '&:hover': { bgcolor: 'primary.dark' },
+                boxShadow: 2,
+              }}
+              aria-label="Toggle parts library"
+            >
+              {leftSidebarOpen ? <ChevronLeftIcon sx={{ fontSize: 14 }} /> : <ChevronRightIcon sx={{ fontSize: 14 }} />}
+            </IconButton>
+          </Tooltip>
+
           <GridCanvas />
+
+          {/* Right panel toggle – visible on all screen sizes */}
+          <Tooltip title={rightSidebarOpen ? 'Collapse settings panel' : 'Expand settings panel'} placement="left">
+            <IconButton
+              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+              size="small"
+              sx={{
+                position: 'absolute',
+                right: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 100,
+                bgcolor: 'primary.main',
+                color: 'white',
+                borderRadius: '6px 0 0 6px',
+                width: 18,
+                height: 52,
+                minWidth: 0,
+                p: 0,
+                '&:hover': { bgcolor: 'primary.dark' },
+                boxShadow: 2,
+              }}
+              aria-label="Toggle settings panel"
+            >
+              {rightSidebarOpen ? <ChevronRightIcon sx={{ fontSize: 14 }} /> : <ChevronLeftIcon sx={{ fontSize: 14 }} />}
+            </IconButton>
+          </Tooltip>
         </Box>
         
         {/* Right Sidebar - Layers, Properties, BOM */}

@@ -215,8 +215,8 @@ export const PartLibrary: React.FC = () => {
     target.style.pointerEvents = 'none';
     
     // Check if we're over the canvas
-    const canvasElement = document.querySelector('.MuiBox-root:has(.konvajs-content)') || 
-                         document.querySelector('.konvajs-content')?.parentElement;
+    const konvaContent = document.querySelector('.konvajs-content');
+    const canvasElement = konvaContent?.parentElement ?? konvaContent;
     if (canvasElement) {
       const canvasRect = canvasElement.getBoundingClientRect();
       const isOverCanvas = touch.clientX >= canvasRect.left && 
@@ -261,31 +261,29 @@ export const PartLibrary: React.FC = () => {
     
     if (!moduleId) return;
     
-    // Check if we're over the canvas
-    const canvasElement = document.querySelector('.MuiBox-root:has(.konvajs-content)') || 
-                         document.querySelector('.konvajs-content')?.parentElement;
-    if (canvasElement) {
-      const canvasRect = canvasElement.getBoundingClientRect();
-      const isOverCanvas = touch.clientX >= canvasRect.left && 
-                          touch.clientX <= canvasRect.right && 
-                          touch.clientY >= canvasRect.top && 
-                          touch.clientY <= canvasRect.bottom;
-      if (isOverCanvas) {
-        // Provide haptic feedback for successful drop
-        if ('vibrate' in navigator) {
-          navigator.vibrate([30, 30, 30]);
-        }
-        
-        // Simulate a drop event
-        const dropEvent = new CustomEvent('mobile-drop', {
-          detail: {
-            moduleId,
-            x: touch.clientX,
-            y: touch.clientY
-          }
-        });
-        canvasElement.dispatchEvent(dropEvent);
+    // Determine whether the touch ended over the canvas area
+    const konvaContent = document.querySelector('.konvajs-content');
+    const canvasElement = konvaContent?.parentElement ?? konvaContent;
+    const isOverCanvas = (() => {
+      if (!canvasElement) return true; // fallback: attempt drop anyway
+      const rect = canvasElement.getBoundingClientRect();
+      return (
+        touch.clientX >= rect.left &&
+        touch.clientX <= rect.right &&
+        touch.clientY >= rect.top &&
+        touch.clientY <= rect.bottom
+      );
+    })();
+
+    if (isOverCanvas) {
+      // Provide haptic feedback for successful drop
+      if ('vibrate' in navigator) {
+        navigator.vibrate([30, 30, 30]);
       }
+      // Dispatch on window so GridCanvas always receives it regardless of DOM structure
+      window.dispatchEvent(new CustomEvent('mobile-drop', {
+        detail: { moduleId, x: touch.clientX, y: touch.clientY },
+      }));
     }
   };
 
