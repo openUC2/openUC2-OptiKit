@@ -20,6 +20,10 @@ export interface ModuleCSVRow {
   framePosition?: string;
   frameOrientation?: string;
   docsUrl?: string;
+  glbUrl?: string;
+  glbOffsetX?: string;
+  glbOffsetY?: string;
+  glbOffsetZ?: string;
 }
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
@@ -50,6 +54,15 @@ function addConfiguratorPrefix(path: string | undefined): string | undefined {
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   if (path.startsWith('/')) return '/configurator' + path;
   return '/configurator/' + path;
+}
+
+const GLB_STORE_BASE = 'https://raw.githubusercontent.com/openUC2/openUC2-OptiKit-GLBStore/main/';
+
+function addGLBStorePrefix(path: string | undefined): string | undefined {
+  if (!path) return path;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  // Relative path — prepend GLB store base
+  return GLB_STORE_BASE + path;
 }
 
 export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
@@ -101,6 +114,14 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
     framePosition: row.framePosition || undefined,
     frameOrientation: row.frameOrientation || undefined,
     docsUrl: row.docsUrl || undefined,
+    glbUrl: addGLBStorePrefix(row.glbUrl || undefined),
+    glbOffset: (row.glbOffsetX || row.glbOffsetY || row.glbOffsetZ)
+      ? [
+          parseFloat(row.glbOffsetX || '0'),
+          parseFloat(row.glbOffsetY || '0'),
+          parseFloat(row.glbOffsetZ || '0')
+        ] as [number, number, number]
+      : undefined,
   };
 }
 

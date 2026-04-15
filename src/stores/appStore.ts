@@ -56,6 +56,7 @@ interface AppStore extends AppState {
   placeModule: (moduleId: string, position: Point, layer: number) => void;
   moveModule: (moduleId: string, position: Point) => void;
   rotateModule: (moduleId: string, rotation: number) => void;
+  rotateModuleTop: (moduleId: string, topRotation: number) => void;
   removeModule: (moduleId: string) => void;
   updateModuleCustomText: (moduleId: string, customText: string) => void;
   updateModuleParams: (moduleId: string, params: Record<string, unknown>) => void;
@@ -312,6 +313,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }));
   },
 
+  rotateModuleTop: (moduleId: string, topRotation: number) => {
+    // Snap to nearest 90°
+    const snapped = (Math.round(topRotation / 90) * 90 + 360) % 360;
+    set(state => ({
+      placedModules: state.placedModules.map(m =>
+        m.id === moduleId ? { ...m, topRotation: snapped } : m
+      )
+    }));
+  },
+
   removeModule: (moduleId: string) => {
     const state = get();
     
@@ -535,7 +546,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const newModules: PlacedModule[] = state.clipboard.map(m => ({
       ...m,
       id: uuidv4(),
-      position: { x: m.position.x + 1, y: m.position.y + 1 }
+      position: { x: m.position.x + 1, y: m.position.y + 1 },
+      topRotation: m.topRotation // preserve topRotation on clone
     }));
 
     set(s => ({
@@ -776,7 +788,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           rotation: module.r || 0,
           layer: module.p[2] || 0,
           params: {},
-          customText: module.t
+          customText: module.t,
+          topRotation: module.tr || 0
         }));
         
         // Convert annotations if they exist
@@ -969,7 +982,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           rotation: module.r || 0,
           layer: module.p[2] || 0,
           params: {},
-          customText: module.t
+          customText: module.t,
+          topRotation: module.tr || 0
         }));
         
         set({
@@ -1221,7 +1235,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         i: module.moduleId,
         p: [module.position.x, module.position.y, module.layer],
         r: module.rotation,
-        ...(module.customText && { t: module.customText })
+        ...(module.customText && { t: module.customText }),
+        ...(module.topRotation && { tr: module.topRotation })
       })),
       a: state.annotations.map(annotation => ({
         t: annotation.type,

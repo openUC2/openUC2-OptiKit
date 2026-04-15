@@ -30,6 +30,8 @@ export interface ModuleDefinition {
   framePosition?: string;
   frameOrientation?: string;
   docsUrl?: string;
+  glbUrl?: string;
+  glbOffset?: [number, number, number];
 }
 
 export interface PlacedModule {
@@ -37,6 +39,7 @@ export interface PlacedModule {
   moduleId: string;
   position: Point; // in grid coordinates
   rotation: number; // in degrees (0, 90, 180, 270)
+  topRotation?: number; // top-view rotation in degrees (0, 90, 180, 270), default 0
   layer: number;
   params?: Record<string, unknown>;
   customText?: string; // For wild card modules
@@ -181,6 +184,7 @@ export interface CompactModule {
   p: [number, number, number]; // position [x, y, layer]
   r: number; // rotation
   t?: string; // customText
+  tr?: number; // topRotation (omitted when 0)
 }
 
 export interface CompactAnnotation {
