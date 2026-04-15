@@ -55,6 +55,7 @@ interface AppStore extends AppState {
   setAllLayersVisibility: (visible: boolean) => void;
   placeModule: (moduleId: string, position: Point, layer: number) => void;
   moveModule: (moduleId: string, position: Point) => void;
+  moveModuleToLayer: (moduleId: string, layer: number) => void;
   rotateModule: (moduleId: string, rotation: number) => void;
   rotateModuleTop: (moduleId: string, topRotation: number) => void;
   removeModule: (moduleId: string) => void;
@@ -294,6 +295,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set(state => ({
       placedModules: state.placedModules.map(m => 
         m.id === moduleId ? { ...m, position } : m
+      )
+    }));
+  },
+
+  moveModuleToLayer: (moduleId: string, layer: number) => {
+    const state = get();
+    const module = state.placedModules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    state.pushToHistory({
+      placedModules: state.placedModules,
+      annotations: state.annotations,
+      layers: state.layers,
+      activeLayerId: state.activeLayerId,
+      selectedItems: state.selectedItems,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType
+    });
+
+    set(state => ({
+      placedModules: state.placedModules.map(m =>
+        m.id === moduleId ? { ...m, layer: Math.max(0, layer) } : m
       )
     }));
   },

@@ -1,4 +1,4 @@
-import { useState, Suspense, useMemo } from 'react';
+import { useState, useRef, useEffect, Suspense, useMemo } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -6,6 +6,11 @@ import { moduleWorldPosition } from './coords';
 import { useAppStore } from '../stores/appStore';
 import { GRID_MM } from '../constants/grid';
 import type { PlacedModule, ModuleDefinition } from '../types';
+
+// ─── Shared ref registry so CubeGizmo can find the selected cube ────────────
+
+/** Map of module id → outer Three.js group ref */
+export const cubeRefRegistry = new Map<string, THREE.Group>();
 
 // ─── Selection / hover highlight ─────────────────────────────────────────────
 
@@ -64,9 +69,17 @@ interface CubeInstanceProps {
 }
 
 export function CubeInstance({ module: m, moduleDef: def }: CubeInstanceProps) {
+  const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const selectItem = useAppStore(s => s.selectItem);
   const isSelected = useAppStore(s => s.selectedItemId === m.id);
+
+  // Register / unregister this group in the shared ref map
+  useEffect(() => {
+    const node = groupRef.current;
+    if (node) cubeRefRegistry.set(m.id, node);
+    return () => { cubeRefRegistry.delete(m.id); };
+  }, [m.id]);
 
   const worldPos  = moduleWorldPosition(m);
   const yRotRad   = THREE.MathUtils.degToRad(-m.rotation);
@@ -76,6 +89,7 @@ export function CubeInstance({ module: m, moduleDef: def }: CubeInstanceProps) {
   return (
     // Outer group: grid position + in-plane (Y-axis) rotation
     <group
+      ref={groupRef}
       position={worldPos}
       rotation={[0, yRotRad, 0]}
       onClick={(e) => { e.stopPropagation(); selectItem(m.id, 'module'); }}
