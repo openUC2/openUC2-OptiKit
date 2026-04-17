@@ -249,4 +249,7 @@ Bundle size of the 2D route should not grow after PR 1–2. After PR 3, it shoul
 GLB cache: navigating away from /3d and back shouldn't re-fetch GLBs. drei's useGLTF handles this, but worth confirming in DevTools Network tab.
 Coordinate sanity check after PR 3: place one module at grid (0,0) layer 0 — its center should be at world (0, 30, 0) (5 mm baseplate + 25 mm to cube center). Eyeball with a small axes helper in dev mode.
 
-Want me to write out the actual code for PR 1 now, or refine anything in the plan first?
+
+
+
+Not in scope (noted as TODO in source): inter-layer vertical rays would need physics engine changes.

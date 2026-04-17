@@ -7,19 +7,23 @@ import {
   Height as MoveYIcon,
   RotateLeft as RotateBaseIcon,
   Rotate90DegreesCw as RotateTopIcon,
+  Timeline as RaysIcon,
 } from '@mui/icons-material';
 import { Cubes } from './Cubes';
 import { SelectionHUD } from './SelectionHUD';
 import { CubeGizmo } from './CubeGizmo';
+import { Rays3D } from './Rays3D';
 import { useAppStore } from '../stores/appStore';
+import { useSimulationStore } from '../stores/simulationStore';
 import type { GizmoMode } from './CubeGizmo';
 
 // ─── Inner canvas content (needs R3F context) ────────────────────────────────
 
-function SceneContent({ gizmoMode, onDraggingChanged, orbitEnabled }: {
+function SceneContent({ gizmoMode, onDraggingChanged, orbitEnabled, showRays }: {
   gizmoMode: GizmoMode;
   onDraggingChanged: (d: boolean) => void;
   orbitEnabled: boolean;
+  showRays: boolean;
 }) {
   return (
     <>
@@ -42,6 +46,8 @@ function SceneContent({ gizmoMode, onDraggingChanged, orbitEnabled }: {
         <SelectionHUD />
       </Suspense>
 
+      {showRays && <Rays3D />}
+
       <CubeGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
     </>
   );
@@ -56,7 +62,12 @@ interface Scene3DProps {
 
 export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
   const clearSelection = useAppStore(s => s.clearSelection);
+  const simEnabled = useSimulationStore(s => s.config.enabled);
+  const simShowRays = useSimulationStore(s => s.config.showRays);
   const [isDragging, setIsDragging] = useState(false);
+  const [localShowRays, setLocalShowRays] = useState(true);
+
+  const showRays = simEnabled && simShowRays && localShowRays;
 
   const handleDraggingChanged = useCallback((d: boolean) => setIsDragging(d), []);
 
@@ -71,6 +82,7 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
           gizmoMode={gizmoMode}
           onDraggingChanged={handleDraggingChanged}
           orbitEnabled={!isDragging}
+          showRays={showRays}
         />
       </Canvas>
 
@@ -86,6 +98,9 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
           backdropFilter: 'blur(8px)',
           px: 1,
           py: 0.5,
+          display: 'flex',
+          gap: 1,
+          alignItems: 'center',
         }}
       >
         <ToggleButtonGroup
@@ -111,6 +126,21 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
             <Tooltip title="Rotate top (T)"><RotateTopIcon fontSize="small" /></Tooltip>
           </ToggleButton>
         </ToggleButtonGroup>
+
+        {/* Rays toggle */}
+        <ToggleButton
+          value="rays"
+          selected={localShowRays}
+          onChange={() => setLocalShowRays(v => !v)}
+          size="small"
+          sx={{
+            color: 'grey.300',
+            borderColor: 'grey.700',
+            '&.Mui-selected': { color: '#00e5ff', bgcolor: 'rgba(0,229,255,0.15)' },
+          }}
+        >
+          <Tooltip title="Show rays"><RaysIcon fontSize="small" /></Tooltip>
+        </ToggleButton>
       </Box>
     </Box>
   );
