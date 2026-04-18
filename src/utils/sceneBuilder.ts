@@ -236,7 +236,8 @@ export function buildCompoundElements(
 export function buildScene(
   placedModules: PlacedModule[],
   moduleDefinitions: ModuleDefinition[],
-  config: SimulationConfig
+  config: SimulationConfig,
+  options?: { layerFilter?: number }
 ): {
   elements: OpticalElement[];
   sources: OpticalElement[];
@@ -247,6 +248,11 @@ export function buildScene(
   const sources: OpticalElement[] = [];
   const detectors: OpticalElement[] = [];
   const warnings: string[] = [];
+
+  // Optionally restrict to a single layer
+  const modulesToProcess = options?.layerFilter !== undefined
+    ? placedModules.filter(m => m.layer === options.layerFilter)
+    : placedModules;
   
   // Create a lookup map for module definitions
   const defMap = new Map<string, ModuleDefinition>();
@@ -255,7 +261,7 @@ export function buildScene(
   }
   
   // Process each placed module
-  for (const module of placedModules) {
+  for (const module of modulesToProcess) {
     const definition = defMap.get(module.moduleId);
     if (!definition) {
       warnings.push(`Module definition not found: ${module.moduleId}`);

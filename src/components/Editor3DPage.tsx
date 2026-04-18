@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Box, Button, IconButton, Paper, Tooltip } from '@mui/material';
+import { Box, Button, CircularProgress, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   ViewInAr as View3DIcon,
@@ -31,7 +31,19 @@ export function Editor3DPage() {
 
   const clearSelection = useAppStore(s => s.clearSelection);
   const selectedItemId = useAppStore(s => s.selectedItemId);
+  const activeLayerId = useAppStore(s => s.activeLayerId);
   const removeModule = useAppStore(s => s.removeModule);
+  const modules = useAppStore(s => s.modules);
+  const loadModules = useAppStore(s => s.loadModules);
+  const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
+
+  // Ensure modules are loaded when refreshing directly to /configurator/3d
+  useEffect(() => {
+    if (modules.length === 0) {
+      loadModules().then(() => loadStateFromStorage());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -114,7 +126,13 @@ export function Editor3DPage() {
         <Button
           color="inherit"
           startIcon={<BackIcon />}
-          onClick={() => navigate('/configurator')}
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (selectedItemId) params.set('selected', selectedItemId);
+            if (activeLayerId) params.set('layer', activeLayerId);
+            const query = params.toString();
+            navigate(`/configurator${query ? '?' + query : ''}`);
+          }}
           size="small"
           sx={{ textTransform: 'none', ml: 1 }}
         >
@@ -133,7 +151,14 @@ export function Editor3DPage() {
             bgcolor: theme.background,
           }}
         >
-          <Scene3D gizmoMode={gizmoMode} onGizmoModeChange={setGizmoMode} />
+          {modules.length === 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}>
+              <CircularProgress />
+              <Typography variant="body2" color="text.secondary">Loading setup…</Typography>
+            </Box>
+          ) : (
+            <Scene3D gizmoMode={gizmoMode} onGizmoModeChange={setGizmoMode} />
+          )}
         </Box>
 
         {/* Right panel: properties */}

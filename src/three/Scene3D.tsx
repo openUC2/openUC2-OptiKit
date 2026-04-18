@@ -1,7 +1,7 @@
-import { Suspense, useState, useCallback, useRef } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import { Box, ToggleButton, ToggleButtonGroup, Tooltip } from '@mui/material';
 import {
   OpenWith as MoveXZIcon,
@@ -9,18 +9,22 @@ import {
   RotateLeft as RotateBaseIcon,
   Rotate90DegreesCw as RotateTopIcon,
   Timeline as RaysIcon,
+  ViewInAr as BeamIcon,
 } from '@mui/icons-material';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { Cubes } from './Cubes';
 import { SelectionHUD } from './SelectionHUD';
 import { CubeGizmo } from './CubeGizmo';
 import { Rays3D } from './Rays3D';
+import { RayBeam3D } from './RayBeam3D';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { useSettings3D, THEMES_3D } from './use3DSettings';
 import { useCameraState } from './useCameraState';
 import { NavToolbar, TweenRunner, CameraCapture } from './NavToolbar';
-import { makeTween } from './cameraUtils';
+import { makeTween, focusOn } from './cameraUtils';
+import { moduleWorldPosition } from './coords';
+import { GRID_MM } from '../constants/grid';
 import type { GizmoMode } from './CubeGizmo';
 
 // ─── Inner canvas content (needs R3F context) ────────────────────────────────
@@ -88,7 +92,7 @@ function SceneContent({
           sectionColor={theme.sectionColor}
           infiniteGrid
           fadeDistance={1500}
-          position={[0, 0, 0]}
+          position={[0, GRID_MM.baseplate, 0]}
         />
       )}
 
@@ -99,9 +103,11 @@ function SceneContent({
         <SelectionHUD />
       </Suspense>
 
-      {showRays && <Rays3D />}
+      {showRays && (settings.rayMode === 'beams' ? <RayBeam3D /> : <Rays3D />)}
 
       <CubeGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+
+      {import.meta.env.DEV && <Stats showPanel={0} className="r3f-stats" />}
     </>
   );
 }
@@ -115,17 +121,39 @@ interface Scene3DProps {
 
 export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
   const clearSelection = useAppStore(s => s.clearSelection);
+  const placedModules = useAppStore(s => s.placedModules);
+  const selectedItemId = useAppStore(s => s.selectedItemId);
+  const selectedItemType = useAppStore(s => s.selectedItemType);
   const simEnabled = useSimulationStore(s => s.config.enabled);
   const simShowRays = useSimulationStore(s => s.config.showRays);
   const [isDragging, setIsDragging] = useState(false);
   const [localShowRays, setLocalShowRays] = useState(true);
-  const { settings } = useSettings3D();
+  const { settings, setSettings } = useSettings3D();
   const theme = THEMES_3D[settings.theme];
 
   // Shared refs for NavToolbar ↔ Canvas bridge
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const tweenRef = useRef(makeTween());
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+
+  // F key: focus selected module
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key.toLowerCase() !== 'f') return;
+      const cam = cameraRef.current;
+      const ctrl = controlsRef.current;
+      if (!cam || !ctrl) return;
+      if (!selectedItemId || selectedItemType !== 'module') return;
+      const placed = placedModules.find(m => m.id === selectedItemId);
+      if (!placed) return;
+      const [wx, wy, wz] = moduleWorldPosition(placed);
+      focusOn(tweenRef.current, cam, ctrl, new THREE.Vector3(wx, wy, wz));
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedItemId, selectedItemType, placedModules]);
 
   const showRays = simEnabled && simShowRays && localShowRays;
 
@@ -143,7 +171,10 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
         style={{ width: '100%', height: '100%' }}
         gl={{ alpha: false }}
         scene={{ background: new THREE.Color(theme.background) }}
-        onPointerMissed={() => clearSelection()}
+        onPointerMissed={(e) => {
+          // Only clear selection when clicking the canvas itself, not DOM overlays
+          if (e.target instanceof HTMLCanvasElement) clearSelection();
+        }}
       >
         <SceneContent
           gizmoMode={gizmoMode}
@@ -213,6 +244,23 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
           }}
         >
           <Tooltip title="Show rays"><RaysIcon fontSize="small" /></Tooltip>
+        </ToggleButton>
+
+        {/* Lines ↔ Beams toggle */}
+        <ToggleButton
+          value="beams"
+          selected={settings.rayMode === 'beams'}
+          onChange={() =>
+            setSettings(s => ({ ...s, rayMode: s.rayMode === 'beams' ? 'lines' : 'beams' }))
+          }
+          size="small"
+          sx={{
+            color: buttonColor,
+            borderColor: buttonBorder,
+            '&.Mui-selected': { color: '#ff9100', bgcolor: 'rgba(255,145,0,0.15)' },
+          }}
+        >
+          <Tooltip title="3D Beams"><BeamIcon fontSize="small" /></Tooltip>
         </ToggleButton>
       </Box>
     </Box>

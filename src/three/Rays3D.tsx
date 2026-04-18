@@ -24,15 +24,17 @@ function opticalAxisY(layer: number): number {
 
 export function Rays3D() {
   const rays = useSimulationStore(s => s.rays);
+  const raysByLayer = useSimulationStore(s => s.raysByLayer);
   const config = useSimulationStore(s => s.config);
   const elements = useSimulationStore(s => s.elements);
   const placedModules = useAppStore(s => s.placedModules);
 
-  // Map sourceId → layer (via placed modules)
+  // Map sourceId → layer (via placed modules, supports sim- prefix)
   const sourceLayerMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const pm of placedModules) {
       m.set(pm.id, pm.layer);
+      m.set(`sim-${pm.id}`, pm.layer);
     }
     return m;
   }, [placedModules]);
@@ -44,10 +46,10 @@ export function Rays3D() {
       .map(e => e.id);
   }, [elements]);
 
-  // Build line data: separate <Line> per ray path keeps color / opacity correct
-  // while staying cheap enough for typical setups (< 1 000 segments).
+  // Build line data from raysByLayer (preferred) or flat rays (fallback)
+  // Mirror lines are added for each segment to show rotational symmetry.
   const lineDefs = useMemo(() => {
-    if (!config.enabled || !config.showRays || rays.length === 0) return [];
+    if (!config.enabled || !config.showRays) return [];
 
     const out: {
       key: string;
@@ -56,34 +58,68 @@ export function Rays3D() {
       opacity: number;
     }[] = [];
 
-    rays.forEach((ray, ri) => {
-      const layer = sourceLayerMap.get(ray.sourceId) ?? 0;
-      const y = opticalAxisY(layer);
-      const sourceIndex = Math.max(0, sourceIds.indexOf(ray.sourceId));
+    const pushSegment = (
+      key: string,
+      seg: { start: { x: number; y: number }; end: { x: number; y: number }; wavelength: number; intensity: number },
+      y: number,
+      sourceIndex: number,
+    ) => {
+      const color = getRayColor(seg.wavelength, seg.intensity, sourceIndex, config.rayColorMode);
+      const opacity = Math.max(0.35, Math.min(1, seg.intensity * config.rayBrightness));
 
-      ray.segments.forEach((seg, si) => {
-        const color = getRayColor(
-          seg.wavelength,
-          seg.intensity,
-          sourceIndex,
-          config.rayColorMode,
-        );
-        const opacity = Math.max(0.35, Math.min(1, seg.intensity * config.rayBrightness));
+      // Primary line
+      out.push({
+        key,
+        points: [
+          [seg.start.x, y, seg.start.y],
+          [seg.end.x, y, seg.end.y],
+        ],
+        color,
+        opacity,
+      });
 
+      // Mirror line (negate sim.y → Three Z) for rotational-symmetry visualisation
+      if (Math.abs(seg.start.y) > 0.01 || Math.abs(seg.end.y) > 0.01) {
         out.push({
-          key: `ray-${ri}-${si}`,
+          key: `${key}-m`,
           points: [
-            [seg.start.x, y, seg.start.y],
-            [seg.end.x, y, seg.end.y],
+            [seg.start.x, y, -seg.start.y],
+            [seg.end.x, y, -seg.end.y],
           ],
           color,
-          opacity,
+          opacity: opacity * 0.45,
+        });
+      }
+    };
+
+    const hasLayerData = Object.keys(raysByLayer).length > 0;
+
+    if (hasLayerData) {
+      for (const [layerStr, layerRays] of Object.entries(raysByLayer)) {
+        const layer = Number(layerStr);
+        const y = opticalAxisY(layer);
+
+        layerRays.forEach((ray, ri) => {
+          const sourceIndex = Math.max(0, sourceIds.indexOf(ray.sourceId));
+          ray.segments.forEach((seg, si) => {
+            pushSegment(`ray-L${layer}-${ri}-${si}`, seg, y, sourceIndex);
+          });
+        });
+      }
+    } else {
+      rays.forEach((ray, ri) => {
+        const layer = sourceLayerMap.get(ray.sourceId) ?? 0;
+        const y = opticalAxisY(layer);
+        const sourceIndex = Math.max(0, sourceIds.indexOf(ray.sourceId));
+
+        ray.segments.forEach((seg, si) => {
+          pushSegment(`ray-${ri}-${si}`, seg, y, sourceIndex);
         });
       });
-    });
+    }
 
     return out;
-  }, [rays, config.enabled, config.showRays, config.rayColorMode, config.rayBrightness, sourceLayerMap, sourceIds]);
+  }, [rays, raysByLayer, config.enabled, config.showRays, config.rayColorMode, config.rayBrightness, sourceLayerMap, sourceIds]);
 
   if (lineDefs.length === 0) return null;
 

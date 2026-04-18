@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Box, 
   Drawer, 
@@ -35,7 +36,19 @@ export const Layout: React.FC = () => {
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'));   // phones only
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(!isMobile);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(!isMobile);
-  const { activeRightTab, setActiveRightTab } = useAppStore();
+  const { activeRightTab, setActiveRightTab, selectItem, setActiveLayer } = useAppStore();
+  const location = useLocation();
+
+  // Restore selection and active layer from query params (e.g. when navigating back from 3D)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const selectedId = params.get('selected');
+    const layerId = params.get('layer');
+    if (selectedId) selectItem(selectedId, 'module');
+    if (layerId) setActiveLayer(layerId);
+  // Run once on mount only
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Collapse both panels automatically when the screen becomes narrow

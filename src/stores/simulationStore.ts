@@ -12,7 +12,8 @@ import type {
   SimulationWarning,
   SimulationError,
   OpticalElement,
-  SimulationResult
+  SimulationResult,
+  RayPath
 } from '../types';
 import { getDefaultSimulationConfig, buildScene } from '../utils/sceneBuilder';
 import { getSimulationManager } from '../simulation';
@@ -44,6 +45,8 @@ const defaultState: SimulationState = {
   lastRunTime: 0,
   elements: [],
   rays: [],
+  raysByLayer: {},
+  elementsByLayer: {},
   detectorReadings: [],
   warnings: [],
   errors: []
@@ -95,23 +98,35 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     // Get placed modules and module definitions from app store
     const appState = useAppStore.getState();
     const { placedModules, modules } = appState;
-    
-    // Build scene from placed modules
-    const scene = buildScene(placedModules, modules, state.config);
-    
-    // Store elements
-    set({ elements: scene.elements });
-    
-    // Add any build warnings
-    for (const warning of scene.warnings) {
-      get().addWarning({ code: 'SCENE_BUILD', message: warning });
+
+    // Compute unique layers
+    const layers = [...new Set(placedModules.map(m => m.layer))].sort((a, b) => a - b);
+    if (layers.length === 0) layers.push(0);
+
+    // Build per-layer scenes
+    const allElements: OpticalElement[] = [];
+    const elementsByLayer: Record<number, OpticalElement[]> = {};
+    let hasSources = false;
+
+    for (const layer of layers) {
+      const scene = buildScene(placedModules, modules, state.config, { layerFilter: layer });
+      elementsByLayer[layer] = scene.elements;
+      allElements.push(...scene.elements);
+      if (scene.sources.length > 0) hasSources = true;
+
+      for (const warning of scene.warnings) {
+        get().addWarning({ code: 'SCENE_BUILD', message: warning });
+      }
     }
-    
-    // Check if we have anything to simulate
-    if (scene.sources.length === 0) {
+
+    // Store merged elements list (backward compat for 2D overlay)
+    set({ elements: allElements, elementsByLayer });
+
+    if (!hasSources) {
       set({
         isRunning: false,
         rays: [],
+        raysByLayer: {},
         detectorReadings: [],
         warnings: [...get().warnings, { code: 'NO_SOURCES', message: 'No light sources found. Add a laser or LED module.' }]
       });
@@ -120,25 +135,63 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     
     // Set running state
     set({ isRunning: true, warnings: [], errors: [] });
-    
-    // Get simulation manager and run
+
+    // Run simulation per layer, collect results, then merge
     const manager = getSimulationManager();
-    
-    manager.run(scene.elements, state.config, {
-      onResult: (result) => {
-        get().setResults(result);
-      },
-      onProgress: (progress, rayCount) => {
-        // Could update progress UI here
-        console.log(`Simulation progress: ${progress}%, rays: ${rayCount}`);
-      },
-      onError: (error) => {
-        set({ 
-          isRunning: false,
-          errors: [...get().errors, { code: 'RUNTIME_ERROR', message: error }]
-        });
+    const raysByLayer: Record<number, RayPath[]> = {};
+    let pendingLayers = layers.length;
+
+    for (const layer of layers) {
+      const layerElements = elementsByLayer[layer];
+      if (layerElements.length === 0) {
+        raysByLayer[layer] = [];
+        pendingLayers--;
+        if (pendingLayers === 0) finalizeResults();
+        continue;
       }
-    });
+
+      manager.run(layerElements, state.config, {
+        onResult: (result) => {
+          raysByLayer[layer] = result.rays;
+          pendingLayers--;
+          if (pendingLayers === 0) {
+            // Merge all per-layer results into a single flat array for backward compat
+            const allRays = Object.values(raysByLayer).flat();
+            const allDetector = result.detectorReadings; // last layer's readings (TODO: merge)
+            set({
+              isRunning: false,
+              rays: allRays,
+              raysByLayer,
+              detectorReadings: allDetector,
+              warnings: result.warnings,
+              errors: result.errors,
+              lastRunTime: result.executionTimeMs,
+            });
+          }
+        },
+        onProgress: (progress, rayCount) => {
+          console.log(`Layer ${layer} simulation progress: ${progress}%, rays: ${rayCount}`);
+        },
+        onError: (error) => {
+          pendingLayers--;
+          set({
+            isRunning: pendingLayers > 0,
+            errors: [...get().errors, { code: 'RUNTIME_ERROR', message: `Layer ${layer}: ${error}` }]
+          });
+        }
+      });
+    }
+
+    function finalizeResults() {
+      const allRays = Object.values(raysByLayer).flat();
+      set({
+        isRunning: false,
+        rays: allRays,
+        raysByLayer,
+        detectorReadings: [],
+        lastRunTime: 0,
+      });
+    }
   },
 
   stopSimulation: () => {
@@ -150,6 +203,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   clearResults: () => {
     set({
       rays: [],
+      raysByLayer: {},
+      elementsByLayer: {},
       detectorReadings: [],
       warnings: [],
       errors: [],
@@ -165,6 +220,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     set({
       isRunning: false,
       rays: result.rays,
+      raysByLayer: {},
       detectorReadings: result.detectorReadings,
       warnings: result.warnings,
       errors: result.errors,

@@ -5,6 +5,7 @@ import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { moduleWorldPosition } from './coords';
 import { useAppStore } from '../stores/appStore';
 import { GRID_MM } from '../constants/grid';
+import { GLBErrorBoundary } from './GLBErrorBoundary';
 import type { PlacedModule, ModuleDefinition } from '../types';
 
 // ─── Shared ref registry so CubeGizmo can find the selected cube ────────────
@@ -26,15 +27,19 @@ function HighlightBox({ color, size }: { color: string; size: number }) {
   );
 }
 
-// ─── Fallback ────────────────────────────────────────────────────────────────
+// ─── Default fallback cube (shown when no GLB URL or load fails) ─────────────
 
-function FallbackBox({ offset }: { offset?: [number, number, number] }) {
+function DefaultCube({ offset }: { offset?: [number, number, number] }) {
+  const edgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(48, 48, 48));
   return (
     <group position={offset}>
       <mesh>
-        <boxGeometry args={[50, 50, 50]} />
-        <meshBasicMaterial color={0x888888} wireframe />
+        <boxGeometry args={[48, 48, 48]} />
+        <meshStandardMaterial color="#b0b0b0" roughness={0.7} metalness={0.1} transparent opacity={0.85} />
       </mesh>
+      <lineSegments geometry={edgesGeo}>
+        <lineBasicMaterial color="#888888" />
+      </lineSegments>
     </group>
   );
 }
@@ -103,11 +108,13 @@ export function CubeInstance({ module: m, moduleDef: def }: CubeInstanceProps) {
       {/* Inner group: top rotation around Z axis */}
       <group rotation={[0, 0, topRotRad]}>
         {def?.glbUrl ? (
-          <Suspense fallback={<FallbackBox offset={offset} />}>
-            <GLBScene url={def.glbUrl} offset={offset} />
-          </Suspense>
+          <GLBErrorBoundary fallback={<DefaultCube offset={offset} />}>
+            <Suspense fallback={<DefaultCube offset={offset} />}>
+              <GLBScene url={def.glbUrl} offset={offset} />
+            </Suspense>
+          </GLBErrorBoundary>
         ) : (
-          <FallbackBox offset={offset} />
+          <DefaultCube offset={offset} />
         )}
       </group>
     </group>

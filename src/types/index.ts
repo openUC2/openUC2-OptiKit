@@ -538,6 +538,8 @@ export interface SimulationState {
   lastRunTime: number;       // ms
   elements: OpticalElement[];
   rays: RayPath[];
+  raysByLayer: Record<number, RayPath[]>;
+  elementsByLayer: Record<number, OpticalElement[]>;
   detectorReadings: DetectorReading[];
   warnings: SimulationWarning[];
   errors: SimulationError[];

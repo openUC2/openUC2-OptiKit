@@ -4,6 +4,7 @@ export interface Settings3D {
   theme: 'light' | 'dark';
   showGrid: boolean;
   showAxes: boolean;
+  rayMode: 'lines' | 'beams';
 }
 
 const STORAGE_KEY = 'openuc2-3d-settings';
@@ -12,6 +13,7 @@ const DEFAULTS: Settings3D = {
   theme: 'light',
   showGrid: true,
   showAxes: true,
+  rayMode: 'lines',
 };
 
 export const THEMES_3D = {
