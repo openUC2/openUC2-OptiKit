@@ -1,4 +1,5 @@
 import { Suspense, useState, useCallback } from 'react';
+import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import { Box, ToggleButton, ToggleButtonGroup, Tooltip } from '@mui/material';
@@ -15,6 +16,7 @@ import { CubeGizmo } from './CubeGizmo';
 import { Rays3D } from './Rays3D';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
+import { useSettings3D, THEMES_3D } from './use3DSettings';
 import type { GizmoMode } from './CubeGizmo';
 
 // ─── Inner canvas content (needs R3F context) ────────────────────────────────
@@ -25,21 +27,34 @@ function SceneContent({ gizmoMode, onDraggingChanged, orbitEnabled, showRays }: 
   orbitEnabled: boolean;
   showRays: boolean;
 }) {
+  const { settings } = useSettings3D();
+  const theme = THEMES_3D[settings.theme];
+
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[200, 400, 200]} intensity={0.8} castShadow />
+      <fog attach="fog" args={[theme.fogColor, 800, 2000]} />
+
+      <hemisphereLight args={['#ffffff', '#b0b0b0', 0.6]} />
+      <ambientLight intensity={1.0} />
+      <directionalLight position={[200, 400, 200]} intensity={1.2} castShadow />
+      <directionalLight position={[-200, 300, -200]} intensity={0.4} />
 
       <OrbitControls makeDefault enabled={orbitEnabled} />
 
-      <Grid
-        args={[2000, 2000]}
-        cellSize={50}
-        sectionSize={250}
-        infiniteGrid
-        fadeDistance={1500}
-        position={[0, 0, 0]}
-      />
+      {settings.showGrid && (
+        <Grid
+          args={[2000, 2000]}
+          cellSize={50}
+          sectionSize={250}
+          cellColor={theme.gridColor}
+          sectionColor={theme.sectionColor}
+          infiniteGrid
+          fadeDistance={1500}
+          position={[0, 0, 0]}
+        />
+      )}
+
+      {settings.showAxes && <axesHelper args={[100]} />}
 
       <Suspense fallback={null}>
         <Cubes />
@@ -66,16 +81,25 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
   const simShowRays = useSimulationStore(s => s.config.showRays);
   const [isDragging, setIsDragging] = useState(false);
   const [localShowRays, setLocalShowRays] = useState(true);
+  const { settings } = useSettings3D();
+  const theme = THEMES_3D[settings.theme];
 
   const showRays = simEnabled && simShowRays && localShowRays;
 
   const handleDraggingChanged = useCallback((d: boolean) => setIsDragging(d), []);
+
+  const isDark = settings.theme === 'dark';
+  const toolbarBg = isDark ? 'rgba(30, 30, 46, 0.88)' : 'rgba(255, 255, 255, 0.88)';
+  const buttonColor = isDark ? 'grey.300' : 'grey.700';
+  const buttonBorder = isDark ? 'grey.700' : 'grey.400';
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
       <Canvas
         camera={{ position: [300, 300, 300], near: 1, far: 5000, fov: 45 }}
         style={{ width: '100%', height: '100%' }}
+        gl={{ alpha: false }}
+        scene={{ background: new THREE.Color(theme.background) }}
         onPointerMissed={() => clearSelection()}
       >
         <SceneContent
@@ -93,7 +117,7 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
           bottom: 16,
           left: '50%',
           transform: 'translateX(-50%)',
-          bgcolor: 'rgba(30, 30, 46, 0.88)',
+          bgcolor: toolbarBg,
           borderRadius: 2,
           backdropFilter: 'blur(8px)',
           px: 1,
@@ -109,7 +133,7 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
           onChange={(_e, v) => { if (v) onGizmoModeChange(v as GizmoMode); }}
           size="small"
           sx={{
-            '& .MuiToggleButton-root': { color: 'grey.300', borderColor: 'grey.700' },
+            '& .MuiToggleButton-root': { color: buttonColor, borderColor: buttonBorder },
             '& .Mui-selected': { color: '#FFAA00', bgcolor: 'rgba(255,170,0,0.15)' },
           }}
         >
@@ -134,8 +158,8 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
           onChange={() => setLocalShowRays(v => !v)}
           size="small"
           sx={{
-            color: 'grey.300',
-            borderColor: 'grey.700',
+            color: buttonColor,
+            borderColor: buttonBorder,
             '&.Mui-selected': { color: '#00e5ff', bgcolor: 'rgba(0,229,255,0.15)' },
           }}
         >

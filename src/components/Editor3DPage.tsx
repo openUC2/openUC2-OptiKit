@@ -1,10 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Box, Button, Paper } from '@mui/material';
-import { ArrowBack as BackIcon, ViewInAr as View3DIcon } from '@mui/icons-material';
+import { Box, Button, IconButton, Paper, Tooltip } from '@mui/material';
+import {
+  ArrowBack as BackIcon,
+  ViewInAr as View3DIcon,
+  LightMode as LightModeIcon,
+  DarkMode as DarkModeIcon,
+  GridOn as GridOnIcon,
+  GridOff as GridOffIcon,
+  Adjust as AxesOnIcon,
+  RadioButtonUnchecked as AxesOffIcon,
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Scene3D } from '../three/Scene3D';
 import { PropertyPanel } from './PropertyPanel';
 import { useAppStore } from '../stores/appStore';
+import { use3DSettings, Settings3DContext, THEMES_3D } from '../three/use3DSettings';
 import type { GizmoMode } from '../three/CubeGizmo';
 
 /**
@@ -14,6 +24,10 @@ import type { GizmoMode } from '../three/CubeGizmo';
 export function Editor3DPage() {
   const navigate = useNavigate();
   const [gizmoMode, setGizmoMode] = useState<GizmoMode>('translate-xz');
+  const settingsCtx = use3DSettings();
+  const { settings, setSettings } = settingsCtx;
+  const theme = THEMES_3D[settings.theme];
+  const isDark = settings.theme === 'dark';
 
   const clearSelection = useAppStore(s => s.clearSelection);
   const selectedItemId = useAppStore(s => s.selectedItemId);
@@ -44,6 +58,7 @@ export function Editor3DPage() {
   }, [handleKeyDown]);
 
   return (
+    <Settings3DContext.Provider value={settingsCtx}>
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Minimal top bar */}
       <Paper
@@ -64,12 +79,44 @@ export function Editor3DPage() {
         <Box sx={{ fontWeight: 500, fontSize: '1.1rem', flex: 1 }}>
           OpenUC2 — 3D View
         </Box>
+
+        {/* ── Settings toggles ── */}
+        <Tooltip title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+          <IconButton
+            size="small"
+            color="inherit"
+            onClick={() => setSettings(s => ({ ...s, theme: isDark ? 'light' : 'dark' }))}
+          >
+            {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title={settings.showGrid ? 'Hide grid' : 'Show grid'}>
+          <IconButton
+            size="small"
+            color="inherit"
+            onClick={() => setSettings(s => ({ ...s, showGrid: !s.showGrid }))}
+          >
+            {settings.showGrid ? <GridOnIcon fontSize="small" /> : <GridOffIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title={settings.showAxes ? 'Hide axes' : 'Show axes'}>
+          <IconButton
+            size="small"
+            color="inherit"
+            onClick={() => setSettings(s => ({ ...s, showAxes: !s.showAxes }))}
+          >
+            {settings.showAxes ? <AxesOnIcon fontSize="small" /> : <AxesOffIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+
         <Button
           color="inherit"
           startIcon={<BackIcon />}
           onClick={() => navigate('/configurator')}
           size="small"
-          sx={{ textTransform: 'none' }}
+          sx={{ textTransform: 'none', ml: 1 }}
         >
           Back to 2D
         </Button>
@@ -83,7 +130,7 @@ export function Editor3DPage() {
             flex: 1,
             position: 'relative',
             overflow: 'hidden',
-            bgcolor: '#1a1a2e',
+            bgcolor: theme.background,
           }}
         >
           <Scene3D gizmoMode={gizmoMode} onGizmoModeChange={setGizmoMode} />
@@ -107,5 +154,6 @@ export function Editor3DPage() {
         </Paper>
       </Box>
     </Box>
+    </Settings3DContext.Provider>
   );
 }
