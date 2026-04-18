@@ -43,7 +43,8 @@ import {
   Delete as DeleteIcon,
   Memory as ImSwitchIcon,
   Science as SimulationIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  ThreeDRotation as View3DIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
@@ -391,6 +392,28 @@ openUC2 team via GitHub repository
               </Typography>
             </Button>
           </Tooltip>
+          {isEditorPage && (
+            <Tooltip title="View setup in 3D">
+              <Button
+                color="inherit"
+                startIcon={<View3DIcon />}
+                onClick={() => navigate('/configurator/3d')}
+                size="small"
+                sx={{
+                  textTransform: 'none',
+                  minWidth: { xs: '40px', sm: 'auto' },
+                  px: { xs: 1, sm: 2 },
+                  '& .MuiButton-startIcon': {
+                    mr: { xs: 0, sm: 1 }
+                  }
+                }}
+              >
+                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  View 3D
+                </Typography>
+              </Button>
+            </Tooltip>
+          )}
         </Box>
 
         <Divider 
@@ -645,10 +668,13 @@ openUC2 team via GitHub repository
               onClose={() => setMoreMenuAnchor(null)}
               slotProps={{ paper: { sx: { maxHeight: '70vh' } } }}
             >
-              {/* Simulation */}
-              <MenuItem onClick={() => { useSimulationStore.getState().toggleSimulation(); setMoreMenuAnchor(null); }}>
+              {/* Simulation */}\n              <MenuItem onClick={() => { useSimulationStore.getState().toggleSimulation(); setMoreMenuAnchor(null); }}>
                 <ListItemIcon><SimulationIcon color={useSimulationStore.getState().config.enabled ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
                 <ListItemText>{useSimulationStore.getState().config.enabled ? 'Disable Ray Simulation' : 'Enable Ray Simulation'}</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/configurator/3d'); setMoreMenuAnchor(null); }}>
+                <ListItemIcon><View3DIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>View in 3D</ListItemText>
               </MenuItem>
 
               {/* Annotation tools */}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
@@ -13,6 +13,11 @@ import { materialTheme } from './theme/materialTheme'
 import { trackUserVisit } from './utils/statisticsHandler'
 import './styles/brand.css'
 import './App.css'
+
+// Lazy-load the 3D route so three.js / R3F are excluded from the 2D bundle
+const Editor3DPage = lazy(() =>
+  import('./components/Editor3DPage').then(m => ({ default: m.Editor3DPage }))
+);
 
 function App() {
   const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
@@ -146,6 +151,7 @@ function App() {
           <Route path="/configurator/" element={<EditorPage />} />
           <Route path="/configurator/frame" element={<FrameWizardPage />} />
           <Route path="/configurator/setups" element={<SetupBrowser />} />
+          <Route path="/configurator/3d" element={<Suspense fallback={null}><Editor3DPage /></Suspense>} />
           <Route path="/configurator/:collectionName" element={<CollectionView />} />
           {/* Legacy routes for backward compatibility */}
           <Route path="/" element={<EditorPage />} />
