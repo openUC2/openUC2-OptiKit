@@ -24,6 +24,13 @@ export interface ModuleCSVRow {
   glbOffsetX?: string;
   glbOffsetY?: string;
   glbOffsetZ?: string;
+  // Intra-cube placement offsets (mirrors optikit_exporter conventions)
+  dx_mm?: string;        // transverse X offset within cube (mm)
+  dy_mm?: string;        // transverse Y offset within cube (mm)
+  dz_mm?: string;        // axial offset along beam direction within cube (mm)
+  rxOffset_deg?: string; // pitch rotation offset (deg)
+  ryOffset_deg?: string; // yaw rotation offset (deg)
+  rzOffset_deg?: string; // in-plane rotation offset — changes mirror/BS orientation (deg)
 }
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
@@ -124,6 +131,19 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
           parseFloat(row.glbOffsetZ || '0')
         ] as [number, number, number]
       : undefined,
+    placementOffset: (() => {
+      const dx = parseFloat(row.dx_mm || '0') || 0;
+      const dy = parseFloat(row.dy_mm || '0') || 0;
+      const dz = parseFloat(row.dz_mm || '0') || 0;
+      const rx = parseFloat(row.rxOffset_deg || '0') || 0;
+      const ry = parseFloat(row.ryOffset_deg || '0') || 0;
+      const rz = parseFloat(row.rzOffset_deg || '0') || 0;
+      // Only store if any offset is non-zero to avoid polluting definitions
+      if (dx || dy || dz || rx || ry || rz) {
+        return { dx_mm: dx, dy_mm: dy, dz_mm: dz, rxOffset_deg: rx, ryOffset_deg: ry, rzOffset_deg: rz };
+      }
+      return undefined;
+    })(),
   };
 }
 

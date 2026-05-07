@@ -393,7 +393,20 @@ export const PhysicalModuleOverlay: React.FC<PhysicalModuleOverlayProps> = ({
       if (!model || model.elementType === 'compound') continue;
 
       const center = getModuleCenterSimCoords(pm, def, 50);
-      const effectiveRotation = ((pm.rotation + (model.rotationOffset ?? 0)) % 360 + 360) % 360;
+      let effectiveRotation = ((pm.rotation + (model.rotationOffset ?? 0)) % 360 + 360) % 360;
+
+      // Apply intra-cube placement offsets from the module definition (sourced from CSV).
+      const po = def.placementOffset;
+      if (po) {
+        if (po.rzOffset_deg) {
+          effectiveRotation = ((effectiveRotation + po.rzOffset_deg) % 360 + 360) % 360;
+        }
+        if (po.dz_mm || po.dx_mm) {
+          const facingRad = (effectiveRotation * Math.PI) / 180;
+          center.x += Math.cos(facingRad) * po.dz_mm - Math.sin(facingRad) * po.dx_mm;
+          center.y += Math.sin(facingRad) * po.dz_mm + Math.cos(facingRad) * po.dx_mm;
+        }
+      }
 
       result.push({
         id: `phy-${pm.id}`,

@@ -163,6 +163,24 @@ export function buildOpticalElement(
   if (simModel.rotationOffset) {
     effectiveRotation = (module.rotation + simModel.rotationOffset) % 360;
   }
+
+  // Apply intra-cube placement offsets from the module definition (sourced from CSV).
+  // rzOffset_deg: in-plane rotation fine-tune — directly changes mirror/BS surface orientation.
+  // dz_mm: shift along the element's facing direction (optical axis within cube).
+  // dx_mm: shift perpendicular to the facing direction (transverse within cube).
+  const po = definition.placementOffset;
+  if (po) {
+    if (po.rzOffset_deg) {
+      effectiveRotation = ((effectiveRotation + po.rzOffset_deg) % 360 + 360) % 360;
+    }
+    if (po.dz_mm || po.dx_mm) {
+      const facingRad = (effectiveRotation * Math.PI) / 180;
+      // dz along facing direction, dx perpendicular (rotated 90° CCW from facing)
+      center.x += Math.cos(facingRad) * po.dz_mm - Math.sin(facingRad) * po.dx_mm;
+      center.y += Math.sin(facingRad) * po.dz_mm + Math.cos(facingRad) * po.dx_mm;
+    }
+  }
+
   // NOTE: Mirror surface angle (params.angle) is now consumed directly inside
   // rayMirrorIntersection in SimulationEngine.ts for a cleaner separation of concerns.
   

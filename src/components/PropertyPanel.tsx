@@ -33,6 +33,109 @@ import {
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { getSimulationModel, getElementTypeName } from '../utils/sceneBuilder';
+import { PlacedModule } from '../types';
+
+// Proper React component so hooks are never called conditionally
+const DetectorSignalPlot: React.FC<{ module: PlacedModule }> = ({ module }) => {
+  const { detectorReadings } = useSimulationStore();
+
+  const reading = detectorReadings.find(r => r.moduleInstanceId === module.id);
+
+  if (!reading || reading.rayCount === 0) {
+    return (
+      <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary" align="center">
+          No rays detected. Run simulation to see signal.
+        </Typography>
+      </Box>
+    );
+  }
+
+  const sensorWidth = module.params?.width as number || 12;
+  const numBins = 20;
+  const bins = new Array(numBins).fill(0);
+
+  const simModel = getSimulationModel(module.moduleId);
+  const rotationOffset = simModel?.rotationOffset || 0;
+  const totalRotation = ((module.rotation || 0) + rotationOffset) * Math.PI / 180;
+  const perpDir = { x: -Math.sin(totalRotation), y: Math.cos(totalRotation) };
+
+  for (const impact of reading.rayImpacts) {
+    const dx = impact.x - reading.centroid.x;
+    const dy = impact.y - reading.centroid.y;
+    const lateralPos = dx * perpDir.x + dy * perpDir.y;
+    const binIndex = Math.floor((lateralPos / sensorWidth + 0.5) * numBins);
+    if (binIndex >= 0 && binIndex < numBins) {
+      bins[binIndex]++;
+    }
+  }
+
+  const maxCount = Math.max(...bins, 1);
+  const barHeight = 60;
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="body2" gutterBottom sx={{ fontWeight: 500 }}>
+        Ray Distribution ({reading.rayCount} rays)
+      </Typography>
+
+      {/* Simple bar chart */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        height: barHeight + 20,
+        bgcolor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1,
+        p: 1,
+        gap: '1px'
+      }}>
+        {bins.map((count, idx) => (
+          <Box
+            key={idx}
+            sx={{
+              flex: 1,
+              height: `${(count / maxCount) * barHeight}px`,
+              bgcolor: count > 0 ? 'primary.main' : 'action.disabledBackground',
+              minHeight: 2,
+              borderRadius: '2px 2px 0 0',
+              transition: 'height 0.2s'
+            }}
+            title={`Bin ${idx + 1}: ${count} rays`}
+          />
+        ))}
+      </Box>
+
+      {/* X-axis labels */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+        <Typography variant="caption" color="text.secondary">
+          -{(sensorWidth / 2).toFixed(1)}mm
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          0
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          +{(sensorWidth / 2).toFixed(1)}mm
+        </Typography>
+      </Box>
+
+      {/* Statistics */}
+      <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        <Chip
+          size="small"
+          label={`Power: ${reading.totalPower.toFixed(2)}`}
+          variant="outlined"
+        />
+        <Chip
+          size="small"
+          label={`RMS: ${reading.spread.x.toFixed(2)}mm`}
+          variant="outlined"
+        />
+      </Box>
+    </Box>
+  );
+};
 
 export const PropertyPanel: React.FC = () => {
   const { 
@@ -885,7 +988,7 @@ export const PropertyPanel: React.FC = () => {
                   />
                 </Box>
                 {/* Detector Signal Plot */}
-                {renderDetectorSignalPlot(module)}
+                <DetectorSignalPlot module={module} />
               </>
             )}
           </Box>
@@ -902,114 +1005,6 @@ export const PropertyPanel: React.FC = () => {
           </Button>
         </CardContent>
       </Card>
-    );
-  };
-
-  // Render detector signal plot showing ray intensity distribution
-  const renderDetectorSignalPlot = (module: typeof placedModules[0]) => {
-    const { detectorReadings } = useSimulationStore();
-    
-    // Find the detector reading for this module
-    const reading = detectorReadings.find(r => r.moduleInstanceId === module.id);
-    
-    if (!reading || reading.rayCount === 0) {
-      return (
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-          <Typography variant="body2" color="text.secondary" align="center">
-            No rays detected. Run simulation to see signal.
-          </Typography>
-        </Box>
-      );
-    }
-    
-    // Create histogram bins for ray impacts
-    const sensorWidth = module.params?.width as number || 12;
-    const numBins = 20;
-    const bins = new Array(numBins).fill(0);
-    
-    // Calculate offset from detector center for each impact
-    const simModel = getSimulationModel(module.moduleId);
-    const rotationOffset = simModel?.rotationOffset || 0;
-    const totalRotation = ((module.rotation || 0) + rotationOffset) * Math.PI / 180;
-    const perpDir = { x: -Math.sin(totalRotation), y: Math.cos(totalRotation) };
-    
-    // Bin the ray impacts
-    for (const impact of reading.rayImpacts) {
-      const dx = impact.x - reading.centroid.x;
-      const dy = impact.y - reading.centroid.y;
-      const lateralPos = dx * perpDir.x + dy * perpDir.y;
-      
-      // Convert to bin index
-      const binIndex = Math.floor((lateralPos / sensorWidth + 0.5) * numBins);
-      if (binIndex >= 0 && binIndex < numBins) {
-        bins[binIndex]++;
-      }
-    }
-    
-    const maxCount = Math.max(...bins, 1);
-    const barHeight = 60;
-    
-    return (
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="body2" gutterBottom sx={{ fontWeight: 500 }}>
-          Ray Distribution ({reading.rayCount} rays)
-        </Typography>
-        
-        {/* Simple bar chart */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'flex-end', 
-          height: barHeight + 20,
-          bgcolor: 'background.paper',
-          border: 1,
-          borderColor: 'divider',
-          borderRadius: 1,
-          p: 1,
-          gap: '1px'
-        }}>
-          {bins.map((count, idx) => (
-            <Box
-              key={idx}
-              sx={{
-                flex: 1,
-                height: `${(count / maxCount) * barHeight}px`,
-                bgcolor: count > 0 ? 'primary.main' : 'action.disabledBackground',
-                minHeight: 2,
-                borderRadius: '2px 2px 0 0',
-                transition: 'height 0.2s'
-              }}
-              title={`Bin ${idx + 1}: ${count} rays`}
-            />
-          ))}
-        </Box>
-        
-        {/* X-axis labels */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-          <Typography variant="caption" color="text.secondary">
-            -{(sensorWidth / 2).toFixed(1)}mm
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            0
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            +{(sensorWidth / 2).toFixed(1)}mm
-          </Typography>
-        </Box>
-        
-        {/* Statistics */}
-        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          <Chip 
-            size="small" 
-            label={`Power: ${reading.totalPower.toFixed(2)}`} 
-            variant="outlined" 
-          />
-          <Chip 
-            size="small" 
-            label={`RMS: ${reading.spread.x.toFixed(2)}mm`} 
-            variant="outlined" 
-          />
-        </Box>
-      </Box>
     );
   };
 

@@ -32,6 +32,15 @@ export interface ModuleDefinition {
   docsUrl?: string;
   glbUrl?: string;
   glbOffset?: [number, number, number];
+  /** Intra-cube placement offsets sourced from CSV (mirrors optikit_exporter conventions). */
+  placementOffset?: {
+    dx_mm: number;        // transverse X offset within cube (mm)
+    dy_mm: number;        // transverse Y offset within cube (mm)
+    dz_mm: number;        // axial offset along element facing direction (mm)
+    rxOffset_deg: number; // pitch rotation offset (deg, 3-D only, stored for completeness)
+    ryOffset_deg: number; // yaw rotation offset (deg, 3-D only, stored for completeness)
+    rzOffset_deg: number; // in-plane rotation offset — directly affects mirror/BS orientation (deg)
+  };
 }
 
 export interface PlacedModule {

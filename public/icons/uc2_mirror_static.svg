@@ -29,13 +29,13 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      showgrid="false"
-     inkscape:zoom="2.36"
-     inkscape:cx="50"
-     inkscape:cy="50"
+     inkscape:zoom="3.8011289"
+     inkscape:cx="48.143592"
+     inkscape:cy="46.038954"
      inkscape:window-width="746"
      inkscape:window-height="480"
      inkscape:window-x="52"
-     inkscape:window-y="38"
+     inkscape:window-y="432"
      inkscape:window-maximized="0"
      inkscape:current-layer="svg6468" />
   <rect
@@ -49,72 +49,56 @@
      stroke="#111111"
      stroke-width="4"
      id="rect6446" />
-  <line
-     x1="14"
-     y1="50.0"
-     x2="86"
-     y2="50.0"
-     stroke="#444444"
-     stroke-width="1"
-     stroke-dasharray="6 4"
-     opacity="0.55"
-     id="line6448" />
-  <line
-     x1="50.0"
-     y1="50.0"
-     x2="50.0"
-     y2="86"
-     stroke="#444444"
-     stroke-width="1"
-     stroke-dasharray="6 4"
-     opacity="0.55"
-     id="line6450" />
-  <line
-     x1="22.0"
-     y1="22.0"
-     x2="78.0"
-     y2="78.0"
-     stroke="#111111"
-     stroke-width="4"
-     id="line6452" />
-  <line
-     x1="31.333333333333332"
-     y1="31.333333333333332"
-     x2="27.090692646214045"
-     y2="35.57597402045262"
-     stroke="#111111"
-     stroke-width="1.2"
-     id="line6454" />
-  <line
-     x1="40.666666666666664"
-     y1="40.666666666666664"
-     x2="36.42402597954738"
-     y2="44.90930735378595"
-     stroke="#111111"
-     stroke-width="1.2"
-     id="line6456" />
-  <line
-     x1="50.0"
-     y1="50.0"
-     x2="45.757359312880716"
-     y2="54.242640687119284"
-     stroke="#111111"
-     stroke-width="1.2"
-     id="line6458" />
-  <line
-     x1="59.33333333333333"
-     y1="59.33333333333333"
-     x2="55.090692646214045"
-     y2="63.57597402045261"
-     stroke="#111111"
-     stroke-width="1.2"
-     id="line6460" />
-  <line
-     x1="68.66666666666667"
-     y1="68.66666666666667"
-     x2="64.42402597954738"
-     y2="72.90930735378596"
-     stroke="#111111"
-     stroke-width="1.2"
-     id="line6462" />
+  <g
+     id="g1633"
+     transform="rotate(-90,50,50)">
+    <line
+       x1="22"
+       y1="22"
+       x2="78"
+       y2="78"
+       stroke="#111111"
+       stroke-width="4"
+       id="line6452" />
+    <line
+       x1="31.333334"
+       y1="31.333334"
+       x2="27.090693"
+       y2="35.575974"
+       stroke="#111111"
+       stroke-width="1.2"
+       id="line6454" />
+    <line
+       x1="40.666668"
+       y1="40.666668"
+       x2="36.424026"
+       y2="44.909306"
+       stroke="#111111"
+       stroke-width="1.2"
+       id="line6456" />
+    <line
+       x1="50"
+       y1="50"
+       x2="45.757359"
+       y2="54.242641"
+       stroke="#111111"
+       stroke-width="1.2"
+       id="line6458" />
+    <line
+       x1="59.333332"
+       y1="59.333332"
+       x2="55.090694"
+       y2="63.575974"
+       stroke="#111111"
+       stroke-width="1.2"
+       id="line6460" />
+    <line
+       x1="68.666664"
+       y1="68.666664"
+       x2="64.424026"
+       y2="72.909309"
+       stroke="#111111"
+       stroke-width="1.2"
+       id="line6462" />
+  </g>
 </svg>
