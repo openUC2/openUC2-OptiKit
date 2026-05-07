@@ -1,0 +1,16 @@
+{
+  "focusLock": {
+    "camera": "FocusLockCamera",
+    "positioner": "ESP32Stage",
+    "updateFreq": 10,
+    "cropCenter": [1024, 1024],
+    "cropSize": 400,
+    "piKp": 1.0,
+    "piKi": 0.0,
+    "focusLockMetric": "peak",
+    "laserName": "488",
+    "laserValue": 0,
+    "fovWidth": 2048,
+    "fovCenter": [null, null]
+  }
+}

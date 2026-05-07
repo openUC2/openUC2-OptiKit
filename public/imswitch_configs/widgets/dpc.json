@@ -1,0 +1,8 @@
+{
+  "dpc": {
+    "wavelength": 530,
+    "pixelsize": 0.2,
+    "NA": 0.3,
+    "n": 1.0
+  }
+}

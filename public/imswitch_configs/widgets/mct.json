@@ -1,0 +1,13 @@
+{
+  "mct": {
+    "tWait": null,
+    "monitorIdx": 1,
+    "width": 1080,
+    "height": 1920,
+    "wavelength": 0,
+    "pixelSize": 0,
+    "angleMount": 0,
+    "patternsDir": null,
+    "patternsDirWin": null
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "nidaq": {
+    "timerCounterChannel": null,
+    "startTrigger": false
+  }
+}

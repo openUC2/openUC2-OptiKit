@@ -1,0 +1,25 @@
+{
+  "detectors": {
+    "WidefieldCamera": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "MockCamManager",
+      "managerProperties": {
+        "cameraListIndex": 0,
+        "cameraEffPixelsize": 1.0,
+        "isRGB": false,
+        "mocktype": "normal",
+        "mockstackpath": null,
+        "mockcam": {
+          "exposure": 0,
+          "gain": 0,
+          "blacklevel": 100,
+          "image_width": 1000,
+          "image_height": 1000
+        }
+      },
+      "forAcquisition": true,
+      "forFocusLock": true
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "detectors": {
+    "WidefieldCamera": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "HikCamManager",
+      "managerProperties": {
+        "isRGB": 0,
+        "cameraListIndex": 0,
+        "cameraEffPixelsize": 0.2257,
+        "mocktype": "normal",
+        "hikcam": {
+          "exposure": 0,
+          "gain": 0,
+          "blacklevel": 100,
+          "image_width": 1000,
+          "image_height": 1000
+        }
+      },
+      "forAcquisition": true,
+      "forFocusLock": true
+    }
+  }
+}

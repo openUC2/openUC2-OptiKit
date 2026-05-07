@@ -1,0 +1,25 @@
+{
+  "detectors": {
+    "WidefieldCamera": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "TucsenCamManager",
+      "managerProperties": {
+        "cameraListIndex": 0,
+        "cameraEffPixelsize": 3.45,
+        "isRGB": false,
+        "mockstackpath": null,
+        "mocktype": "normal",
+        "tucsencam": {
+          "exposure_time": 100,
+          "gain": 1,
+          "blacklevel": 100,
+          "binning": 1,
+          "frame_rate": -1
+        }
+      },
+      "forAcquisition": true,
+      "forFocusLock": false
+    }
+  }
+}

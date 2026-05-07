@@ -1,0 +1,24 @@
+{
+  "positioners": {
+    "ESP32StageZ": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "ESP32StageManager",
+      "managerProperties": {
+        "rs232device": "ESP32",
+        "stepsizeZ": 0.3125,
+        "homeSpeedZ": 10000,
+        "homeDirectionZ": 1,
+        "homeZenabled": 1,
+        "homeOnStartZ": 0,
+        "initialSpeedZ": 15000
+      },
+      "axes": ["Z"],
+      "isPositiveDirection": true,
+      "forPositioning": true,
+      "forScanning": true,
+      "resetOnClose": true,
+      "stageOffsets": { "stageOffsetPositionZ": 0 }
+    }
+  }
+}

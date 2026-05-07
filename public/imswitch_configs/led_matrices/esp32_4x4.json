@@ -1,0 +1,17 @@
+{
+  "LEDMatrixs": {
+    "ESP32 LEDMatrix": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "ESP32LEDMatrixManager",
+      "managerProperties": {
+        "rs232device": "ESP32",
+        "Nx": 4,
+        "Ny": 4,
+        "wavelength": 488,
+        "valueRangeMin": 0,
+        "valueRangeMax": 32768
+      }
+    }
+  }
+}

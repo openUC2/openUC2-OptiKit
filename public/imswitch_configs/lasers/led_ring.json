@@ -1,0 +1,17 @@
+{
+  "lasers": {
+    "LED Ring": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "ESP32LEDLaserManager",
+      "managerProperties": { "rs232device": "ESP32", "channel_index": "LED", "filter_change": false },
+      "valueRangeMin": 0,
+      "valueRangeMax": 255,
+      "wavelength": 555,
+      "freqRangeMin": 0,
+      "freqRangeMax": 0,
+      "freqRangeInit": 0,
+      "valueRangeStep": 1.0
+    }
+  }
+}

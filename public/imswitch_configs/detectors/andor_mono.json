@@ -1,0 +1,24 @@
+{
+  "detectors": {
+    "WidefieldCamera": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "AndorCamManager",
+      "managerProperties": {
+        "cameraListIndex": 0,
+        "cameraEffPixelsize": 6.5,
+        "isRGB": false,
+        "andorcam": {
+          "exposure": 100,
+          "gain": 1,
+          "binning": 1,
+          "image_width": 2048,
+          "image_height": 2048,
+          "temperature": -10
+        }
+      },
+      "forAcquisition": true,
+      "forFocusLock": false
+    }
+  }
+}

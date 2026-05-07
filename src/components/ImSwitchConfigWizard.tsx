@@ -32,11 +32,124 @@ import {
   Download as DownloadIcon,
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { ImSwitchJsonEditor } from './ImSwitchJsonEditor';
 import type { 
   ImSwitchConfiguration, 
   AvailableController,
   PlacedModule 
 } from '../types';
+
+// Base path for standalone JSON config fragments shipped under public/imswitch_configs
+const IMSWITCH_CONFIGS_BASE = '/configurator/imswitch_configs';
+
+// Map widget controller IDs to their default JSON config fragment.
+// When a widget is toggled on, the fragment is fetched and merged into the config.
+const WIDGET_CONFIG_MAP: Record<string, string> = {
+  autofocus: 'widgets/autofocus.json',
+  focuslock: 'widgets/focuslock_astigmatism.json',
+  histoscan: 'widgets/histoscan.json',
+  pixelcalibration: 'widgets/pixelcalibration.json',
+  mct: 'widgets/mct.json',
+  dpc: 'widgets/dpc.json',
+  objective: 'widgets/objective_10x_20x.json',
+  lightsheet: 'widgets/lightsheet.json',
+  experiment: 'widgets/experiment.json',
+  imswitch_server: 'widgets/pyro_server.json',
+  nidaq: 'widgets/nidaq.json',
+};
+
+// Top-level keys mapped from a widget; toggling the widget OFF removes them.
+const WIDGET_TOPLEVEL_KEYS: Record<string, string[]> = {
+  autofocus: ['autofocus'],
+  focuslock: ['focusLock'],
+  histoscan: ['HistoScan'],
+  pixelcalibration: ['PixelCalibration'],
+  mct: ['mct'],
+  dpc: ['dpc'],
+  objective: ['objective'],
+  lightsheet: ['lightsheet'],
+  experiment: ['experiment'],
+  imswitch_server: ['pyroServerInfo'],
+  nidaq: ['nidaq'],
+};
+
+/** Fetch a JSON config fragment from public/imswitch_configs/. */
+async function loadConfigFromFile(configFile: string): Promise<Partial<ImSwitchConfiguration>> {
+  try {
+    const response = await fetch(`${IMSWITCH_CONFIGS_BASE}/${configFile}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return (await response.json()) as Partial<ImSwitchConfiguration>;
+  } catch (error) {
+    console.warn(`Failed to load config file: ${configFile}`, error);
+    return {};
+  }
+}
+
+/**
+ * Deep-merge a per-module config fragment into the running merged config.
+ *
+ * For collection-style sections (detectors / lasers / LEDs / positioners /
+ * rs232devices / LEDMatrixs) we deduplicate device names: when two modules
+ * contribute the same key (e.g. two cameras both named "WidefieldCamera"),
+ * the second instance is suffixed with an integer ("WidefieldCamera1",
+ * "WidefieldCamera2", ...). The resulting names are returned via the
+ * `nameMap` so the caller can update detected hardware lists.
+ */
+const COLLECTION_KEYS = [
+  'detectors',
+  'lasers',
+  'LEDs',
+  'LEDMatrixs',
+  'positioners',
+  'rs232devices',
+] as const;
+
+function mergeFragmentWithDedupe(
+  target: Partial<ImSwitchConfiguration>,
+  fragment: Partial<ImSwitchConfiguration>,
+): { added: Partial<Record<(typeof COLLECTION_KEYS)[number], string[]>> } {
+  const added: Partial<Record<(typeof COLLECTION_KEYS)[number], string[]>> = {};
+
+  for (const key of COLLECTION_KEYS) {
+    const src = (fragment as Record<string, unknown>)[key] as Record<string, unknown> | undefined;
+    if (!src || typeof src !== 'object') continue;
+    const dst = ((target as Record<string, unknown>)[key] ||= {}) as Record<string, unknown>;
+    const addedNames: string[] = [];
+    for (const [origName, value] of Object.entries(src)) {
+      let finalName = origName;
+      if (Object.prototype.hasOwnProperty.call(dst, finalName)) {
+        // Collision: append numeric suffix. If origName already ends with a digit
+        // we still append; we want stable predictable names like Camera1, Camera2.
+        let i = 1;
+        // First duplicate: rename existing entry to "<name>1" and new to "<name>2"
+        // for a more consistent enumeration.
+        const existing = dst[finalName];
+        delete dst[finalName];
+        dst[`${finalName}${i}`] = existing;
+        // Update added list if the original was previously added
+        const prev = added[key];
+        if (prev) {
+          const idx = prev.indexOf(finalName);
+          if (idx >= 0) prev[idx] = `${finalName}${i}`;
+        }
+        i = 2;
+        while (Object.prototype.hasOwnProperty.call(dst, `${finalName}${i}`)) i++;
+        finalName = `${finalName}${i}`;
+      }
+      dst[finalName] = value;
+      addedNames.push(finalName);
+    }
+    added[key] = addedNames;
+  }
+
+  // Non-collection keys: shallow overwrite (later modules win).
+  for (const [k, v] of Object.entries(fragment)) {
+    if ((COLLECTION_KEYS as readonly string[]).includes(k)) continue;
+    (target as Record<string, unknown>)[k] = v;
+  }
+
+  return { added };
+}
 
 interface ImSwitchConfigWizardProps {
   open: boolean;
@@ -180,6 +293,28 @@ const DEFAULT_CONTROLLERS: AvailableController[] = [
     description: 'WiFi connectivity management',
     category: 'widget',
   },
+  // Extended widget set, mirroring widgets seen in real ImSwitch configs
+  { id: 'liveview', name: 'LiveView', description: 'Live camera stream view', category: 'widget', dependencies: ['camera'] },
+  { id: 'ledmatrix', name: 'LEDMatrix', description: 'LED matrix pattern control', category: 'widget' },
+  { id: 'dpc', name: 'DPC', description: 'Differential phase contrast imaging', category: 'widget', dependencies: ['camera'] },
+  { id: 'holo', name: 'Holo', description: 'Holographic reconstruction', category: 'widget', dependencies: ['camera'] },
+  { id: 'offaxisholo', name: 'OffAxisHolo', description: 'Off-axis holographic imaging', category: 'widget', dependencies: ['camera'] },
+  { id: 'fft', name: 'FFT', description: 'Fourier transform display', category: 'widget', dependencies: ['camera'] },
+  { id: 'triggeracquisition', name: 'TriggerAcquisition', description: 'Hardware-triggered acquisition', category: 'widget', dependencies: ['camera'] },
+  { id: 'stagescanaquisition', name: 'StageScanAcquisition', description: 'Stage-scanning tiled acquisition', category: 'widget', dependencies: ['camera', 'stage'] },
+  { id: 'galvoscanner', name: 'GalvoScanner', description: 'Galvo mirror scanner control', category: 'widget' },
+  { id: 'composite', name: 'Composite', description: 'Multi-channel image composition', category: 'widget', dependencies: ['camera'] },
+  { id: 'imswitch_server', name: 'ImSwitchServer', description: 'REST API server for remote control', category: 'widget' },
+  { id: 'hypha', name: 'Hypha', description: 'Hypha cloud integration', category: 'widget' },
+  { id: 'arkitekt', name: 'Arkitekt', description: 'Arkitekt workflow integration', category: 'widget' },
+  { id: 'flowstop', name: 'FlowStop', description: 'Microfluidic flow control', category: 'widget' },
+  { id: 'holisheet', name: 'HoliSheet', description: 'Light sheet control', category: 'widget', dependencies: ['laser', 'camera'] },
+  { id: 'histogramm', name: 'Histogramm', description: 'Live image histogram', category: 'widget', dependencies: ['camera'] },
+  { id: 'demo', name: 'Demo', description: 'Demo mode for testing', category: 'widget' },
+  { id: 'mazegame', name: 'MazeGame', description: 'Stage calibration game', category: 'widget', dependencies: ['stage'] },
+  { id: 'goniometer', name: 'Goniometer', description: 'Angular measurement and control', category: 'widget' },
+  { id: 'workflow', name: 'Workflow', description: 'Automated workflow execution', category: 'widget' },
+  { id: 'nidaq', name: 'NIDAQ', description: 'NI-DAQ analog/digital IO', category: 'widget' },
 ];
 
 export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
@@ -202,6 +337,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
     'settings', 'view', 'recording', 'image' // Default controllers
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
 
   // Parse ImSwitch data from module CSV
   const parseImSwitchData = (imSwitchString: string): Partial<ImSwitchConfiguration> => {
@@ -351,66 +487,79 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
     }
   };
 
-  // Analyze placed modules and extract ImSwitch configurations
+  // Analyze placed modules and extract ImSwitch configurations.
+  // Loads each module's standalone JSON config (preferred) or falls back to the
+  // legacy inline `imSwitchConfig` CSV string. Per-module fragments are merged
+  // in placement order with duplicate device names disambiguated by an integer
+  // suffix (e.g. WidefieldCamera -> WidefieldCamera1, WidefieldCamera2).
   useEffect(() => {
     if (!open) return;
 
-    const cameras: string[] = [];
-    const lasers: string[] = [];
-    const stages: string[] = [];
-    const mergedConfig: Partial<ImSwitchConfiguration> = {
-      detectors: {},
-      lasers: {},
-      positioners: {},
-      rs232devices: {},
-      LEDs: {},
-      LEDMatrixs: {},
-      availableWidgets: [],
-      nonAvailableWidgets: [],
+    let cancelled = false;
+    setIsLoadingConfigs(true);
+
+    (async () => {
+      const mergedConfig: Partial<ImSwitchConfiguration> = {
+        detectors: {},
+        lasers: {},
+        positioners: {},
+        rs232devices: {},
+        LEDs: {},
+        LEDMatrixs: {},
+        availableWidgets: [],
+        nonAvailableWidgets: [],
+      };
+
+      // Load each placed module's config fragment in parallel, preserving order.
+      const fragments = await Promise.all(
+        placedModules.map(async (placedModule: PlacedModule) => {
+          const moduleDefinition = modules.find(m => m.id === placedModule.moduleId);
+          if (!moduleDefinition) return null;
+
+          // Prefer the new file-based reference
+          if (moduleDefinition.imSwitchConfigFile) {
+            const frag = await loadConfigFromFile(moduleDefinition.imSwitchConfigFile);
+            return { moduleDefinition, fragment: frag };
+          }
+          // Fall back to legacy inline string parsing
+          if (moduleDefinition.imSwitchConfig) {
+            const frag = parseImSwitchData(moduleDefinition.imSwitchConfig);
+            return { moduleDefinition, fragment: frag };
+          }
+          return null;
+        }),
+      );
+
+      const cameras: string[] = [];
+      const lasers: string[] = [];
+      const stages: string[] = [];
+
+      for (const entry of fragments) {
+        if (!entry) continue;
+        const { added } = mergeFragmentWithDedupe(mergedConfig, entry.fragment);
+        if (added.detectors) cameras.push(...added.detectors);
+        if (added.lasers) lasers.push(...added.lasers);
+        if (added.LEDs) lasers.push(...added.LEDs);
+        if (added.positioners) stages.push(...added.positioners);
+      }
+
+      if (cancelled) return;
+
+      setDetectedHardware({
+        cameras: [...new Set(cameras)],
+        lasers: [...new Set(lasers)],
+        stages: [...new Set(stages)],
+      });
+      setImSwitchConfig(mergedConfig);
+      setIsLoadingConfigs(false);
+    })().catch(err => {
+      console.error('Failed to analyze placed modules:', err);
+      if (!cancelled) setIsLoadingConfigs(false);
+    });
+
+    return () => {
+      cancelled = true;
     };
-
-    placedModules.forEach((placedModule: PlacedModule) => {
-      const moduleDefinition = modules.find(m => m.id === placedModule.moduleId);
-      if (!moduleDefinition) return;
-
-      // Get ImSwitch data from the module definition
-      const imSwitchData = moduleDefinition.imSwitchConfig;
-      console.log('Checking module:', moduleDefinition.name, 'ImSwitch data:', imSwitchData);
-      
-      if (!imSwitchData) return;
-
-      const parsedConfig = parseImSwitchData(imSwitchData);
-      console.log('Parsed ImSwitch config for', moduleDefinition.name, ':', parsedConfig);
-      
-      // Merge configurations
-      if (parsedConfig.detectors) {
-        Object.assign(mergedConfig.detectors!, parsedConfig.detectors);
-        cameras.push(...Object.keys(parsedConfig.detectors));
-      }
-      if (parsedConfig.lasers) {
-        Object.assign(mergedConfig.lasers!, parsedConfig.lasers);
-        lasers.push(...Object.keys(parsedConfig.lasers));
-      }
-      if (parsedConfig.LEDs) {
-        Object.assign(mergedConfig.LEDs!, parsedConfig.LEDs);
-        // LEDs are also considered as light sources like lasers
-        lasers.push(...Object.keys(parsedConfig.LEDs));
-      }
-      if (parsedConfig.positioners) {
-        Object.assign(mergedConfig.positioners!, parsedConfig.positioners);
-        stages.push(...Object.keys(parsedConfig.positioners));
-      }
-      if (parsedConfig.rs232devices) {
-        Object.assign(mergedConfig.rs232devices!, parsedConfig.rs232devices);
-      }
-    });
-
-    setDetectedHardware({
-      cameras: [...new Set(cameras)],
-      lasers: [...new Set(lasers)],
-      stages: [...new Set(stages)],
-    });
-    setImSwitchConfig(mergedConfig);
   }, [open, placedModules, modules]);
 
   const handleNext = () => {
@@ -427,12 +576,52 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
 
   const handleControllerToggle = (controllerId: string) => {
     setSelectedControllers(prev => {
-      if (prev.includes(controllerId)) {
-        return prev.filter(id => id !== controllerId);
-      } else {
-        return [...prev, controllerId];
+      const isOn = prev.includes(controllerId);
+      const next = isOn ? prev.filter(id => id !== controllerId) : [...prev, controllerId];
+
+      // Side effect: load or remove the corresponding JSON config fragment.
+      if (!isOn && WIDGET_CONFIG_MAP[controllerId]) {
+        // Toggling ON -> fetch widget defaults and merge into config
+        loadConfigFromFile(WIDGET_CONFIG_MAP[controllerId]).then(fragment => {
+          setImSwitchConfig(current => {
+            const merged: Partial<ImSwitchConfiguration> = { ...current };
+            // Auto-bind device references using detected hardware where applicable
+            const bindFragment = JSON.parse(JSON.stringify(fragment)) as Record<string, unknown>;
+            if (bindFragment.autofocus && typeof bindFragment.autofocus === 'object') {
+              const af = bindFragment.autofocus as Record<string, unknown>;
+              if (detectedHardware.cameras[0]) af.camera = detectedHardware.cameras[0];
+              if (detectedHardware.stages[0]) af.positioner = detectedHardware.stages[0];
+            }
+            if (bindFragment.focusLock && typeof bindFragment.focusLock === 'object') {
+              const fl = bindFragment.focusLock as Record<string, unknown>;
+              if (detectedHardware.cameras[0]) fl.camera = detectedHardware.cameras[0];
+              if (detectedHardware.stages[0]) fl.positioner = detectedHardware.stages[0];
+              if (detectedHardware.lasers[0]) fl.laserName = detectedHardware.lasers[0];
+            }
+            for (const [k, v] of Object.entries(bindFragment)) {
+              (merged as Record<string, unknown>)[k] = v;
+            }
+            return merged;
+          });
+        });
+      } else if (isOn && WIDGET_TOPLEVEL_KEYS[controllerId]) {
+        // Toggling OFF -> strip the widget's top-level keys from the config
+        setImSwitchConfig(current => {
+          const stripped: Partial<ImSwitchConfiguration> = { ...current };
+          for (const k of WIDGET_TOPLEVEL_KEYS[controllerId]) {
+            delete (stripped as Record<string, unknown>)[k];
+          }
+          return stripped;
+        });
       }
+
+      return next;
     });
+  };
+
+  /** Apply an edited JSON section back into the running config. */
+  const handleSectionEdit = (key: string, value: unknown) => {
+    setImSwitchConfig(current => ({ ...current, [key]: value } as Partial<ImSwitchConfiguration>));
   };
 
   const generateFinalConfiguration = () => {
@@ -539,7 +728,21 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   };
 
   const handleDownload = () => {
-    const configJson = JSON.stringify(imSwitchConfig, null, 2);
+    // Embed the OptiKit layout under a reserved `_optikitConfig` key so the
+    // exported JSON can later be re-imported into OptiKit and used to
+    // reconstruct the same module layout that produced this config.
+    const exported: ImSwitchConfiguration = {
+      ...(imSwitchConfig as ImSwitchConfiguration),
+      _optikitConfig: {
+        version: '1.0.0',
+        exportedAt: new Date().toISOString(),
+        placedModules,
+        moduleDefinitions: modules.filter(m =>
+          placedModules.some((p: PlacedModule) => p.moduleId === m.id),
+        ),
+      },
+    };
+    const configJson = JSON.stringify(exported, null, 2);
     const blob = new Blob([configJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -561,6 +764,15 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
             <Typography variant="body2" color="textSecondary" paragraph>
               The wizard has analyzed your layout and detected the following ImSwitch-compatible components:
             </Typography>
+
+            {isLoadingConfigs && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <CircularProgress size={18} />
+                <Typography variant="body2" color="textSecondary">
+                  Loading module configurations...
+                </Typography>
+              </Box>
+            )}
             
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Card>
@@ -701,6 +913,35 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
                 );
               })}
             </FormGroup>
+
+            {/* Per-section live JSON editor: lets advanced users tweak the
+                merged configuration before export. Each editable section is
+                shown as a collapsible accordion. */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Edit Configuration JSON
+              </Typography>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                Inspect or edit individual configuration sections directly. Click Apply to commit changes.
+              </Typography>
+              {Object.entries(imSwitchConfig)
+                .filter(([k]) => !k.startsWith('_'))
+                .map(([sectionKey, sectionValue]) => (
+                  <Accordion key={sectionKey}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography>{sectionKey}</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <ImSwitchJsonEditor
+                        title=""
+                        configKey={sectionKey}
+                        value={sectionValue}
+                        onChange={handleSectionEdit}
+                      />
+                    </AccordionDetails>
+                  </Accordion>
+                ))}
+            </Box>
           </Box>
         );
 

@@ -1,0 +1,27 @@
+{
+  "detectors": {
+    "WidefieldCamera": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "Picamera2Manager",
+      "managerProperties": {
+        "cameraListIndex": 0,
+        "cameraEffPixelsize": 1.12,
+        "isRGB": true,
+        "resolution": [640, 480],
+        "binning": 1,
+        "use_video_mode": true,
+        "mocktype": "normal",
+        "picamera2": {
+          "exposure": 10,
+          "gain": 1.0,
+          "frame_rate": 30,
+          "flipX": false,
+          "flipY": false
+        }
+      },
+      "forAcquisition": true,
+      "forFocusLock": true
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "pyroServerInfo": {
+    "name": "ImSwitchServer",
+    "host": "0.0.0.0",
+    "port": 54333,
+    "active": false
+  }
+}

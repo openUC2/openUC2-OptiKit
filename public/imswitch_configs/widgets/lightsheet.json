@@ -1,0 +1,7 @@
+{
+  "lightsheet": {
+    "camera": "WidefieldCamera",
+    "laser": "488",
+    "positioner": "ESP32Stage"
+  }
+}

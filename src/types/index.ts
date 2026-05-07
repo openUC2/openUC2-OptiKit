@@ -25,7 +25,8 @@ export interface ModuleDefinition {
   price?: number;
   notification?: string;
   linkUrl?: string;
-  imSwitchConfig?: string; // Raw ImSwitch configuration string from CSV
+  imSwitchConfig?: string; // Raw ImSwitch configuration string from CSV (legacy, inline)
+  imSwitchConfigFile?: string; // Path to standalone JSON file under public/imswitch_configs/
   frameOnly?: boolean;
   framePosition?: string;
   frameOrientation?: string;
@@ -338,6 +339,21 @@ export interface ImSwitchConfiguration {
   defaultLaserPresetForScan?: null;
   availableWidgets?: string[];
   nonAvailableWidgets?: string[];
+  // OptiKit embedded configuration (round-trip import/export). Underscore prefix
+  // marks it as a non-ImSwitch field that ImSwitch should ignore.
+  _optikitConfig?: {
+    version: string;
+    exportedAt: string;
+    placedModules: PlacedModule[];
+    moduleDefinitions?: Array<{ id: string; name: string; group: string }>;
+    annotations?: Annotation[];
+    metadata?: {
+      projectName?: string;
+      description?: string;
+    };
+  };
+  // Allow widget-specific top-level keys merged from per-widget JSON fragments
+  [key: string]: unknown;
 }
 
 export interface AvailableController {

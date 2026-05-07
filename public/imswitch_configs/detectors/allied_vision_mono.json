@@ -1,0 +1,24 @@
+{
+  "detectors": {
+    "WidefieldCamera": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "VimbaCamManager",
+      "managerProperties": {
+        "cameraListIndex": 0,
+        "cameraEffPixelsize": 3.45,
+        "isRGB": false,
+        "vimbacam": {
+          "exposure": 100,
+          "gain": 1,
+          "blacklevel": 100,
+          "binning": 1,
+          "image_width": 1936,
+          "image_height": 1216
+        }
+      },
+      "forAcquisition": true,
+      "forFocusLock": false
+    }
+  }
+}

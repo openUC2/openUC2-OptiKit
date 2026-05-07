@@ -1,0 +1,15 @@
+{
+  "objective": {
+    "pixelsizes": [0.44, 1.1],
+    "NAs": [0.3, 0.1],
+    "magnifications": [10, 4],
+    "objectiveNames": ["10x", "4x"],
+    "objectivePositions": [0, 1],
+    "homeDirection": 1,
+    "homePolarity": 0,
+    "homeSpeed": 20000,
+    "homeAcceleration": 200000,
+    "calibrateOnStart": false,
+    "active": true
+  }
+}

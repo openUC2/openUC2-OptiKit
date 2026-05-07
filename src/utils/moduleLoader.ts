@@ -15,7 +15,8 @@ export interface ModuleCSVRow {
   price?: string;
   notification?: string;
   linkUrl?: string;
-  ImSwitch?: string; // ImSwitch configuration data
+  ImSwitch?: string; // ImSwitch configuration data (inline, legacy)
+  imSwitchConfigFile?: string; // Path to standalone JSON config under public/imswitch_configs/
   frameOnly?: string;
   framePosition?: string;
   frameOrientation?: string;
@@ -118,7 +119,8 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
     price: row.price ? parseFloat(row.price) : undefined,
     notification: notification || undefined,
     linkUrl: row.linkUrl || undefined,
-    imSwitchConfig: row.ImSwitch || undefined, // Add ImSwitch configuration
+    imSwitchConfig: row.ImSwitch || undefined, // Add ImSwitch configuration (legacy inline)
+    imSwitchConfigFile: row.imSwitchConfigFile && row.imSwitchConfigFile.trim() ? row.imSwitchConfigFile.trim() : undefined,
     frameOnly: row.frameOnly === 'TRUE' || row.frameOnly === 'true',
     framePosition: row.framePosition || undefined,
     frameOrientation: row.frameOrientation || undefined,

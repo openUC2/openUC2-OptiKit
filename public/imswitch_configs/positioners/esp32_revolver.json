@@ -1,0 +1,24 @@
+{
+  "positioners": {
+    "ESP32Revolver": {
+      "analogChannel": null,
+      "digitalLine": null,
+      "managerName": "ESP32StageManager",
+      "managerProperties": {
+        "rs232device": "ESP32",
+        "stepsizeA": 1.0,
+        "homeSpeedA": 10000,
+        "homeDirectionA": 1,
+        "homeAenabled": 1,
+        "homeOnStartA": 0,
+        "initialSpeedA": 15000
+      },
+      "axes": ["A"],
+      "isPositiveDirection": true,
+      "forPositioning": true,
+      "forScanning": false,
+      "resetOnClose": true,
+      "stageOffsets": { "stageOffsetPositionA": 0 }
+    }
+  }
+}
