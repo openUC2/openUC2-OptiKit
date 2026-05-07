@@ -33,7 +33,7 @@ import {
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { getSimulationModel, getElementTypeName } from '../utils/sceneBuilder';
-import { PlacedModule } from '../types';
+import type { PlacedModule } from '../types';
 
 // Proper React component so hooks are never called conditionally
 const DetectorSignalPlot: React.FC<{ module: PlacedModule }> = ({ module }) => {
