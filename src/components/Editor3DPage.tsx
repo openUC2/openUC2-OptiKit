@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Box, Button, CircularProgress, IconButton, Paper, Tooltip, Typography } from '@mui/material';
+import { Box, Button, ButtonGroup, CircularProgress, Divider, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   ViewInAr as View3DIcon,
@@ -9,6 +9,8 @@ import {
   GridOff as GridOffIcon,
   Adjust as AxesOnIcon,
   RadioButtonUnchecked as AxesOffIcon,
+  RotateLeft as RotateLeftIcon,
+  RotateRight as RotateRightIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Scene3D } from '../three/Scene3D';
@@ -36,6 +38,13 @@ export function Editor3DPage() {
   const modules = useAppStore(s => s.modules);
   const loadModules = useAppStore(s => s.loadModules);
   const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
+  const placedModules = useAppStore(s => s.placedModules);
+  const rotateModule = useAppStore(s => s.rotateModule);
+  const rotateModuleTop = useAppStore(s => s.rotateModuleTop);
+  const moveModule = useAppStore(s => s.moveModule);
+  const moveModuleToLayer = useAppStore(s => s.moveModuleToLayer);
+
+  const selectedModule = selectedItemId ? placedModules.find(m => m.id === selectedItemId) : undefined;
 
   // Ensure modules are loaded when refreshing directly to /configurator/3d
   useEffect(() => {
@@ -142,6 +151,77 @@ export function Editor3DPage() {
 
       {/* Main content: 3D canvas + right property panel */}
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+        {/* Left transform panel */}
+        {selectedModule && (
+          <Paper
+            elevation={2}
+            square
+            sx={{ width: 160, overflowY: 'auto', p: 1, borderRight: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1 }}
+          >
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Rotate</Typography>
+
+            <Typography variant="caption">Base (Z)</Typography>
+            <ButtonGroup size="small" fullWidth>
+              <Tooltip title="Rotate base −90°">
+                <Button onClick={() => rotateModule(selectedModule.id, ((selectedModule.rotation - 90) + 360) % 360)}>
+                  <RotateLeftIcon fontSize="small" />
+                </Button>
+              </Tooltip>
+              <Tooltip title="Rotate base +90°">
+                <Button onClick={() => rotateModule(selectedModule.id, (selectedModule.rotation + 90) % 360)}>
+                  <RotateRightIcon fontSize="small" />
+                </Button>
+              </Tooltip>
+            </ButtonGroup>
+
+            <Typography variant="caption">Top (Y)</Typography>
+            <ButtonGroup size="small" fullWidth>
+              <Tooltip title="Rotate top −90°">
+                <Button onClick={() => rotateModuleTop(selectedModule.id, (((selectedModule.topRotation ?? 0) - 90) + 360) % 360)}>
+                  <RotateLeftIcon fontSize="small" />
+                </Button>
+              </Tooltip>
+              <Tooltip title="Rotate top +90°">
+                <Button onClick={() => rotateModuleTop(selectedModule.id, ((selectedModule.topRotation ?? 0) + 90) % 360)}>
+                  <RotateRightIcon fontSize="small" />
+                </Button>
+              </Tooltip>
+            </ButtonGroup>
+
+            <Divider sx={{ my: 0.5 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Translate (50 mm)</Typography>
+
+            <Typography variant="caption">X axis</Typography>
+            <ButtonGroup size="small" fullWidth>
+              <Tooltip title="Move −50 mm (X)">
+                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x - 1, y: selectedModule.position.y })}>−X</Button>
+              </Tooltip>
+              <Tooltip title="Move +50 mm (X)">
+                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x + 1, y: selectedModule.position.y })}>+X</Button>
+              </Tooltip>
+            </ButtonGroup>
+
+            <Typography variant="caption">Y axis</Typography>
+            <ButtonGroup size="small" fullWidth>
+              <Tooltip title="Move −50 mm (Y)">
+                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x, y: selectedModule.position.y - 1 })}>−Y</Button>
+              </Tooltip>
+              <Tooltip title="Move +50 mm (Y)">
+                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x, y: selectedModule.position.y + 1 })}>+Y</Button>
+              </Tooltip>
+            </ButtonGroup>
+
+            <Typography variant="caption">Z (layer)</Typography>
+            <ButtonGroup size="small" fullWidth>
+              <Tooltip title="Move down one layer (−Z)">
+                <Button onClick={() => moveModuleToLayer(selectedModule.id, selectedModule.layer - 1)}>−Z</Button>
+              </Tooltip>
+              <Tooltip title="Move up one layer (+Z)">
+                <Button onClick={() => moveModuleToLayer(selectedModule.id, selectedModule.layer + 1)}>+Z</Button>
+              </Tooltip>
+            </ButtonGroup>
+          </Paper>
+        )}
         {/* 3D canvas fills remaining space */}
         <Box
           sx={{

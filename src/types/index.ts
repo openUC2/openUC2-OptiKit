@@ -363,6 +363,10 @@ export interface AvailableController {
   category: 'widget' | 'hardware';
   dependencies?: string[];
   configTemplate?: Record<string, unknown>;
+  /** Path to JSON config fragment, relative to imswitch_configs/ */
+  configFile?: string;
+  /** Top-level keys this widget owns in the ImSwitch config */
+  topLevelKeys?: string[];
 }
 
 // =====================================================

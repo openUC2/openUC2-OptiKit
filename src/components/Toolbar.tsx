@@ -4,17 +4,14 @@ import {
   AppBar, 
   Toolbar as MuiToolbar, 
   Typography, 
-  IconButton, 
   Divider,
   Box,
-  Tooltip,
   Button,
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
-  useMediaQuery,
-  useTheme
+  Tooltip,
 } from '@mui/material';
 import {
   Undo as UndoIcon,
@@ -43,7 +40,6 @@ import {
   Delete as DeleteIcon,
   Memory as ImSwitchIcon,
   Science as SimulationIcon,
-  MoreVert as MoreVertIcon,
   ThreeDRotation as View3DIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
@@ -54,14 +50,15 @@ import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isEditorPage = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
   
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
   const [imSwitchWizardOpen, setImSwitchWizardOpen] = React.useState(false);
-  const [moreMenuAnchor, setMoreMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [editMenuAnchor, setEditMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [annotateMenuAnchor, setAnnotateMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [helpMenuAnchor, setHelpMenuAnchor] = React.useState<null | HTMLElement>(null);
   
   const { 
     exportData, 
@@ -429,369 +426,171 @@ openUC2 team via GitHub repository
         {/* Editor-only controls */}
         {isEditorPage && (
           <>
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5, bgcolor: 'rgba(255,255,255,0.2)' }} />
 
-        {/* Primary Controls - Always visible on mobile */}
-        <Box sx={{ display: 'flex', gap: 0.5, flex: 1, overflow: 'hidden' }}>
-          <Tooltip title="Undo">
-            <IconButton 
+            {/* Edit menu */}
+            <Button
               color="inherit"
-              onClick={undo}
               size="small"
-              sx={{ minWidth: { xs: 40, sm: 'auto' } }}
+              onClick={e => setEditMenuAnchor(e.currentTarget)}
+              sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
             >
-              <UndoIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Redo">
-            <IconButton 
-              color="inherit"
-              onClick={redo}
-              size="small"
-              sx={{ minWidth: { xs: 40, sm: 'auto' } }}
-            >
-              <RedoIcon />
-            </IconButton>
-          </Tooltip>
-
-          {/* Grid Controls - Hidden on small mobile */}
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.5 }}>
-            <Tooltip title={`Selection Mode: ${selectionMode === 'single' ? 'Single' : 'Multiple'}`}>
-              <IconButton 
-                color={selectionMode === 'multiple' ? "secondary" : "inherit"}
-                onClick={() => setSelectionMode(selectionMode === 'single' ? 'multiple' : 'single')}
-                size="small"
-              >
-                <SelectIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Center View">
-              <IconButton 
-                color="inherit"
-                onClick={centerView}
-                size="small"
-              >
-                <CenterIcon />
-              </IconButton>
-            </Tooltip>
-            {selectedItems.length > 1 && (
-              <Tooltip title={`Delete ${selectedItems.length} selected items`}>
-                <IconButton 
-                  color="error"
-                  onClick={deleteSelectedItems}
-                  size="small"
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-        </Box>
-
-        {/* Secondary Controls - Hidden on mobile, visible on tablet+ */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 0.5 }}>
-          <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
-          
-          {/* Annotation Tools */}
-          <Box data-tour="toolbar-drawing" sx={{ display: 'flex', gap: 0.5 }}>
-            <Tooltip title={useSimulationStore.getState().config.enabled ? "Disable Ray Simulation" : "Enable Ray Simulation"}>
-              <IconButton 
-                color={useSimulationStore.getState().config.enabled ? "secondary" : "inherit"}
-                onClick={() => useSimulationStore.getState().toggleSimulation()}
-                size="small"
-              >
-                <SimulationIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Draw Line">
-              <IconButton 
-                color={annotationMode === 'line' ? "secondary" : "inherit"}
-                onClick={() => setAnnotationMode(annotationMode === 'line' ? 'none' : 'line')}
-                size="small"
-              >
-                <LineIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Draw Arrow">
-              <IconButton 
-                color={annotationMode === 'arrow' ? "secondary" : "inherit"}
-                onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
-                size="small"
-              >
-                <ArrowIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Draw Optical Axis">
-              <IconButton 
-                color={annotationMode === 'optical-axis' ? "secondary" : "inherit"}
-                onClick={() => setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis')}
-                size="small"
-              >
-                <OpticalAxisIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Add Text">
-              <IconButton 
-                color={annotationMode === 'text' ? "secondary" : "inherit"}
-                onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
-              size="small"
-            >
-              <TextIcon />
-            </IconButton>
-          </Tooltip>
-          </Box>
-
-          <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.2)' }} />
-
-          {/* File Operations */}
-          <Box data-tour="toolbar-actions" sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title="Save Layout As...">
-            <IconButton 
-              color="inherit"
-              onClick={handleExport}
-              size="small"
-            >
-              <SaveIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Generate Shareable Link">
-            <IconButton 
-              color="inherit"
-              onClick={handleGenerateShareableLink}
-              size="small"
-            >
-              <LinkIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Share via Email">
-            <IconButton 
-              color="inherit"
-              onClick={handleShare}
-              size="small"
-            >
-              <EmailIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Import Layout">
-            <IconButton 
-              color="inherit"
-              onClick={handleImport}
-              size="small"
-            >
-              <ImportIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Import from URL">
-            <IconButton 
-              color="inherit"
-              onClick={handleImportFromUrl}
-              size="small"
-            >
-              <UrlIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Download Screenshot">
-            <IconButton 
-              color="inherit"
-              onClick={downloadScreenshot}
-              size="small"
-            >
-              <ScreenshotIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Download STL Bundle">
-            <IconButton 
-              color="inherit"
-              onClick={handleExportSTL}
-              size="small"
-            >
-              <STLIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Export ImSwitch Configuration">
-            <IconButton 
-              color="inherit"
-              onClick={() => setImSwitchWizardOpen(true)}
-              size="small"
-            >
-              <ImSwitchIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Upload to Optical Setup Browser">
-            <IconButton 
-              color="inherit"
-              onClick={handleSaveToGitHub}
-              size="small"
-            >
-              <GitHubIcon />
-            </IconButton>
-          </Tooltip>
-          {/* Show overwrite button only when a remote setup is loaded */}
-          {remoteSourcePath && (
-            <Tooltip title={`Save (overwrite) → ${remoteSourcePath}`}>
-              <IconButton
-                color="inherit"
-                onClick={handleOverwriteToGitHub}
-                size="small"
-                sx={{ opacity: 0.85 }}
-              >
-                <SaveIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title="Clear All">
-            <IconButton 
-              color="inherit"
-              onClick={handleClear}
-              size="small"
-            >
-              <ClearIcon />
-            </IconButton>
-          </Tooltip>
-          </Box>
-        </Box>
-
-        {/* Mobile overflow menu — visible only on small screens */}
-        {isMobile && (
-          <>
-            <Tooltip title="More actions">
-              <IconButton
-                color="inherit"
-                onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
-                size="small"
-              >
-                <MoreVertIcon />
-              </IconButton>
-            </Tooltip>
-            <Menu
-              anchorEl={moreMenuAnchor}
-              open={Boolean(moreMenuAnchor)}
-              onClose={() => setMoreMenuAnchor(null)}
-              slotProps={{ paper: { sx: { maxHeight: '70vh' } } }}
-            >
-              {/* Simulation */}\n              <MenuItem onClick={() => { useSimulationStore.getState().toggleSimulation(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><SimulationIcon color={useSimulationStore.getState().config.enabled ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>{useSimulationStore.getState().config.enabled ? 'Disable Ray Simulation' : 'Enable Ray Simulation'}</ListItemText>
+              Edit
+            </Button>
+            <Menu anchorEl={editMenuAnchor} open={Boolean(editMenuAnchor)} onClose={() => setEditMenuAnchor(null)}>
+              <MenuItem onClick={() => { undo(); setEditMenuAnchor(null); }}>
+                <ListItemIcon><UndoIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Undo</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => { navigate('/configurator/3d'); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><View3DIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>View in 3D</ListItemText>
+              <MenuItem onClick={() => { redo(); setEditMenuAnchor(null); }}>
+                <ListItemIcon><RedoIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Redo</ListItemText>
               </MenuItem>
-
-              {/* Annotation tools */}
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'line' ? 'none' : 'line'); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><LineIcon color={annotationMode === 'line' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Draw Line</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow'); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><ArrowIcon color={annotationMode === 'arrow' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Draw Arrow</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis'); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><OpticalAxisIcon color={annotationMode === 'optical-axis' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Optical Axis</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'text' ? 'none' : 'text'); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><TextIcon color={annotationMode === 'text' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Add Text</ListItemText>
-              </MenuItem>
-
               <Divider />
-
-              {/* Selection / view */}
-              <MenuItem onClick={() => { setSelectionMode(selectionMode === 'single' ? 'multiple' : 'single'); setMoreMenuAnchor(null); }}>
+              <MenuItem onClick={() => { setSelectionMode(selectionMode === 'single' ? 'multiple' : 'single'); setEditMenuAnchor(null); }}>
                 <ListItemIcon><SelectIcon color={selectionMode === 'multiple' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>{selectionMode === 'single' ? 'Multi-Select' : 'Single Select'}</ListItemText>
+                <ListItemText>{selectionMode === 'single' ? 'Multi-Select Mode' : 'Single-Select Mode'}</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => { centerView(); setMoreMenuAnchor(null); }}>
+              <MenuItem onClick={() => { centerView(); setEditMenuAnchor(null); }}>
                 <ListItemIcon><CenterIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Center View</ListItemText>
               </MenuItem>
-
+              {selectedItems.length > 1 && (
+                <MenuItem onClick={() => { deleteSelectedItems(); setEditMenuAnchor(null); }}>
+                  <ListItemIcon><DeleteIcon color="error" fontSize="small" /></ListItemIcon>
+                  <ListItemText>Delete Selected ({selectedItems.length})</ListItemText>
+                </MenuItem>
+              )}
               <Divider />
-
-              {/* File operations */}
-              <MenuItem onClick={() => { handleExport(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Save Layout</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { handleImport(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Import Layout</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { handleGenerateShareableLink(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Shareable Link</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { downloadScreenshot(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><ScreenshotIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Screenshot</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { handleShare(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><EmailIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Share via Email</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { handleSaveToGitHub(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><GitHubIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Upload to GitHub</ListItemText>
-              </MenuItem>
-
-              <Divider />
-
-              <MenuItem onClick={() => { handleClear(); setMoreMenuAnchor(null); }}>
+              <MenuItem onClick={() => { handleClear(); setEditMenuAnchor(null); }}>
                 <ListItemIcon><ClearIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Clear All</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => { handleHelp(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><HelpIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Help</ListItemText>
+            </Menu>
+
+            {/* Annotate menu */}
+            <Button
+              color="inherit"
+              size="small"
+              onClick={e => setAnnotateMenuAnchor(e.currentTarget)}
+              sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
+            >
+              Annotate
+            </Button>
+            <Menu anchorEl={annotateMenuAnchor} open={Boolean(annotateMenuAnchor)} onClose={() => setAnnotateMenuAnchor(null)}>
+              <MenuItem onClick={() => { useSimulationStore.getState().toggleSimulation(); setAnnotateMenuAnchor(null); }}>
+                <ListItemIcon><SimulationIcon color={useSimulationStore.getState().config.enabled ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
+                <ListItemText>{useSimulationStore.getState().config.enabled ? 'Disable Ray Simulation' : 'Enable Ray Simulation'}</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => { handleForum(); setMoreMenuAnchor(null); }}>
-                <ListItemIcon><ForumIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Forum</ListItemText>
+              <Divider />
+              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'line' ? 'none' : 'line'); setAnnotateMenuAnchor(null); }}>
+                <ListItemIcon><LineIcon color={annotationMode === 'line' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
+                <ListItemText>Draw Line</ListItemText>
               </MenuItem>
+              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow'); setAnnotateMenuAnchor(null); }}>
+                <ListItemIcon><ArrowIcon color={annotationMode === 'arrow' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
+                <ListItemText>Draw Arrow</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis'); setAnnotateMenuAnchor(null); }}>
+                <ListItemIcon><OpticalAxisIcon color={annotationMode === 'optical-axis' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
+                <ListItemText>Optical Axis</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'text' ? 'none' : 'text'); setAnnotateMenuAnchor(null); }}>
+                <ListItemIcon><TextIcon color={annotationMode === 'text' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
+                <ListItemText>Add Text</ListItemText>
+              </MenuItem>
+            </Menu>
+
+            {/* File menu */}
+            <Button
+              color="inherit"
+              size="small"
+              onClick={e => setFileMenuAnchor(e.currentTarget)}
+              sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
+            >
+              File
+            </Button>
+            <Menu anchorEl={fileMenuAnchor} open={Boolean(fileMenuAnchor)} onClose={() => setFileMenuAnchor(null)}>
+              <MenuItem onClick={() => { handleExport(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Save Layout As…</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleImport(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Import Layout</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleImportFromUrl(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><UrlIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Import from URL</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => { handleGenerateShareableLink(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Generate Shareable Link</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleShare(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><EmailIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Share via Email</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => { downloadScreenshot(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><ScreenshotIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Download Screenshot</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleExportSTL(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><STLIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Download STL Bundle</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setImSwitchWizardOpen(true); setFileMenuAnchor(null); }}>
+                <ListItemIcon><ImSwitchIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Export ImSwitch Config</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => { handleSaveToGitHub(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><GitHubIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Upload to Setup Browser</ListItemText>
+              </MenuItem>
+              {remoteSourcePath && (
+                <MenuItem onClick={() => { handleOverwriteToGitHub(); setFileMenuAnchor(null); }}>
+                  <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>Save (Overwrite) → {remoteSourcePath}</ListItemText>
+                </MenuItem>
+              )}
             </Menu>
           </>
         )}
-          </>
-        )}
 
-        {/* Help Section - Minimal on mobile */}
-        <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.5, ml: 'auto' }}>
-          <Tooltip title="Forum Support">
-            <IconButton 
-              color="inherit"
-              onClick={handleForum}
-              size="small"
-            >
-              <ForumIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Help">
-            <IconButton 
-              color="inherit"
-              onClick={handleHelp}
-              size="small"
-            >
-              <HelpIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Privacy">
-            <IconButton 
-              color="inherit"
-              onClick={handlePrivacy}
-              size="small"
-            >
-              <PrivacyIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        {/* Help menu — always visible */}
+        <Button
+          color="inherit"
+          size="small"
+          onClick={e => setHelpMenuAnchor(e.currentTarget)}
+          sx={{ textTransform: 'none', minWidth: 0, px: 1.5, ml: 'auto' }}
+        >
+          Help
+        </Button>
+        <Menu anchorEl={helpMenuAnchor} open={Boolean(helpMenuAnchor)} onClose={() => setHelpMenuAnchor(null)}>
+          <MenuItem onClick={() => { handleHelp(); setHelpMenuAnchor(null); }}>
+            <ListItemIcon><HelpIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Help / Tutorial</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => { handleForum(); setHelpMenuAnchor(null); }}>
+            <ListItemIcon><ForumIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Forum</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => { handlePrivacy(); setHelpMenuAnchor(null); }}>
+            <ListItemIcon><PrivacyIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Privacy</ListItemText>
+          </MenuItem>
+        </Menu>
 
-        {/* Title - Hidden on mobile to save space */}
-        <Box sx={{ flexGrow: 1, display: { xs: 'none', lg: 'flex' }, justifyContent: 'center' }}>
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 400 }}>
-            {isEditorPage ? 'OptiKit - 2D Grid Builder' : 'Setup Browser'}
-          </Typography>
-        </Box>
+        {/* Title — right-aligned, hidden on small screens */}
+        <Typography
+          variant="h6"
+          sx={{ display: { xs: 'none', lg: 'block' }, fontWeight: 400, fontSize: '1rem', ml: 2, whiteSpace: 'nowrap' }}
+        >
+          {isEditorPage ? 'OptiKit - 2D Grid Builder' : 'Setup Browser'}
+        </Typography>
       </MuiToolbar>
       
       {/* Feedback Dialog */}

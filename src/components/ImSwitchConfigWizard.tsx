@@ -42,37 +42,10 @@ import type {
 // Base path for standalone JSON config fragments shipped under public/imswitch_configs
 const IMSWITCH_CONFIGS_BASE = '/configurator/imswitch_configs';
 
-// Map widget controller IDs to their default JSON config fragment.
-// When a widget is toggled on, the fragment is fetched and merged into the config.
-const WIDGET_CONFIG_MAP: Record<string, string> = {
-  autofocus: 'widgets/autofocus.json',
-  focuslock: 'widgets/focuslock_astigmatism.json',
-  histoscan: 'widgets/histoscan.json',
-  pixelcalibration: 'widgets/pixelcalibration.json',
-  mct: 'widgets/mct.json',
-  dpc: 'widgets/dpc.json',
-  objective: 'widgets/objective_10x_20x.json',
-  lightsheet: 'widgets/lightsheet.json',
-  experiment: 'widgets/experiment.json',
-  imswitch_server: 'widgets/pyro_server.json',
-  nidaq: 'widgets/nidaq.json',
-};
-
-// Top-level keys mapped from a widget; toggling the widget OFF removes them.
-const WIDGET_TOPLEVEL_KEYS: Record<string, string[]> = {
-  autofocus: ['autofocus'],
-  focuslock: ['focusLock'],
-  histoscan: ['HistoScan'],
-  pixelcalibration: ['PixelCalibration'],
-  mct: ['mct'],
-  dpc: ['dpc'],
-  objective: ['objective'],
-  lightsheet: ['lightsheet'],
-  experiment: ['experiment'],
-  imswitch_server: ['pyroServerInfo'],
-  nidaq: ['nidaq'],
-};
-
+// --- These are built dynamically from widget_database.json ---
+// Fallback empty values; will be populated from the database once loaded.
+let WIDGET_CONFIG_MAP: Record<string, string> = {};
+let WIDGET_TOPLEVEL_KEYS: Record<string, string[]> = {};
 /** Fetch a JSON config fragment from public/imswitch_configs/. */
 async function loadConfigFromFile(configFile: string): Promise<Partial<ImSwitchConfiguration>> {
   try {
@@ -159,170 +132,13 @@ interface ImSwitchConfigWizardProps {
 const steps = ['Module Analysis', 'Controller Selection', 'Configuration Preview', 'Export'];
 
 // Default available controllers
-const DEFAULT_CONTROLLERS: AvailableController[] = [
-  {
-    id: 'settings',
-    name: 'Settings',
-    description: 'Basic application settings and configuration',
-    category: 'widget',
-  },
-  {
-    id: 'view',
-    name: 'View',
-    description: 'Camera view and image display',
-    category: 'widget',
-    dependencies: ['camera']
-  },
-  {
-    id: 'recording',
-    name: 'Recording',
-    description: 'Video and image recording functionality',
-    category: 'widget',
-    dependencies: ['camera']
-  },
-  {
-    id: 'image',
-    name: 'Image',
-    description: 'Image processing and analysis tools',
-    category: 'widget',
-    dependencies: ['camera']
-  },
-  {
-    id: 'laser',
-    name: 'Laser',
-    description: 'Laser control and management',
-    category: 'widget',
-    dependencies: ['laser']
-  },
-  {
-    id: 'positioner',
-    name: 'Positioner',
-    description: 'Stage and positioning controls',
-    category: 'widget',
-    dependencies: ['stage']
-  },
-  {
-    id: 'autofocus',
-    name: 'Autofocus',
-    description: 'Automatic focusing system',
-    category: 'widget',
-    dependencies: ['camera', 'stage']
-  },
-  {
-    id: 'focuslock',
-    name: 'Focus Lock',
-    description: 'Real-time focus stabilization',
-    category: 'widget',
-    dependencies: ['camera', 'stage']
-  },
-  {
-    id: 'mct',
-    name: 'MCT',
-    description: 'Multi-channel time-lapse imaging',
-    category: 'widget',
-  },
-  {
-    id: 'uc2config',
-    name: 'UC2Config',
-    description: 'UC2 system configuration tools',
-    category: 'widget',
-  },
-  {
-    id: 'pixelcalibration',
-    name: 'Pixel Calibration',
-    description: 'Camera pixel size calibration',
-    category: 'widget',
-    dependencies: ['camera']
-  },
-  {
-    id: 'histoscan',
-    name: 'HistoScan',
-    description: 'Histology scanning functionality',
-    category: 'widget',
-    dependencies: ['camera', 'stage']
-  },
-  {
-    id: 'joystick',
-    name: 'Joystick',
-    description: 'Manual stage control with joystick',
-    category: 'widget',
-    dependencies: ['stage']
-  },
-  {
-    id: 'flatfield',
-    name: 'Flatfield',
-    description: 'Flat field correction',
-    category: 'widget',
-    dependencies: ['camera']
-  },
-  {
-    id: 'roiscan',
-    name: 'ROI Scan',
-    description: 'Region of interest scanning',
-    category: 'widget',
-    dependencies: ['camera', 'stage']
-  },
-  {
-    id: 'objective',
-    name: 'Objective',
-    description: 'Objective lens control',
-    category: 'widget',
-  },
-  {
-    id: 'experiment',
-    name: 'Experiment',
-    description: 'Experiment workflow management',
-    category: 'widget',
-  },
-  {
-    id: 'lightsheet',
-    name: 'Lightsheet',
-    description: 'Light sheet microscopy controls',
-    category: 'widget',
-    dependencies: ['laser', 'camera']
-  },
-  {
-    id: 'esp32infoscreen',
-    name: 'ESP32 Info Screen',
-    description: 'ESP32 device information and diagnostics',
-    category: 'widget',
-  },
-  {
-    id: 'wifi',
-    name: 'WiFi',
-    description: 'WiFi connectivity management',
-    category: 'widget',
-  },
-  // Extended widget set, mirroring widgets seen in real ImSwitch configs
-  { id: 'liveview', name: 'LiveView', description: 'Live camera stream view', category: 'widget', dependencies: ['camera'] },
-  { id: 'ledmatrix', name: 'LEDMatrix', description: 'LED matrix pattern control', category: 'widget' },
-  { id: 'dpc', name: 'DPC', description: 'Differential phase contrast imaging', category: 'widget', dependencies: ['camera'] },
-  { id: 'holo', name: 'Holo', description: 'Holographic reconstruction', category: 'widget', dependencies: ['camera'] },
-  { id: 'offaxisholo', name: 'OffAxisHolo', description: 'Off-axis holographic imaging', category: 'widget', dependencies: ['camera'] },
-  { id: 'fft', name: 'FFT', description: 'Fourier transform display', category: 'widget', dependencies: ['camera'] },
-  { id: 'triggeracquisition', name: 'TriggerAcquisition', description: 'Hardware-triggered acquisition', category: 'widget', dependencies: ['camera'] },
-  { id: 'stagescanaquisition', name: 'StageScanAcquisition', description: 'Stage-scanning tiled acquisition', category: 'widget', dependencies: ['camera', 'stage'] },
-  { id: 'galvoscanner', name: 'GalvoScanner', description: 'Galvo mirror scanner control', category: 'widget' },
-  { id: 'composite', name: 'Composite', description: 'Multi-channel image composition', category: 'widget', dependencies: ['camera'] },
-  { id: 'imswitch_server', name: 'ImSwitchServer', description: 'REST API server for remote control', category: 'widget' },
-  { id: 'hypha', name: 'Hypha', description: 'Hypha cloud integration', category: 'widget' },
-  { id: 'arkitekt', name: 'Arkitekt', description: 'Arkitekt workflow integration', category: 'widget' },
-  { id: 'flowstop', name: 'FlowStop', description: 'Microfluidic flow control', category: 'widget' },
-  { id: 'holisheet', name: 'HoliSheet', description: 'Light sheet control', category: 'widget', dependencies: ['laser', 'camera'] },
-  { id: 'histogramm', name: 'Histogramm', description: 'Live image histogram', category: 'widget', dependencies: ['camera'] },
-  { id: 'demo', name: 'Demo', description: 'Demo mode for testing', category: 'widget' },
-  { id: 'mazegame', name: 'MazeGame', description: 'Stage calibration game', category: 'widget', dependencies: ['stage'] },
-  { id: 'goniometer', name: 'Goniometer', description: 'Angular measurement and control', category: 'widget' },
-  { id: 'workflow', name: 'Workflow', description: 'Automated workflow execution', category: 'widget' },
-  { id: 'nidaq', name: 'NIDAQ', description: 'NI-DAQ analog/digital IO', category: 'widget' },
-];
-
 export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   open,
   onClose,
 }) => {
   const { modules, placedModules } = useAppStore();
   const [activeStep, setActiveStep] = useState(0);
+  const [controllerDatabase, setControllerDatabase] = useState<AvailableController[]>([]);
   const [detectedHardware, setDetectedHardware] = useState<{
     cameras: string[];
     lasers: string[];
@@ -338,6 +154,26 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
+
+  // Load widget database from JSON on first open
+  useEffect(() => {
+    if (!open || controllerDatabase.length > 0) return;
+    fetch(`${IMSWITCH_CONFIGS_BASE}/widget_database.json`)
+      .then(r => r.json())
+      .then((data: { controllers: AvailableController[] }) => {
+        setControllerDatabase(data.controllers);
+        // Rebuild lookup maps from database
+        const cfgMap: Record<string, string> = {};
+        const keysMap: Record<string, string[]> = {};
+        for (const c of data.controllers) {
+          if (c.configFile) cfgMap[c.id] = c.configFile;
+          if (c.topLevelKeys?.length) keysMap[c.id] = c.topLevelKeys;
+        }
+        WIDGET_CONFIG_MAP = cfgMap;
+        WIDGET_TOPLEVEL_KEYS = keysMap;
+      })
+      .catch(err => console.warn('Failed to load widget_database.json', err));
+  }, [open, controllerDatabase.length]);
 
   // Parse ImSwitch data from module CSV
   const parseImSwitchData = (imSwitchString: string): Partial<ImSwitchConfiguration> => {
@@ -631,10 +467,10 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
     const finalConfig: ImSwitchConfiguration = {
       ...imSwitchConfig,
       availableWidgets: selectedControllers.map(id => {
-        const controller = DEFAULT_CONTROLLERS.find(c => c.id === id);
+        const controller = controllerDatabase.find(c => c.id === id);
         return controller?.name || id;
       }),
-      nonAvailableWidgets: DEFAULT_CONTROLLERS
+      nonAvailableWidgets: controllerDatabase
         .filter(c => !selectedControllers.includes(c.id))
         .map(c => c.name),
       // Add default values for required fields
@@ -862,7 +698,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
             </Typography>
 
             <FormGroup>
-              {DEFAULT_CONTROLLERS.map((controller) => {
+              {controllerDatabase.map((controller) => {
                 const hasRequiredHardware = !controller.dependencies || controller.dependencies.every(dep => {
                   switch (dep) {
                     case 'camera':
@@ -877,8 +713,8 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
                 });
 
                 return (
+                  <Box key={controller.id}>
                   <FormControlLabel
-                    key={controller.id}
                     control={
                       <Checkbox
                         checked={selectedControllers.includes(controller.id)}
@@ -910,38 +746,33 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
                       </Box>
                     }
                   />
+                  {/* Show JSON editor inline only when this widget is enabled and has a config fragment */}
+                  {selectedControllers.includes(controller.id) && WIDGET_TOPLEVEL_KEYS[controller.id] && (
+                    <Box sx={{ ml: 4, mb: 1 }}>
+                      {WIDGET_TOPLEVEL_KEYS[controller.id].map(sectionKey => (
+                        (imSwitchConfig as Record<string, unknown>)[sectionKey] !== undefined && (
+                          <Accordion key={sectionKey} disableGutters sx={{ boxShadow: 1 }}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{sectionKey}</Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <ImSwitchJsonEditor
+                                title=""
+                                configKey={sectionKey}
+                                value={(imSwitchConfig as Record<string, unknown>)[sectionKey]}
+                                onChange={handleSectionEdit}
+                                schemaOnly
+                              />
+                            </AccordionDetails>
+                          </Accordion>
+                        )
+                      ))}
+                    </Box>
+                  )}
+                  </Box>
                 );
               })}
             </FormGroup>
-
-            {/* Per-section live JSON editor: lets advanced users tweak the
-                merged configuration before export. Each editable section is
-                shown as a collapsible accordion. */}
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Edit Configuration JSON
-              </Typography>
-              <Typography variant="body2" color="textSecondary" paragraph>
-                Inspect or edit individual configuration sections directly. Click Apply to commit changes.
-              </Typography>
-              {Object.entries(imSwitchConfig)
-                .filter(([k]) => !k.startsWith('_'))
-                .map(([sectionKey, sectionValue]) => (
-                  <Accordion key={sectionKey}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography>{sectionKey}</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <ImSwitchJsonEditor
-                        title=""
-                        configKey={sectionKey}
-                        value={sectionValue}
-                        onChange={handleSectionEdit}
-                      />
-                    </AccordionDetails>
-                  </Accordion>
-                ))}
-            </Box>
           </Box>
         );
 
@@ -993,7 +824,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
                   <AccordionDetails>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       {selectedControllers.map(controllerId => {
-                        const controller = DEFAULT_CONTROLLERS.find(c => c.id === controllerId);
+                        const controller = controllerDatabase.find(c => c.id === controllerId);
                         return (
                           <Chip 
                             key={controllerId} 
