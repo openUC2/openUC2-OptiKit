@@ -564,18 +564,39 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   };
 
   const handleDownload = () => {
-    // Embed the OptiKit layout under a reserved `_optikitConfig` key so the
-    // exported JSON can later be re-imported into OptiKit and used to
-    // reconstruct the same module layout that produced this config.
+    // Build uc2_components in the same format as the standalone OptiKit JSON export
+    // so the file can be re-imported by the OptiKit layout tools.
+    const uc2Components = placedModules.flatMap((pm: PlacedModule, index: number) => {
+      const def = modules.find(m => m.id === pm.moduleId);
+      if (!def) return [];
+      const baseName = def.name.replace(/\s+/g, '_');
+      const runningNumber = index.toString().padStart(2, '0');
+      return [{
+        name: `${baseName}_${runningNumber}`,
+        file: def.autodeskInventor ||
+              `C:\\UC2_Components\\${def.name.replace(/\s+/g, '_')}.iam`,
+        grid_pos: [pm.position.x, pm.position.y, pm.layer] as [number, number, number],
+        rotation: [0, pm.rotation, 0] as [number, number, number],
+        moduleId: pm.moduleId,
+        originalName: def.name,
+        description: def.description,
+        params: pm.params || {},
+        ...(pm.customText ? { customText: pm.customText } : {}),
+      }];
+    });
+
     const exported: ImSwitchConfiguration = {
       ...(imSwitchConfig as ImSwitchConfiguration),
       _optikitConfig: {
         version: '1.0.0',
         exportedAt: new Date().toISOString(),
-        placedModules,
-        moduleDefinitions: modules.filter(m =>
-          placedModules.some((p: PlacedModule) => p.moduleId === m.id),
-        ),
+        uc2_components: uc2Components,
+        annotations: [],
+        metadata: {
+          version: '1.0',
+          created: new Date().toISOString(),
+          software: 'OpenUC2 OptiKit',
+        },
       },
     };
     const configJson = JSON.stringify(exported, null, 2);
@@ -770,30 +791,40 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
               </Box>
             ) : (
               <Box>
-                <Accordion defaultExpanded>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1">Hardware Configuration</Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ pl: 2 }}>
-                      {Object.entries(imSwitchConfig.detectors || {}).length > 0 && (
-                        <Typography variant="body2">
-                          <strong>Detectors:</strong> {Object.keys(imSwitchConfig.detectors || {}).join(', ')}
-                        </Typography>
-                      )}
-                      {Object.entries(imSwitchConfig.lasers || {}).length > 0 && (
-                        <Typography variant="body2">
-                          <strong>Lasers:</strong> {Object.keys(imSwitchConfig.lasers || {}).join(', ')}
-                        </Typography>
-                      )}
-                      {Object.entries(imSwitchConfig.positioners || {}).length > 0 && (
-                        <Typography variant="body2">
-                          <strong>Positioners:</strong> {Object.keys(imSwitchConfig.positioners || {}).join(', ')}
-                        </Typography>
-                      )}
-                    </Box>
-                  </AccordionDetails>
-                </Accordion>
+                {COLLECTION_KEYS.filter(key => {
+                  const col = (imSwitchConfig as Record<string, unknown>)[key];
+                  return col && typeof col === 'object' && Object.keys(col).length > 0;
+                }).map(collectionKey => {
+                  const collection = (imSwitchConfig as Record<string, unknown>)[collectionKey] as Record<string, unknown>;
+                  const label = collectionKey.charAt(0).toUpperCase() + collectionKey.slice(1);
+                  return (
+                    <Accordion key={collectionKey} defaultExpanded>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="subtitle1">{label} ({Object.keys(collection).length})</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        {Object.entries(collection).map(([deviceName, deviceConfig]) => (
+                          <Accordion key={deviceName} disableGutters sx={{ boxShadow: 1, mb: 0.5 }}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{deviceName}</Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <ImSwitchJsonEditor
+                                title=""
+                                configKey={deviceName}
+                                value={deviceConfig}
+                                onChange={(_deviceKey, updated) => {
+                                  handleSectionEdit(collectionKey, { ...collection, [deviceName]: updated });
+                                }}
+                                schemaOnly
+                              />
+                            </AccordionDetails>
+                          </Accordion>
+                        ))}
+                      </AccordionDetails>
+                    </Accordion>
+                  );
+                })}
 
                 <Accordion>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>

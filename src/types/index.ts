@@ -344,13 +344,14 @@ export interface ImSwitchConfiguration {
   _optikitConfig?: {
     version: string;
     exportedAt: string;
-    placedModules: PlacedModule[];
-    moduleDefinitions?: Array<{ id: string; name: string; group: string }>;
+    /** Primary format — same structure as the standalone OptiKit JSON export. */
+    uc2_components: UC2Component[];
     annotations?: Annotation[];
-    metadata?: {
-      projectName?: string;
-      description?: string;
-    };
+    layers?: Layer[];
+    metadata?: Record<string, unknown>;
+    /** Legacy fields kept for backward compatibility. */
+    placedModules?: PlacedModule[];
+    moduleDefinitions?: Array<{ id: string; name: string; group: string }>;
   };
   // Allow widget-specific top-level keys merged from per-widget JSON fragments
   [key: string]: unknown;
