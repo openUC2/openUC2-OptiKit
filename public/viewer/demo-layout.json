@@ -1,0 +1,295 @@
+{
+  "uc2_components": [
+    {
+      "name": "Mirror_00",
+      "file": "ASS - 2020 - CUBMIR45\ufffdTH2 - V04.iam",
+      "grid_pos": [
+        5,
+        6,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "mirror-1x1",
+      "originalName": "Mirror",
+      "description": "Mirror module for beam steering",
+      "params": {
+        "angle": 45
+      }
+    },
+    {
+      "name": "Mirror_01",
+      "file": "ASS - 2020 - CUBMIR45\ufffdTH2 - V04.iam",
+      "grid_pos": [
+        3,
+        6,
+        0
+      ],
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "moduleId": "mirror-1x1",
+      "originalName": "Mirror",
+      "description": "Mirror module for beam steering",
+      "params": {
+        "angle": 45
+      }
+    },
+    {
+      "name": "Basic_Cube_02",
+      "file": "ASS - 2000 - CUB - V04.iam",
+      "grid_pos": [
+        4,
+        6,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "cube-1x1",
+      "originalName": "Basic Cube",
+      "description": "Basic 1x1 cube module for structural support",
+      "params": {
+        "height": 50
+      }
+    },
+    {
+      "name": "Z_Stage_03",
+      "file": "ASS - 3004 - CUBMANSTGR10 - V04.iam",
+      "grid_pos": [
+        2,
+        4,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "stage-z",
+      "originalName": "Z Stage",
+      "description": "Z-axis focus stage",
+      "params": {
+        "range": 10
+      }
+    },
+    {
+      "name": "Basic_Cube_04",
+      "file": "ASS - 2000 - CUB - V04.iam",
+      "grid_pos": [
+        2,
+        6,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "cube-1x1",
+      "originalName": "Basic Cube",
+      "description": "Basic 1x1 cube module for structural support",
+      "params": {
+        "height": 50
+      }
+    },
+    {
+      "name": "Torch_1x1_05",
+      "file": "ASS - 4004 - TOR+BAT.iam",
+      "grid_pos": [
+        3,
+        3,
+        0
+      ],
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "moduleId": "torch-1x1",
+      "originalName": "Torch 1x1",
+      "description": "White LED torch module for general illumination.",
+      "params": {
+        "luminousFlux": 100,
+        "colorTemperature": 5600
+      }
+    },
+    {
+      "name": "Microscope_Objective_4\u00d7_06",
+      "file": "C:\\UC2_Components\\Microscope_Objective_4\u00d7.iam",
+      "grid_pos": [
+        3,
+        5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "objective-4x-1x1",
+      "originalName": "Microscope Objective 4\u00d7",
+      "description": "Achromatic objective for imaging.",
+      "params": {
+        "magnification": 4,
+        "na": 0.25,
+        "wd_mm": 10
+      }
+    },
+    {
+      "name": "Smartphone_Holder_07",
+      "file": "ASS - 4001 - PHNHOL - A.iam",
+      "grid_pos": [
+        5,
+        4,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "phone-holder-1x1",
+      "originalName": "Smartphone Holder",
+      "description": "Smartphone Holder",
+      "params": {}
+    },
+    {
+      "name": "Eyepiece_10\u00d7_08",
+      "file": "ASS - 2025 - CUBEYEPCE - V04.iam",
+      "grid_pos": [
+        5,
+        5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "eyepiece-1x1",
+      "originalName": "Eyepiece 10\u00d7",
+      "description": "10\u00d7 magnification eyepiece for visual inspection.",
+      "params": {
+        "magnification": 10,
+        "fieldOfView": 20
+      }
+    },
+    {
+      "name": "Sample_Holder_1x1_09",
+      "file": "ASS - 2005 - CUBSAMHOL - V03.iam",
+      "grid_pos": [
+        3,
+        4,
+        0
+      ],
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "moduleId": "sampleholder-1x1",
+      "originalName": "Sample Holder 1x1",
+      "description": "Clamp module for holding microscope slides or samples.",
+      "params": {
+        "maxThickness": 2,
+        "clampForce": 1
+      }
+    },
+    {
+      "name": "Basic_Cube_10",
+      "file": "ASS - 2000 - CUB - V04.iam",
+      "grid_pos": [
+        6,
+        6,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "cube-1x1",
+      "originalName": "Basic Cube",
+      "description": "Basic 1x1 cube module for structural support",
+      "params": {
+        "height": 50
+      }
+    },
+    {
+      "name": "Basic_Cube_11",
+      "file": "ASS - 2000 - CUB - V04.iam",
+      "grid_pos": [
+        6,
+        6,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "cube-1x1",
+      "originalName": "Basic Cube",
+      "description": "Basic 1x1 cube module for structural support",
+      "params": {
+        "height": 50
+      }
+    },
+    {
+      "name": "Basic_Cube_12",
+      "file": "ASS - 2000 - CUB - V04.iam",
+      "grid_pos": [
+        6,
+        5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "moduleId": "cube-1x1",
+      "originalName": "Basic Cube",
+      "description": "Basic 1x1 cube module for structural support",
+      "params": {
+        "height": 50
+      }
+    }
+  ],
+  "annotations": [],
+  "layers": [
+    {
+      "id": "layer-0",
+      "name": "Layer 0",
+      "index": 0,
+      "visible": true
+    }
+  ],
+  "name": "FRAME Configuration",
+  "author": "",
+  "githubAccount": "",
+  "description": "Generated by FRAME Wizard",
+  "category": "Microscopy",
+  "screenshot": "",
+  "uc2_verified": false,
+  "version": "1.0.0",
+  "createdAt": "2026-05-18T10:49:15.359Z",
+  "collection": [
+    "Microscopy",
+    "FRAME"
+  ],
+  "notification": "",
+  "metadata": {
+    "version": "1.0",
+    "created": "2026-05-18T11:19:33.127Z",
+    "software": "OpenUC2 OptiKit"
+  }
+}

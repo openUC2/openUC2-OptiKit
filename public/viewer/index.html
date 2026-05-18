@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenUC2 OptiKit Viewer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e4e4e4;
+    --text-muted: #8899aa;
+    --accent: #0f3460;
+    --accent-light: #4a9b8e;
+    --grid-line: rgba(255,255,255,0.06);
+    --grid-line-major: rgba(255,255,255,0.12);
+  }
+  html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  /* Header */
+  #header { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; min-height: 48px; }
+  #header h1 { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  #header .setup-name { font-size: 13px; color: var(--accent-light); font-weight: 500; }
+  .tab-group { display: flex; gap: 2px; background: var(--bg); border-radius: 6px; padding: 2px; }
+  .tab-btn { padding: 5px 16px; border: none; border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; }
+  .tab-btn.active { background: var(--accent); color: #fff; }
+  .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.05); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .status { font-size: 11px; color: var(--text-muted); }
+  .status .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .status .dot.live { background: #4ade80; }
+  .status .dot.static { background: #facc15; }
+  .status .dot.error { background: #f87171; }
+  #component-count { font-size: 11px; color: var(--text-muted); }
+
+  /* Canvas area */
+  #viewer-container { flex: 1; position: relative; overflow: hidden; }
+  #canvas2d, #canvas3d-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #canvas2d { cursor: grab; }
+  #canvas2d:active { cursor: grabbing; }
+  #canvas3d-container { display: none; }
+  #canvas3d-container canvas { width: 100% !important; height: 100% !important; }
+
+  /* Tooltip */
+  #tooltip { position: fixed; pointer-events: none; background: rgba(22,33,62,0.95); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; line-height: 1.5; z-index: 100; display: none; max-width: 240px; backdrop-filter: blur(8px); }
+  #tooltip .tt-name { font-weight: 600; color: var(--accent-light); }
+  #tooltip .tt-detail { color: var(--text-muted); }
+
+  /* Loading overlay */
+  #loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg); z-index: 50; }
+  #loading.hidden { display: none; }
+  #loading p { margin-top: 16px; color: var(--text-muted); font-size: 13px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent-light); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Drop zone */
+  #dropzone { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(15,52,96,0.85); z-index: 60; border: 3px dashed var(--accent-light); margin: 8px; border-radius: 12px; }
+  #dropzone p { font-size: 16px; color: #fff; }
+  #dropzone.active { display: flex; }
+
+  /* Empty state */
+  #empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); }
+  #empty-state.hidden { display: none; }
+  #empty-state p { font-size: 14px; text-align: center; max-width: 400px; line-height: 1.6; }
+  #empty-state code { background: var(--surface); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
+  /* Legend */
+  #legend { position: absolute; bottom: 12px; left: 12px; background: rgba(22,33,62,0.9); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 11px; z-index: 10; backdrop-filter: blur(8px); display: none; max-height: 200px; overflow-y: auto; }
+  #legend.visible { display: block; }
+  #legend h3 { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+  .legend-label { color: var(--text); white-space: nowrap; }
+
+  /* Controls hint */
+  #controls-hint { position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: var(--text-muted); background: rgba(22,33,62,0.9); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(8px); z-index: 10; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>OpenUC2 OptiKit</h1>
+    <span id="setup-name" class="setup-name"></span>
+    <div class="tab-group">
+      <button class="tab-btn active" data-tab="2d">2D</button>
+      <button class="tab-btn" data-tab="3d">3D</button>
+    </div>
+    <div class="header-right">
+      <span id="component-count"></span>
+      <span id="status" class="status"></span>
+    </div>
+  </div>
+  <div id="viewer-container">
+    <canvas id="canvas2d"></canvas>
+    <div id="canvas3d-container"></div>
+    <div id="loading"><div class="spinner"></div><p>Loading layout…</p></div>
+    <div id="empty-state" class="hidden">
+      <p>Drag &amp; drop an OptiKit JSON file here, or load via URL:</p>
+      <p><code>?json=https://example.com/layout.json</code></p>
+    </div>
+    <div id="dropzone"><p>Drop OptiKit JSON file here</p></div>
+    <div id="tooltip"></div>
+    <div id="legend"></div>
+    <div id="controls-hint"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
+
+// ── Grid constants (match src/constants/grid.ts) ───────────────
+const GRID_MM = { x: 50, z: 50, yLayer: 55, baseplate: 5, cube: 50 };
+const DEFAULT_GLB_URL = 'https://raw.githubusercontent.com/openUC2/openUC2-OptiKit-GLBStore/main/models/default/default-cube.glb';
+
+// ── Asset paths ────────────────────────────────────────────────
+// Viewer typically lives at /configurator/viewer/; assets are siblings at /configurator/.
+const BASE_PATH = location.pathname.replace(/\/viewer\/.*$/, '/').replace(/\/+$/, '/');
+const ICONS_PATH = BASE_PATH + 'icons/';
+const CSV_URL = BASE_PATH + 'modules_updated.csv';
+
+// ── Module fallback registry (used until CSV loads, or if CSV fails) ─
+const MODULE_REGISTRY = {
+  'cube-1x1':              { color: '#1e4670', label: 'Cube' },
+  'lens-pos-1x1':          { color: '#7cc142', label: 'Lens+' },
+  'lens-neg-1x1':          { color: '#7cc142', label: 'Lens-' },
+  'lens-asp-1x1':          { color: '#7cc142', label: 'Lens(A)' },
+  'mirror-1x1':            { color: '#4a9b8e', label: 'Mirror' },
+  'beamsplitter-1x1':      { color: '#4a9b8e', label: 'BS' },
+  'led-470nm':             { color: '#2196f3', label: 'LED' },
+  'led-530nm':             { color: '#4caf50', label: 'LED' },
+  'led-625nm':             { color: '#dc3545', label: 'LED' },
+  'filter-bandpass':       { color: '#4a9b8e', label: 'Filter' },
+  'filter-dichroic':       { color: '#6c757d', label: 'Dichroic' },
+  'camera-usb-daheng':     { color: '#343a40', label: 'Camera' },
+  'camera-usb':            { color: '#343a40', label: 'Camera' },
+  'stage-z':               { color: '#495057', label: 'Z Stage' },
+  'stage-z-motorized':     { color: '#495057', label: 'Z Stage(M)' },
+  'laser-405nm':           { color: '#6610f2', label: 'Laser 405' },
+  'laser-488nm':           { color: '#2962ff', label: 'Laser 488' },
+  'laser-532nm':           { color: '#198754', label: 'Laser 532' },
+  'laser-635nm':           { color: '#c62828', label: 'Laser 635' },
+  'photodiode':            { color: '#198754', label: 'PD' },
+  'sampleholder-1x1':      { color: '#8d6e63', label: 'Sample' },
+  'eyepiece-1x1':          { color: '#5c6bc0', label: 'Eyepiece' },
+  'kinematicmirror-1x1':   { color: '#26a69a', label: 'Kin.Mirror' },
+  'kinematicmirror-90-1x1':{ color: '#26a69a', label: 'Kin.M 90' },
+  'torch-1x1':             { color: '#ff9800', label: 'Torch' },
+  'screenholder-1x1':      { color: '#78909c', label: 'Screen' },
+  'objective-4x-1x1':      { color: '#ab47bc', label: 'Obj 4x' },
+  'objective-10x-1x1':     { color: '#ab47bc', label: 'Obj 10x' },
+  'objective-20x-1x1':     { color: '#ab47bc', label: 'Obj 20x' },
+  'tube-lens-1x1':         { color: '#7cc142', label: 'Tube Lens' },
+  'phone-holder-1x1':      { color: '#607d8b', label: 'Phone' },
+  'iris-1x1':              { color: '#78909c', label: 'Iris' },
+  'pinhole-1x1':           { color: '#78909c', label: 'Pinhole' },
+  'polfilter-1x1':         { color: '#9575cd', label: 'Polarizer' },
+  'cube-ledmatrix-1x1':    { color: '#ff7043', label: 'LED Matrix' },
+  'cube-raspicam-2x1':     { color: '#5c6bc0', label: 'RaspiCam' },
+  'galvo-xy':              { color: '#26a69a', label: 'Galvo XY' },
+  'fiber-combiner':        { color: '#6c757d', label: 'Fib.Comb' },
+  'wildcard-1x1':          { color: '#6c757d', label: 'Custom' },
+  'electronics-v3':        { color: '#455a64', label: 'Electronics' },
+  'laser-fcsm-1x1':       { color: '#c62828', label: 'FC Laser' },
+  'aquarium-1x1':          { color: '#0097a7', label: 'Aquarium' },
+  'fluorescent-sample-1x1':{ color: '#66bb6a', label: 'Fluor.Sample' },
+};
+
+function getModuleInfo(moduleId) {
+  const fromCsv = CSV_MODULES[moduleId];
+  const fromHardcoded = MODULE_REGISTRY[moduleId];
+  if (fromCsv) return { ...fromHardcoded, ...fromCsv };
+  return fromHardcoded || { color: '#6c757d', label: moduleId.replace(/-/g, ' ') };
+}
+
+// ── CSV-sourced module data ────────────────────────────────────
+const CSV_MODULES = {}; // moduleId → { color, label, thumbnail, glbUrl, glbOffset:[x,y,z] }
+
+function parseCsvLine(line, delim = ';') {
+  // Tiny CSV parser that respects double-quoted fields
+  const out = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') inQ = false;
+      else cur += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === delim) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+async function loadCsv() {
+  try {
+    const resp = await fetch(CSV_URL);
+    if (!resp.ok) throw new Error(`CSV HTTP ${resp.status}`);
+    const text = await resp.text();
+    const lines = text.split(/\r?\n/);
+    const headers = parseCsvLine(lines[0]);
+    const idx = (n) => headers.indexOf(n);
+    const I = {
+      id: idx('id'), name: idx('name'), color: idx('color'),
+      thumb: idx('thumbnail'), glb: idx('glbUrl'),
+      ox: idx('glbOffsetX'), oy: idx('glbOffsetY'), oz: idx('glbOffsetZ'),
+    };
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      const f = parseCsvLine(lines[i]);
+      const id = f[I.id]; if (!id) continue;
+      const thumb = f[I.thumb] || '';
+      const glb = f[I.glb] || '';
+      CSV_MODULES[id] = {
+        color: f[I.color] || '#6c757d',
+        label: f[I.name] || id,
+        thumbnail: thumb ? (thumb.startsWith('/') ? BASE_PATH + thumb.slice(1) : thumb) : '',
+        glbUrl: glb || '',
+        glbOffset: [parseFloat(f[I.ox]) || 0, parseFloat(f[I.oy]) || 0, parseFloat(f[I.oz]) || 0],
+      };
+    }
+    return true;
+  } catch (e) {
+    console.warn('CSV load failed, using fallback registry:', e);
+    return false;
+  }
+}
+
+// ── Asset caches ───────────────────────────────────────────────
+const iconCache = new Map(); // url → HTMLImageElement | 'loading' | 'failed'
+const gltfLoader = new GLTFLoader();
+const glbCache = new Map(); // url → THREE.Group | 'loading' | 'failed'
+
+function loadIcon(url) {
+  if (!url) return null;
+  const cached = iconCache.get(url);
+  if (cached === 'loading' || cached === 'failed') return null;
+  if (cached) return cached;
+  iconCache.set(url, 'loading');
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => { iconCache.set(url, img); draw2d(); };
+  img.onerror = () => { iconCache.set(url, 'failed'); };
+  img.src = url;
+  return null;
+}
+
+function loadGlb(url, onReady) {
+  if (!url) { onReady(null); return; }
+  const cached = glbCache.get(url);
+  if (cached && cached !== 'loading' && cached !== 'failed') { onReady(cached); return; }
+  if (cached === 'failed') { onReady(null); return; }
+  if (cached === 'loading') {
+    setTimeout(() => loadGlb(url, onReady), 100);
+    return;
+  }
+  glbCache.set(url, 'loading');
+  gltfLoader.load(
+    url,
+    (gltf) => { glbCache.set(url, gltf.scene); onReady(gltf.scene); },
+    undefined,
+    (err) => { console.warn('GLB load failed:', url, err.message || err); glbCache.set(url, 'failed'); onReady(null); }
+  );
+}
+
+// ── State ──────────────────────────────────────────────────────
+let layout = null;
+let activeTab = '2d';
+let jsonUrl = null;
+let pollInterval = null;
+let lastJsonHash = '';
+
+// 2D state
+const view2d = { x: 0, y: 0, zoom: 1 };
+let dragging = false;
+let dragStart = { x: 0, y: 0 };
+let hoveredComponent = null;
+
+// 3D state
+let scene3d, camera3d, renderer3d, controls3d;
+let cubeGroup3d = null;
+let threeInitialized = false;
+
+const CELL = 50;
+
+// ── DOM refs ───────────────────────────────────────────────────
+const canvas2d = document.getElementById('canvas2d');
+const ctx = canvas2d.getContext('2d');
+const container3d = document.getElementById('canvas3d-container');
+const loading = document.getElementById('loading');
+const emptyState = document.getElementById('empty-state');
+const tooltip = document.getElementById('tooltip');
+const legend = document.getElementById('legend');
+const statusEl = document.getElementById('status');
+const setupNameEl = document.getElementById('setup-name');
+const componentCountEl = document.getElementById('component-count');
+const controlsHint = document.getElementById('controls-hint');
+const dropzone = document.getElementById('dropzone');
+
+// ── Tabs ───────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    canvas2d.style.display = activeTab === '2d' ? 'block' : 'none';
+    container3d.style.display = activeTab === '3d' ? 'block' : 'none';
+    controlsHint.textContent = activeTab === '2d'
+      ? 'Drag to pan · Scroll to zoom · Hover for details'
+      : 'Drag to orbit · Scroll to zoom · Right-drag to pan';
+    if (activeTab === '2d') draw2d();
+    if (activeTab === '3d' && layout) init3d();
+  });
+});
+
+// ── JSON loading ───────────────────────────────────────────────
+function simpleHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return h.toString(36);
+}
+
+async function loadFromUrl(url) {
+  try {
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    const hash = simpleHash(text);
+    if (hash === lastJsonHash) return false;
+    lastJsonHash = hash;
+    const data = JSON.parse(text);
+    setLayout(data);
+    setStatus('live', `Polling ${new URL(url, location.href).hostname}`);
+    return true;
+  } catch (e) {
+    console.error('Load error:', e);
+    setStatus('error', e.message);
+    return false;
+  }
+}
+
+function loadFromData(base64) {
+  try {
+    const json = atob(base64);
+    const data = JSON.parse(json);
+    setLayout(data);
+    setStatus('static', 'Loaded from data');
+    return true;
+  } catch (e) {
+    console.error('Parse error:', e);
+    setStatus('error', 'Invalid data');
+    return false;
+  }
+}
+
+function loadFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      setLayout(data);
+      setStatus('static', 'Loaded from file');
+    } catch (e) {
+      setStatus('error', 'Invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function setLayout(data) {
+  layout = data;
+  loading.classList.add('hidden');
+  emptyState.classList.add('hidden');
+
+  const name = data.name || data.metadata?.name || '';
+  setupNameEl.textContent = name;
+  document.title = name ? `${name} — OptiKit Viewer` : 'OptiKit Viewer';
+
+  const count = (data.uc2_components || []).length;
+  componentCountEl.textContent = `${count} component${count !== 1 ? 's' : ''}`;
+
+  buildLegend(data.uc2_components || []);
+  draw2d();
+  if (activeTab === '3d') init3d();
+  else if (threeInitialized) rebuild3d();
+}
+
+function setStatus(type, text) {
+  statusEl.innerHTML = `<span class="dot ${type}"></span>${text}`;
+}
+
+// ── Auto-refresh polling ───────────────────────────────────────
+function startPolling(url, intervalMs = 5000) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(() => loadFromUrl(url), intervalMs);
+}
+
+// ── Init from URL params ───────────────────────────────────────
+(async function init() {
+  const params = new URLSearchParams(location.search);
+  const url = params.get('json') || params.get('url');
+  const data = params.get('data');
+  const interval = parseInt(params.get('interval') || '5000', 10);
+
+  controlsHint.textContent = 'Drag to pan · Scroll to zoom · Hover for details';
+  resizeCanvas2d();
+
+  // Load CSV for icons/GLBs/colors (best-effort; viewer still works if it fails)
+  await loadCsv();
+
+  if (url) {
+    jsonUrl = url;
+    await loadFromUrl(url);
+    startPolling(url, Math.max(interval, 1000));
+  } else if (data) {
+    loadFromData(data);
+    loading.classList.add('hidden');
+  } else {
+    loading.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+  }
+})();
+
+// ── Legend ──────────────────────────────────────────────────────
+function buildLegend(components) {
+  const seen = new Map();
+  for (const c of components) {
+    if (!seen.has(c.moduleId)) {
+      const info = getModuleInfo(c.moduleId);
+      seen.set(c.moduleId, { color: info.color, name: c.originalName || info.label });
+    }
+  }
+  if (seen.size === 0) { legend.classList.remove('visible'); return; }
+  let html = '<h3>Components</h3>';
+  for (const [, { color, name }] of seen) {
+    html += `<div class="legend-item"><div class="legend-swatch" style="background:${color}"></div><span class="legend-label">${name}</span></div>`;
+  }
+  legend.innerHTML = html;
+  legend.classList.add('visible');
+}
+
+// ── 2D Canvas ──────────────────────────────────────────────────
+function resizeCanvas2d() {
+  const r = canvas2d.parentElement.getBoundingClientRect();
+  canvas2d.width = r.width * devicePixelRatio;
+  canvas2d.height = r.height * devicePixelRatio;
+  canvas2d.style.width = r.width + 'px';
+  canvas2d.style.height = r.height + 'px';
+  draw2d();
+}
+window.addEventListener('resize', () => {
+  resizeCanvas2d();
+  if (threeInitialized) resize3d();
+});
+
+function worldToScreen(wx, wy) {
+  const cw = canvas2d.width / devicePixelRatio;
+  const ch = canvas2d.height / devicePixelRatio;
+  return {
+    x: (wx + view2d.x) * view2d.zoom + cw / 2,
+    y: (wy + view2d.y) * view2d.zoom + ch / 2
+  };
+}
+function screenToWorld(sx, sy) {
+  const cw = canvas2d.width / devicePixelRatio;
+  const ch = canvas2d.height / devicePixelRatio;
+  return {
+    x: (sx - cw / 2) / view2d.zoom - view2d.x,
+    y: (sy - ch / 2) / view2d.zoom - view2d.y
+  };
+}
+
+function draw2d() {
+  if (activeTab !== '2d') return;
+  const dpr = devicePixelRatio;
+  const W = canvas2d.width;
+  const H = canvas2d.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(0, 0, W, H);
+
+  const cw = W / dpr;
+  const ch = H / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.save();
+  ctx.translate(cw / 2, ch / 2);
+  ctx.scale(view2d.zoom, view2d.zoom);
+  ctx.translate(view2d.x, view2d.y);
+
+  if (!layout || !(layout.uc2_components || []).length) {
+    ctx.restore();
+    return;
+  }
+  const components = layout.uc2_components;
+
+  // Compute bounds
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of components) {
+    const [gx, gy] = c.grid_pos;
+    minX = Math.min(minX, gx); minY = Math.min(minY, gy);
+    maxX = Math.max(maxX, gx); maxY = Math.max(maxY, gy);
+  }
+  const pad = 2;
+  const gx0 = minX - pad, gy0 = minY - pad;
+  const gx1 = maxX + pad + 1, gy1 = maxY + pad + 1;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 0.5 / view2d.zoom;
+  for (let x = gx0; x <= gx1; x++) {
+    ctx.beginPath(); ctx.moveTo(x * CELL, gy0 * CELL); ctx.lineTo(x * CELL, gy1 * CELL); ctx.stroke();
+  }
+  for (let y = gy0; y <= gy1; y++) {
+    ctx.beginPath(); ctx.moveTo(gx0 * CELL, y * CELL); ctx.lineTo(gx1 * CELL, y * CELL); ctx.stroke();
+  }
+
+  // Major grid every 5
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1 / view2d.zoom;
+  for (let x = Math.floor(gx0 / 5) * 5; x <= gx1; x += 5) {
+    ctx.beginPath(); ctx.moveTo(x * CELL, gy0 * CELL); ctx.lineTo(x * CELL, gy1 * CELL); ctx.stroke();
+  }
+  for (let y = Math.floor(gy0 / 5) * 5; y <= gy1; y += 5) {
+    ctx.beginPath(); ctx.moveTo(gx0 * CELL, y * CELL); ctx.lineTo(gx1 * CELL, y * CELL); ctx.stroke();
+  }
+
+  // Draw components
+  for (const c of components) {
+    const [gx, gy] = c.grid_pos;
+    const info = getModuleInfo(c.moduleId);
+    const px = gx * CELL;
+    const py = gy * CELL;
+    const rotY = (c.rotation && c.rotation[1]) || 0;
+
+    ctx.save();
+    ctx.translate(px + CELL / 2, py + CELL / 2);
+    ctx.rotate((rotY * Math.PI) / 180);
+
+    // Cube body
+    const s = CELL - 4;
+    ctx.fillStyle = info.color;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.roundRect(-s / 2, -s / 2, s, s, 4);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Border
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.5 / view2d.zoom;
+    ctx.stroke();
+
+    // Highlight hovered
+    if (hoveredComponent === c) {
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = 2.5 / view2d.zoom;
+      ctx.stroke();
+    }
+
+    // SVG icon overlay (if available from CSV)
+    const iconUrl = info.thumbnail;
+    if (iconUrl) {
+      const icon = loadIcon(iconUrl);
+      if (icon) {
+        const ip = s * 0.85;
+        ctx.globalAlpha = 0.95;
+        try { ctx.drawImage(icon, -ip / 2, -ip / 2, ip, ip); } catch {}
+        ctx.globalAlpha = 1;
+      } else {
+        // Fallback: show rotation arrow while icon loads / if missing
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 1.5 / view2d.zoom;
+        const arrowLen = s * 0.3;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -arrowLen); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -arrowLen);
+        ctx.lineTo(-3, -arrowLen + 6);
+        ctx.lineTo(3, -arrowLen + 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5 / view2d.zoom;
+      const arrowLen = s * 0.3;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -arrowLen); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -arrowLen);
+      ctx.lineTo(-3, -arrowLen + 6);
+      ctx.lineTo(3, -arrowLen + 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Label
+    const fontSize = Math.max(8, Math.min(11, 11 / view2d.zoom));
+    ctx.font = `500 ${fontSize}px -apple-system, sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(info.label, px + CELL / 2, py + CELL + 2);
+  }
+
+  // Origin crosshair
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1 / view2d.zoom;
+  ctx.setLineDash([4 / view2d.zoom, 4 / view2d.zoom]);
+  ctx.beginPath(); ctx.moveTo(-500, 0); ctx.lineTo(500, 0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -500); ctx.lineTo(0, 500); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.restore();
+}
+
+// Auto-fit view to layout
+function fitView2d() {
+  if (!layout || !(layout.uc2_components || []).length) return;
+  const components = layout.uc2_components;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of components) {
+    const [gx, gy] = c.grid_pos;
+    minX = Math.min(minX, gx * CELL); minY = Math.min(minY, gy * CELL);
+    maxX = Math.max(maxX, (gx + 1) * CELL); maxY = Math.max(maxY, (gy + 1) * CELL);
+  }
+  const cw = canvas2d.width / devicePixelRatio;
+  const ch = canvas2d.height / devicePixelRatio;
+  const bw = maxX - minX + CELL * 4;
+  const bh = maxY - minY + CELL * 4;
+  view2d.zoom = Math.min(cw / bw, ch / bh, 3);
+  view2d.x = -(minX + maxX) / 2;
+  view2d.y = -(minY + maxY) / 2;
+  draw2d();
+}
+
+// Fit on first load
+const origSetLayout = setLayout;
+setLayout = function(data) {
+  const firstLoad = !layout;
+  origSetLayout(data);
+  if (firstLoad) fitView2d();
+};
+
+// ── 2D interaction: pan, zoom, hover ───────────────────────────
+canvas2d.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  dragging = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  canvas2d.setPointerCapture(e.pointerId);
+});
+canvas2d.addEventListener('pointermove', (e) => {
+  if (dragging) {
+    const dx = (e.clientX - dragStart.x) / view2d.zoom;
+    const dy = (e.clientY - dragStart.y) / view2d.zoom;
+    view2d.x += dx;
+    view2d.y += dy;
+    dragStart = { x: e.clientX, y: e.clientY };
+    draw2d();
+    tooltip.style.display = 'none';
+    return;
+  }
+  // Hover detection
+  if (!layout) return;
+  const rect = canvas2d.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const world = screenToWorld(sx, sy);
+
+  let found = null;
+  for (const c of layout.uc2_components || []) {
+    const [gx, gy] = c.grid_pos;
+    const px = gx * CELL;
+    const py = gy * CELL;
+    if (world.x >= px && world.x < px + CELL && world.y >= py && world.y < py + CELL) {
+      found = c;
+      break;
+    }
+  }
+  if (found !== hoveredComponent) {
+    hoveredComponent = found;
+    draw2d();
+  }
+  if (found) {
+    const info = getModuleInfo(found.moduleId);
+    const rotY = (found.rotation && found.rotation[1]) || 0;
+    tooltip.innerHTML = `
+      <div class="tt-name">${found.originalName || found.name}</div>
+      <div class="tt-detail">ID: ${found.moduleId}</div>
+      <div class="tt-detail">Grid: [${found.grid_pos.join(', ')}]</div>
+      ${rotY ? `<div class="tt-detail">Rotation: ${rotY}°</div>` : ''}
+      ${found.description ? `<div class="tt-detail">${found.description}</div>` : ''}
+    `;
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY + 14) + 'px';
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+canvas2d.addEventListener('pointerup', () => { dragging = false; });
+canvas2d.addEventListener('pointerleave', () => {
+  dragging = false;
+  hoveredComponent = null;
+  tooltip.style.display = 'none';
+  draw2d();
+});
+canvas2d.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const rect = canvas2d.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const before = screenToWorld(sx, sy);
+  view2d.zoom = Math.min(Math.max(view2d.zoom * factor, 0.1), 20);
+  const after = screenToWorld(sx, sy);
+  view2d.x += after.x - before.x;
+  view2d.y += after.y - before.y;
+  draw2d();
+}, { passive: false });
+
+// Double-click to fit
+canvas2d.addEventListener('dblclick', () => fitView2d());
+
+// ── 3D Scene ───────────────────────────────────────────────────
+function init3d() {
+  if (threeInitialized) { rebuild3d(); return; }
+  threeInitialized = true;
+
+  scene3d = new THREE.Scene();
+  scene3d.background = new THREE.Color('#111827');
+
+  camera3d = new THREE.PerspectiveCamera(50, container3d.clientWidth / container3d.clientHeight, 1, 5000);
+  camera3d.position.set(300, 400, 500);
+
+  renderer3d = new THREE.WebGLRenderer({ antialias: true });
+  renderer3d.setPixelRatio(devicePixelRatio);
+  renderer3d.setSize(container3d.clientWidth, container3d.clientHeight);
+  renderer3d.shadowMap.enabled = true;
+  container3d.appendChild(renderer3d.domElement);
+
+  controls3d = new OrbitControls(camera3d, renderer3d.domElement);
+  controls3d.enableDamping = true;
+  controls3d.dampingFactor = 0.08;
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  scene3d.add(ambient);
+  const dir = new THREE.DirectionalLight(0xffffff, 1);
+  dir.position.set(200, 400, 300);
+  dir.castShadow = true;
+  scene3d.add(dir);
+  const hemi = new THREE.HemisphereLight(0x87ceeb, 0x362d1b, 0.3);
+  scene3d.add(hemi);
+
+  rebuild3d();
+  animate3d();
+}
+
+function makeFallbackCube(info, glbOffset) {
+  // Default colored cube used when no GLB is available
+  const cubeGeo = new THREE.BoxGeometry(GRID_MM.cube, GRID_MM.cube, GRID_MM.cube);
+  const color = new THREE.Color(info.color);
+  const mat = new THREE.MeshStandardMaterial({
+    color, roughness: 0.4, metalness: 0.1, transparent: true, opacity: 0.85
+  });
+  const mesh = new THREE.Mesh(cubeGeo, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(cubeGeo),
+    new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.25, transparent: true })
+  );
+  mesh.add(edge);
+
+  // Direction indicator on front face
+  const coneGeo = new THREE.ConeGeometry(4, 10, 8);
+  const coneMat = new THREE.MeshStandardMaterial({ color: 0xffffff, opacity: 0.5, transparent: true });
+  const cone = new THREE.Mesh(coneGeo, coneMat);
+  cone.position.set(0, 0, -GRID_MM.cube / 2 + 2);
+  cone.rotation.x = -Math.PI / 2;
+  mesh.add(cone);
+
+  // Y-position cube center above baseplate
+  mesh.position.set(0, GRID_MM.cube / 2, 0);
+  const wrapper = new THREE.Group();
+  if (glbOffset && (glbOffset[0] || glbOffset[1] || glbOffset[2])) {
+    mesh.position.x += glbOffset[0];
+    mesh.position.y += glbOffset[1];
+    mesh.position.z += glbOffset[2];
+  }
+  wrapper.add(mesh);
+  return wrapper;
+}
+
+function rebuild3d() {
+  if (!threeInitialized || !layout) return;
+  if (cubeGroup3d) scene3d.remove(cubeGroup3d);
+  cubeGroup3d = new THREE.Group();
+
+  const components = layout.uc2_components || [];
+  if (!components.length) return;
+
+  // Compute bounds for camera framing and baseplate
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of components) {
+    minX = Math.min(minX, c.grid_pos[0]); minY = Math.min(minY, c.grid_pos[1]);
+    maxX = Math.max(maxX, c.grid_pos[0]); maxY = Math.max(maxY, c.grid_pos[1]);
+  }
+  const cx = ((minX + maxX) / 2 + 0.5) * GRID_MM.x;
+  const cz = ((minY + maxY) / 2 + 0.5) * GRID_MM.z;
+  const span = Math.max(maxX - minX, maxY - minY) + 6;
+
+  // Grid helper at baseplate level
+  const gridHelper = new THREE.GridHelper(span * GRID_MM.x, span, 0x444466, 0x222244);
+  gridHelper.position.set(cx, 0, cz);
+  cubeGroup3d.add(gridHelper);
+
+  // Baseplate
+  const plateGeo = new THREE.BoxGeometry((maxX - minX + 3) * GRID_MM.x, GRID_MM.baseplate, (maxY - minY + 3) * GRID_MM.z);
+  const plateMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, transparent: true, opacity: 0.6 });
+  const plate = new THREE.Mesh(plateGeo, plateMat);
+  plate.position.set(cx, GRID_MM.baseplate / 2, cz);
+  plate.receiveShadow = true;
+  cubeGroup3d.add(plate);
+
+  // Each component: try GLB, fallback to colored cube
+  for (const c of components) {
+    const info = getModuleInfo(c.moduleId);
+    const [gx, gy, gz] = c.grid_pos;
+    const rotY = (c.rotation && c.rotation[1]) || 0;
+    const layer = gz || 0;
+
+    // Outer group: world position + Y-axis rotation (matches main app's coords)
+    const outer = new THREE.Group();
+    outer.position.set(
+      gx * GRID_MM.x + GRID_MM.x / 2,
+      layer * GRID_MM.yLayer + GRID_MM.baseplate,
+      gy * GRID_MM.z + GRID_MM.z / 2,
+    );
+    outer.rotation.y = (-rotY * Math.PI) / 180;
+    outer.userData = c;
+    cubeGroup3d.add(outer);
+
+    // Start with fallback, swap to GLB when loaded
+    const fallback = makeFallbackCube(info, info.glbOffset);
+    outer.add(fallback);
+
+    const glbUrl = info.glbUrl;
+    if (glbUrl) {
+      loadGlb(glbUrl, (scene) => {
+        if (!scene) return; // keep fallback on failure
+        // Only swap if this outer is still in the scene
+        if (!outer.parent) return;
+        outer.remove(fallback);
+        const cloned = skeletonClone(scene);
+        const wrapper = new THREE.Group();
+        const off = info.glbOffset || [0, 0, 0];
+        wrapper.position.set(off[0], off[1] + GRID_MM.cube / 2, off[2]);
+        wrapper.add(cloned);
+        // Improve shadow casting on the loaded model
+        cloned.traverse(obj => { if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; } });
+        outer.add(wrapper);
+      });
+    }
+  }
+
+  scene3d.add(cubeGroup3d);
+
+  // Camera framing
+  controls3d.target.set(cx, GRID_MM.cube / 2, cz);
+  camera3d.position.set(cx + span * 28, span * 32, cz + span * 28);
+  controls3d.update();
+}
+
+function resize3d() {
+  if (!threeInitialized) return;
+  camera3d.aspect = container3d.clientWidth / container3d.clientHeight;
+  camera3d.updateProjectionMatrix();
+  renderer3d.setSize(container3d.clientWidth, container3d.clientHeight);
+}
+
+function animate3d() {
+  requestAnimationFrame(animate3d);
+  if (activeTab !== '3d' || !threeInitialized) return;
+  controls3d.update();
+  renderer3d.render(scene3d, camera3d);
+}
+
+// ── Drag & drop ────────────────────────────────────────────────
+document.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('active'); });
+document.addEventListener('dragleave', (e) => {
+  if (e.relatedTarget === null || !document.contains(e.relatedTarget)) dropzone.classList.remove('active');
+});
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('active');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.json')) loadFromFile(file);
+});
+
+// ── Keyboard shortcuts ─────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'f' || e.key === 'F') fitView2d();
+  if (e.key === '2') document.querySelector('[data-tab="2d"]').click();
+  if (e.key === '3') document.querySelector('[data-tab="3d"]').click();
+});
+
+// ── Window message API for iframe communication ────────────────
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'optikit-load') {
+    if (e.data.json) {
+      setLayout(e.data.json);
+      setStatus('static', 'Loaded via postMessage');
+    } else if (e.data.url) {
+      jsonUrl = e.data.url;
+      loadFromUrl(e.data.url);
+      startPolling(e.data.url);
+    }
+  }
+});
+</script>
+</body>
+</html>

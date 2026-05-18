@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OptiKit Viewer — Embedding Examples</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 40px 20px; color: #1a1a2e; line-height: 1.6; }
+  h1 { font-size: 24px; margin-bottom: 8px; }
+  h2 { font-size: 18px; margin-top: 40px; margin-bottom: 12px; color: #0f3460; }
+  p { color: #555; margin-bottom: 12px; }
+  code { background: #f0f4f8; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  pre { background: #1a1a2e; color: #e4e4e4; padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 12px 0 24px; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .tag { color: #4a9b8e; }
+  .attr { color: #7cc142; }
+  .str { color: #f0a030; }
+  .comment { color: #6c757d; }
+
+  .demo-frame { border: 1px solid #dde; border-radius: 8px; overflow: hidden; margin: 16px 0 32px; }
+  .demo-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+
+  hr { border: none; border-top: 1px solid #eee; margin: 40px 0; }
+
+  .api-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  .api-table th, .api-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .api-table th { background: #f8f9fa; font-weight: 600; }
+  .api-table code { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>OpenUC2 OptiKit Embedded Viewer</h1>
+<p>Interactive 2D/3D viewer for OptiKit cube arrangements. Embed it in any documentation site, wiki, or web page.</p>
+
+<hr>
+
+<h2>1. Basic iframe Embed</h2>
+<p>Point the <code>?json=</code> parameter to any hosted OptiKit layout JSON file:</p>
+
+<pre><code><span class="tag">&lt;iframe</span>
+  <span class="attr">src</span>=<span class="str">"https://youseetoo.github.io/configurator/viewer/?json=https://example.com/my-layout.json"</span>
+  <span class="attr">width</span>=<span class="str">"100%"</span>
+  <span class="attr">height</span>=<span class="str">"500"</span>
+  <span class="attr">frameborder</span>=<span class="str">"0"</span>
+  <span class="attr">style</span>=<span class="str">"border-radius: 8px; border: 1px solid #ddd;"</span>
+<span class="tag">&gt;&lt;/iframe&gt;</span></code></pre>
+
+<p class="demo-label">Live demo (loading the bundled demo layout):</p>
+<div class="demo-frame">
+  <iframe
+    src="index.html?json=demo-layout.json"
+    width="100%"
+    height="500"
+    frameborder="0"
+  ></iframe>
+</div>
+
+<h2>2. With Custom Polling Interval</h2>
+<p>Set <code>?interval=</code> (in ms) to control how often the viewer re-fetches the JSON. Default is 5000ms.</p>
+
+<pre><code><span class="tag">&lt;iframe</span>
+  <span class="attr">src</span>=<span class="str">"https://youseetoo.github.io/configurator/viewer/?json=URL&amp;interval=2000"</span>
+  <span class="attr">width</span>=<span class="str">"100%"</span>
+  <span class="attr">height</span>=<span class="str">"500"</span>
+  <span class="attr">frameborder</span>=<span class="str">"0"</span>
+<span class="tag">&gt;&lt;/iframe&gt;</span></code></pre>
+
+<h2>3. Inline Data (no server needed)</h2>
+<p>Base64-encode the JSON and pass it via <code>?data=</code>. Useful for static docs or when you don't want to host a JSON file.</p>
+
+<pre><code><span class="comment">// In JavaScript:</span>
+const layout = { uc2_components: [...] };
+const encoded = btoa(JSON.stringify(layout));
+const src = `https://youseetoo.github.io/configurator/viewer/?data=${encoded}`;
+iframe.src = src;</code></pre>
+
+<h2>4. Dynamic Updates via postMessage</h2>
+<p>Push new layouts to the viewer at runtime without reloading. Useful for apps that generate/modify layouts dynamically.</p>
+
+<pre><code><span class="comment">// Send a layout object directly:</span>
+const iframe = document.getElementById('optikit-viewer');
+iframe.contentWindow.postMessage({
+  type: 'optikit-load',
+  json: { uc2_components: [...], name: 'My Setup' }
+}, '*');
+
+<span class="comment">// Or tell it to poll a new URL:</span>
+iframe.contentWindow.postMessage({
+  type: 'optikit-load',
+  url: 'https://example.com/updated-layout.json'
+}, '*');</code></pre>
+
+<hr>
+
+<h2>URL Parameters Reference</h2>
+<table class="api-table">
+  <thead>
+    <tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>json</code></td><td>URL</td><td>URL to an OptiKit layout JSON file. Viewer polls this for changes.</td></tr>
+    <tr><td><code>data</code></td><td>Base64</td><td>Base64-encoded JSON layout (static, no polling).</td></tr>
+    <tr><td><code>interval</code></td><td>Number</td><td>Polling interval in ms (default: 5000, min: 1000).</td></tr>
+  </tbody>
+</table>
+
+<h2>Keyboard Shortcuts</h2>
+<table class="api-table">
+  <thead>
+    <tr><th>Key</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>2</code></td><td>Switch to 2D view</td></tr>
+    <tr><td><code>3</code></td><td>Switch to 3D view</td></tr>
+    <tr><td><code>F</code></td><td>Fit view to layout</td></tr>
+    <tr><td>Double-click</td><td>Fit view (2D)</td></tr>
+  </tbody>
+</table>
+
+<h2>JSON Format</h2>
+<p>The viewer reads the standard OptiKit export format. Minimum required structure:</p>
+
+<pre><code>{
+  "name": "My Setup",
+  "uc2_components": [
+    {
+      "moduleId": "mirror-1x1",
+      "originalName": "Mirror",
+      "grid_pos": [3, 4, 0],
+      "rotation": [0, 90, 0],
+      "description": "45° beam steering mirror"
+    }
+  ]
+}</code></pre>
+
+<p>Each component needs <code>moduleId</code>, <code>grid_pos</code> <code>[x, y, layer]</code>, and <code>rotation</code> <code>[rx, ry, rz]</code>.
+The <code>ry</code> value (Y-axis rotation) determines the facing direction in the viewer.</p>
+
+</body>
+</html>
