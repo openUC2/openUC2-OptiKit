@@ -1,0 +1,48 @@
+- need a per module affine matrix that we attach to optikit-layout-optikit.json and have to generate from the optikit 
+- need a link to openUC2-optikit-modules or public/optics/<moduleId>.json - in the end we need to map that through modules_updated.csv? 
+- Add three columns at the end of the existing CSV (kept additive so the
+React loader and Conversion3D don't break)
+
+
+
+
+
+
+
+does the 3D grid actually match the one in the 2d Layout? The rays are placed at an off-center position
+
+
+
+changing the arrangement/state in 2D layout has (at least translationally) an effect on the 3D layout but not vice versa; Changing something in the 3D (position/orientation)
+
+The context menu in the right hand side should be the same for the 2D and 3D  - should also be callapsable
+
+Is there a way to cache the glb files once loaded? 
+
+The grid overlay in the 3D looks bigger then 50mm
+
+we would need add puzzle pieces on top/below every cube module which is named PRT_-_1004_-_PUZ11_-_V04_-_A.glb it's the puzzle piece that connects multiple modules between layers and is 5mm high and has 50x50mm width (x/y)
+
+we should change the upper bar so that we have dropdown menus e.g. file=>save, import, etc. similar to word. 
+
+Inventor coordinate system is XY plane z height, three s is xz plane y height, Optiland? Mirror is wrong in physical drawing, principle plane no effect, move source XYZ, generally: implement an additional state per physical model dxyz, drxyz for everything so that we can change it
+
+Make docs subpage like oshpark
+
+Link to openUC2 markdown 
+
+
+- the offset in z is not reall working as intended, should be relative inside the cube?
+            z_running += gap # TODO: Is this correct? We want to only move the lens inside the cube not everythiing afterwards 
+
+
+
+export the optiland symbols as the phyiscal overlays into the optikit representation so that we can see if the coordinate ystems match
+
+
+- Think about the puzzle pieces 50 vs 55mm -> also integrate them in between layers 
+
+
+converter to lasercad
+
+Reimport imSwitch not working
