@@ -28,16 +28,22 @@ import { FluorescenceStep } from './frameWizard/FluorescenceStep';
 import { CameraStep } from './frameWizard/CameraStep';
 import { SampleHolderStep } from './frameWizard/SampleHolderStep';
 import { SummaryQuoteStep } from './frameWizard/SummaryQuoteStep';
+import { AutofocusStep } from './frameWizard/AutofocusStep';
+import { OverviewCameraStep } from './frameWizard/OverviewCameraStep';
+import { ControlInputsStep } from './frameWizard/ControlInputsStep';
 import { FramePreview } from './frameWizard/FramePreview';
 import { PresetSelector } from './frameWizard/PresetSelector';
 
-// WP1: new 7-step tab order.
+// 11-step tab order.
 const STEP_LABELS = [
   'Objective Changer',
   'Objectives',
   'Illumination',
   'Fluorescence',
   'Camera',
+  'Autofocus',
+  'Overview Camera',
+  'Control Inputs',
   'Sample Holders',
   'Summary & Quote',
 ];
@@ -115,13 +121,16 @@ export function FrameWizardPage() {
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0: return <ObjectiveChangerStep />;
-      case 1: return <ObjectiveStep />;
-      case 2: return <IlluminationStep />;
-      case 3: return <FluorescenceStep />;
-      case 4: return <CameraStep />;
-      case 5: return <SampleHolderStep />;
-      case 6: return <SummaryQuoteStep onOpenInEditor={handleOpenInCanvas} />;
+      case 0:  return <ObjectiveChangerStep />;
+      case 1:  return <ObjectiveStep />;
+      case 2:  return <IlluminationStep />;
+      case 3:  return <FluorescenceStep />;
+      case 4:  return <CameraStep />;
+      case 5:  return <AutofocusStep />;
+      case 6:  return <OverviewCameraStep />;
+      case 7:  return <ControlInputsStep />;
+      case 8:  return <SampleHolderStep />;
+      case 9: return <SummaryQuoteStep onOpenInEditor={handleOpenInCanvas} />;
       default: return null;
     }
   };

@@ -80,6 +80,9 @@ export interface FluorescenceOption {
 // --- WP2: Objective changer ---
 export type ObjectiveChangerChoice = 'single' | '2-position';
 
+// --- Autofocus ---
+export type AutofocusChoice = 'laser-astigmatism' | 'image-contrast' | 'none';
+
 // --- WP4: Illumination ---
 export type LightSourceChoice = 'single-led' | 'complex-setup';
 export type CondenserChoice = 'abbe' | 'aspherical-25' | 'aspherical-8-ph';
@@ -110,6 +113,8 @@ export interface FrameWizardState {
   // Step 2: Objective lenses
   primaryObjective: string | null;
   secondaryObjective: string | null;
+  // Step 3: Motorized revolver
+  hasRevolver: boolean;
   // Step 3: Illumination (WP4)
   lightSource: LightSourceChoice;
   condenser: CondenserChoice;
@@ -121,7 +126,13 @@ export interface FrameWizardState {
   fluorescenceChannels: string[];
   // Step 5: Camera
   selectedCamera: string | null;
-  // Step 6: Sample holder (WP7)
+  // Step 6: Autofocus
+  autofocus: AutofocusChoice;
+  // Step 7: Overview camera
+  hasOverviewCamera: boolean;
+  // Step 8: Control inputs
+  controlInputs: string[];
+  // Step 9: Sample holder (WP7)
   sampleHolder: SampleHolderChoice;
   customSampleHolderNotes: string;
   // Step 7: Summary / Quote (WP8)

@@ -43,8 +43,8 @@ interface FrameWizardStore {
   computeNyquist: () => NyquistResult | null;
 }
 
-// WP1: 7 steps total
-export const TOTAL_STEPS = 7;
+// 11 steps: Changer → Objectives → Revolver → Illumination → Fluorescence → Camera → Autofocus → Overview Camera → Control Inputs → Sample Holders → Summary
+export const TOTAL_STEPS = 11;
 
 // Fixed tube lens used in all configurations (Olympus infinity correction, 180 mm).
 const FIXED_TUBE_LENS_FL_MM = 180;
@@ -87,6 +87,7 @@ const defaultWizardState: FrameWizardState = {
   objectiveChanger: 'single',
   primaryObjective: null,
   secondaryObjective: null,
+  hasRevolver: false,
   lightSource: 'single-led',
   condenser: 'abbe',
   brightfieldModes: ['bf-only'],
@@ -95,6 +96,9 @@ const defaultWizardState: FrameWizardState = {
   dichroic: 'none',
   fluorescenceChannels: [],
   selectedCamera: null,
+  autofocus: 'none',
+  hasOverviewCamera: false,
+  controlInputs: [],
   sampleHolder: 'none',
   customSampleHolderNotes: '',
   fieldOfApplication: '',
