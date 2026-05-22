@@ -1,184 +1,111 @@
-import { useState } from 'react';
 import {
   Box,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Radio,
-  Paper,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Card,
+  CardActionArea,
+  CardContent,
   Chip,
   Alert,
-  Tooltip,
-  IconButton,
+  Divider,
 } from '@mui/material';
-import { Search, Videocam, Info } from '@mui/icons-material';
+import { CameraAlt, Bolt } from '@mui/icons-material';
 import { useFrameWizardStore } from '../../stores/frameWizardStore';
 
+/**
+ * WP5: Camera selection. Shows the three curated cameras with recommendation
+ * chips, highlights the Tucsen Libra16 for fluorescence, and renders a live
+ * Nyquist indicator based on the currently selected primary objective.
+ */
 export function CameraStep() {
   const { wizardState, updateWizardState, cameras, computeNyquist } = useFrameWizardStore();
-  const [search, setSearch] = useState('');
-  const [mfgFilter, setMfgFilter] = useState<string>('all');
-
-  const manufacturers = [...new Set(cameras.map((c) => c.manufacturer))];
-
-  const filtered = cameras.filter((c) => {
-    const matchSearch =
-      !search ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.manufacturer.toLowerCase().includes(search.toLowerCase());
-    const matchMfg = mfgFilter === 'all' || c.manufacturer === mfgFilter;
-    return matchSearch && matchMfg;
-  });
-
   const nyquist = computeNyquist();
 
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Videocam color="primary" />
-        <Typography variant="h5" fontWeight="bold">
-          Select Camera
-        </Typography>
+        <CameraAlt color="primary" />
+        <Typography variant="h5" fontWeight="bold">Camera</Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Choose the main imaging camera. The Nyquist sampling indicator helps ensure your pixel size matches the optical resolution.
+        Choose one of the three recommended cameras. The live Nyquist indicator below uses your
+        selected primary objective and the fixed 180&nbsp;mm tube lens.
       </Typography>
 
-      {/* Nyquist indicator */}
-      {nyquist && (
-        <Alert severity={nyquist.isSampled ? 'success' : 'warning'} sx={{ mb: 2 }}>
-          <Typography variant="body2" fontWeight="bold">
-            Nyquist Sampling: {nyquist.isSampled ? 'Satisfied ✓' : 'Undersampled ✗'}
-          </Typography>
-          <Typography variant="caption">
-            Optical resolution: {nyquist.resolution_um.toFixed(2)} µm |
-            Nyquist pixel: {nyquist.nyquistPixelSize_um.toFixed(2)} µm |
-            Effective pixel: {nyquist.effectivePixelSize_um.toFixed(2)} µm |
-            Ratio: {nyquist.samplingRatio.toFixed(2)}×
-          </Typography>
-        </Alert>
-      )}
-
-      {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
-        <TextField
-          size="small"
-          placeholder="Search cameras..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
-          sx={{ width: 280 }}
-        />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Manufacturer</InputLabel>
-          <Select
-            value={mfgFilter}
-            label="Manufacturer"
-            onChange={(e) => setMfgFilter(e.target.value)}
-          >
-            <MenuItem value="all">All</MenuItem>
-            {manufacturers.map((m) => (
-              <MenuItem key={m} value={m}>{m}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        {cameras.map((cam) => {
+          const selected = wizardState.selectedCamera === cam.id;
+          const isLibra = cam.id === 'cam-tucsen-libra16';
+          return (
+            <Card
+              key={cam.id}
+              variant={selected ? 'elevation' : 'outlined'}
+              sx={{
+                width: 280,
+                border: selected ? '2px solid' : undefined,
+                borderColor: 'primary.main',
+                position: 'relative',
+              }}
+            >
+              {isLibra && (
+                <Chip
+                  icon={<Bolt />}
+                  label="Best Quantum Efficiency"
+                  color="warning"
+                  size="small"
+                  sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+                />
+              )}
+              <CardActionArea
+                onClick={() => updateWizardState({ selectedCamera: cam.id })}
+                sx={{ p: 2, height: '100%' }}
+              >
+                <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold">{cam.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {cam.manufacturer} · {cam.sensor}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                    <Chip label={cam.resolution} size="small" variant="outlined" />
+                    <Chip label={`${cam.pixelSize_um} µm px`} size="small" variant="outlined" />
+                    <Chip label={`${cam.fps_max} fps`} size="small" variant="outlined" />
+                    <Chip label={`QE ${cam.quantumEfficiency}%`} size="small" variant="outlined" />
+                  </Box>
+                  {cam.recommendation && (
+                    <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }}>
+                      {cam.recommendation}
+                    </Alert>
+                  )}
+                  <Typography variant="subtitle2" color="primary" sx={{ mt: 1.5 }}>
+                    +${cam.price.toLocaleString()}
+                  </Typography>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          );
+        })}
       </Box>
 
-      {/* Camera Table */}
-      <TableContainer component={Paper} sx={{ maxHeight: 380 }}>
-        <Table stickyHeader size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox" />
-              <TableCell>Name</TableCell>
-              <TableCell>Manufacturer</TableCell>
-              <TableCell>Resolution</TableCell>
-              <TableCell align="right">Pixel (µm)</TableCell>
-              <TableCell align="right">FPS</TableCell>
-              <TableCell>Interface</TableCell>
-              <TableCell>Mount</TableCell>
-              <TableCell align="right">Price</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filtered.map((cam) => (
-              <TableRow
-                key={cam.id}
-                hover
-                sx={{
-                  bgcolor: wizardState.selectedCamera === cam.id ? 'primary.50' : undefined,
-                }}
-              >
-                <TableCell padding="checkbox">
-                  <Radio
-                    size="small"
-                    checked={wizardState.selectedCamera === cam.id}
-                    onChange={() => updateWizardState({ selectedCamera: cam.id })}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" fontWeight={500}>
-                    {cam.name}
-                  </Typography>
-                </TableCell>
-                <TableCell>{cam.manufacturer}</TableCell>
-                <TableCell>{cam.resolution}</TableCell>
-                <TableCell align="right">{cam.pixelSize_um}</TableCell>
-                <TableCell align="right">{cam.fps_max}</TableCell>
-                <TableCell>
-                  <Chip label={cam.interface} size="small" variant="outlined" />
-                </TableCell>
-                <TableCell>{cam.mountType}</TableCell>
-                <TableCell align="right">${cam.price.toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Divider sx={{ my: 3 }} />
 
-      {/* Selected camera detail card */}
-      {(() => {
-        const sel = cameras.find((c) => c.id === wizardState.selectedCamera);
-        if (!sel) return null;
-        return (
-          <Paper variant="outlined" sx={{ mt: 2, p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-            {sel.thumbnail && (
-              <Box sx={{ flexShrink: 0, width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img
-                  src={sel.thumbnail.startsWith('/') ? `/configurator${sel.thumbnail}` : sel.thumbnail}
-                  alt={sel.name}
-                  style={{ maxWidth: 70, maxHeight: 70 }}
-                />
-              </Box>
-            )}
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle1" fontWeight="bold">{sel.name}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {sel.manufacturer} &middot; {sel.resolution} &middot; {sel.pixelSize_um}µm &middot; {sel.fps_max}fps &middot; {sel.interface} &middot; {sel.mountType}
-              </Typography>
-              <Typography variant="subtitle2" color="primary" sx={{ mt: 0.5 }}>
-                ${sel.price.toLocaleString()}
-              </Typography>
-            </Box>
-            {sel.docsUrl && (
-              <Tooltip title="View full documentation">
-                <IconButton onClick={() => window.open(sel.docsUrl, '_blank', 'noopener')}>
-                  <Info />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Paper>
-        );
-      })()}
+      <Typography variant="h6" fontWeight="bold" gutterBottom>
+        Nyquist sampling check
+      </Typography>
+      {!wizardState.primaryObjective || !wizardState.selectedCamera ? (
+        <Alert severity="info">
+          Select a primary objective <em>and</em> a camera to see the Nyquist sampling result.
+        </Alert>
+      ) : nyquist ? (
+        <Alert severity={nyquist.isSampled ? 'success' : 'warning'}>
+          <Typography variant="body2">
+            Effective pixel size: <strong>{nyquist.effectivePixelSize_um.toFixed(3)} µm</strong> ·
+            Required (Nyquist): <strong>{nyquist.nyquistPixelSize_um.toFixed(3)} µm</strong>
+          </Typography>
+          <Typography variant="caption">
+            Sampling ratio = {nyquist.samplingRatio.toFixed(2)} (≥ 1.0 means properly Nyquist-sampled).
+            Optical resolution ≈ {(nyquist.resolution_um * 1000).toFixed(0)} nm.
+          </Typography>
+        </Alert>
+      ) : null}
     </Box>
   );
 }

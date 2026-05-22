@@ -1,196 +1,143 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import {
   Box,
   Typography,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
   TableHead,
   TableRow,
+  TableCell,
+  TableBody,
   Radio,
-  TextField,
   Chip,
+  Alert,
   Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Tooltip,
   IconButton,
+  Tooltip,
 } from '@mui/material';
-import { Search, Info } from '@mui/icons-material';
+import { Visibility, Clear } from '@mui/icons-material';
 import { useFrameWizardStore } from '../../stores/frameWizardStore';
+import type { ObjectiveOption } from '../../types/frameWizard';
 
+/**
+ * WP3: Objective selection. Lists the canonical 11 objectives grouped by
+ * category, hides the secondary column when the user has chosen a single mount,
+ * and emphasises Olympus 180 mm tube-lens compatibility.
+ */
 export function ObjectiveStep() {
   const { wizardState, updateWizardState, objectives } = useFrameWizardStore();
-  const [search, setSearch] = useState('');
-  const [mfgFilter, setMfgFilter] = useState<string>('all');
+  const showSecondary = wizardState.objectiveChanger === '2-position';
 
-  const manufacturers = [...new Set(objectives.map((o) => o.manufacturer))];
-
-  const filtered = objectives.filter((o) => {
-    const matchSearch =
-      !search ||
-      o.name.toLowerCase().includes(search.toLowerCase()) ||
-      o.manufacturer.toLowerCase().includes(search.toLowerCase());
-    const matchMfg = mfgFilter === 'all' || o.manufacturer === mfgFilter;
-    return matchSearch && matchMfg;
-  });
+  // Group objectives by their declared category for clean visual sections.
+  const grouped = useMemo(() => {
+    const map = new Map<string, ObjectiveOption[]>();
+    objectives.forEach((o) => {
+      const key = o.category || 'Other';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    });
+    // Stable ordering for the rendered sections.
+    const order = ['Special', 'High Rank Soptop', 'Phase Contrast', 'Low Rank', 'Other'];
+    return order
+      .filter((k) => map.has(k))
+      .map((k) => [k, map.get(k)!] as const)
+      .concat(
+        Array.from(map.entries()).filter(([k]) => !order.includes(k)),
+      );
+  }, [objectives]);
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
-        🔬 Select Objective Lenses
+      <Typography variant="h5" fontWeight="bold" gutterBottom>
+        Select Objective{showSecondary ? 's' : ''}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Choose a primary objective (required) and optionally a secondary objective for the motorized revolver.
-      </Typography>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        All objectives are optically based on <strong>Olympus infinity correction</strong> and use a
+        fixed <strong>180&nbsp;mm tube lens</strong>. Effective magnification therefore equals the
+        nominal objective magnification.
+      </Alert>
 
-      {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
-        <TextField
-          size="small"
-          placeholder="Search objectives..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
-          sx={{ width: 280 }}
-        />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Manufacturer</InputLabel>
-          <Select
-            value={mfgFilter}
-            label="Manufacturer"
-            onChange={(e) => setMfgFilter(e.target.value)}
-          >
-            <MenuItem value="all">All</MenuItem>
-            {manufacturers.map((m) => (
-              <MenuItem key={m} value={m}>{m}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {wizardState.primaryObjective && (
-          <Chip label="Primary selected" color="primary" size="small" />
-        )}
-        {wizardState.secondaryObjective && (
-          <Chip label="Secondary selected" color="secondary" size="small" />
-        )}
-      </Box>
-
-      {/* Objective Table */}
-      <TableContainer component={Paper} sx={{ maxHeight: 420 }}>
-        <Table stickyHeader size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox">Primary</TableCell>
-              <TableCell padding="checkbox">Secondary</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Manufacturer</TableCell>
-              <TableCell align="right">Mag</TableCell>
-              <TableCell align="right">NA</TableCell>
-              <TableCell align="right">WD (mm)</TableCell>
-              <TableCell>Immersion</TableCell>
-              <TableCell>Thread</TableCell>
-              <TableCell align="right">Price</TableCell>
-              <TableCell></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filtered.map((obj) => (
-              <TableRow
-                key={obj.id}
-                hover
-                sx={{
-                  bgcolor:
-                    wizardState.primaryObjective === obj.id
-                      ? 'primary.50'
-                      : wizardState.secondaryObjective === obj.id
-                        ? 'secondary.50'
-                        : undefined,
-                }}
-              >
-                <TableCell padding="checkbox">
-                  <Radio
-                    size="small"
-                    checked={wizardState.primaryObjective === obj.id}
-                    onChange={() => updateWizardState({ primaryObjective: obj.id })}
-                  />
-                </TableCell>
-                <TableCell padding="checkbox">
-                  <Radio
-                    size="small"
-                    checked={wizardState.secondaryObjective === obj.id}
-                    onChange={() => updateWizardState({ secondaryObjective: obj.id })}
-                    disabled={wizardState.primaryObjective === obj.id}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" fontWeight={500}>
-                    {obj.name}
-                  </Typography>
-                </TableCell>
-                <TableCell>{obj.manufacturer}</TableCell>
-                <TableCell align="right">{obj.magnification}×</TableCell>
-                <TableCell align="right">{obj.na}</TableCell>
-                <TableCell align="right">{obj.workingDistance_mm}</TableCell>
-                <TableCell>
-                  <Chip label={obj.immersion} size="small" variant="outlined" />
-                </TableCell>
-                <TableCell>{obj.threadType}</TableCell>
-                <TableCell align="right">${obj.price.toLocaleString()}</TableCell>
-                <TableCell>
-                  {obj.docsUrl && (
-                    <Tooltip title="View specs">
-                      <IconButton
-                        size="small"
-                        onClick={() => window.open(obj.docsUrl, '_blank', 'noopener')}
-                      >
-                        <Info fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </TableCell>
+      {grouped.map(([category, list]) => (
+        <Paper key={category} variant="outlined" sx={{ mb: 2, overflow: 'hidden' }}>
+          <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover' }}>
+            <Typography variant="subtitle2" fontWeight="bold">{category}</Typography>
+          </Box>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 60 }} align="center">Primary</TableCell>
+                {showSecondary && (
+                  <TableCell sx={{ width: 80 }} align="center">Secondary</TableCell>
+                )}
+                <TableCell>Name</TableCell>
+                <TableCell align="right">Mag</TableCell>
+                <TableCell align="right">NA</TableCell>
+                <TableCell align="right">WD (mm)</TableCell>
+                <TableCell align="right">f (mm)</TableCell>
+                <TableCell>Thread</TableCell>
+                <TableCell align="right">Price</TableCell>
+                <TableCell align="center">Info</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {list.map((obj) => (
+                <TableRow key={obj.id} hover>
+                  <TableCell align="center">
+                    <Radio
+                      checked={wizardState.primaryObjective === obj.id}
+                      onChange={() => updateWizardState({ primaryObjective: obj.id })}
+                    />
+                  </TableCell>
+                  {showSecondary && (
+                    <TableCell align="center">
+                      <Radio
+                        checked={wizardState.secondaryObjective === obj.id}
+                        onChange={() => updateWizardState({ secondaryObjective: obj.id })}
+                        disabled={wizardState.primaryObjective === obj.id}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="bold">{obj.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {obj.manufacturer} · {obj.correctionType}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">{obj.magnification}x</TableCell>
+                  <TableCell align="right">{obj.na}</TableCell>
+                  <TableCell align="right">{obj.workingDistance_mm}</TableCell>
+                  <TableCell align="right">{obj.focalLength_mm}</TableCell>
+                  <TableCell><Chip label={obj.threadType} size="small" /></TableCell>
+                  <TableCell align="right">
+                    <strong>${obj.price.toLocaleString()}</strong>
+                  </TableCell>
+                  <TableCell align="center">
+                    {obj.docsUrl && (
+                      <Tooltip title="Open documentation">
+                        <IconButton
+                          size="small"
+                          onClick={() => window.open(obj.docsUrl, '_blank')}
+                        >
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      ))}
 
-      {/* Selected objective detail card */}
-      {(() => {
-        const sel = objectives.find((o) => o.id === wizardState.primaryObjective);
-        if (!sel) return null;
-        return (
-          <Paper variant="outlined" sx={{ mt: 2, p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-            {sel.thumbnail && (
-              <Box sx={{ flexShrink: 0, width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img
-                  src={sel.thumbnail.startsWith('/') ? `/configurator${sel.thumbnail}` : sel.thumbnail}
-                  alt={sel.name}
-                  style={{ maxWidth: 70, maxHeight: 70 }}
-                />
-              </Box>
-            )}
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle1" fontWeight="bold">{sel.name}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {sel.manufacturer} &middot; {sel.magnification}× &middot; NA {sel.na} &middot; WD {sel.workingDistance_mm}mm &middot; {sel.immersion} &middot; {sel.threadType}
-              </Typography>
-              <Typography variant="subtitle2" color="primary" sx={{ mt: 0.5 }}>
-                ${sel.price.toLocaleString()}
-              </Typography>
-            </Box>
-            {sel.docsUrl && (
-              <Tooltip title="View full documentation">
-                <IconButton onClick={() => window.open(sel.docsUrl, '_blank', 'noopener')}>
-                  <Info />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Paper>
-        );
-      })()}
+      {/* Allow clearing the secondary slot without un-selecting the primary one. */}
+      {showSecondary && wizardState.secondaryObjective && (
+        <Chip
+          label="Clear secondary objective"
+          onDelete={() => updateWizardState({ secondaryObjective: null })}
+          deleteIcon={<Clear />}
+          sx={{ mt: 1 }}
+        />
+      )}
     </Box>
   );
 }

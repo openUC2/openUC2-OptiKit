@@ -1,0 +1,18 @@
+{
+  "objectiveChanger": "single",
+  "primaryObjective": "obj-ph-20x-0.4",
+  "secondaryObjective": null,
+  "lightSource": "complex-setup",
+  "condenser": "aspherical-8-ph",
+  "brightfieldModes": ["bf-only", "phase-contrast"],
+  "hasFluorescence": false,
+  "fluoLightSource": "none",
+  "dichroic": "none",
+  "fluorescenceChannels": [],
+  "selectedCamera": "cam-hik-mvcs060",
+  "sampleHolder": "petri-dish",
+  "customSampleHolderNotes": "",
+  "fieldOfApplication": "Phase contrast imaging of unstained live cells",
+  "specialRequirements": "",
+  "customNotes": ""
+}

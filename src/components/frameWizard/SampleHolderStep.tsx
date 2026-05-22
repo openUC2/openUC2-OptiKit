@@ -2,171 +2,124 @@ import {
   Box,
   Typography,
   Card,
-  CardContent,
   CardActionArea,
-  Tooltip,
-  IconButton,
-  Paper,
-  Divider,
+  CardContent,
+  TextField,
+  Alert,
 } from '@mui/material';
-import { Info, ViewModule } from '@mui/icons-material';
+import { ViewInAr } from '@mui/icons-material';
 import { useFrameWizardStore } from '../../stores/frameWizardStore';
 import type { SampleHolderChoice } from '../../types/frameWizard';
 
-const HOLDER_OPTIONS: {
+interface HolderOption {
   value: SampleHolderChoice;
-  label: string;
-  icon: string;
-  photo: string;
+  title: string;
   description: string;
-  detailText: string;
-  docsUrl: string;
   price: number;
-}[] = [
+}
+
+// WP7: four canonical sample holders + an optional custom 3D-printed one.
+const OPTIONS: HolderOption[] = [
   {
-    value: '4-slide-insert',
-    label: '4-Slide Insert',
-    icon: '/configurator/icons/uc2-framewellplate4.svg',
-    photo: '/configurator/photos/4-slide-insert.svg',
-    description:
-      'Holds up to 4 standard microscope slides (75×25mm). Compatible with motorized XY stage for scanning.',
-    detailText:
-      'The 4-slide insert is a 3D-printed holder that fits into the FRAME stage area. It accommodates up to 4 standard microscope slides (75×25mm) in a 2×2 grid arrangement. Compatible with the motorized XY stage for automated slide scanning. Spring-loaded clips hold slides securely during movement.',
-    docsUrl: 'https://docs.openuc2.com/frame/4-slide-insert',
+    value: 'microscope-slide',
+    title: 'Standard microscope slides',
+    description: '76 × 26 mm slides — universal histology format.',
+    price: 60,
+  },
+  {
+    value: 'mtp',
+    title: 'Microtiter plates (SLAS/ANSI)',
+    description: '96/384-well plate holder for screening assays.',
+    price: 100,
+  },
+  {
+    value: 'petri-dish',
+    title: 'Petri dishes',
+    description: 'Standard 35–60 mm round dishes incl. glass-bottom variants.',
     price: 80,
   },
   {
-    value: 'wellplate-insert',
-    label: 'Wellplate Insert',
-    icon: '/configurator/icons/uc2-framewellplate.svg',
-    photo: '/configurator/photos/wellplate-insert.svg',
-    description:
-      'Standard SBS-format wellplate holder. Fits 6, 12, 24, 48, or 96-well plates for high-throughput screening.',
-    detailText:
-      'The wellplate insert accepts standard SBS-format microwell plates (6 to 96-well). Precise positioning ensures alignment with motorized XY scanning patterns. Features alignment pins and spring retention for vibration-free imaging. Ideal for drug screening, cell culture assays, and high-content analysis.',
-    docsUrl: 'https://docs.openuc2.com/frame/wellplate-insert',
-    price: 100,
+    value: 'custom-3d',
+    title: 'Custom 3D-printed insert',
+    description: 'Bring your own geometry — we 3D print it to fit the FRAME.',
+    price: 120,
   },
 ];
 
+/**
+ * WP7: Sample holder picker. Selecting "Custom 3D" unlocks a free-form text
+ * field so users can describe what they need printed.
+ */
 export function SampleHolderStep() {
   const { wizardState, updateWizardState } = useFrameWizardStore();
 
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <ViewModule color="primary" />
-        <Typography variant="h5" fontWeight="bold">
-          Sample Holder
-        </Typography>
+        <ViewInAr color="primary" />
+        <Typography variant="h5" fontWeight="bold">Sample Holder</Typography>
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Choose which type of sample stage insert you need for your experiments.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Choose how you would like to mount your samples. You can also skip this step.
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {HOLDER_OPTIONS.map((opt) => (
-          <Card
-            key={opt.value}
-            variant={wizardState.sampleHolder === opt.value ? 'elevation' : 'outlined'}
-            sx={{
-              width: 260,
-              border: wizardState.sampleHolder === opt.value ? '2px solid' : undefined,
-              borderColor: 'primary.main',
-              transition: 'all 0.2s',
-            }}
-          >
-            <CardActionArea
-              onClick={() => updateWizardState({ sampleHolder: opt.value })}
-              sx={{ p: 2 }}
+        {OPTIONS.map((opt) => {
+          const selected = wizardState.sampleHolder === opt.value;
+          return (
+            <Card
+              key={opt.value}
+              variant={selected ? 'elevation' : 'outlined'}
+              sx={{
+                width: 260,
+                border: selected ? '2px solid' : undefined,
+                borderColor: 'primary.main',
+              }}
             >
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  mb: 1,
-                  height: 80,
-                  alignItems: 'center',
-                }}
+              <CardActionArea
+                onClick={() =>
+                  updateWizardState({
+                    sampleHolder: selected ? 'none' : opt.value,
+                    // Clear notes when leaving the custom option.
+                    ...(selected && opt.value === 'custom-3d'
+                      ? { customSampleHolderNotes: '' }
+                      : {}),
+                  })
+                }
+                sx={{ p: 2 }}
               >
-                <img src={opt.icon} alt={opt.label} style={{ maxHeight: 70, maxWidth: 70 }} />
-              </Box>
-              <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-                <Typography variant="subtitle1" fontWeight="bold" textAlign="center">
-                  {opt.label}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  textAlign="center"
-                  sx={{ mt: 0.5, fontSize: '0.75rem' }}
-                >
-                  {opt.description}
-                </Typography>
-                <Typography variant="subtitle2" color="primary" textAlign="center" sx={{ mt: 1 }}>
-                  ${opt.price}
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-            <Box sx={{ textAlign: 'right', pr: 1, pb: 0.5 }}>
-              <Tooltip title="View documentation">
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(opt.docsUrl, '_blank', 'noopener');
-                  }}
-                >
-                  <Info fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Card>
-        ))}
+                <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold">{opt.title}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    {opt.description}
+                  </Typography>
+                  <Typography variant="subtitle2" color="primary" sx={{ mt: 1.5 }}>
+                    +${opt.price}
+                  </Typography>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          );
+        })}
       </Box>
 
-      <Box sx={{ mt: 2 }}>
-        <Card
-          variant={wizardState.sampleHolder === 'none' ? 'elevation' : 'outlined'}
-          sx={{
-            border: wizardState.sampleHolder === 'none' ? '2px solid' : undefined,
-            borderColor: 'text.secondary',
-            cursor: 'pointer',
-          }}
-        >
-          <CardActionArea
-            onClick={() => updateWizardState({ sampleHolder: 'none' })}
-            sx={{ p: 1.5 }}
-          >
-            <Typography variant="body2" textAlign="center" color="text.secondary">
-              No sample holder (I'll use my own)
-            </Typography>
-          </CardActionArea>
-        </Card>
-      </Box>
-
-      {/* Selected module detail panel */}
-      {(() => {
-        const sel = HOLDER_OPTIONS.find((o) => o.value === wizardState.sampleHolder);
-        if (!sel) return null;
-        return (
-          <Paper variant="outlined" sx={{ mt: 3, p: 2.5, display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-            <Box sx={{ flexShrink: 0, width: 160, height: 120, borderRadius: 1, overflow: 'hidden', bgcolor: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src={sel.photo} alt={sel.label} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" fontWeight="bold">{sel.label}</Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {sel.detailText}
-              </Typography>
-              <Typography variant="subtitle1" color="primary" fontWeight="bold">
-                ${sel.price.toLocaleString()}
-              </Typography>
-            </Box>
-          </Paper>
-        );
-      })()}
+      {wizardState.sampleHolder === 'custom-3d' && (
+        <Box sx={{ mt: 2 }}>
+          <Alert severity="info" sx={{ mb: 1 }}>
+            Describe the geometry, dimensions and material you need. Attach a CAD file to your
+            quote request if available.
+          </Alert>
+          <TextField
+            label="Custom holder description"
+            multiline
+            minRows={3}
+            fullWidth
+            value={wizardState.customSampleHolderNotes}
+            onChange={(e) => updateWizardState({ customSampleHolderNotes: e.target.value })}
+            placeholder="e.g. 35 mm round dish with cover glass bottom, 5 mm side opening, …"
+          />
+        </Box>
+      )}
     </Box>
   );
 }

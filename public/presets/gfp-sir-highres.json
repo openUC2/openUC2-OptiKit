@@ -1,0 +1,18 @@
+{
+  "objectiveChanger": "2-position",
+  "primaryObjective": "obj-soptop-hr-40x-0.65",
+  "secondaryObjective": "obj-soptop-hr-10x-0.3",
+  "lightSource": "complex-setup",
+  "condenser": "aspherical-25",
+  "brightfieldModes": ["bf-only"],
+  "hasFluorescence": true,
+  "fluoLightSource": "led-quad",
+  "dichroic": "dual-cn",
+  "fluorescenceChannels": ["fluor-gfp", "fluor-cy5"],
+  "selectedCamera": "cam-tucsen-libra16",
+  "sampleHolder": "mtp",
+  "customSampleHolderNotes": "",
+  "fieldOfApplication": "High-resolution multi-colour fluorescence (GFP + SiR-DNA) on plates",
+  "specialRequirements": "Live-cell incubation chamber preferred",
+  "customNotes": ""
+}

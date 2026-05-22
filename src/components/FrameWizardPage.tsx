@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import {
   Box,
   Stepper,
@@ -17,34 +17,29 @@ import {
   ArrowForward,
   ShoppingCart,
   Refresh,
+  Bookmark,
 } from '@mui/icons-material';
-import { useFrameWizardStore } from '../stores/frameWizardStore';
+import { useFrameWizardStore, TOTAL_STEPS } from '../stores/frameWizardStore';
 import { loadAllLibraries } from '../utils/frameLibraryLoader';
-import { LightSourceStep } from './frameWizard/LightSourceStep';
-import { AutofocusStep } from './frameWizard/AutofocusStep';
+import { ObjectiveChangerStep } from './frameWizard/ObjectiveChangerStep';
 import { ObjectiveStep } from './frameWizard/ObjectiveStep';
-import { SampleHolderStep } from './frameWizard/SampleHolderStep';
-import { RevolverStep } from './frameWizard/RevolverStep';
-import { OverviewCameraStep } from './frameWizard/OverviewCameraStep';
+import { IlluminationStep } from './frameWizard/IlluminationStep';
 import { FluorescenceStep } from './frameWizard/FluorescenceStep';
 import { CameraStep } from './frameWizard/CameraStep';
-import { TubeLensStep } from './frameWizard/TubeLensStep';
-import { ControlInputsStep } from './frameWizard/ControlInputsStep';
-import { CustomizationStep } from './frameWizard/CustomizationStep';
+import { SampleHolderStep } from './frameWizard/SampleHolderStep';
+import { SummaryQuoteStep } from './frameWizard/SummaryQuoteStep';
 import { FramePreview } from './frameWizard/FramePreview';
+import { PresetSelector } from './frameWizard/PresetSelector';
 
+// WP1: new 7-step tab order.
 const STEP_LABELS = [
-  'Light Source',
-  'Autofocus',
+  'Objective Changer',
   'Objectives',
-  'Sample Holder',
-  'Obj. Revolver',
-  'Overview Cam',
+  'Illumination',
   'Fluorescence',
   'Camera',
-  'Tube Lens',
-  'Controls',
-  'Custom',
+  'Sample Holders',
+  'Summary & Quote',
 ];
 
 export function FrameWizardPage() {
@@ -65,6 +60,8 @@ export function FrameWizardPage() {
     setIsLoading,
   } = useFrameWizardStore();
 
+  const [presetOpen, setPresetOpen] = useState(false);
+
   useEffect(() => {
     setIsLoading(true);
     loadAllLibraries().then(({ objectives, lenses, cameras, fluorescence }) => {
@@ -78,7 +75,6 @@ export function FrameWizardPage() {
 
   const handleOpenInCanvas = useCallback(() => {
     const components = getSelectedComponents();
-    // Build a layout JSON compatible with the main editor
     const layout = {
       uc2_components: components.map((c, i) => ({
         name: `${c.moduleId}_${i}`,
@@ -110,8 +106,6 @@ export function FrameWizardPage() {
       },
     };
 
-    // Encode as base64 and navigate to canvas via full page load
-    // (React Router navigate() won't re-trigger the App.tsx useEffect that reads ?data=)
     const encoded = btoa(JSON.stringify(layout));
     window.location.href = `/configurator/?data=${encoded}`;
   }, [getSelectedComponents]);
@@ -121,17 +115,13 @@ export function FrameWizardPage() {
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0: return <LightSourceStep />;
-      case 1: return <AutofocusStep />;
-      case 2: return <ObjectiveStep />;
-      case 3: return <SampleHolderStep />;
-      case 4: return <RevolverStep />;
-      case 5: return <OverviewCameraStep />;
-      case 6: return <FluorescenceStep />;
-      case 7: return <CameraStep />;
-      case 8: return <TubeLensStep />;
-      case 9: return <ControlInputsStep />;
-      case 10: return <CustomizationStep />;
+      case 0: return <ObjectiveChangerStep />;
+      case 1: return <ObjectiveStep />;
+      case 2: return <IlluminationStep />;
+      case 3: return <FluorescenceStep />;
+      case 4: return <CameraStep />;
+      case 5: return <SampleHolderStep />;
+      case 6: return <SummaryQuoteStep onOpenInEditor={handleOpenInCanvas} />;
       default: return null;
     }
   };
@@ -175,12 +165,23 @@ export function FrameWizardPage() {
             </Typography>
           </Box>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip
             icon={<ShoppingCart />}
             label={`Total: $${totalPrice.toLocaleString()}`}
             sx={{ bgcolor: '#fff', color: '#1e4670', fontWeight: 'bold', fontSize: '1rem', p: 1 }}
           />
+          <Tooltip title="Load preconfigured preset">
+            <Button
+              variant="outlined"
+              onClick={() => setPresetOpen(true)}
+              sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}
+              startIcon={<Bookmark />}
+              size="small"
+            >
+              Load Preset
+            </Button>
+          </Tooltip>
           <Tooltip title="Reset wizard">
             <Button
               variant="outlined"
@@ -221,7 +222,6 @@ export function FrameWizardPage() {
             flexDirection: 'column',
           }}
         >
-          {/* Step price indicator */}
           {stepPrice > 0 && (
             <Chip
               label={`This step: +$${stepPrice.toLocaleString()}`}
@@ -259,9 +259,9 @@ export function FrameWizardPage() {
           Previous
         </Button>
         <Typography variant="body2" color="text.secondary">
-          Step {currentStep + 1} of {STEP_LABELS.length}
+          Step {currentStep + 1} of {TOTAL_STEPS}
         </Typography>
-        {currentStep === STEP_LABELS.length - 1 ? (
+        {currentStep === TOTAL_STEPS - 1 ? (
           <Button
             variant="contained"
             color="success"
@@ -276,6 +276,8 @@ export function FrameWizardPage() {
           </Button>
         )}
       </Paper>
+
+      <PresetSelector open={presetOpen} onClose={() => setPresetOpen(false)} />
     </Box>
   );
 }

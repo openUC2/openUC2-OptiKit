@@ -45,6 +45,7 @@ export async function loadObjectives(): Promise<ObjectiveOption[]> {
       parfocalDistance_mm: parseFloat(row.parfocalDistance_mm) || 45,
       fieldNumber_mm: parseFloat(row.fieldNumber_mm) || 20,
       correctionType: row.correctionType || 'achromatic',
+      category: row.category || 'Other',
       price: parseFloat(row.price) || 0,
       thumbnail: addPrefix(row.thumbnail),
       optilandJson: row.optilandJson || undefined,
@@ -107,6 +108,8 @@ export async function loadCameras(): Promise<CameraOption[]> {
       price: parseFloat(row.price) || 0,
       thumbnail: addPrefix(row.thumbnail),
       docsUrl: row.docsUrl || undefined,
+      partNumber: row.partNumber || undefined,
+      recommendation: row.recommendation || undefined,
     }));
   } catch (error) {
     console.error('Failed to load cameras library:', error);

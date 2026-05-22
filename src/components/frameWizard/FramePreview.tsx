@@ -94,16 +94,14 @@ interface PlacedBlock {
   h: number;
 }
 
-// Build config image filename from wizard state
+// Build config image filename from wizard state (no autofocus in the new flow).
 function getConfigImageFilename(ws: {
   lightSource: string;
-  autofocus: string;
   hasFluorescence: boolean;
 }): string {
   const illuKey = (ws.lightSource || 'none').replace(/[^a-z0-9]/gi, '').toLowerCase();
-  const afKey = (ws.autofocus || 'none').replace(/[^a-z0-9]/gi, '').toLowerCase();
   const fluoKey = ws.hasFluorescence ? 'fluo' : 'nofluo';
-  return `/configurator/frame_configs/frame_${illuKey}_${afKey}_${fluoKey}.svg`;
+  return `/configurator/frame_configs/frame_${illuKey}_${fluoKey}.svg`;
 }
 
 export function FramePreview() {

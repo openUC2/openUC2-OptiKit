@@ -1,0 +1,18 @@
+{
+  "objectiveChanger": "single",
+  "primaryObjective": "obj-low-10x-0.25",
+  "secondaryObjective": null,
+  "lightSource": "single-led",
+  "condenser": "abbe",
+  "brightfieldModes": ["bf-only"],
+  "hasFluorescence": false,
+  "fluoLightSource": "none",
+  "dichroic": "none",
+  "fluorescenceChannels": [],
+  "selectedCamera": "cam-hik-mvcs060",
+  "sampleHolder": "microscope-slide",
+  "customSampleHolderNotes": "",
+  "fieldOfApplication": "Teaching / entry-level brightfield microscopy",
+  "specialRequirements": "",
+  "customNotes": ""
+}

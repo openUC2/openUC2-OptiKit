@@ -29,6 +29,7 @@ interface FrameWizardStore {
   prevStep: () => void;
   updateWizardState: (partial: Partial<FrameWizardState>) => void;
   resetWizard: () => void;
+  loadPreset: (preset: Partial<FrameWizardState>) => void;
   setObjectives: (objectives: ObjectiveOption[]) => void;
   setLenses: (lenses: LensOption[]) => void;
   setCameras: (cameras: CameraOption[]) => void;
@@ -42,21 +43,62 @@ interface FrameWizardStore {
   computeNyquist: () => NyquistResult | null;
 }
 
-const TOTAL_STEPS = 11;
+// WP1: 7 steps total
+export const TOTAL_STEPS = 7;
+
+// Fixed tube lens used in all configurations (Olympus infinity correction, 180 mm).
+const FIXED_TUBE_LENS_FL_MM = 180;
+const FIXED_TUBE_LENS_PRICE = 80;
+
+// Static price tables centralised for transparent quoting.
+const LIGHT_SOURCE_PRICE: Record<string, number> = {
+  'single-led': 60,
+  'complex-setup': 280,
+};
+const CONDENSER_PRICE: Record<string, number> = {
+  abbe: 90,
+  'aspherical-25': 45,
+  'aspherical-8-ph': 50,
+};
+const FLUO_LIGHT_PRICE: Record<string, number> = {
+  'laser-single': 1200,
+  'laser-dual': 2200,
+  'laser-quad': 3800,
+  'led-single': 220,
+  'led-quad': 1400,
+};
+const DICHROIC_PRICE: Record<string, number> = {
+  'single-cn': 350,
+  'dual-cn': 600,
+  'multi-ahf': 1200,
+};
+const SAMPLE_HOLDER_PRICE: Record<string, number> = {
+  'microscope-slide': 60,
+  mtp: 100,
+  'petri-dish': 80,
+  'custom-3d': 120,
+};
+const CHANGER_PRICE: Record<string, number> = {
+  single: 120,
+  '2-position': 1500,
+};
 
 const defaultWizardState: FrameWizardState = {
-  lightSource: 'none',
-  autofocus: 'none',
+  objectiveChanger: 'single',
   primaryObjective: null,
   secondaryObjective: null,
-  sampleHolder: 'none',
-  hasRevolver: false,
-  hasOverviewCamera: false,
+  lightSource: 'single-led',
+  condenser: 'abbe',
+  brightfieldModes: ['bf-only'],
   hasFluorescence: false,
+  fluoLightSource: 'none',
+  dichroic: 'none',
   fluorescenceChannels: [],
   selectedCamera: null,
-  selectedTubeLens: null,
-  controlInputs: [],
+  sampleHolder: 'none',
+  customSampleHolderNotes: '',
+  fieldOfApplication: '',
+  specialRequirements: '',
   customNotes: '',
 };
 
@@ -76,8 +118,14 @@ export const useFrameWizardStore = create<FrameWizardStore>((set, get) => ({
   updateWizardState: (partial) =>
     set((s) => ({ wizardState: { ...s.wizardState, ...partial } })),
 
-  resetWizard: () =>
-    set({ currentStep: 0, wizardState: { ...defaultWizardState } }),
+  resetWizard: () => set({ currentStep: 0, wizardState: { ...defaultWizardState } }),
+
+  // WP9: merges a partial state from a preset JSON over the defaults.
+  loadPreset: (preset) =>
+    set({
+      currentStep: 0,
+      wizardState: { ...defaultWizardState, ...preset },
+    }),
 
   setObjectives: (objectives) => set({ objectives }),
   setLenses: (lenses) => set({ lenses }),
@@ -86,269 +134,206 @@ export const useFrameWizardStore = create<FrameWizardStore>((set, get) => ({
   setIsLoading: (loading) => set({ isLoading: loading }),
 
   getSelectedComponents: () => {
-    const { wizardState, objectives, cameras, lenses } = get();
+    const { wizardState, objectives, cameras } = get();
     const components: FrameComponentPlacement[] = [];
 
-    // Always include the frame body
+    // Always include frame body.
+    components.push({ moduleId: 'frame-body', gridPos: [0, 0, 0], rotation: [0, 0, 0] });
+
+    // Illumination: single LED or complex (LED + RGB ring).
+    if (wizardState.lightSource === 'single-led') {
+      components.push({ moduleId: 'frame-single-led', gridPos: [4, 0, 0], rotation: [0, 0, 0] });
+    } else {
+      components.push({ moduleId: 'frame-single-led', gridPos: [4, 0, 0], rotation: [0, 0, 0] });
+      components.push({ moduleId: 'led-ring-koehlerillu', gridPos: [4, 1, 0], rotation: [0, 0, 0] });
+    }
+
+    // Condenser lens (always present).
     components.push({
-      moduleId: 'frame-body',
-      gridPos: [0, 0, 0],
+      moduleId: 'condenser-lens',
+      gridPos: [4, 2, 0],
       rotation: [0, 0, 0],
+      params: { type: wizardState.condenser },
     });
 
-    // Light source
-    switch (wizardState.lightSource) {
-      case 'single-led':
-        components.push({ moduleId: 'frame-single-led', gridPos: [4, 0, 0], rotation: [0, 0, 0] });
-        break;
-      case 'led-matrix':
-        components.push({ moduleId: 'frame-led-matrix', gridPos: [4, -1, 0], rotation: [0, 0, 0] });
-        break;
-      case 'led-ring':
-        components.push({ moduleId: 'led-ring-koehlerillu', gridPos: [4, 0, 0], rotation: [0, 0, 0] });
-        break;
+    // Objective changer.
+    if (wizardState.objectiveChanger === '2-position') {
+      components.push({
+        moduleId: 'motorized-objective-revolver',
+        gridPos: [4, 3, 0],
+        rotation: [0, 0, 0],
+      });
     }
 
-    // Autofocus
-    switch (wizardState.autofocus) {
-      case 'laser-astigmatism':
-        components.push({ moduleId: 'frame-laser-af', gridPos: [5, 4, 0], rotation: [0, 0, 0] });
-        break;
-      case 'image-contrast':
-        components.push({ moduleId: 'frame-image-af', gridPos: [5, 4, 0], rotation: [0, 0, 0] });
-        break;
-    }
-
-    // Objective lenses
+    // Primary objective.
     if (wizardState.primaryObjective) {
       const obj = objectives.find((o) => o.id === wizardState.primaryObjective);
       if (obj) {
         components.push({
-          moduleId: 'objective-10x-1x1', // generic objective module
-          gridPos: [4, 3, 0],
+          moduleId: 'objective-10x-1x1',
+          gridPos: [4, 4, 0],
           rotation: [0, 0, 0],
           params: { magnification: obj.magnification, na: obj.na, wd_mm: obj.workingDistance_mm },
         });
       }
     }
 
-    // Revolver
-    if (wizardState.hasRevolver) {
-      components.push({ moduleId: 'motorized-objective-revolver', gridPos: [4, 3, 0], rotation: [0, 0, 0] });
-    }
-
-    // Sample holder
+    // Sample holder.
     switch (wizardState.sampleHolder) {
-      case '4-slide-insert':
-        components.push({ moduleId: 'frame-wellplate-insert-4slides', gridPos: [4, 2, 0], rotation: [0, 0, 0] });
+      case 'microscope-slide':
+        components.push({ moduleId: 'frame-wellplate-insert-4slides', gridPos: [4, 5, 0], rotation: [0, 0, 0] });
         break;
-      case 'wellplate-insert':
-        components.push({ moduleId: 'frame-wellplate-insert-wellplate', gridPos: [4, 2, 0], rotation: [0, 0, 0] });
+      case 'mtp':
+        components.push({ moduleId: 'frame-wellplate-insert-wellplate', gridPos: [4, 5, 0], rotation: [0, 0, 0] });
+        break;
+      case 'petri-dish':
+        components.push({ moduleId: 'frame-petri-dish-holder', gridPos: [4, 5, 0], rotation: [0, 0, 0] });
+        break;
+      case 'custom-3d':
+        components.push({ moduleId: 'frame-custom-holder', gridPos: [4, 5, 0], rotation: [0, 0, 0] });
         break;
     }
 
-    // Overview camera
-    if (wizardState.hasOverviewCamera) {
-      components.push({ moduleId: 'overview-camera', gridPos: [2, 6, 0], rotation: [0, 90, 0] });
+    // Fluorescence (dichroic + light source).
+    if (wizardState.hasFluorescence && wizardState.fluoLightSource !== 'none') {
+      components.push({ moduleId: 'filter-dichroic', gridPos: [4, 6, 0], rotation: [0, 180, 0] });
+      components.push({ moduleId: 'led-470nm', gridPos: [7, 6, 0], rotation: [0, 0, 0] });
     }
 
-    // Fluorescence
-    if (wizardState.hasFluorescence && wizardState.fluorescenceChannels.length > 0) {
-      // Add dichroic + filter module
-      components.push({ moduleId: 'filter-dichroic', gridPos: [4, 5, 0], rotation: [0, 180, 0] });
-      // Add LED/laser for first channel
-      components.push({ moduleId: 'led-470nm', gridPos: [7, 5, 0], rotation: [0, 0, 0] });
-    }
+    // Tube lens is fixed: Olympus infinity correction 180 mm.
+    components.push({
+      moduleId: 'tube-lens-1x1',
+      gridPos: [4, 7, 0],
+      rotation: [0, 0, 0],
+      params: { focalLength_mm: FIXED_TUBE_LENS_FL_MM, fixed: true },
+    });
 
-    // Camera
+    // Camera.
     if (wizardState.selectedCamera) {
       const cam = cameras.find((c) => c.id === wizardState.selectedCamera);
       if (cam) {
         components.push({
           moduleId: 'camera-usb',
-          gridPos: [4, 7, 0],
+          gridPos: [4, 8, 0],
           rotation: [0, 0, 0],
           params: { sensor: cam.sensor, resolution: cam.resolution },
         });
       }
     }
 
-    // Tube lens
-    if (wizardState.selectedTubeLens) {
-      const lens = lenses.find((l) => l.id === wizardState.selectedTubeLens);
-      if (lens) {
-        components.push({
-          moduleId: 'tube-lens-1x1',
-          gridPos: [4, 6, 0],
-          rotation: [0, 0, 0],
-          params: { focalLength_mm: lens.focalLength_mm },
-        });
-      }
-    }
-
-    // Control inputs
-    if (wizardState.controlInputs.includes('ps4-joystick')) {
-      components.push({ moduleId: 'frame-ps4-joystick', gridPos: [0, 8, 0], rotation: [0, 0, 0] });
-    }
-    if (wizardState.controlInputs.includes('can-jog-dial')) {
-      components.push({ moduleId: 'dial-control', gridPos: [1, 8, 0], rotation: [0, 0, 0] });
-    }
-
-    // Always include electronics
+    // Always include electronics board.
     components.push({ moduleId: 'electronics-v3', gridPos: [0, 5, 0], rotation: [0, 0, 0] });
 
     return components;
   },
 
   getTotalPrice: () => {
-    const { wizardState, objectives, cameras, lenses, fluorescenceOptions } = get();
-    let total = 9999; // Frame body base price
+    const { wizardState, objectives, cameras, fluorescenceOptions } = get();
+    let total = 9999; // Frame body base price.
 
-    // Light source
-    const lightPrices: Record<string, number> = {
-      'single-led': 30,
-      'led-matrix': 150,
-      'led-ring': 120,
-    };
-    if (wizardState.lightSource !== 'none') {
-      total += lightPrices[wizardState.lightSource] || 0;
-    }
+    total += CHANGER_PRICE[wizardState.objectiveChanger] || 0;
 
-    // Autofocus
-    if (wizardState.autofocus === 'laser-astigmatism') total += 3000;
-    // image-contrast is software-based, no hardware cost
-
-    // Objectives
     if (wizardState.primaryObjective) {
       const obj = objectives.find((o) => o.id === wizardState.primaryObjective);
       if (obj) total += obj.price;
     }
-    if (wizardState.secondaryObjective) {
+    if (wizardState.objectiveChanger === '2-position' && wizardState.secondaryObjective) {
       const obj = objectives.find((o) => o.id === wizardState.secondaryObjective);
       if (obj) total += obj.price;
     }
 
-    // Revolver
-    if (wizardState.hasRevolver) total += 1500;
+    total += LIGHT_SOURCE_PRICE[wizardState.lightSource] || 0;
+    total += CONDENSER_PRICE[wizardState.condenser] || 0;
 
-    // Sample holder
-    const samplePrices: Record<string, number> = {
-      '4-slide-insert': 80,
-      'wellplate-insert': 100,
-    };
-    if (wizardState.sampleHolder !== 'none') {
-      total += samplePrices[wizardState.sampleHolder] || 0;
-    }
-
-    // Overview camera
-    if (wizardState.hasOverviewCamera) total += 150;
-
-    // Fluorescence
     if (wizardState.hasFluorescence) {
+      total += FLUO_LIGHT_PRICE[wizardState.fluoLightSource] || 0;
+      total += DICHROIC_PRICE[wizardState.dichroic] || 0;
       wizardState.fluorescenceChannels.forEach((chId) => {
         const ch = fluorescenceOptions.find((f) => f.id === chId);
         if (ch) total += ch.price_filterSet;
       });
     }
 
-    // Camera
     if (wizardState.selectedCamera) {
       const cam = cameras.find((c) => c.id === wizardState.selectedCamera);
       if (cam) total += cam.price;
     }
 
-    // Tube lens
-    if (wizardState.selectedTubeLens) {
-      const lens = lenses.find((l) => l.id === wizardState.selectedTubeLens);
-      if (lens) total += lens.price;
+    if (wizardState.sampleHolder !== 'none') {
+      total += SAMPLE_HOLDER_PRICE[wizardState.sampleHolder] || 0;
     }
 
-    // Controls
-    if (wizardState.controlInputs.includes('ps4-joystick')) total += 40;
-    if (wizardState.controlInputs.includes('can-jog-dial')) total += 80;
-
-    // Electronics
+    // Fixed tube lens & electronics board.
+    total += FIXED_TUBE_LENS_PRICE;
     total += 150;
 
     return total;
   },
 
   getStepPrice: (step: number) => {
-    const { wizardState, objectives, cameras, lenses, fluorescenceOptions } = get();
+    const { wizardState, objectives, cameras, fluorescenceOptions } = get();
     switch (step) {
-      case 0: {
-        const prices: Record<string, number> = { 'single-led': 30, 'led-matrix': 150, 'led-ring': 120 };
-        return prices[wizardState.lightSource] || 0;
-      }
-      case 1:
-        return wizardState.autofocus === 'laser-astigmatism' ? 3000 : 0;
-      case 2: {
+      case 0: // Objective changer
+        return CHANGER_PRICE[wizardState.objectiveChanger] || 0;
+      case 1: {
+        // Objectives
         let p = 0;
         if (wizardState.primaryObjective) {
           const obj = objectives.find((o) => o.id === wizardState.primaryObjective);
           if (obj) p += obj.price;
         }
-        if (wizardState.secondaryObjective) {
+        if (wizardState.objectiveChanger === '2-position' && wizardState.secondaryObjective) {
           const obj = objectives.find((o) => o.id === wizardState.secondaryObjective);
           if (obj) p += obj.price;
         }
         return p;
       }
+      case 2: // Illumination = light source + condenser
+        return (
+          (LIGHT_SOURCE_PRICE[wizardState.lightSource] || 0) +
+          (CONDENSER_PRICE[wizardState.condenser] || 0)
+        );
       case 3: {
-        const prices: Record<string, number> = { '4-slide-insert': 80, 'wellplate-insert': 100 };
-        return prices[wizardState.sampleHolder] || 0;
-      }
-      case 4:
-        return wizardState.hasRevolver ? 1500 : 0;
-      case 5:
-        return wizardState.hasOverviewCamera ? 150 : 0;
-      case 6: {
+        // Fluorescence
         if (!wizardState.hasFluorescence) return 0;
-        return wizardState.fluorescenceChannels.reduce((sum, chId) => {
+        let p =
+          (FLUO_LIGHT_PRICE[wizardState.fluoLightSource] || 0) +
+          (DICHROIC_PRICE[wizardState.dichroic] || 0);
+        wizardState.fluorescenceChannels.forEach((chId) => {
           const ch = fluorescenceOptions.find((f) => f.id === chId);
-          return sum + (ch?.price_filterSet || 0);
-        }, 0);
+          if (ch) p += ch.price_filterSet;
+        });
+        return p;
       }
-      case 7: {
+      case 4: {
+        // Camera
         if (!wizardState.selectedCamera) return 0;
         const cam = cameras.find((c) => c.id === wizardState.selectedCamera);
         return cam?.price || 0;
       }
-      case 8: {
-        if (!wizardState.selectedTubeLens) return 0;
-        const lens = lenses.find((l) => l.id === wizardState.selectedTubeLens);
-        return lens?.price || 0;
-      }
-      case 9: {
-        let p = 0;
-        if (wizardState.controlInputs.includes('ps4-joystick')) p += 40;
-        if (wizardState.controlInputs.includes('can-jog-dial')) p += 80;
-        return p;
-      }
+      case 5: // Sample holder
+        return wizardState.sampleHolder !== 'none'
+          ? SAMPLE_HOLDER_PRICE[wizardState.sampleHolder] || 0
+          : 0;
       default:
         return 0;
     }
   },
 
   computeNyquist: () => {
-    const { wizardState, objectives, cameras, lenses } = get();
+    const { wizardState, objectives, cameras } = get();
     if (!wizardState.primaryObjective || !wizardState.selectedCamera) return null;
 
     const obj = objectives.find((o) => o.id === wizardState.primaryObjective);
     const cam = cameras.find((c) => c.id === wizardState.selectedCamera);
     if (!obj || !cam) return null;
 
-    const tubeLens = wizardState.selectedTubeLens
-      ? lenses.find((l) => l.id === wizardState.selectedTubeLens)
-      : null;
-
-    const centralWavelength_um = 0.5; // 500nm
+    const centralWavelength_um = 0.5; // 500 nm
     const resolution_um = (0.61 * centralWavelength_um) / obj.na;
     const nyquistPixelSize_um = resolution_um / 2;
 
-    // Effective magnification: if tube lens is chosen, use its focal length / objective focal length
-    const tubeFocalLength = tubeLens?.focalLength_mm || 200; // default 200mm
-    const effectiveMag = tubeFocalLength / obj.focalLength_mm;
+    // Fixed 180 mm tube lens; effective magnification = f_tube / f_obj.
+    const effectiveMag = FIXED_TUBE_LENS_FL_MM / obj.focalLength_mm;
     const effectivePixelSize_um = cam.pixelSize_um / effectiveMag;
 
     const samplingRatio = nyquistPixelSize_um / effectivePixelSize_um;

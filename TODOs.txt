@@ -15,6 +15,43 @@ does the 3D grid actually match the one in the 2d Layout? The rays are placed at
 
 changing the arrangement/state in 2D layout has (at least translationally) an effect on the 3D layout but not vice versa; Changing something in the 3D (position/orientation)
 
+
+
+The context menu in the right hand side should be the same for the 2D and 3D  - should also be callapsable
+
+
+
+Is there a way to cache the glb files once loaded? 
+
+
+
+The grid overlay in the 3D looks bigger then 50mm
+
+
+
+we would need add puzzle pieces on top/below every cube module which is named PRT_-_1004_-_PUZ11_-_V04_-_A.glb it's the puzzle piece that connects multiple modules between layers and is 5mm high and has 50x50mm width (x/y)
+
+we should change the upper bar so that we have dropdown menus e.g. file=>save, import, etc. similar to word. 
+
+
+
+Inventor coordinate system is XY plane z height, three s is xz plane y height, Optiland? Mirror is wrong in physical drawing, principle plane no effect, move source XYZ, generally: implement an additional state per physical model dxyz, drxyz for everything so that we can change it
+
+
+
+Make docs subpage like oshpark
+
+Link to openUC2 markdown 
+
+
+
+
+does the 3D grid actually match the one in the 2d Layout? The rays are placed at an off-center position
+
+
+
+changing the arrangement/state in 2D layout has (at least translationally) an effect on the 3D layout but not vice versa; Changing something in the 3D (position/orientation)
+
 The context menu in the right hand side should be the same for the 2D and 3D  - should also be callapsable
 
 Is there a way to cache the glb files once loaded?
@@ -48,3 +85,22 @@ converter to lasercad
 Reimport imSwitch not working
 
 we need to be able to load the legacy format and also the imswitch format in
+
+
+Viewer:
+
+in der theorie ja, in der praxis überlappen sich schriftzüge und bilder, dass sieht nicht gut aus, auch sind die components abgeschnitten, das bild passt sich nich gut an unterschiedliche bildschrimgrößen an.. kann man das noch fixen? wenn das gut aussieht würde ich auch gerne die viewer snippets verwenden :D
+
+
+
+
+Infobubble in 3D view is always on top of the cubs, that'S annoying, we should make it go vanish
+
+top vs side view of symbols?
+
+rotation in 3D misses rotation aorund the z axis
+
+
+consider having an xy vs xz view representation in 2D
+
+Viewer needs to borrow raytracing

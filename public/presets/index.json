@@ -1,0 +1,23 @@
+[
+  {
+    "id": "basic-brightfield",
+    "name": "Basic Brightfield",
+    "description": "Entry-level setup: 10× achromat, single LED, Abbe condenser, basic CMOS camera.",
+    "image": "/configurator/presets/basic-brightfield.svg",
+    "file": "basic-brightfield.json"
+  },
+  {
+    "id": "phase-contrast",
+    "name": "Phase Contrast",
+    "description": "Phase contrast 20× with aspheric phase-ring condenser and HIK MV-CS060.",
+    "image": "/configurator/presets/phase-contrast.svg",
+    "file": "phase-contrast.json"
+  },
+  {
+    "id": "gfp-sir-highres",
+    "name": "GFP + SiR High-Resolution Fluorescence",
+    "description": "High-rank 40×/0.65 with quad LED engine, dual-band dichroic, GFP & SiR channels, Tucsen Libra16.",
+    "image": "/configurator/presets/gfp-sir-highres.svg",
+    "file": "gfp-sir-highres.json"
+  }
+]

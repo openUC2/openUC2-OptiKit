@@ -13,6 +13,8 @@ export interface ObjectiveOption {
   parfocalDistance_mm: number;
   fieldNumber_mm: number;
   correctionType: string;
+  /** Logical grouping shown in the wizard table (Special, High Rank Soptop, Low Rank, Phase Contrast). */
+  category?: string;
   price: number;
   thumbnail?: string;
   optilandJson?: string;
@@ -53,6 +55,8 @@ export interface CameraOption {
   price: number;
   thumbnail?: string;
   docsUrl?: string;
+  /** Free-form usage recommendation shown as a chip. */
+  recommendation?: string;
 }
 
 export interface FluorescenceOption {
@@ -73,36 +77,56 @@ export interface FluorescenceOption {
   price_filterSet: number;
 }
 
-export type LightSourceChoice = 'none' | 'single-led' | 'led-matrix' | 'led-ring';
+// --- WP2: Objective changer ---
+export type ObjectiveChangerChoice = 'single' | '2-position';
 
-export type AutofocusChoice = 'none' | 'laser-astigmatism' | 'image-contrast';
+// --- WP4: Illumination ---
+export type LightSourceChoice = 'single-led' | 'complex-setup';
+export type CondenserChoice = 'abbe' | 'aspherical-25' | 'aspherical-8-ph';
+export type BrightfieldMode = 'bf-only' | 'phase-contrast' | 'darkfield' | 'polarization';
 
-export type SampleHolderChoice = 'none' | '4-slide-insert' | 'wellplate-insert';
+// --- WP6: Fluorescence ---
+export type FluoLightSource =
+  | 'none'
+  | 'laser-single'
+  | 'laser-dual'
+  | 'laser-quad'
+  | 'led-single'
+  | 'led-quad';
+
+export type DichroicChoice = 'none' | 'single-cn' | 'dual-cn' | 'multi-ahf';
+
+// --- WP7: Sample holder ---
+export type SampleHolderChoice =
+  | 'none'
+  | 'microscope-slide'
+  | 'mtp'
+  | 'petri-dish'
+  | 'custom-3d';
 
 export interface FrameWizardState {
-  // Step 1: Light source
+  // Step 1: Objective changer (WP2)
+  objectiveChanger: ObjectiveChangerChoice;
+  // Step 2: Objective lenses
+  primaryObjective: string | null;
+  secondaryObjective: string | null;
+  // Step 3: Illumination (WP4)
   lightSource: LightSourceChoice;
-  // Step 2: Hardware autofocus
-  autofocus: AutofocusChoice;
-  // Step 3: Objective lenses
-  primaryObjective: string | null; // objective id
-  secondaryObjective: string | null; // objective id (if revolver)
-  // Step 4: Sample holder
-  sampleHolder: SampleHolderChoice;
-  // Step 5: Motorized objective revolver
-  hasRevolver: boolean;
-  // Step 6: Overview camera
-  hasOverviewCamera: boolean;
-  // Step 7: Fluorescence
+  condenser: CondenserChoice;
+  brightfieldModes: BrightfieldMode[];
+  // Step 4: Fluorescence (WP6)
   hasFluorescence: boolean;
-  fluorescenceChannels: string[]; // fluorescence option ids
-  // Step 8: Main camera
-  selectedCamera: string | null; // camera id
-  // Step 9: Tube lens
-  selectedTubeLens: string | null; // lens id
-  // Step 10: Control inputs
-  controlInputs: string[]; // 'ps4-joystick' | 'can-jog-dial'
-  // Step 11: Customization
+  fluoLightSource: FluoLightSource;
+  dichroic: DichroicChoice;
+  fluorescenceChannels: string[];
+  // Step 5: Camera
+  selectedCamera: string | null;
+  // Step 6: Sample holder (WP7)
+  sampleHolder: SampleHolderChoice;
+  customSampleHolderNotes: string;
+  // Step 7: Summary / Quote (WP8)
+  fieldOfApplication: string;
+  specialRequirements: string;
   customNotes: string;
 }
 
@@ -137,4 +161,13 @@ export interface FrameConfiguration {
     description: string;
     createdAt: string;
   };
+}
+
+/** WP9: preset entry as listed in presets/index.json. */
+export interface PresetIndexEntry {
+  id: string;
+  name: string;
+  description: string;
+  image?: string;
+  file: string;
 }
