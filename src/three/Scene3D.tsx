@@ -8,6 +8,7 @@ import {
   Height as MoveYIcon,
   RotateLeft as RotateBaseIcon,
   Rotate90DegreesCw as RotateTopIcon,
+  Rotate90DegreesCcw as RotateTiltIcon,
   Timeline as RaysIcon,
   ViewInAr as BeamIcon,
 } from '@mui/icons-material';
@@ -22,8 +23,8 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { useSettings3D, THEMES_3D } from './use3DSettings';
 import { useCameraState } from './useCameraState';
 import { NavToolbar, TweenRunner, CameraCapture } from './NavToolbar';
-import { makeTween, focusOn } from './cameraUtils';
-import { moduleWorldPosition } from './coords';
+import { makeTween, focusOn, computeTopFit } from './cameraUtils';
+import { moduleWorldPosition, snapGridXZ } from './coords';
 import { GRID_MM } from '../constants/grid';
 import type { GizmoMode } from './CubeGizmo';
 
@@ -54,7 +55,8 @@ function SceneContent({
 
   return (
     <>
-      <fog attach="fog" args={[theme.fogColor, 800, 2000]} />
+      {/* Fog kept far out so cubes never wash into the background when zoomed out. */}
+      <fog attach="fog" args={[theme.fogColor, 12000, 30000]} />
 
       <hemisphereLight args={['#ffffff', '#b0b0b0', 0.6]} />
       <ambientLight intensity={1.0} />
@@ -68,7 +70,7 @@ function SceneContent({
         enableDamping
         dampingFactor={0.12}
         minDistance={30}
-        maxDistance={3000}
+        maxDistance={9000}
         maxPolarAngle={Math.PI * 0.85}
         mouseButtons={{
           LEFT: THREE.MOUSE.ROTATE,
@@ -86,13 +88,18 @@ function SceneContent({
       {settings.showGrid && (
         <Grid
           args={[2000, 2000]}
-          cellSize={50}
-          sectionSize={250}
+          cellSize={GRID_MM.x}
+          cellThickness={1}
+          sectionSize={GRID_MM.x * 5}
+          sectionThickness={1.4}
           cellColor={theme.gridColor}
           sectionColor={theme.sectionColor}
           infiniteGrid
-          fadeDistance={1500}
-          position={[0, GRID_MM.baseplate, 0]}
+          fadeDistance={12000}
+          fadeStrength={1.2}
+          /* Offset by half a cell so each 50 mm cube sits centred in a grid
+             cell (matching the 2D builder) instead of straddling intersections. */
+          position={[GRID_MM.x / 2, GRID_MM.baseplate, GRID_MM.z / 2]}
         />
       )}
 
@@ -124,6 +131,9 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
   const placedModules = useAppStore(s => s.placedModules);
   const selectedItemId = useAppStore(s => s.selectedItemId);
   const selectedItemType = useAppStore(s => s.selectedItemType);
+  const placeModule = useAppStore(s => s.placeModule);
+  const layers = useAppStore(s => s.layers);
+  const activeLayerId = useAppStore(s => s.activeLayerId);
   const simEnabled = useSimulationStore(s => s.config.enabled);
   const simShowRays = useSimulationStore(s => s.config.showRays);
   const [isDragging, setIsDragging] = useState(false);
@@ -135,6 +145,33 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const tweenRef = useRef(makeTween());
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+
+  // On first 3D entry (no saved camera) auto-frame the scene from straight above
+  // — the "XY-plane" view. The camera is set directly (not tweened) so it doesn't
+  // depend on the render loop, and re-applied across the side-drawer open
+  // transition (which resizes the canvas), until the user grabs the camera.
+  useEffect(() => {
+    if (sessionStorage.getItem('openuc2-3d-camera')) return;
+    let userMoved = false;
+    let attached: OrbitControlsImpl | null = null;
+    const onStart = () => { userMoved = true; };
+    const apply = () => {
+      const cam = cameraRef.current;
+      const ctrl = controlsRef.current;
+      if (!cam || !ctrl) return;
+      if (!attached) { ctrl.addEventListener('start', onStart); attached = ctrl; }
+      if (userMoved || cam.aspect <= 0.05) return;
+      const { position, target } = computeTopFit(cam, useAppStore.getState().placedModules, cam.aspect);
+      cam.position.copy(position);
+      ctrl.target.copy(target);
+      ctrl.update();
+    };
+    const timers = [80, 250, 500, 900, 1400].map(ms => window.setTimeout(apply, ms));
+    return () => {
+      timers.forEach(clearTimeout);
+      if (attached) attached.removeEventListener('start', onStart);
+    };
+  }, []);
 
   // F key: focus selected module
   useEffect(() => {
@@ -159,17 +196,48 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
 
   const handleDraggingChanged = useCallback((d: boolean) => setIsDragging(d), []);
 
+  // Drag a part from the library onto the 3D canvas → place it on the grid cell
+  // under the cursor (on the active layer's plane).
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const moduleId = e.dataTransfer.getData('moduleId');
+    const cam = cameraRef.current;
+    const canvas = (e.currentTarget as HTMLElement).querySelector('canvas');
+    if (!moduleId || !cam || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(ndc, cam);
+    const layerIndex = layers.find(l => l.id === activeLayerId)?.index ?? 0;
+    const planeY = layerIndex * GRID_MM.yLayer + GRID_MM.baseplate;
+    const hit = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY), hit)) return;
+    placeModule(moduleId, snapGridXZ(hit.x, hit.z), layerIndex);
+  }, [layers, activeLayerId, placeModule]);
+
   const isDark = settings.theme === 'dark';
   const toolbarBg = isDark ? 'rgba(30, 30, 46, 0.88)' : 'rgba(255, 255, 255, 0.88)';
   const buttonColor = isDark ? 'grey.300' : 'grey.700';
   const buttonBorder = isDark ? 'grey.700' : 'grey.400';
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+    <Box
+      sx={{ position: 'relative', width: '100%', height: '100%' }}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <Canvas
-        camera={{ position: [300, 300, 300], near: 1, far: 5000, fov: 45 }}
+        camera={{ position: [0, 900, 350], near: 1, far: 30000, fov: 45 }}
         style={{ width: '100%', height: '100%' }}
-        gl={{ alpha: false }}
+        gl={{ alpha: false, preserveDrawingBuffer: true }}
         scene={{ background: new THREE.Color(theme.background) }}
         onPointerMissed={(e) => {
           // Only clear selection when clicking the canvas itself, not DOM overlays
@@ -224,10 +292,13 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
             <Tooltip title="Move Y / Layer (Y)"><MoveYIcon fontSize="small" /></Tooltip>
           </ToggleButton>
           <ToggleButton value="rotate-base">
-            <Tooltip title="Rotate base (R)"><RotateBaseIcon fontSize="small" /></Tooltip>
+            <Tooltip title="Rotate Y · turn (R)"><RotateBaseIcon fontSize="small" /></Tooltip>
+          </ToggleButton>
+          <ToggleButton value="rotate-tilt">
+            <Tooltip title="Rotate X · tilt (X)"><RotateTiltIcon fontSize="small" /></Tooltip>
           </ToggleButton>
           <ToggleButton value="rotate-top">
-            <Tooltip title="Rotate top (T)"><RotateTopIcon fontSize="small" /></Tooltip>
+            <Tooltip title="Rotate Z · roll (T)"><RotateTopIcon fontSize="small" /></Tooltip>
           </ToggleButton>
         </ToggleButtonGroup>
 

@@ -33,7 +33,46 @@ import {
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { getSimulationModel, getElementTypeName } from '../utils/sceneBuilder';
+import { loadThumbnailManifest, orientationsFor, thumbnailUrl, defaultOrientation, type ThumbnailManifest } from '../utils/moduleThumbnails';
 import type { PlacedModule } from '../types';
+
+// Per-module GLB preview with selectable orientation (uses pre-rendered thumbnails).
+const ModuleThumbnailPreview: React.FC<{ moduleId: string }> = ({ moduleId }) => {
+  const [manifest, setManifest] = useState<ThumbnailManifest>({});
+  const [orient, setOrient] = useState<string | null>(null);
+  React.useEffect(() => {
+    loadThumbnailManifest().then(m => { setManifest(m); setOrient(defaultOrientation(m, moduleId)); });
+  }, [moduleId]);
+  const orients = orientationsFor(manifest, moduleId);
+  if (orients.length === 0 || !orient) return null;
+  return (
+    <Card>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>Preview</Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1, mb: 1 }}>
+          <img
+            src={thumbnailUrl(moduleId, orient)}
+            alt={`${moduleId} ${orient}`}
+            style={{ width: '70%', maxWidth: 180, aspectRatio: '1 / 1', objectFit: 'contain' }}
+          />
+        </Box>
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {orients.map(o => (
+            <Chip
+              key={o}
+              label={o}
+              size="small"
+              variant={o === orient ? 'filled' : 'outlined'}
+              color={o === orient ? 'primary' : 'default'}
+              onClick={() => setOrient(o)}
+              sx={{ textTransform: 'capitalize', cursor: 'pointer' }}
+            />
+          ))}
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
 
 // Proper React component so hooks are never called conditionally
 const DetectorSignalPlot: React.FC<{ module: PlacedModule }> = ({ module }) => {
@@ -447,6 +486,7 @@ export const PropertyPanel: React.FC = () => {
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <ModuleThumbnailPreview moduleId={module.moduleId} />
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>

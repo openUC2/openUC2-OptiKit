@@ -86,10 +86,11 @@ export function CubeInstance({ module: m, moduleDef: def }: CubeInstanceProps) {
     return () => { cubeRefRegistry.delete(m.id); };
   }, [m.id]);
 
-  const worldPos  = moduleWorldPosition(m);
-  const yRotRad   = THREE.MathUtils.degToRad(-m.rotation);
-  const topRotRad = THREE.MathUtils.degToRad(m.topRotation ?? 0);
-  const offset    = def?.glbOffset;
+  const worldPos   = moduleWorldPosition(m);
+  const yRotRad    = THREE.MathUtils.degToRad(-m.rotation);
+  const topRotRad  = THREE.MathUtils.degToRad(m.topRotation ?? 0);
+  const tiltRotRad = THREE.MathUtils.degToRad(m.tiltRotation ?? 0);
+  const offset     = def?.glbOffset;
 
   return (
     // Outer group: grid position + in-plane (Y-axis) rotation
@@ -105,8 +106,8 @@ export function CubeInstance({ module: m, moduleDef: def }: CubeInstanceProps) {
       {isSelected && <HighlightBox color={SELECTION_COLOR} size={GRID_MM.cube + 2} />}
       {hovered && !isSelected && <HighlightBox color={HOVER_COLOR} size={GRID_MM.cube + 1} />}
 
-      {/* Inner group: top rotation around Z axis */}
-      <group rotation={[0, 0, topRotRad]}>
+      {/* Inner group: tilt (X) + roll/top (Z) rotation */}
+      <group rotation={[tiltRotRad, 0, topRotRad]}>
         {def?.glbUrl ? (
           <GLBErrorBoundary fallback={<DefaultCube offset={offset} />}>
             <Suspense fallback={<DefaultCube offset={offset} />}>

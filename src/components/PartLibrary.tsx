@@ -29,6 +29,7 @@ import {
   Biotech as PhysicsIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { loadThumbnailManifest, defaultOrientation, thumbnailUrl, type ThumbnailManifest } from '../utils/moduleThumbnails';
 import { ModuleCreationWizard } from './ModuleCreationWizard';
 import { MODULE_SIMULATION_MODELS } from '../types';
 import type { ModuleDefinition, OpticalElement, OpticalElementType } from '../types';
@@ -103,8 +104,14 @@ export const PartLibrary: React.FC = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0 for all modules, 1 for user created
   const [iconMode, setIconMode] = useState<'svg' | 'canvas'>('svg'); // icon display mode
+  const [thumbManifest, setThumbManifest] = useState<ThumbnailManifest>({});
   const longPressTimeout = useRef<number | null>(null);
   const isDragging = useRef(false);
+
+  // Load the pre-rendered GLB thumbnail manifest (falls back to SVG when absent)
+  useEffect(() => {
+    loadThumbnailManifest().then(setThumbManifest);
+  }, []);
 
   useEffect(() => {
     loadModules();
@@ -336,6 +343,9 @@ export const PartLibrary: React.FC = () => {
   };
 
   const renderModuleTile = (module: ModuleDefinition) => {
+    // Prefer a pre-rendered GLB thumbnail (default orientation), else the SVG.
+    const glbOrient = defaultOrientation(thumbManifest, module.id);
+    const imgSrc = (glbOrient ? thumbnailUrl(module.id, glbOrient) : null) || module.thumbnail;
     return (
       <Card
         key={module.id}
@@ -381,9 +391,9 @@ export const PartLibrary: React.FC = () => {
           >
             {iconMode === 'canvas' ? (
               <MiniPhysicalIcon module={module} size={58} />
-            ) : module.thumbnail ? (
-              <img 
-                src={module.thumbnail} 
+            ) : imgSrc ? (
+              <img
+                src={imgSrc}
                 alt={module.name}
                 style={{ 
                   width: '100%', 

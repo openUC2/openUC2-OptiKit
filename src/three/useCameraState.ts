@@ -37,9 +37,15 @@ export function useCameraState(controlsRef: React.RefObject<OrbitControlsImpl | 
   const { camera } = useThree();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Read the saved camera once, synchronously, so callers can branch on it
+  // during the same render (e.g. skip the initial top-down fit).
+  const savedRef = useRef<SavedCamera | null | undefined>(undefined);
+  if (savedRef.current === undefined) savedRef.current = load();
+  const hadSaved = !!savedRef.current;
+
   // On mount: restore saved camera state
   useEffect(() => {
-    const saved = load();
+    const saved = savedRef.current;
     if (saved) {
       camera.position.set(...saved.position);
       // Wait one frame for OrbitControls to mount before updating target
@@ -80,5 +86,5 @@ export function useCameraState(controlsRef: React.RefObject<OrbitControlsImpl | 
     save(camera.position, controlsRef.current?.target ?? new THREE.Vector3());
   };
 
-  return { resetCamera };
+  return { resetCamera, hadSaved };
 }

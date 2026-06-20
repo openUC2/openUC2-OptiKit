@@ -50,8 +50,12 @@ import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isEditorPage = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
-  
+  const isThreeD = location.pathname.startsWith('/configurator/3d');
+  const is2DEditor = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
+  // Both the 2D and 3D editors share the same toolbar (edit/annotate/file/save);
+  // they differ only in the rendering surface in the center.
+  const isEditorPage = is2DEditor || isThreeD;
+
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
   const [imSwitchWizardOpen, setImSwitchWizardOpen] = React.useState(false);
@@ -390,11 +394,11 @@ openUC2 team via GitHub repository
             </Button>
           </Tooltip>
           {isEditorPage && (
-            <Tooltip title="View setup in 3D">
+            <Tooltip title={isThreeD ? 'Switch to 2D grid view' : 'Switch to 3D view'}>
               <Button
                 color="inherit"
-                startIcon={<View3DIcon />}
-                onClick={() => navigate('/configurator/3d')}
+                startIcon={isThreeD ? <EditorIcon /> : <View3DIcon />}
+                onClick={() => navigate(isThreeD ? '/configurator' : '/configurator/3d')}
                 size="small"
                 sx={{
                   textTransform: 'none',
@@ -406,7 +410,7 @@ openUC2 team via GitHub repository
                 }}
               >
                 <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  View 3D
+                  {isThreeD ? 'View 2D' : 'View 3D'}
                 </Typography>
               </Button>
             </Tooltip>
@@ -589,7 +593,7 @@ openUC2 team via GitHub repository
           variant="h6"
           sx={{ display: { xs: 'none', lg: 'block' }, fontWeight: 400, fontSize: '1rem', ml: 2, whiteSpace: 'nowrap' }}
         >
-          {isEditorPage ? 'OptiKit - 2D Grid Builder' : 'Setup Browser'}
+          {isThreeD ? 'OptiKit — 3D Builder' : is2DEditor ? 'OptiKit - 2D Grid Builder' : 'Setup Browser'}
         </Typography>
       </MuiToolbar>
       

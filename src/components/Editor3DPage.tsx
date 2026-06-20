@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Box, Button, ButtonGroup, CircularProgress, Divider, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import {
-  ArrowBack as BackIcon,
-  ViewInAr as View3DIcon,
+  Box, Button, ButtonGroup, CircularProgress, Divider, Drawer, IconButton, Paper,
+  Tab, Tabs, Tooltip, Typography, useMediaQuery, useTheme,
+} from '@mui/material';
+import {
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
   GridOn as GridOnIcon,
@@ -11,21 +12,35 @@ import {
   RadioButtonUnchecked as AxesOffIcon,
   RotateLeft as RotateLeftIcon,
   RotateRight as RotateRightIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
 import { Scene3D } from '../three/Scene3D';
+import { Toolbar } from './Toolbar';
+import { PartLibrary } from './PartLibrary';
 import { PropertyPanel } from './PropertyPanel';
+import { LayerPanel } from './LayerPanel';
+import { SimulationPanel } from './SimulationPanel';
+import { AnnotationPanel } from './AnnotationPanel';
+import { BOMPanel } from './BOMPanel';
+import { ChatPanel } from './ChatPanel';
 import { useAppStore } from '../stores/appStore';
 import { use3DSettings, Settings3DContext, THEMES_3D } from '../three/use3DSettings';
 import type { GizmoMode } from '../three/CubeGizmo';
 
 /**
- * 3D editor view with full drag / rotate parity.
- * Rendered at /configurator/3d via React.lazy — not included in the 2D bundle.
+ * 3D-first editor. Shares the toolbar, part library and right-hand panels with
+ * the 2D editor — only the center surface (Scene3D vs. the Konva grid) differs.
  */
 export function Editor3DPage() {
-  const navigate = useNavigate();
+  const muiTheme = useTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+
   const [gizmoMode, setGizmoMode] = useState<GizmoMode>('translate-xz');
+  const [leftOpen, setLeftOpen] = useState(!isMobile);
+  const [rightOpen, setRightOpen] = useState(!isMobile);
+
   const settingsCtx = use3DSettings();
   const { settings, setSettings } = settingsCtx;
   const theme = THEMES_3D[settings.theme];
@@ -33,7 +48,6 @@ export function Editor3DPage() {
 
   const clearSelection = useAppStore(s => s.clearSelection);
   const selectedItemId = useAppStore(s => s.selectedItemId);
-  const activeLayerId = useAppStore(s => s.activeLayerId);
   const removeModule = useAppStore(s => s.removeModule);
   const modules = useAppStore(s => s.modules);
   const loadModules = useAppStore(s => s.loadModules);
@@ -41,22 +55,49 @@ export function Editor3DPage() {
   const placedModules = useAppStore(s => s.placedModules);
   const rotateModule = useAppStore(s => s.rotateModule);
   const rotateModuleTop = useAppStore(s => s.rotateModuleTop);
+  const rotateModuleTilt = useAppStore(s => s.rotateModuleTilt);
   const moveModule = useAppStore(s => s.moveModule);
   const moveModuleToLayer = useAppStore(s => s.moveModuleToLayer);
+  const activeRightTab = useAppStore(s => s.activeRightTab);
+  const setActiveRightTab = useAppStore(s => s.setActiveRightTab);
 
   const selectedModule = selectedItemId ? placedModules.find(m => m.id === selectedItemId) : undefined;
 
-  // Ensure modules are loaded when refreshing directly to /configurator/3d
+  // Ensure modules are loaded when refreshing directly onto /configurator/3d
   useEffect(() => {
     if (modules.length === 0) {
       loadModules().then(() => loadStateFromStorage());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setLeftOpen(!isMobile);
+    setRightOpen(!isMobile);
+  }, [isMobile]);
+
+  // Screenshot: the store's File ▸ Download Screenshot dispatches this event;
+  // capture the WebGL canvas (preserveDrawingBuffer is enabled in Scene3D).
+  useEffect(() => {
+    const onShot = () => {
+      const canvas = document.querySelector('canvas');
+      if (!canvas) return;
+      try {
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'optikit-3d.png';
+        a.click();
+      } catch (e) {
+        console.warn('3D screenshot failed:', e);
+      }
+    };
+    window.addEventListener('download-screenshot', onShot);
+    return () => window.removeEventListener('download-screenshot', onShot);
   }, []);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Ignore when typing in an input
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -65,6 +106,7 @@ export function Editor3DPage() {
       case 'y': setGizmoMode('translate-y'); break;
       case 'r': setGizmoMode('rotate-base'); break;
       case 't': setGizmoMode('rotate-top'); break;
+      case 'x': setGizmoMode('rotate-tilt'); break;
       case 'escape': clearSelection(); break;
       case 'delete':
       case 'backspace':
@@ -78,187 +120,198 @@ export function Editor3DPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
+
   return (
     <Settings3DContext.Provider value={settingsCtx}>
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Minimal top bar */}
-      <Paper
-        elevation={2}
-        square
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          px: 2,
-          py: 1,
-          bgcolor: 'primary.main',
-          color: 'white',
-          zIndex: 1300,
-        }}
-      >
-        <View3DIcon sx={{ mr: 0.5 }} />
-        <Box sx={{ fontWeight: 500, fontSize: '1.1rem', flex: 1 }}>
-          OpenUC2 — 3D View
-        </Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        {/* Shared toolbar (File/save, Edit, Annotate, nav, View 2D) */}
+        <Toolbar />
 
-        {/* ── Settings toggles ── */}
-        <Tooltip title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
-          <IconButton
-            size="small"
-            color="inherit"
-            onClick={() => setSettings(s => ({ ...s, theme: isDark ? 'light' : 'dark' }))}
+        <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          {/* Left: part library (double-tap to place into the 3D scene) */}
+          <Drawer
+            variant={isMobile ? 'temporary' : 'persistent'}
+            anchor="left"
+            open={leftOpen}
+            onClose={() => setLeftOpen(false)}
+            sx={{
+              width: sidebarWidth,
+              flexShrink: 0,
+              '& .MuiDrawer-paper': {
+                width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
+                height: '100%', top: 'auto', borderRight: `1px solid ${muiTheme.palette.divider}`,
+              },
+            }}
           >
-            {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-          </IconButton>
-        </Tooltip>
+            <PartLibrary />
+          </Drawer>
 
-        <Tooltip title={settings.showGrid ? 'Hide grid' : 'Show grid'}>
-          <IconButton
-            size="small"
-            color="inherit"
-            onClick={() => setSettings(s => ({ ...s, showGrid: !s.showGrid }))}
+          {/* Center: 3D canvas + floating overlays */}
+          <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden', bgcolor: theme.background }}>
+            {/* Left drawer toggle */}
+            <Tooltip title={leftOpen ? 'Collapse parts library' : 'Expand parts library'} placement="right">
+              <IconButton
+                onClick={() => setLeftOpen(o => !o)}
+                size="small"
+                sx={{
+                  position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 100,
+                  bgcolor: 'primary.main', color: 'white', borderRadius: '0 6px 6px 0',
+                  width: 18, height: 52, minWidth: 0, p: 0, boxShadow: 2,
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                {leftOpen ? <ChevronLeftIcon sx={{ fontSize: 14 }} /> : <ChevronRightIcon sx={{ fontSize: 14 }} />}
+              </IconButton>
+            </Tooltip>
+
+            {modules.length === 0 ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}>
+                <CircularProgress />
+                <Typography variant="body2" color="text.secondary">Loading setup…</Typography>
+              </Box>
+            ) : (
+              <Scene3D gizmoMode={gizmoMode} onGizmoModeChange={setGizmoMode} />
+            )}
+
+            {/* Top-right: 3D view settings */}
+            <Paper
+              elevation={3}
+              sx={{
+                position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex',
+                bgcolor: isDark ? 'rgba(30,30,46,0.88)' : 'rgba(255,255,255,0.9)',
+                backdropFilter: 'blur(8px)', borderRadius: 2, p: 0.25,
+              }}
+            >
+              <Tooltip title={isDark ? 'Light mode' : 'Dark mode'}>
+                <IconButton size="small" onClick={() => setSettings(s => ({ ...s, theme: isDark ? 'light' : 'dark' }))}>
+                  {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={settings.showGrid ? 'Hide grid' : 'Show grid'}>
+                <IconButton size="small" onClick={() => setSettings(s => ({ ...s, showGrid: !s.showGrid }))}>
+                  {settings.showGrid ? <GridOnIcon fontSize="small" /> : <GridOffIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={settings.showAxes ? 'Hide axes' : 'Show axes'}>
+                <IconButton size="small" onClick={() => setSettings(s => ({ ...s, showAxes: !s.showAxes }))}>
+                  {settings.showAxes ? <AxesOnIcon fontSize="small" /> : <AxesOffIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </Paper>
+
+            {/* Top-left floating transform panel (shown when a module is selected) */}
+            {selectedModule && (
+              <Paper
+                elevation={3}
+                sx={{
+                  position: 'absolute', top: 12, left: 28, zIndex: 10, p: 1, width: 150,
+                  display: 'flex', flexDirection: 'column', gap: 0.5,
+                  bgcolor: isDark ? 'rgba(30,30,46,0.92)' : 'rgba(255,255,255,0.94)',
+                  backdropFilter: 'blur(8px)', borderRadius: 2,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, flex: 1 }}>Transform</Typography>
+                  <Tooltip title="Deselect (Esc)">
+                    <IconButton size="small" sx={{ p: 0.25 }} onClick={() => clearSelection()}><CloseIcon sx={{ fontSize: 14 }} /></IconButton>
+                  </Tooltip>
+                </Box>
+
+                <Typography variant="caption">Turn · Y</Typography>
+                <ButtonGroup size="small" fullWidth>
+                  <Button onClick={() => rotateModule(selectedModule.id, ((selectedModule.rotation - 90) + 360) % 360)}><RotateLeftIcon fontSize="small" /></Button>
+                  <Button onClick={() => rotateModule(selectedModule.id, (selectedModule.rotation + 90) % 360)}><RotateRightIcon fontSize="small" /></Button>
+                </ButtonGroup>
+
+                <Typography variant="caption">Tilt · X</Typography>
+                <ButtonGroup size="small" fullWidth>
+                  <Button onClick={() => rotateModuleTilt(selectedModule.id, (((selectedModule.tiltRotation ?? 0) - 90) + 360) % 360)}><RotateLeftIcon fontSize="small" /></Button>
+                  <Button onClick={() => rotateModuleTilt(selectedModule.id, ((selectedModule.tiltRotation ?? 0) + 90) % 360)}><RotateRightIcon fontSize="small" /></Button>
+                </ButtonGroup>
+
+                <Typography variant="caption">Roll · Z</Typography>
+                <ButtonGroup size="small" fullWidth>
+                  <Button onClick={() => rotateModuleTop(selectedModule.id, (((selectedModule.topRotation ?? 0) - 90) + 360) % 360)}><RotateLeftIcon fontSize="small" /></Button>
+                  <Button onClick={() => rotateModuleTop(selectedModule.id, ((selectedModule.topRotation ?? 0) + 90) % 360)}><RotateRightIcon fontSize="small" /></Button>
+                </ButtonGroup>
+
+                <Divider sx={{ my: 0.25 }} />
+                <Typography variant="caption">Move X / Y (50 mm)</Typography>
+                <ButtonGroup size="small" fullWidth>
+                  <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x - 1, y: selectedModule.position.y })}>−X</Button>
+                  <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x + 1, y: selectedModule.position.y })}>+X</Button>
+                  <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x, y: selectedModule.position.y - 1 })}>−Y</Button>
+                  <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x, y: selectedModule.position.y + 1 })}>+Y</Button>
+                </ButtonGroup>
+                <Typography variant="caption">Layer (Z)</Typography>
+                <ButtonGroup size="small" fullWidth>
+                  <Button onClick={() => moveModuleToLayer(selectedModule.id, selectedModule.layer - 1)}>−Z</Button>
+                  <Button onClick={() => moveModuleToLayer(selectedModule.id, selectedModule.layer + 1)}>+Z</Button>
+                </ButtonGroup>
+              </Paper>
+            )}
+
+            {/* Right drawer toggle */}
+            <Tooltip title={rightOpen ? 'Collapse settings panel' : 'Expand settings panel'} placement="left">
+              <IconButton
+                onClick={() => setRightOpen(o => !o)}
+                size="small"
+                sx={{
+                  position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 100,
+                  bgcolor: 'primary.main', color: 'white', borderRadius: '6px 0 0 6px',
+                  width: 18, height: 52, minWidth: 0, p: 0, boxShadow: 2,
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                {rightOpen ? <ChevronRightIcon sx={{ fontSize: 14 }} /> : <ChevronLeftIcon sx={{ fontSize: 14 }} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          {/* Right: identical tabbed panel to the 2D editor */}
+          <Drawer
+            variant={isMobile ? 'temporary' : 'persistent'}
+            anchor="right"
+            open={rightOpen}
+            onClose={() => setRightOpen(false)}
+            sx={{
+              width: sidebarWidth,
+              flexShrink: 0,
+              '& .MuiDrawer-paper': {
+                width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
+                height: '100%', top: 'auto', borderLeft: `1px solid ${muiTheme.palette.divider}`,
+              },
+            }}
           >
-            {settings.showGrid ? <GridOnIcon fontSize="small" /> : <GridOffIcon fontSize="small" />}
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title={settings.showAxes ? 'Hide axes' : 'Show axes'}>
-          <IconButton
-            size="small"
-            color="inherit"
-            onClick={() => setSettings(s => ({ ...s, showAxes: !s.showAxes }))}
-          >
-            {settings.showAxes ? <AxesOnIcon fontSize="small" /> : <AxesOffIcon fontSize="small" />}
-          </IconButton>
-        </Tooltip>
-
-        <Button
-          color="inherit"
-          startIcon={<BackIcon />}
-          onClick={() => {
-            const params = new URLSearchParams();
-            if (selectedItemId) params.set('selected', selectedItemId);
-            if (activeLayerId) params.set('layer', activeLayerId);
-            const query = params.toString();
-            navigate(`/configurator${query ? '?' + query : ''}`);
-          }}
-          size="small"
-          sx={{ textTransform: 'none', ml: 1 }}
-        >
-          Back to 2D
-        </Button>
-      </Paper>
-
-      {/* Main content: 3D canvas + right property panel */}
-      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        {/* Left transform panel */}
-        {selectedModule && (
-          <Paper
-            elevation={2}
-            square
-            sx={{ width: 160, overflowY: 'auto', p: 1, borderRight: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1 }}
-          >
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Rotate</Typography>
-
-            <Typography variant="caption">Base (Z)</Typography>
-            <ButtonGroup size="small" fullWidth>
-              <Tooltip title="Rotate base −90°">
-                <Button onClick={() => rotateModule(selectedModule.id, ((selectedModule.rotation - 90) + 360) % 360)}>
-                  <RotateLeftIcon fontSize="small" />
-                </Button>
-              </Tooltip>
-              <Tooltip title="Rotate base +90°">
-                <Button onClick={() => rotateModule(selectedModule.id, (selectedModule.rotation + 90) % 360)}>
-                  <RotateRightIcon fontSize="small" />
-                </Button>
-              </Tooltip>
-            </ButtonGroup>
-
-            <Typography variant="caption">Top (Y)</Typography>
-            <ButtonGroup size="small" fullWidth>
-              <Tooltip title="Rotate top −90°">
-                <Button onClick={() => rotateModuleTop(selectedModule.id, (((selectedModule.topRotation ?? 0) - 90) + 360) % 360)}>
-                  <RotateLeftIcon fontSize="small" />
-                </Button>
-              </Tooltip>
-              <Tooltip title="Rotate top +90°">
-                <Button onClick={() => rotateModuleTop(selectedModule.id, ((selectedModule.topRotation ?? 0) + 90) % 360)}>
-                  <RotateRightIcon fontSize="small" />
-                </Button>
-              </Tooltip>
-            </ButtonGroup>
-
-            <Divider sx={{ my: 0.5 }} />
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Translate (50 mm)</Typography>
-
-            <Typography variant="caption">X axis</Typography>
-            <ButtonGroup size="small" fullWidth>
-              <Tooltip title="Move −50 mm (X)">
-                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x - 1, y: selectedModule.position.y })}>−X</Button>
-              </Tooltip>
-              <Tooltip title="Move +50 mm (X)">
-                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x + 1, y: selectedModule.position.y })}>+X</Button>
-              </Tooltip>
-            </ButtonGroup>
-
-            <Typography variant="caption">Y axis</Typography>
-            <ButtonGroup size="small" fullWidth>
-              <Tooltip title="Move −50 mm (Y)">
-                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x, y: selectedModule.position.y - 1 })}>−Y</Button>
-              </Tooltip>
-              <Tooltip title="Move +50 mm (Y)">
-                <Button onClick={() => moveModule(selectedModule.id, { x: selectedModule.position.x, y: selectedModule.position.y + 1 })}>+Y</Button>
-              </Tooltip>
-            </ButtonGroup>
-
-            <Typography variant="caption">Z (layer)</Typography>
-            <ButtonGroup size="small" fullWidth>
-              <Tooltip title="Move down one layer (−Z)">
-                <Button onClick={() => moveModuleToLayer(selectedModule.id, selectedModule.layer - 1)}>−Z</Button>
-              </Tooltip>
-              <Tooltip title="Move up one layer (+Z)">
-                <Button onClick={() => moveModuleToLayer(selectedModule.id, selectedModule.layer + 1)}>+Z</Button>
-              </Tooltip>
-            </ButtonGroup>
-          </Paper>
-        )}
-        {/* 3D canvas fills remaining space */}
-        <Box
-          sx={{
-            flex: 1,
-            position: 'relative',
-            overflow: 'hidden',
-            bgcolor: theme.background,
-          }}
-        >
-          {modules.length === 0 ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}>
-              <CircularProgress />
-              <Typography variant="body2" color="text.secondary">Loading setup…</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Tabs
+                value={activeRightTab}
+                onChange={(_, v) => setActiveRightTab(v)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 48, '& .MuiTab-root': { minWidth: 'auto', px: 2 } }}
+              >
+                <Tab label="Layers" value="layers" />
+                <Tab label="Properties" value="properties" />
+                <Tab label="Simulation" value="simulation" />
+                <Tab label="Annotations" value="annotations" />
+                <Tab label="BOM/Quote" value="bom" />
+                <Tab label="Chat" value="chat" />
+              </Tabs>
+              <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+                {activeRightTab === 'layers' && <LayerPanel />}
+                {activeRightTab === 'properties' && <PropertyPanel />}
+                {activeRightTab === 'simulation' && <SimulationPanel />}
+                {activeRightTab === 'annotations' && <AnnotationPanel />}
+                {activeRightTab === 'bom' && <BOMPanel />}
+                {activeRightTab === 'chat' && <ChatPanel />}
+              </Box>
             </Box>
-          ) : (
-            <Scene3D gizmoMode={gizmoMode} onGizmoModeChange={setGizmoMode} />
-          )}
+          </Drawer>
         </Box>
-
-        {/* Right panel: properties */}
-        <Paper
-          elevation={1}
-          square
-          sx={{
-            width: 360,
-            overflowY: 'auto',
-            borderLeft: '1px solid',
-            borderColor: 'divider',
-            p: 2,
-            flexShrink: 0,
-            display: { xs: 'none', md: 'block' },
-          }}
-        >
-          <PropertyPanel />
-        </Paper>
       </Box>
-    </Box>
     </Settings3DContext.Provider>
   );
 }

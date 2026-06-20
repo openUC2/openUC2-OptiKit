@@ -58,6 +58,7 @@ interface AppStore extends AppState {
   moveModuleToLayer: (moduleId: string, layer: number) => void;
   rotateModule: (moduleId: string, rotation: number) => void;
   rotateModuleTop: (moduleId: string, topRotation: number) => void;
+  rotateModuleTilt: (moduleId: string, tiltRotation: number) => void;
   removeModule: (moduleId: string) => void;
   updateModuleCustomText: (moduleId: string, customText: string) => void;
   updateModuleParams: (moduleId: string, params: Record<string, unknown>) => void;
@@ -342,6 +343,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set(state => ({
       placedModules: state.placedModules.map(m =>
         m.id === moduleId ? { ...m, topRotation: snapped } : m
+      )
+    }));
+  },
+
+  rotateModuleTilt: (moduleId: string, tiltRotation: number) => {
+    // Snap to nearest 90°
+    const snapped = (Math.round(tiltRotation / 90) * 90 + 360) % 360;
+    set(state => ({
+      placedModules: state.placedModules.map(m =>
+        m.id === moduleId ? { ...m, tiltRotation: snapped } : m
       )
     }));
   },
@@ -760,14 +771,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const runningNumber = index.toString().padStart(2, '0');
         const name = `${baseName}_${runningNumber}`;
         
-        // Convert rotation to PyInventor format (Y-axis rotation)
+        // Full 3-axis rotation tuple: [X pitch/tilt, Y yaw, Z roll/top]
+        const rotationX = module.tiltRotation || 0;
         const rotationY = module.rotation;
-        
+        const rotationZ = module.topRotation || 0;
+
         uc2_components.push({
           name: name,
           file: moduleDefinition.autodeskInventor || `C:\\UC2_Components\\${moduleDefinition.name.replace(/\s+/g, '_')}.iam`,
           grid_pos: [module.position.x, module.position.y, module.layer],
-          rotation: [0, rotationY, 0],
+          rotation: [rotationX, rotationY, rotationZ],
           moduleId: module.moduleId,
           originalName: moduleDefinition.name,
           description: moduleDefinition.description,
@@ -812,7 +825,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           layer: module.p[2] || 0,
           params: {},
           customText: module.t,
-          topRotation: module.tr || 0
+          topRotation: module.tr || 0,
+          tiltRotation: module.xr || 0
         }));
         
         // Convert annotations if they exist
@@ -869,7 +883,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
           id: uuidv4(),
           moduleId: component.moduleId || component.name.toLowerCase().replace(/_\d+$/, '').replace(/_/g, '-'),
           position: { x: component.grid_pos[0], y: component.grid_pos[1] },
-          rotation: component.rotation[1] || 0, // Use Y-axis rotation
+          rotation: component.rotation[1] || 0, // Y-axis yaw
+          tiltRotation: component.rotation[0] || 0, // X-axis pitch / tilt
+          topRotation: component.rotation[2] || 0, // Z-axis roll / top
           layer: component.grid_pos[2] || 0,
           params: component.params || {},
           customText: component.customText
@@ -1006,7 +1022,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           layer: module.p[2] || 0,
           params: {},
           customText: module.t,
-          topRotation: module.tr || 0
+          topRotation: module.tr || 0,
+          tiltRotation: module.xr || 0
         }));
         
         set({
@@ -1024,7 +1041,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
           id: uuidv4(),
           moduleId: component.moduleId || component.name.toLowerCase().replace(/_\d+$/, '').replace(/_/g, '-'),
           position: { x: component.grid_pos[0], y: component.grid_pos[1] },
-          rotation: component.rotation[1] || 0, // Use Y-axis rotation
+          rotation: component.rotation[1] || 0, // Y-axis yaw
+          tiltRotation: component.rotation[0] || 0, // X-axis pitch / tilt
+          topRotation: component.rotation[2] || 0, // Z-axis roll / top
           layer: component.grid_pos[2] || 0,
           params: component.params || {},
           customText: component.customText
@@ -1259,7 +1278,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         p: [module.position.x, module.position.y, module.layer],
         r: module.rotation,
         ...(module.customText && { t: module.customText }),
-        ...(module.topRotation && { tr: module.topRotation })
+        ...(module.topRotation && { tr: module.topRotation }),
+        ...(module.tiltRotation && { xr: module.tiltRotation })
       })),
       a: state.annotations.map(annotation => ({
         t: annotation.type,

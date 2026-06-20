@@ -1,0 +1,394 @@
+{
+  "cube-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "lens-pos-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "lens-neg-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "lens-asp-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "mirror-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "beamsplitter-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "led-470nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "led-530nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "led-625nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "filter-dichroic": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "stage-z": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "stage-z-motorized": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "laser-405nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "laser-532nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "laser-488nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "laser-635nm": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "photodiode": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "lens-negative-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "sampleholder-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "eyepiece-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "cube-fiberholder-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "cube-ledmatrix-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "polfilter-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "pinhole-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "torch-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "screenholder-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "electronics-v3": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "lambdahalf-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "galvo-xy": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "fiber-combiner": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "xy-stage": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "focus-tunable-lens-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "xyz-stage-compact-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "xyz-openflexure-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "xyz-stage-compact-motorised-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "iris-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "ndfilter-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "c-mount-adapter-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "tube-lens-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "diffuser-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "filter-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "cylindrical-lens-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "uc2-controller": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "phone-holder-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "aquarium-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "fluorescent-sample-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "dev-mirror-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "dev-camera-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ],
+  "dev-empty-1x1": [
+    "iso",
+    "front",
+    "top",
+    "left",
+    "right",
+    "back"
+  ]
+}

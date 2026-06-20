@@ -8,7 +8,7 @@ import { cubeRefRegistry } from './CubeInstance';
 import { snapGridXZ, snapLayerY, snapRotation, moduleWorldPosition } from './coords';
 import { GRID_MM } from '../constants/grid';
 
-export type GizmoMode = 'translate-xz' | 'translate-y' | 'rotate-base' | 'rotate-top';
+export type GizmoMode = 'translate-xz' | 'translate-y' | 'rotate-base' | 'rotate-top' | 'rotate-tilt';
 
 interface CubeGizmoProps {
   mode: GizmoMode;
@@ -27,6 +27,7 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
   const moveModuleToLayer = useAppStore(s => s.moveModuleToLayer);
   const rotateModule = useAppStore(s => s.rotateModule);
   const rotateModuleTop = useAppStore(s => s.rotateModuleTop);
+  const rotateModuleTilt = useAppStore(s => s.rotateModuleTilt);
   const checkCollision = useAppStore(s => s.checkCollision);
 
   const { invalidate } = useThree();
@@ -122,6 +123,12 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
       const zRad = targetObject.rotation.z;
       const deg = snapRotation(THREE.MathUtils.radToDeg(zRad));
       rotateModuleTop(placed.id, deg);
+    } else if (mode === 'rotate-tilt') {
+      // Tilt rotation is the X on the inner group; read the X euler from the
+      // outer group, snap to 90°, and commit.
+      const xRad = targetObject.rotation.x;
+      const deg = snapRotation(THREE.MathUtils.radToDeg(xRad));
+      rotateModuleTilt(placed.id, deg);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed, def, targetObject, mode]);
@@ -174,6 +181,14 @@ function getControlsProps(mode: GizmoMode) {
         showX: false,
         showY: false,
         showZ: true,
+        rotationSnap: Math.PI / 2,
+      };
+    case 'rotate-tilt':
+      return {
+        mode: 'rotate' as const,
+        showX: true,
+        showY: false,
+        showZ: false,
         rotationSnap: Math.PI / 2,
       };
   }

@@ -19,8 +19,8 @@ const DEFAULTS: Settings3D = {
 export const THEMES_3D = {
   light: {
     background: '#f0f2f5',
-    gridColor: '#cccccc',
-    sectionColor: '#999999',
+    gridColor: '#bcc3cc',
+    sectionColor: '#8d97a3',
     fogColor: '#f0f2f5',
   },
   dark: {

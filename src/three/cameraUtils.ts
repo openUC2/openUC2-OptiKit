@@ -70,6 +70,48 @@ function sceneBounds(placedModules: PlacedModule[]) {
   return { center, size };
 }
 
+/**
+ * Compute a top-down ("XY-plane") camera framing that fits all placed modules,
+ * accounting for viewport aspect ratio. Returns position + target without
+ * animating — used for the initial 3D entry view.
+ *
+ * In a top-down view the screen's vertical axis maps to world Z (depth) and the
+ * horizontal axis to world X, so we fit each against the matching FOV.
+ */
+export function computeTopFit(
+  camera: THREE.PerspectiveCamera,
+  placedModules: PlacedModule[],
+  aspect: number,
+  marginFactor = 1.35,
+): { position: THREE.Vector3; target: THREE.Vector3 } {
+  const { center, size } = sceneBounds(placedModules);
+  const fovRad = (camera.fov * Math.PI) / 180;
+  const tan = Math.tan(fovRad / 2);
+  // Guard against a not-yet-laid-out canvas (aspect ~0) producing an absurd distance.
+  const safeAspect = aspect > 0.05 ? aspect : 1.5;
+  const distForDepth = size.z / 2 / tan; // vertical screen axis ← world Z
+  const distForWidth = size.x / 2 / (tan * safeAspect); // horizontal ← world X
+  const dist = Math.min(
+    Math.max(distForDepth, distForWidth, 200) * marginFactor,
+    6000,
+  );
+  // Tiny Z nudge keeps the view direction off the camera-up axis (avoids gimbal flip).
+  const position = new THREE.Vector3(center.x, center.y + dist, center.z + 0.01);
+  return { position, target: center.clone() };
+}
+
+/** Animate the camera to a top-down framing of all placed modules. */
+export function topFitView(
+  tween: CameraTween,
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControlsImpl,
+  placedModules: PlacedModule[],
+  aspect: number,
+) {
+  const { position, target } = computeTopFit(camera, placedModules, aspect);
+  animateTo(tween, camera, controls, position, target);
+}
+
 /** Animate the camera to frame all placed modules. */
 export function zoomToFit(
   tween: CameraTween,

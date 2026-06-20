@@ -24,8 +24,14 @@ export function SelectionHUD() {
 
   const def = modules.find(d => d.id === placed.moduleId);
   const pos = moduleWorldPosition(placed);
-  // Position the HUD above the cube
-  const hudPos: [number, number, number] = [pos[0], pos[1] + GRID_MM.cube / 2 + 15, pos[2]];
+  // Offset the HUD up and to the (screen) upper-right of the cube so it never
+  // covers the selected module or its gizmo. +X = right, −Z = up-screen in the
+  // default top-down view.
+  const hudPos: [number, number, number] = [
+    pos[0] + GRID_MM.cube * 0.9,
+    pos[1] + GRID_MM.cube * 1.1,
+    pos[2] - GRID_MM.cube * 0.9,
+  ];
 
   return (
     <Html
@@ -60,7 +66,10 @@ export function SelectionHUD() {
             <Chip label={`Layer ${placed.layer}`} size="small" variant="outlined" sx={{ color: isDark ? 'grey.300' : 'grey.700', borderColor: isDark ? 'grey.600' : 'grey.400', height: 20, fontSize: '0.65rem' }} />
             <Chip label={`${placed.rotation}°`} size="small" variant="outlined" sx={{ color: isDark ? 'grey.300' : 'grey.700', borderColor: isDark ? 'grey.600' : 'grey.400', height: 20, fontSize: '0.65rem' }} />
             {(placed.topRotation ?? 0) !== 0 && (
-              <Chip label={`Top ${placed.topRotation}°`} size="small" variant="outlined" sx={{ color: isDark ? 'grey.300' : 'grey.700', borderColor: isDark ? 'grey.600' : 'grey.400', height: 20, fontSize: '0.65rem' }} />
+              <Chip label={`Roll ${placed.topRotation}°`} size="small" variant="outlined" sx={{ color: isDark ? 'grey.300' : 'grey.700', borderColor: isDark ? 'grey.600' : 'grey.400', height: 20, fontSize: '0.65rem' }} />
+            )}
+            {(placed.tiltRotation ?? 0) !== 0 && (
+              <Chip label={`Tilt ${placed.tiltRotation}°`} size="small" variant="outlined" sx={{ color: isDark ? 'grey.300' : 'grey.700', borderColor: isDark ? 'grey.600' : 'grey.400', height: 20, fontSize: '0.65rem' }} />
             )}
           </Stack>
         </CardContent>
