@@ -3,6 +3,8 @@ import {
   Box, Button, ButtonGroup, CircularProgress, Divider, Drawer, IconButton, Paper,
   Tab, Tabs, Tooltip, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import { materialTheme, materialThemeDark } from '../theme/materialTheme';
 import {
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
@@ -10,6 +12,8 @@ import {
   GridOff as GridOffIcon,
   Adjust as AxesOnIcon,
   RadioButtonUnchecked as AxesOffIcon,
+  Info as InfoOnIcon,
+  InfoOutlined as InfoOffIcon,
   RotateLeft as RotateLeftIcon,
   RotateRight as RotateRightIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -37,7 +41,7 @@ export function Editor3DPage() {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
-  const [gizmoMode, setGizmoMode] = useState<GizmoMode>('translate-xz');
+  const [gizmoMode, setGizmoMode] = useState<GizmoMode>('translate');
   const [leftOpen, setLeftOpen] = useState(!isMobile);
   const [rightOpen, setRightOpen] = useState(!isMobile);
 
@@ -102,11 +106,8 @@ export function Editor3DPage() {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
     switch (e.key.toLowerCase()) {
-      case 'g': setGizmoMode('translate-xz'); break;
-      case 'y': setGizmoMode('translate-y'); break;
-      case 'r': setGizmoMode('rotate-base'); break;
-      case 't': setGizmoMode('rotate-top'); break;
-      case 'x': setGizmoMode('rotate-tilt'); break;
+      case 'g': setGizmoMode('translate'); break;
+      case 'r': setGizmoMode('rotate'); break;
       case 'escape': clearSelection(); break;
       case 'delete':
       case 'backspace':
@@ -123,8 +124,9 @@ export function Editor3DPage() {
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
 
   return (
+    <ThemeProvider theme={isDark ? materialThemeDark : materialTheme}>
     <Settings3DContext.Provider value={settingsCtx}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
         {/* Shared toolbar (File/save, Edit, Annotate, nav, View 2D) */}
         <Toolbar />
 
@@ -144,7 +146,7 @@ export function Editor3DPage() {
               },
             }}
           >
-            <PartLibrary />
+            <PartLibrary glbThumbnails />
           </Drawer>
 
           {/* Center: 3D canvas + floating overlays */}
@@ -196,6 +198,11 @@ export function Editor3DPage() {
               <Tooltip title={settings.showAxes ? 'Hide axes' : 'Show axes'}>
                 <IconButton size="small" onClick={() => setSettings(s => ({ ...s, showAxes: !s.showAxes }))}>
                   {settings.showAxes ? <AxesOnIcon fontSize="small" /> : <AxesOffIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={settings.showInfoCard ? 'Hide module info card' : 'Show module info card'}>
+                <IconButton size="small" onClick={() => setSettings(s => ({ ...s, showInfoCard: !s.showInfoCard }))}>
+                  {settings.showInfoCard ? <InfoOnIcon fontSize="small" /> : <InfoOffIcon fontSize="small" />}
                 </IconButton>
               </Tooltip>
             </Paper>
@@ -313,5 +320,6 @@ export function Editor3DPage() {
         </Box>
       </Box>
     </Settings3DContext.Provider>
+    </ThemeProvider>
   );
 }

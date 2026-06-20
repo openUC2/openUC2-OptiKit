@@ -97,7 +97,7 @@ const MiniPhysicalIcon: React.FC<MiniPhysicalIconProps> = ({ module, size = 58 }
   );
 };
 
-export const PartLibrary: React.FC = () => {
+export const PartLibrary: React.FC<{ glbThumbnails?: boolean }> = ({ glbThumbnails = false }) => {
   const { modules, loadModules, placeModule, placedModules, layers, activeLayerId } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
@@ -108,10 +108,11 @@ export const PartLibrary: React.FC = () => {
   const longPressTimeout = useRef<number | null>(null);
   const isDragging = useRef(false);
 
-  // Load the pre-rendered GLB thumbnail manifest (falls back to SVG when absent)
+  // Load the pre-rendered GLB thumbnail manifest only in 3D (the 2D designer
+  // keeps its SVG symbols). Falls back to SVG when absent.
   useEffect(() => {
-    loadThumbnailManifest().then(setThumbManifest);
-  }, []);
+    if (glbThumbnails) loadThumbnailManifest().then(setThumbManifest);
+  }, [glbThumbnails]);
 
   useEffect(() => {
     loadModules();
@@ -343,8 +344,9 @@ export const PartLibrary: React.FC = () => {
   };
 
   const renderModuleTile = (module: ModuleDefinition) => {
-    // Prefer a pre-rendered GLB thumbnail (default orientation), else the SVG.
-    const glbOrient = defaultOrientation(thumbManifest, module.id);
+    // In 3D, prefer a pre-rendered GLB thumbnail (default orientation); in 2D
+    // keep the SVG symbol.
+    const glbOrient = glbThumbnails ? defaultOrientation(thumbManifest, module.id) : null;
     const imgSrc = (glbOrient ? thumbnailUrl(module.id, glbOrient) : null) || module.thumbnail;
     return (
       <Card

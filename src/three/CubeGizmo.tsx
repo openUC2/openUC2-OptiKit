@@ -6,9 +6,9 @@ import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { useAppStore } from '../stores/appStore';
 import { cubeRefRegistry } from './CubeInstance';
 import { snapGridXZ, snapLayerY, snapRotation, moduleWorldPosition } from './coords';
-import { GRID_MM } from '../constants/grid';
 
-export type GizmoMode = 'translate-xz' | 'translate-y' | 'rotate-base' | 'rotate-top' | 'rotate-tilt';
+// Two Slicer-style tools: a 3-axis move and a 3-axis rotate (all three rings).
+export type GizmoMode = 'translate' | 'rotate';
 
 interface CubeGizmoProps {
   mode: GizmoMode;
@@ -41,8 +41,8 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
   // Get the target object from the ref registry
   const targetObject = selectedId ? cubeRefRegistry.get(selectedId) : undefined;
 
-  // Store the original position/rotation before drag starts
-  const dragStartRef = useRef<{ pos: [number, number, number]; rotY: number; rotZ: number } | null>(null);
+  // Orientation captured when a rotate drag begins (for delta-based commit).
+  const dragStartQuat = useRef<THREE.Quaternion | null>(null);
 
   // Clear blocked flash after timeout
   useEffect(() => {
@@ -59,17 +59,11 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
     const handleDraggingChanged = (event: { value: boolean }) => {
       onDraggingChanged(event.value);
 
-      if (event.value && placed) {
-        // Drag started — record starting state
-        dragStartRef.current = {
-          pos: moduleWorldPosition(placed),
-          rotY: THREE.MathUtils.degToRad(-placed.rotation),
-          rotZ: THREE.MathUtils.degToRad(placed.topRotation ?? 0),
-        };
+      if (event.value && targetObject) {
+        dragStartQuat.current = targetObject.quaternion.clone();
       }
 
       if (!event.value && placed && def) {
-        // Drag ended — commit the snapped result
         commitTransform();
       }
     };
@@ -84,24 +78,25 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
       c.removeEventListener('dragging-changed', handleDraggingChanged);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed, def, mode]);
+  }, [placed, def, mode, targetObject]);
 
   const commitTransform = useCallback(() => {
     if (!placed || !def || !targetObject) return;
 
-    if (mode === 'translate-xz') {
+    if (mode === 'translate') {
+      // Snap X/Z to the grid and Y to the nearest layer — a full 3-axis move.
       const wp = targetObject.position;
       const snapped = snapGridXZ(wp.x, wp.z);
+      const newLayer = snapLayerY(wp.y);
 
-      // Collision check
       const footprint = def.footprint;
       const isRotated = placed.rotation === 90 || placed.rotation === 270;
       const actualFp = isRotated
         ? { width: footprint.height, height: footprint.width }
         : { width: footprint.width, height: footprint.height };
 
-      if (checkCollision(snapped, actualFp, placed.layer, placed.id)) {
-        // Blocked — snap back to original position
+      if (checkCollision(snapped, actualFp, newLayer, placed.id)) {
+        // Blocked — snap the object back to its committed pose.
         setBlocked(true);
         const origPos = moduleWorldPosition(placed);
         targetObject.position.set(origPos[0], origPos[1], origPos[2]);
@@ -110,32 +105,34 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
       }
 
       moveModule(placed.id, snapped);
-    } else if (mode === 'translate-y') {
-      const newLayer = snapLayerY(targetObject.position.y);
-      moveModuleToLayer(placed.id, newLayer);
-    } else if (mode === 'rotate-base') {
-      const yRad = targetObject.rotation.y;
-      const deg = snapRotation(-THREE.MathUtils.radToDeg(yRad));
-      rotateModule(placed.id, deg);
-    } else if (mode === 'rotate-top') {
-      // Top rotation is the Z on the inner group — but TransformControls is on the outer.
-      // We read the Z euler from the outer group, snap, and commit.
-      const zRad = targetObject.rotation.z;
-      const deg = snapRotation(THREE.MathUtils.radToDeg(zRad));
-      rotateModuleTop(placed.id, deg);
-    } else if (mode === 'rotate-tilt') {
-      // Tilt rotation is the X on the inner group; read the X euler from the
-      // outer group, snap to 90°, and commit.
-      const xRad = targetObject.rotation.x;
-      const deg = snapRotation(THREE.MathUtils.radToDeg(xRad));
-      rotateModuleTilt(placed.id, deg);
+      if (newLayer !== placed.layer) moveModuleToLayer(placed.id, newLayer);
+    } else {
+      // Rotate: compare end vs start orientation, snap the dominant axis to 90°,
+      // and apply it to the matching store field (the gizmo snaps one ring at a time).
+      const start = dragStartQuat.current;
+      if (!start) return;
+      const delta = targetObject.quaternion.clone().multiply(start.clone().invert());
+      const e = new THREE.Euler().setFromQuaternion(delta, 'XYZ');
+      const dx = THREE.MathUtils.radToDeg(e.x);
+      const dy = THREE.MathUtils.radToDeg(e.y);
+      const dz = THREE.MathUtils.radToDeg(e.z);
+      const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+      if (Math.max(ax, ay, az) < 1) return; // no meaningful rotation
+
+      if (ax >= ay && ax >= az) {
+        rotateModuleTilt(placed.id, snapRotation((placed.tiltRotation ?? 0) + dx));
+      } else if (ay >= ax && ay >= az) {
+        // CubeInstance applies world-yaw = -rotation, so a +Y world delta lowers rotation.
+        rotateModule(placed.id, snapRotation(placed.rotation - dy));
+      } else {
+        rotateModuleTop(placed.id, snapRotation((placed.topRotation ?? 0) + dz));
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed, def, targetObject, mode]);
 
   if (!targetObject || !placed) return null;
 
-  // Derive TransformControls props from gizmo mode
   const controlsProps = getControlsProps(mode);
 
   return (
@@ -150,46 +147,19 @@ export function CubeGizmo({ mode, onDraggingChanged }: CubeGizmoProps) {
 }
 
 function getControlsProps(mode: GizmoMode) {
-  switch (mode) {
-    case 'translate-xz':
-      return {
-        mode: 'translate' as const,
-        showX: true,
-        showY: false,
-        showZ: true,
-        translationSnap: GRID_MM.x,
-      };
-    case 'translate-y':
-      return {
-        mode: 'translate' as const,
-        showX: false,
-        showY: true,
-        showZ: false,
-        translationSnap: GRID_MM.yLayer,
-      };
-    case 'rotate-base':
-      return {
-        mode: 'rotate' as const,
-        showX: false,
-        showY: true,
-        showZ: false,
-        rotationSnap: Math.PI / 2,
-      };
-    case 'rotate-top':
-      return {
-        mode: 'rotate' as const,
-        showX: false,
-        showY: false,
-        showZ: true,
-        rotationSnap: Math.PI / 2,
-      };
-    case 'rotate-tilt':
-      return {
-        mode: 'rotate' as const,
-        showX: true,
-        showY: false,
-        showZ: false,
-        rotationSnap: Math.PI / 2,
-      };
+  if (mode === 'translate') {
+    return {
+      mode: 'translate' as const,
+      showX: true,
+      showY: true,
+      showZ: true,
+    };
   }
+  return {
+    mode: 'rotate' as const,
+    showX: true,
+    showY: true,
+    showZ: true,
+    rotationSnap: Math.PI / 2,
+  };
 }

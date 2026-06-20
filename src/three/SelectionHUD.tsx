@@ -18,19 +18,19 @@ export function SelectionHUD() {
   const isDark = settings.theme === 'dark';
 
   if (!selectedId || selectedType !== 'module') return null;
+  if (!settings.showInfoCard) return null; // user disabled the info card
 
   const placed = placedModules.find(m => m.id === selectedId);
   if (!placed) return null;
 
   const def = modules.find(d => d.id === placed.moduleId);
   const pos = moduleWorldPosition(placed);
-  // Offset the HUD up and to the (screen) upper-right of the cube so it never
-  // covers the selected module or its gizmo. +X = right, −Z = up-screen in the
-  // default top-down view.
+  // Float the HUD well clear of the cube and its gizmo (up + screen upper-right).
+  // +X = right, −Z = up-screen in the default top-down view.
   const hudPos: [number, number, number] = [
-    pos[0] + GRID_MM.cube * 0.9,
-    pos[1] + GRID_MM.cube * 1.1,
-    pos[2] - GRID_MM.cube * 0.9,
+    pos[0] + GRID_MM.cube * 1.9,
+    pos[1] + GRID_MM.cube * 2.0,
+    pos[2] - GRID_MM.cube * 1.9,
   ];
 
   return (

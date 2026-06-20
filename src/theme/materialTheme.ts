@@ -1,4 +1,4 @@
-import { createTheme } from '@mui/material/styles';
+import { createTheme, type ThemeOptions } from '@mui/material/styles';
 
 // OpenUC2 brand colors
 const brandColors = {
@@ -11,50 +11,18 @@ const brandColors = {
   success: '#2e7d32',
 };
 
-export const materialTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: brandColors.primary,
-      light: '#4a6fa5',
-      dark: '#153350',
-      contrastText: '#ffffff',
-    },
-    secondary: {
-      main: brandColors.secondary,
-      light: '#9dd368',
-      dark: '#5a8a2e',
-      contrastText: '#ffffff',
-    },
-    error: {
-      main: brandColors.error,
-    },
-    warning: {
-      main: brandColors.warning,
-    },
-    info: {
-      main: brandColors.info,
-    },
-    success: {
-      main: brandColors.success,
-    },
-    background: {
-      default: '#f5f5f5',
-      paper: '#ffffff',
-    },
-    grey: {
-      50: '#fafafa',
-      100: '#f5f5f5',
-      200: '#eeeeee',
-      300: '#e0e0e0',
-      400: '#bdbdbd',
-      500: '#9e9e9e',
-      600: '#757575',
-      700: '#616161',
-      800: '#424242',
-      900: '#212121',
-    },
-  },
+// Palette pieces shared by both light and dark themes.
+const brandPalette = {
+  primary: { main: brandColors.primary, light: '#4a6fa5', dark: '#153350', contrastText: '#ffffff' },
+  secondary: { main: brandColors.secondary, light: '#9dd368', dark: '#5a8a2e', contrastText: '#ffffff' },
+  error: { main: brandColors.error },
+  warning: { main: brandColors.warning },
+  info: { main: brandColors.info },
+  success: { main: brandColors.success },
+};
+
+// Typography / shape / spacing / component overrides shared by both themes.
+const baseOptions = {
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
@@ -221,4 +189,31 @@ export const materialTheme = createTheme({
       },
     },
   },
+} satisfies ThemeOptions;
+
+export const materialTheme = createTheme({
+  palette: {
+    mode: 'light',
+    ...brandPalette,
+    background: { default: '#f5f5f5', paper: '#ffffff' },
+    grey: {
+      50: '#fafafa', 100: '#f5f5f5', 200: '#eeeeee', 300: '#e0e0e0', 400: '#bdbdbd',
+      500: '#9e9e9e', 600: '#757575', 700: '#616161', 800: '#424242', 900: '#212121',
+    },
+  },
+  ...baseOptions,
+});
+
+// Dark theme used by the 3D editor so the whole UI (toolbar, drawers, panels)
+// switches, not just the 3D scene.
+export const materialThemeDark = createTheme({
+  palette: {
+    mode: 'dark',
+    ...brandPalette,
+    primary: { ...brandPalette.primary, main: '#4a6fa5' },
+    background: { default: '#12121c', paper: '#1c1c2b' },
+    text: { primary: '#e6e8ee', secondary: '#a9adbb' },
+    divider: 'rgba(255,255,255,0.12)',
+  },
+  ...baseOptions,
 });

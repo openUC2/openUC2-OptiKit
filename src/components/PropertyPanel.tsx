@@ -33,18 +33,21 @@ import {
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { getSimulationModel, getElementTypeName } from '../utils/sceneBuilder';
+import { useLocation } from 'react-router-dom';
 import { loadThumbnailManifest, orientationsFor, thumbnailUrl, defaultOrientation, type ThumbnailManifest } from '../utils/moduleThumbnails';
 import type { PlacedModule } from '../types';
 
-// Per-module GLB preview with selectable orientation (uses pre-rendered thumbnails).
+// Per-module GLB preview with selectable orientation (3D editor only; the 2D
+// designer keeps its SVG symbols).
 const ModuleThumbnailPreview: React.FC<{ moduleId: string }> = ({ moduleId }) => {
   const [manifest, setManifest] = useState<ThumbnailManifest>({});
   const [orient, setOrient] = useState<string | null>(null);
+  const is3D = useLocation().pathname.includes('/3d');
   React.useEffect(() => {
-    loadThumbnailManifest().then(m => { setManifest(m); setOrient(defaultOrientation(m, moduleId)); });
-  }, [moduleId]);
+    if (is3D) loadThumbnailManifest().then(m => { setManifest(m); setOrient(defaultOrientation(m, moduleId)); });
+  }, [moduleId, is3D]);
   const orients = orientationsFor(manifest, moduleId);
-  if (orients.length === 0 || !orient) return null;
+  if (!is3D || orients.length === 0 || !orient) return null;
   return (
     <Card>
       <CardContent>

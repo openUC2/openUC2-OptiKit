@@ -1,14 +1,11 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Stats } from '@react-three/drei';
+import { OrbitControls, Grid, Stats, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { Box, ToggleButton, ToggleButtonGroup, Tooltip } from '@mui/material';
 import {
   OpenWith as MoveXZIcon,
-  Height as MoveYIcon,
   RotateLeft as RotateBaseIcon,
-  Rotate90DegreesCw as RotateTopIcon,
-  Rotate90DegreesCcw as RotateTiltIcon,
   Timeline as RaysIcon,
   ViewInAr as BeamIcon,
 } from '@mui/icons-material';
@@ -113,6 +110,14 @@ function SceneContent({
       {showRays && (settings.rayMode === 'beams' ? <RayBeam3D /> : <Rays3D />)}
 
       <CubeGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+
+      {/* Corner coordinate axes that rotate with the view; click an axis to orient. */}
+      <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
+        <GizmoViewport
+          axisColors={['#e0533d', '#7cc142', '#2c8fff']}
+          labelColor={settings.theme === 'dark' ? '#ffffff' : '#1a1a1a'}
+        />
+      </GizmoHelper>
 
       {import.meta.env.DEV && <Stats showPanel={0} className="r3f-stats" />}
     </>
@@ -285,20 +290,11 @@ export function Scene3D({ gizmoMode, onGizmoModeChange }: Scene3DProps) {
             '& .Mui-selected': { color: '#FFAA00', bgcolor: 'rgba(255,170,0,0.15)' },
           }}
         >
-          <ToggleButton value="translate-xz">
-            <Tooltip title="Move XZ (G)"><MoveXZIcon fontSize="small" /></Tooltip>
+          <ToggleButton value="translate">
+            <Tooltip title="Move · X / Y / Z (G)"><MoveXZIcon fontSize="small" /></Tooltip>
           </ToggleButton>
-          <ToggleButton value="translate-y">
-            <Tooltip title="Move Y / Layer (Y)"><MoveYIcon fontSize="small" /></Tooltip>
-          </ToggleButton>
-          <ToggleButton value="rotate-base">
-            <Tooltip title="Rotate Y · turn (R)"><RotateBaseIcon fontSize="small" /></Tooltip>
-          </ToggleButton>
-          <ToggleButton value="rotate-tilt">
-            <Tooltip title="Rotate X · tilt (X)"><RotateTiltIcon fontSize="small" /></Tooltip>
-          </ToggleButton>
-          <ToggleButton value="rotate-top">
-            <Tooltip title="Rotate Z · roll (T)"><RotateTopIcon fontSize="small" /></Tooltip>
+          <ToggleButton value="rotate">
+            <Tooltip title="Rotate · X / Y / Z rings (R)"><RotateBaseIcon fontSize="small" /></Tooltip>
           </ToggleButton>
         </ToggleButtonGroup>
 

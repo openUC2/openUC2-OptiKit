@@ -4,6 +4,7 @@ export interface Settings3D {
   theme: 'light' | 'dark';
   showGrid: boolean;
   showAxes: boolean;
+  showInfoCard: boolean;
   rayMode: 'lines' | 'beams';
 }
 
@@ -13,6 +14,7 @@ const DEFAULTS: Settings3D = {
   theme: 'light',
   showGrid: true,
   showAxes: true,
+  showInfoCard: true,
   rayMode: 'lines',
 };
 
