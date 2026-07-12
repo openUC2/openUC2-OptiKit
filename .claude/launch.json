@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "coherent-webapp",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/bene/Downloads/Glen_CC./webapp", "run", "dev"],
+      "port": 5180
     }
   ]
 }
