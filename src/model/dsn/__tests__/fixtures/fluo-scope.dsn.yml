@@ -1,0 +1,211 @@
+# Canonical schema-v0 example: an epifluorescence microscope with two optical paths
+# (excitation and emission) sharing the objective and the dichroic — the system that
+# motivates first-class `paths:` (see openUC2-OptiKit/DOCS/datamodel-unification.md §5.2).
+optikit-version: v0.0.0-alpha.1
+
+design:
+  name: fluo-scope
+  version: 0.1.0
+  description: A minimal epifluorescence microscope with a motorizable objective focus DOF
+  tags:
+    - instrument
+    - instrument/microscope
+    - instrument/microscope/fluorescence
+
+components:
+  laser:
+    type: primitive
+    primitive:
+      type: step
+      model: BUY - Laser - 488nm collimated.stp
+    optics:
+      frames:
+        optical: {z-mm: 0.0}
+      ports:
+        out: {frame: optical, direction: +x}
+    pose:
+      rotation:
+        type: grid
+        grid: {z: +x, x: -z}
+      translation:
+        anchor: dichroic
+        offset-grid: {x: -2}
+
+  excitation-filter:
+    type: primitive
+    primitive:
+      type: step
+      model: BUY - Filter - BP470-490.stp
+    optics:
+      passthrough: true
+      frames:
+        optical: {z-mm: 0.0}
+      ports:
+        front: {frame: optical, direction: -z}
+        back: {frame: optical, direction: +z}
+    template:
+      class: fixed
+      envelope: {x-mm: 50, y-mm: 50, z-mm: 50}
+    pose:
+      rotation:
+        type: grid
+        grid: {z: +x, x: -z}
+      translation:
+        anchor: dichroic
+        offset-grid: {x: -1}
+
+  dichroic:
+    type: primitive
+    primitive:
+      type: step
+      model: BUY - Dichroic - DMLP505.stp
+    optics:
+      fragment:
+        surfaces:
+          - type: standard
+            geometry: {type: StandardGeometry, radius: .inf, conic: 0.0}
+            interaction_model: {type: refractive_reflective, is_reflective: true}
+      frames:
+        optical: {z-mm: 0.0}
+      ports:
+        front: {frame: optical, direction: -z}
+        reflected: {frame: optical, direction: +x, after-surface: 0}
+        transmitted: {frame: optical, direction: +z, after-surface: 0}
+    template:
+      class: fixed
+      envelope: {x-mm: 50, y-mm: 50, z-mm: 50}
+    pose:
+      rotation:
+        type: uc2
+      translation:
+        anchor: objective
+        offset-grid: {z: 1}
+
+  objective:
+    type: primitive
+    primitive:
+      type: step
+      model: SUB - 0023 - LEND40F50 - V04 - virt ass.stp
+    optics:
+      fragment:
+        surfaces:
+          - type: standard
+            geometry: {type: StandardGeometry, radius: 25.8, conic: 0.0}
+            material_post: {type: Material, name: N-BK7}
+          - type: standard
+            geometry: {type: StandardGeometry, radius: -25.8, conic: 0.0}
+      frames:
+        optical: {z-mm: 0.0}
+        mount: {z-mm: 2.6}
+      ports:
+        front: {frame: optical, direction: -z}
+        back: {frame: optical, direction: +z, after-surface: 1}
+    template:
+      class: adaptive
+      envelope: {x-mm: 50, y-mm: 50, z-mm: 50}
+    dof:
+      - name: dz
+        kind: translation
+        axis: z
+        range: [-7.5, 7.5]
+        resolution: 0.05
+        unit: mm
+        actuatable: true
+    pose:
+      rotation:
+        type: uc2
+      translation:
+        anchor: sample
+        offset-grid: {z: 1}
+        offset-mm: {z: -5.0}
+
+  sample:
+    type: location
+    optics:
+      frames:
+        optical: {z-mm: 0.0}
+      ports:
+        plane: {frame: optical, direction: +z}
+    pose:
+      rotation:
+        type: grid
+
+  tube-lens:
+    type: primitive
+    primitive:
+      type: step
+      model: SUB - 0023 - LEND40F50 - V04 - virt ass.stp
+    optics:
+      fragment:
+        surfaces:
+          - type: standard
+            geometry: {type: StandardGeometry, radius: 82.2, conic: 0.0}
+            material_post: {type: Material, name: N-BK7}
+          - type: standard
+            geometry: {type: StandardGeometry, radius: -82.2, conic: 0.0}
+      frames:
+        optical: {z-mm: 0.0}
+      ports:
+        front: {frame: optical, direction: -z}
+        back: {frame: optical, direction: +z, after-surface: 1}
+    template:
+      class: fixed
+      envelope: {x-mm: 50, y-mm: 50, z-mm: 50}
+    pose:
+      rotation:
+        type: uc2
+      translation:
+        anchor: dichroic
+        offset-grid: {z: 2}
+
+  camera:
+    type: primitive
+    primitive:
+      type: step
+      model: BUY - Camera - CS165MU.stp
+    optics:
+      frames:
+        optical: {z-mm: 0.0}
+      ports:
+        sensor: {frame: optical, direction: -z}
+    pose:
+      rotation:
+        type: uc2
+      translation:
+        anchor: tube-lens
+        offset-grid: {z: 2}
+
+paths:
+  excitation:
+    simulation:
+      wavelengths:
+        wavelengths:
+          - {value: 0.488, is_primary: true}
+      aperture: {type: EPD, value: 10.0}
+    chain:
+      - laser.out
+      - excitation-filter.front>back
+      - dichroic.front>reflected
+      - objective.back>front
+      - sample.plane
+  emission:
+    simulation:
+      wavelengths:
+        wavelengths:
+          - {value: 0.52, is_primary: true}
+      aperture: {type: EPD, value: 10.0}
+    chain:
+      - sample.plane
+      - objective.front>back
+      - dichroic.front>transmitted
+      - tube-lens.front>back
+      - camera.sensor
+
+instantiation:
+  dof_values:
+    objective.dz: 1.85
+
+provenance:
+  optimized_by: ""
+  run: ""
+  merit: {}

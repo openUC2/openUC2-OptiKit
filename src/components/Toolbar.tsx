@@ -42,8 +42,10 @@ import {
   Science as SimulationIcon,
   ThreeDRotation as View3DIcon
 } from '@mui/icons-material';
+import { saveAs } from 'file-saver';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
+import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 
@@ -51,10 +53,11 @@ export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isThreeD = location.pathname.startsWith('/configurator/3d');
+  const isSchematic = location.pathname.startsWith('/configurator/schematic');
   const is2DEditor = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
-  // Both the 2D and 3D editors share the same toolbar (edit/annotate/file/save);
+  // The 2D, 3D and schematic editors share the same toolbar (edit/annotate/file/save);
   // they differ only in the rendering surface in the center.
-  const isEditorPage = is2DEditor || isThreeD;
+  const isEditorPage = is2DEditor || isThreeD || isSchematic;
 
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
@@ -83,8 +86,55 @@ export const Toolbar: React.FC = () => {
     setSelectionMode,
     deleteSelectedItems,
     selectedItems,
-    remoteSourcePath
+    remoteSourcePath,
+    addNotification
   } = useAppStore();
+
+  const handleExportDsn = async () => {
+    try {
+      const { blob, filename } = await exportDsnZip();
+      saveAs(blob, filename);
+    } catch (e) {
+      addNotification({
+        type: 'error',
+        title: '.dsn export failed',
+        message: e instanceof Error ? e.message : String(e),
+        duration: 6000,
+      });
+    }
+  };
+
+  const handleImportDsn = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.zip';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const report = importDsnFiles(await unzipDsn(file));
+        const details = [
+          `${report.placed} part(s) placed`,
+          ...(report.skipped.length ? [`skipped: ${report.skipped.join(', ')}`] : []),
+          ...report.warnings.slice(0, 3),
+        ].join(' · ');
+        addNotification({
+          type: report.warnings.length || report.skipped.length ? 'warning' : 'success',
+          title: '.dsn imported',
+          message: details,
+          duration: 8000,
+        });
+      } catch (e) {
+        addNotification({
+          type: 'error',
+          title: '.dsn import failed',
+          message: e instanceof Error ? e.message : String(e),
+          duration: 6000,
+        });
+      }
+    };
+    input.click();
+  };
 
   const handleExport = async () => {
     const data = await exportData();
@@ -394,6 +444,25 @@ openUC2 team via GitHub repository
             </Button>
           </Tooltip>
           {isEditorPage && (
+            <Tooltip title="Switch to 2.5D optical schematic view">
+              <Button
+                color="inherit"
+                onClick={() => navigate('/configurator/schematic')}
+                size="small"
+                sx={{
+                  textTransform: 'none',
+                  minWidth: { xs: '40px', sm: 'auto' },
+                  px: { xs: 1, sm: 2 },
+                  fontWeight: isSchematic ? 700 : 400,
+                }}
+              >
+                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Schematic
+                </Typography>
+              </Button>
+            </Tooltip>
+          )}
+          {isEditorPage && (
             <Tooltip title={isThreeD ? 'Switch to 2D grid view' : 'Switch to 3D view'}>
               <Button
                 color="inherit"
@@ -526,6 +595,15 @@ openUC2 team via GitHub repository
               <MenuItem onClick={() => { handleImportFromUrl(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><UrlIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Import from URL</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => { handleExportDsn(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Export .dsn (zip)</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleImportDsn(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Import .dsn (zip)</ListItemText>
               </MenuItem>
               <Divider />
               <MenuItem onClick={() => { handleGenerateShareableLink(); setFileMenuAnchor(null); }}>

@@ -18,6 +18,9 @@ import './App.css'
 const Editor3DPage = lazy(() =>
   import('./components/Editor3DPage').then(m => ({ default: m.Editor3DPage }))
 );
+const SchematicPage = lazy(() =>
+  import('./components/schematic/SchematicPage').then(m => ({ default: m.SchematicPage }))
+);
 
 function App() {
   const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
@@ -152,6 +155,7 @@ function App() {
           <Route path="/configurator/frame" element={<FrameWizardPage />} />
           <Route path="/configurator/setups" element={<SetupBrowser />} />
           <Route path="/configurator/3d" element={<Suspense fallback={null}><Editor3DPage /></Suspense>} />
+          <Route path="/configurator/schematic" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
           <Route path="/configurator/:collectionName" element={<CollectionView />} />
           {/* Legacy routes for backward compatibility */}
           <Route path="/" element={<EditorPage />} />

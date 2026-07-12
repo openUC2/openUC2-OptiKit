@@ -1,0 +1,336 @@
+/**
+ * 2.5D schematic ("optical layout") editor page — the 3DOptix-like view.
+ * Layout mirrors Editor3DPage (shared Toolbar + PartLibrary), but the center
+ * surface renders schematic glyphs on a working plane and all state flows
+ * through the src/document facade.
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Box,
+  Drawer,
+  IconButton,
+  Paper,
+  Stack,
+  ToggleButton,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import {
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  GridOn as SnapGridIcon,
+  Rotate90DegreesCcw as SnapYawIcon,
+  Timeline as RaysIcon,
+  KeyboardArrowDown as DownIcon,
+  KeyboardArrowUp as UpIcon,
+} from '@mui/icons-material';
+import * as THREE from 'three';
+import { materialThemeDark } from '../../theme/materialTheme';
+import { Toolbar } from '../Toolbar';
+import { PartLibrary } from '../PartLibrary';
+import { useAppStore } from '../../stores/appStore';
+import type { PortRef } from '../../document';
+import {
+  addPart,
+  removePart,
+  selectPart,
+  setPath,
+  useDocPaths,
+  useSelectedPartId,
+  UC2_GRID_MM,
+} from '../../document';
+import { SchematicScene } from './SchematicScene';
+import type { SchematicSettings } from './SchematicScene';
+import { SchematicPropertyPanel } from './SchematicPropertyPanel';
+
+export function SchematicPage() {
+  const muiTheme = useTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const [leftOpen, setLeftOpen] = useState(!isMobile);
+  const [rightOpen, setRightOpen] = useState(!isMobile);
+
+  const [settings, setSettings] = useState<SchematicSettings>({
+    planeZMm: 0,
+    snapGrid: false,
+    snapYaw: false,
+    showRays: true,
+  });
+  const [chainDraft, setChainDraft] = useState<PortRef[] | null>(null);
+  const paths = useDocPaths();
+  const activePathName = `path-${paths.length + 1}`;
+
+  const selectedId = useSelectedPartId();
+  const modules = useAppStore(s => s.modules);
+  const loadModules = useAppStore(s => s.loadModules);
+  const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+
+  useEffect(() => {
+    if (modules.length === 0) {
+      loadModules().then(() => loadStateFromStorage());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // DEV-only: expose the document facade for console debugging / e2e drivers.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    import('../../document').then(doc => {
+      (window as unknown as Record<string, unknown>).__optikitDoc = doc;
+    });
+  }, []);
+
+  // ── chaining ────────────────────────────────────────────────────────────────
+  const onPinClick = useCallback((ref: PortRef) => {
+    setChainDraft(draft => {
+      if (draft === null) return [ref];
+      if (draft[draft.length - 1] === ref) return draft; // ignore double click on same pin
+      return [...draft, ref];
+    });
+  }, []);
+
+  const finishChain = useCallback(() => {
+    setChainDraft(draft => {
+      if (draft && draft.length >= 2) setPath(activePathName, draft);
+      return null;
+    });
+  }, [activePathName]);
+
+  // ── keyboard ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      switch (e.key) {
+        case 'Escape':
+          if (chainDraft) setChainDraft(null);
+          else selectPart(null);
+          break;
+        case 'Enter':
+          if (chainDraft) finishChain();
+          break;
+        case 'Delete':
+        case 'Backspace':
+          if (selectedId) removePart(selectedId);
+          break;
+        case 's':
+          setSettings(s => ({ ...s, snapGrid: !s.snapGrid }));
+          break;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [chainDraft, finishChain, selectedId]);
+
+  // ── drop from the part library ─────────────────────────────────────────────
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const moduleId = e.dataTransfer.getData('moduleId');
+      const cam = cameraRef.current;
+      const canvas = (e.currentTarget as HTMLElement).querySelector('canvas');
+      if (!moduleId || !cam || !canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, cam);
+      const hit = new THREE.Vector3();
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -settings.planeZMm);
+      if (!raycaster.ray.intersectPlane(plane, hit)) return;
+      let x = hit.x;
+      let y = -hit.z;
+      if (settings.snapGrid) {
+        x = Math.round(x / UC2_GRID_MM[0]) * UC2_GRID_MM[0];
+        y = Math.round(y / UC2_GRID_MM[1]) * UC2_GRID_MM[1];
+      }
+      addPart(moduleId, [x, y, settings.planeZMm]);
+    },
+    [settings.planeZMm, settings.snapGrid],
+  );
+
+  const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
+  const layerIndex = Math.round(settings.planeZMm / UC2_GRID_MM[2]);
+
+  return (
+    <ThemeProvider theme={materialThemeDark}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
+        <Toolbar />
+        <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          <Drawer
+            variant={isMobile ? 'temporary' : 'persistent'}
+            anchor="left"
+            open={leftOpen}
+            onClose={() => setLeftOpen(false)}
+            sx={{
+              width: sidebarWidth,
+              flexShrink: 0,
+              '& .MuiDrawer-paper': {
+                width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
+                height: '100%', top: 'auto', borderRight: `1px solid ${muiTheme.palette.divider}`,
+              },
+            }}
+          >
+            <PartLibrary glbThumbnails />
+          </Drawer>
+
+          <Box
+            sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}
+            onDragOver={e => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+            }}
+            onDrop={handleDrop}
+          >
+            <Tooltip title={leftOpen ? 'Collapse parts library' : 'Expand parts library'} placement="right">
+              <IconButton
+                onClick={() => setLeftOpen(o => !o)}
+                size="small"
+                sx={{
+                  position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 100,
+                  bgcolor: 'primary.main', color: 'white', borderRadius: '0 6px 6px 0',
+                  width: 18, height: 52, minWidth: 0, p: 0, boxShadow: 2,
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                {leftOpen ? <ChevronLeftIcon sx={{ fontSize: 14 }} /> : <ChevronRightIcon sx={{ fontSize: 14 }} />}
+              </IconButton>
+            </Tooltip>
+
+            <SchematicScene
+              settings={settings}
+              chainDraft={chainDraft}
+              onPinClick={onPinClick}
+              cameraRef={cameraRef}
+            />
+
+            {/* Bottom toolbar: snap / rays / working plane */}
+            <Paper
+              elevation={3}
+              sx={{
+                position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 10, display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5,
+                bgcolor: 'rgba(23,28,36,0.88)', backdropFilter: 'blur(8px)', borderRadius: 2,
+              }}
+            >
+              <Tooltip title="Snap to 50 mm grid (S) — off by default in the schematic">
+                <ToggleButton
+                  value="snapGrid"
+                  selected={settings.snapGrid}
+                  size="small"
+                  onChange={() => setSettings(s => ({ ...s, snapGrid: !s.snapGrid }))}
+                >
+                  <SnapGridIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title="Snap yaw to 90°">
+                <ToggleButton
+                  value="snapYaw"
+                  selected={settings.snapYaw}
+                  size="small"
+                  onChange={() => setSettings(s => ({ ...s, snapYaw: !s.snapYaw }))}
+                >
+                  <SnapYawIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title="Live 2D ray preview (in-plane approximation)">
+                <ToggleButton
+                  value="rays"
+                  selected={settings.showRays}
+                  size="small"
+                  onChange={() => setSettings(s => ({ ...s, showRays: !s.showRays }))}
+                  sx={{ '&.Mui-selected': { color: '#00e5ff' } }}
+                >
+                  <RaysIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+
+              <Stack alignItems="center" sx={{ px: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+                  working plane
+                </Typography>
+                <Stack direction="row" alignItems="center">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSettings(s => ({ ...s, planeZMm: s.planeZMm - UC2_GRID_MM[2] }))}
+                  >
+                    <DownIcon fontSize="small" />
+                  </IconButton>
+                  <Typography variant="body2" sx={{ minWidth: 86, textAlign: 'center' }}>
+                    L{layerIndex} · {settings.planeZMm.toFixed(0)} mm
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => setSettings(s => ({ ...s, planeZMm: s.planeZMm + UC2_GRID_MM[2] }))}
+                  >
+                    <UpIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            </Paper>
+
+            {/* Hint chip while chaining */}
+            {chainDraft && (
+              <Paper
+                sx={{
+                  position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'rgba(46,196,165,0.92)', color: '#08221c',
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="body2">
+                  Chaining “{activePathName}” — {chainDraft.length} port(s) · Enter to finish · Esc to cancel
+                </Typography>
+              </Paper>
+            )}
+
+            <Tooltip title={rightOpen ? 'Collapse properties' : 'Expand properties'} placement="left">
+              <IconButton
+                onClick={() => setRightOpen(o => !o)}
+                size="small"
+                sx={{
+                  position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 100,
+                  bgcolor: 'primary.main', color: 'white', borderRadius: '6px 0 0 6px',
+                  width: 18, height: 52, minWidth: 0, p: 0, boxShadow: 2,
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                {rightOpen ? <ChevronRightIcon sx={{ fontSize: 14 }} /> : <ChevronLeftIcon sx={{ fontSize: 14 }} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          <Drawer
+            variant={isMobile ? 'temporary' : 'persistent'}
+            anchor="right"
+            open={rightOpen}
+            onClose={() => setRightOpen(false)}
+            sx={{
+              width: sidebarWidth,
+              flexShrink: 0,
+              '& .MuiDrawer-paper': {
+                width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
+                height: '100%', top: 'auto', borderLeft: `1px solid ${muiTheme.palette.divider}`,
+              },
+            }}
+          >
+            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+              <SchematicPropertyPanel
+                chainDraft={chainDraft}
+                activePathName={activePathName}
+                onFinishChain={finishChain}
+                onCancelChain={() => setChainDraft(null)}
+              />
+            </Box>
+          </Drawer>
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
+}
