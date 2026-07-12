@@ -1,5 +1,12 @@
 # OptiKit → "KiCad for Optics" — Workplan
 
+> **⚠ Superseded for execution:** the M0 decisions below are resolved and the WP
+> numbering is replaced by [kicad-for-optics-execution.md](kicad-for-optics-execution.md)
+> (Go-independent track: Pydantic schema in a new `optikit-core` Python repo dictates
+> the standard; engine = Python FastAPI absorbing `optikit_exporter`; per-WP Claude
+> Code prompts + Ethan TODOs there). This document remains the strategic reference
+> (KiCad mapping, principles, stream rationale, risks).
+
 **Status:** working plan · 2026-07-12
 **Builds on:** [datamodel-unification.md](datamodel-unification.md) (adopted architecture C),
 the component-model concept note (T1/T2/T3, four entities, DOF block), and the
