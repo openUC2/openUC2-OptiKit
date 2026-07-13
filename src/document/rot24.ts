@@ -72,8 +72,9 @@ export function decomposeRot24(r: THREE.Matrix4): Rot24Decomposition {
     }
   }
   const residual = best.matrix.clone().transpose().multiply(r);
-  // Extrinsic Z-X-Y == intrinsic Y-X-Z: R = Ry(y)·Rx(x)·Rz(z).
-  const e = new THREE.Euler().setFromRotationMatrix(residual, 'YXZ');
+  // Normative extrinsic Z-X-Y (go3d ExtractEulerAngles): R = Rz(z)·Rx(x)·Ry(y),
+  // i.e. three.js intrinsic order 'ZXY'.
+  const e = new THREE.Euler().setFromRotationMatrix(residual, 'ZXY');
   return {
     rot24: best.name,
     residual,
