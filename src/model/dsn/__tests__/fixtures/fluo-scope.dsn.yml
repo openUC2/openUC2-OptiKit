@@ -22,7 +22,9 @@ components:
       frames:
         optical: {z-mm: 0.0}
       ports:
-        out: {frame: optical, direction: +x}
+        # Local +z is the emission axis; the grid rotation points it along
+        # world +x (toward the dichroic).
+        out: {frame: optical, direction: +z}
     pose:
       rotation:
         type: grid
@@ -68,8 +70,10 @@ components:
       frames:
         optical: {z-mm: 0.0}
       ports:
-        front: {frame: optical, direction: -z}
-        reflected: {frame: optical, direction: +x, after-surface: 0}
+        # Excitation arrives traveling world +x and folds downward (−z) to the
+        # objective; emission arrives from below (+z) and transmits upward.
+        front: {frame: optical, direction: -x}
+        reflected: {frame: optical, direction: -z, after-surface: 0}
         transmitted: {frame: optical, direction: +z, after-surface: 0}
     template:
       class: fixed
@@ -94,14 +98,18 @@ components:
           - type: standard
             geometry: {type: StandardGeometry, radius: 25.8, conic: 0.0}
             material_post: {type: Material, name: N-BK7}
+            thickness: 5.0
           - type: standard
             geometry: {type: StandardGeometry, radius: -25.8, conic: 0.0}
       frames:
         optical: {z-mm: 0.0}
+        # Exit vertex: first vertex + center thickness, so port-to-port gaps
+        # equal the physical air gaps.
+        exit: {z-mm: 5.0}
         mount: {z-mm: 2.6}
       ports:
         front: {frame: optical, direction: -z}
-        back: {frame: optical, direction: +z, after-surface: 1}
+        back: {frame: exit, direction: +z, after-surface: 1}
     template:
       class: adaptive
       envelope: {x-mm: 50, y-mm: 50, z-mm: 50}
@@ -143,13 +151,15 @@ components:
           - type: standard
             geometry: {type: StandardGeometry, radius: 82.2, conic: 0.0}
             material_post: {type: Material, name: N-BK7}
+            thickness: 4.0
           - type: standard
             geometry: {type: StandardGeometry, radius: -82.2, conic: 0.0}
       frames:
         optical: {z-mm: 0.0}
+        exit: {z-mm: 4.0}
       ports:
         front: {frame: optical, direction: -z}
-        back: {frame: optical, direction: +z, after-surface: 1}
+        back: {frame: exit, direction: +z, after-surface: 1}
     template:
       class: fixed
       envelope: {x-mm: 50, y-mm: 50, z-mm: 50}
@@ -191,6 +201,7 @@ paths:
       - objective.back>front
       - sample.plane
   emission:
+    # Enters the dichroic from below through the same folded port.
     simulation:
       wavelengths:
         wavelengths:
@@ -199,7 +210,7 @@ paths:
     chain:
       - sample.plane
       - objective.front>back
-      - dichroic.front>transmitted
+      - dichroic.reflected>transmitted
       - tube-lens.front>back
       - camera.sensor
 

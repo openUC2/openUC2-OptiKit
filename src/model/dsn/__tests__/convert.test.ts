@@ -39,7 +39,7 @@ describe('golden fixture import', () => {
     expect(emission?.chain.map(c => `${c.key}.${c.port}`)).toEqual([
       'sample.plane',
       'objective.front>back',
-      'dichroic.front>transmitted',
+      'dichroic.reflected>transmitted',
       'tube-lens.front>back',
       'camera.sensor',
     ]);
