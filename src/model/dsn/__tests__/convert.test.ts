@@ -24,12 +24,13 @@ describe('golden fixture import', () => {
     const imported = designToParts(fixture('fluo-scope.dsn'));
     const byKey = Object.fromEntries(imported.parts.map(p => [p.key, p]));
 
-    // Anchor chain: sample(origin) → objective(z+1 cell, −5mm) → dichroic(z+1) …
+    // Anchors: objective(z+1 cell, −5mm focus) and dichroic(z+2, fixed) hang off
+    // the sample reference; tube-lens/camera stack above the dichroic.
     expect(byKey['objective'].positionMm).toEqual([0, 0, 50]); // 55 − 5
-    expect(byKey['dichroic'].positionMm).toEqual([0, 0, 105]);
-    expect(byKey['tube-lens'].positionMm).toEqual([0, 0, 215]);
-    expect(byKey['camera'].positionMm).toEqual([0, 0, 325]);
-    expect(byKey['laser'].positionMm).toEqual([-100, 0, 105]);
+    expect(byKey['dichroic'].positionMm).toEqual([0, 0, 110]);
+    expect(byKey['tube-lens'].positionMm).toEqual([0, 0, 220]);
+    expect(byKey['camera'].positionMm).toEqual([0, 0, 330]);
+    expect(byKey['laser'].positionMm).toEqual([-100, 0, 110]);
 
     expect(byKey['objective'].dofValues).toEqual({ dz: 1.85 });
     expect(byKey['laser'].rot24).toEqual({ z: '+x', x: '-z' });

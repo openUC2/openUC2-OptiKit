@@ -78,8 +78,10 @@ components:
       rotation:
         type: uc2
       translation:
-        anchor: objective
-        offset-grid: {z: 1}
+        # Anchored to the fixed sample reference, not to the sliding objective:
+        # the objective's focus offset must not propagate to fixed (T1) cubes.
+        anchor: sample
+        offset-grid: {z: 2}
 
   objective:
     type: primitive
