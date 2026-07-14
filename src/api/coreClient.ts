@@ -156,9 +156,18 @@ async function post<T>(
     });
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw err;
+    // A fetch TypeError covers BOTH "nothing listening" and "response blocked"
+    // (a 500 kills the CORS middleware before headers are added, and the
+    // browser then hides the response). Say so instead of always claiming the
+    // service is down — that misled a real debugging session once.
     throw new CoreServiceError(
       'E_UNREACHABLE',
-      `optikit-core service not reachable at ${getCoreUrl()} — start it with: uv run optikit-core serve`,
+      `no usable response from ${getCoreUrl()} — either the service is not running ` +
+        `(start: uv run optikit-core serve), its CORS config does not allow this ` +
+        `origin (${typeof window === 'undefined' ? 'unknown' : window.location.origin}; ` +
+        `set OPTIKIT_CORS_ORIGINS), or it crashed ` +
+        `mid-request (check the service log; a stale venv shows up as ` +
+        `"No module named anyio._backends" — restart the server)`,
       String(err),
       0,
     );

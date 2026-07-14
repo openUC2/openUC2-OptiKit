@@ -156,8 +156,11 @@ function App() {
       <CssBaseline />
       <Router basename="">
         <Routes>
-          <Route path="/configurator" element={<EditorPage />} />
-          <Route path="/configurator/" element={<EditorPage />} />
+          {/* The schematic is the primary editor; the legacy 2D grid builder
+              stays reachable at /configurator/grid (feedback round 1). */}
+          <Route path="/configurator" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
+          <Route path="/configurator/" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
+          <Route path="/configurator/grid" element={<EditorPage />} />
           <Route path="/configurator/frame" element={<FrameWizardPage />} />
           <Route path="/configurator/setups" element={<SetupBrowser />} />
           <Route path="/configurator/3d" element={<Suspense fallback={null}><Editor3DPage /></Suspense>} />

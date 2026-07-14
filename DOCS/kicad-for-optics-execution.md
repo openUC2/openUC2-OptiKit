@@ -643,6 +643,251 @@ lists the Thorlabs lens with MPN.
 
 ---
 
+# Part 2b · Feedback round 1 (2026-07-14) — new work packages
+
+Bene's field-test findings after WP-1…16, triaged. Bugs fixed immediately are
+in the "quick fixes" list at the end; everything needing design or real scope
+became a WP below. Ordering: **WP-19 and WP-23 before WP-17/18** — the part
+database and the editor UX are what make the assembly/sync work meaningful.
+
+### WP-19 — Part-binding workbench (mechanical ↔ optical registration)
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+The missing tool between "we have an STP of a laser housing" and "every design
+component points at a real ModuleRecord": an interactive registration page.
+
+1. optikit-core: POST /v1/convert/step-to-glb — accept an uploaded STEP,
+   import via cadquery/OCP (the WP-10 stack), export GLB (mm), return it.
+   GLB stays a render-only exchange format; the STEP is the mechanical source
+   of truth referenced by the record (this is now stated normatively in
+   ARCHITECTURE.md).
+2. Frontend page /configurator/bind: load an STP (via 1) or GLB; render it
+   against a toggleable ghost 50 mm cube centered at (0,0,0); free
+   place/rotate the mesh w.r.t. the cube origin (gizmo with snap toggles).
+3. Datum authoring: click surface points to place optical datums — each is a
+   point + direction (+ optional circular area): source plane, sensor plane,
+   reflective plane, front/back ports. Render each as pin + arrow + disc.
+   These become optics.frames (z along the datum axis) + ports.direction in
+   the record; the placement transform becomes the template's mesh offset.
+4. Output: a bound ModuleRecord (+ component/template records as needed) —
+   "Save to workspace" and "Download records for library PR"; developer mode
+   writes into ../optikit-core/library/ directly.
+5. Placeholder part set: dsn-consistent placeholder STP/GLB + records for a
+   laser pointer, flat mirror, camera — so every fluo-scope component can
+   point at a real ModuleRecord out of the box.
+
+Acceptance: bind the WP-8 sample GLB and one raw STP; the laser placeholder's
+source datum round-trips into a design whose chain inference starts at the
+authored emission point/direction instead of the node origin.
+```
+
+### WP-20 — Inventor datum contract v2 + PyInventor authoring helper
+
+```
+PROMPT (repo: optikit-core + openUC2-OptiKit DOCS + github.com/openUC2/PyInventor)
+
+Named datums in Inventor instead of node-origin defaults:
+
+1. Extend DOCS/inventor-naming-contract.md: work-plane/axis/point naming
+   (e.g. "PLN - SRC - out", "PLN - SNS - sensor", "AXIS - OPT",
+   "PT - FOCUS") with the exact semantics each maps to
+   (frames z-offset, ports.direction, clear-aperture disc).
+2. glb2template: parse those named nodes from the GLB export into
+   optics.frames/ports (they export as empty nodes with the datum transform);
+   review-flag any component that still falls back to node origin.
+3. PyInventor reference script for the mechanical engineer: stamp/validate
+   the named datums on an open Inventor document, list violations
+   (runs on the Windows/Inventor machine).
+4. Write the ME guide (DOCS/mechanical-engineering-guide.md): the two
+   authoring paths — (a) Inventor-first: model the holder, add named datums,
+   export GLB+STP; (b) optikit-first: export the optical part's STP from the
+   part-binding workbench, import into Inventor, model the holder around it;
+   (c) T3: no CAD at all, cadquery generates the holder (WP-21).
+
+Note: live Inventor exploration through PyInventor on Bene's second machine is
+available — connect it when this WP starts.
+```
+
+### WP-21 — Auto-holder generator (T3 boolean insert around an arbitrary optic)
+
+```
+PROMPT (repo: optikit-core, extends the WP-10 harness)
+
+generators/boolean_holder_1x1.py: given an optical part mesh (STP) and its
+bound pose from WP-19, generate a printable holder:
+
+1. Start from the 50 mm cube insert envelope; boolean-subtract the part shape
+   at its bound pose with a configurable clearance (default 0.15 mm).
+2. Split the result into two printable halves along a configurable plane
+   through the optical axis.
+3. Add M3 screw bosses from both sides (through-hole one half, cut-off thread
+   pocket in the other) at the four corners.
+4. Params JSON Schema: clearance_mm, split_axis, screw count/positions;
+   artifacts (STEP+STL+GLB per half) through the WP-10 keyed harness.
+
+Acceptance: generate a holder for the AC254-050-A placeholder; halves'
+bounding boxes fit the envelope, boolean cavity matches the part with
+clearance, artifacts regenerate on param change.
+```
+
+### WP-22 — Library registry + contribution flow ("where is the database of parts?")
+
+```
+PROMPT (repo: optikit-core + openUC2-OptiKit)
+
+One canonical place: optikit-core's library/ is the git-of-record for
+openUC2-provided AND community parts.
+
+1. Publish library/dist/index.json + record files + GLB/STP assets via CI
+   (GitHub Pages or the deployed service serving /v1/library/*).
+2. Frontend default index URL points at the published index (dev snapshot
+   stays as fallback); record assets (thumbnails, GLBs) load from the same
+   base URL.
+3. Contribution flow, documented end-to-end: user authors in the component
+   editor / binding workbench → workspace (user.*) → "Download records" →
+   PR against optikit-core library/ → CI validates (library validate +
+   semver gate) → merged → appears in everyone's index.
+4. Developer mode: a local-path setting that writes records straight into a
+   checkout of optikit-core (the "we are the developers" fast path).
+
+Acceptance: a record authored in the browser lands in the published index via
+PR and shows up in a fresh browser session with no manual copying.
+```
+
+### WP-23 — Editor UX round 1 (schematic + assembly)
+
+```
+PROMPT (repo: openUC2-OptiKit)
+
+Field-test friction from the first real use of the schematic/assembly pair:
+
+1. Camera vs part manipulation: locked 2.5D default (SimCity-style) — LMB
+   selects/drags parts, orbit only via middle mouse / right mouse / modifier
+   key; an "unlock view" toggle for free orbit. Today part-drag and orbit
+   fight each other.
+2. Affordance legend: first-run overlay (and a "?" toggle) explaining the
+   port pins (colored dots = beam entry/exit used for chaining), the yaw
+   ring, and the selection sphere; rename/restyle where clearer. The
+   wireframe hover sphere reads as "mystery geometry" — replace with a
+   subtler highlight.
+3. Snap-to-grid semantics: snapping must center the optical axis in the cube
+   — z snaps to layer·55 + axis height, x/y to cell centers; the grid
+   overlay should draw at optical-axis height, not the cube floor.
+4. Part palette in the schematic shows optical glyph thumbnails (lens,
+   mirror, laser…) instead of the cube GLB renders; palette also offers
+   "load STP/GLB…" which routes through the WP-19 binding flow.
+5. Assembly T-rule rendering: cube shells always draw at the R24 grid pose
+   on the grid; the residual yaw / offset-deg applies only to the INSERT
+   content inside the shell (a beamsplitter rotated 39.6° renders as an
+   axis-aligned cube with a rotated insert plate). DRC flags residuals on
+   T1 shells as today.
+6. Navigation: /configurator defaults to the schematic; the legacy 2D grid
+   builder moves to /configurator/grid and gets a nav entry so it stays
+   reachable. [quick-fixed 2026-07-14, keep as regression scope]
+
+Acceptance: place three parts, chain them, and cubify without once fighting
+the camera; a first-time user can explain pins/ring/sphere from the legend.
+```
+
+### WP-24 — Design-system unification
+
+```
+PROMPT (repo: openUC2-OptiKit)
+
+Every page currently has its own visual impression (legacy light 2D builder,
+dark schematic, dark assembly, MUI-default component editor). Unify:
+
+1. Decision (recorded): stay on MUI — the entire app is MUI; migrating to
+   shadcn/Tailwind is a rewrite with no user-visible payoff. Achieve the
+   shadcn-like look via a single design-token theme (spacing, radii, dark
+   palette, typography) in src/theme/, applied app-wide (including the
+   legacy grid builder + FRAME wizard shells).
+2. One shared AppShell (toolbar, nav, drawers) used by every route.
+3. Brand: adopt the provided logo PNG (asset still to be delivered — wire a
+   placeholder slot in the shell header).
+4. FRAME configurator gets restyled within the shell (its UX rework is a
+   separate later item).
+
+Acceptance: switching between grid/schematic/assembly/components feels like
+one product; a visual-regression screenshot set is committed.
+```
+
+### WP-25 — Cloud deployment (AWS · docker + caddy + SSL)
+
+```
+PROMPT (repo: optikit-core) [files delivered 2026-07-14 — see deploy/]
+
+compose.prod.yaml (service + caddy), Caddyfile with automatic HTTPS for a
+configurable domain, CORS origins via OPTIKIT_CORS_ORIGINS env, DEPLOY.md
+(EC2 + DNS + docker compose up). Later: publish the frontend build to the
+same origin so CORS disappears entirely.
+```
+
+### WP-26 — Actuation bridge (dof → firmware via imswitch)
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core, after WP-17)
+
+The DOF value that back-annotation writes should be able to MOVE the real
+insert. All transports (UC2-REST serial, CANopen, …) are hidden behind
+imswitch/newswitchunified — the frontend only ever talks to imswitch's REST
+API.
+
+1. ModuleRecord.electronics.axis-map already binds dof → can-object; add an
+   imswitch endpoint mapping (positioner name / axis).
+2. Assembly view: an "apply to hardware" button on an actuatable insert posts
+   the dof value to a configurable imswitch URL; live position readback
+   renders as a second ghost handle.
+3. Document the mapping contract with one real example (the WP-7
+   openuc2.cube.lens_z axis-map).
+
+Acceptance: dragging the objective insert with hardware connected moves the
+motor via imswitch; without hardware the button degrades to a clear error.
+```
+
+### WP-27 — Tutorials & guides
+
+```
+PROMPT (repo: openUC2-OptiKit DOCS + optikit-core DOCS)
+
+1. "Add a new component" tutorial: the three roads (component-editor form,
+   zmx import, GLB/STP import + binding) with screenshots, ending in a
+   library PR.
+2. "Create a .dsn diagram" tutorial: place parts, chain ports, check,
+   simulate, optimize, export — fluo-scope rebuilt from scratch.
+3. Mechanical-engineering guide (WP-20 deliverable, cross-linked).
+4. API how-to: the {files: {"optikit-design.yml": "<yaml>"}} envelope, curl
+   examples per endpoint, the ±1e999/Infinity contract, typed error codes.
+   [seed version added to WORKING_WITH_FRONTEND.md 2026-07-14]
+```
+
+### Quick fixes landed with this triage (2026-07-14)
+
+- **Stale-venv crash** (`ModuleNotFoundError: anyio._backends`): the server
+  was still running from the old Python 3.14 venv after uv re-created it on
+  3.12 — restart the server. `.python-version` now pins 3.12 and the gotcha
+  is documented.
+- **CORS**: allowed origins configurable via `OPTIKIT_CORS_ORIGINS`
+  (comma-separated), so LAN/Tailscale-served frontends (e.g.
+  http://100.100.43.118:5173) work.
+- **Misleading E_UNREACHABLE**: the client now distinguishes "connection
+  refused" from "response blocked (CORS or server crash — check the service
+  log)".
+- **main.py tour**: gained a Thorlabs zmx-import step and an in-process
+  CadQuery T3 generation step (no subprocess when cadquery is installed:
+  `uv sync --extra generate`).
+- **Deployment files**: `deploy/` with compose.prod.yaml + Caddyfile +
+  DEPLOY.md (WP-25 seed).
+- **Default route**: `/configurator` → schematic; legacy grid builder at
+  `/configurator/grid` with a nav button.
+
+Open items parked (need input): logo PNG (not attached yet — resend), FRAME
+configurator UX rework (needs a spec conversation).
+
+---
+
 # Part 3 · TODOs for Ethan (Go repo `github.com/openUC2/optikit`)
 
 Framed as: the schema is being dictated from `optikit-core` (Pydantic → JSON

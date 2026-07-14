@@ -53,10 +53,15 @@ export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isThreeD = location.pathname.startsWith('/configurator/3d');
-  const isSchematic = location.pathname.startsWith('/configurator/schematic');
+  // /configurator now lands on the schematic; the legacy grid builder lives
+  // at /configurator/grid (feedback round 1).
+  const isSchematic =
+    location.pathname.startsWith('/configurator/schematic') ||
+    location.pathname === '/configurator' ||
+    location.pathname === '/configurator/';
   const isComponentEditor = location.pathname.startsWith('/configurator/components');
   const isAssembly = location.pathname.startsWith('/configurator/assembly');
-  const is2DEditor = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
+  const is2DEditor = location.pathname === '/configurator/grid' || location.pathname === '/';
   // The 2D, 3D, schematic and assembly editors share the same toolbar
   // (edit/annotate/file/save); they differ only in the center surface.
   const isEditorPage = is2DEditor || isThreeD || isSchematic || isComponentEditor || isAssembly;
@@ -503,11 +508,30 @@ openUC2 team via GitHub repository
             </Tooltip>
           )}
           {isEditorPage && (
+            <Tooltip title="Legacy 2D grid builder">
+              <Button
+                color="inherit"
+                onClick={() => navigate('/configurator/grid')}
+                size="small"
+                sx={{
+                  textTransform: 'none',
+                  minWidth: { xs: '40px', sm: 'auto' },
+                  px: { xs: 1, sm: 2 },
+                  fontWeight: is2DEditor ? 700 : 400,
+                }}
+              >
+                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Grid
+                </Typography>
+              </Button>
+            </Tooltip>
+          )}
+          {isEditorPage && (
             <Tooltip title={isThreeD ? 'Switch to 2D grid view' : 'Switch to 3D view'}>
               <Button
                 color="inherit"
                 startIcon={isThreeD ? <EditorIcon /> : <View3DIcon />}
-                onClick={() => navigate(isThreeD ? '/configurator' : '/configurator/3d')}
+                onClick={() => navigate(isThreeD ? '/configurator/grid' : '/configurator/3d')}
                 size="small"
                 sx={{
                   textTransform: 'none',
