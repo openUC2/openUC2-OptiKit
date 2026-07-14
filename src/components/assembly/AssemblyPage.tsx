@@ -100,6 +100,14 @@ export function AssemblyPage() {
     zoomToPart(partId);
   };
 
+  // Cross-probing (WP-17): frame the document-level selection on arrival.
+  useEffect(() => {
+    if (!selectedId) return;
+    const timer = setTimeout(() => zoomToPart(selectedId), 350); // scene mount
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 360;
   const cubifyState =
     store.cubifiedRevision === null

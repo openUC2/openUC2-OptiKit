@@ -266,6 +266,53 @@ export function listPartMechanics(snap?: DocSnapshot): PartMechanics[] {
   return out;
 }
 
+/**
+ * "Back-annotate to schematic" (WP-17): fold the live DOF values into the
+ * RETAINED source design's `instantiation.dof_values` and stamp provenance,
+ * so the parked YAML agrees with the document again. Pose/path edits are not
+ * touched — those flow through the cubify direction. Comments in the retained
+ * YAML do not survive (the browser has no comment-preserving YAML layer;
+ * optikit-core's ruamel path does — documented in io.ts).
+ *
+ * Returns the number of dof values written, or null without a retained source.
+ */
+export function backAnnotateSource(
+  snap: DocSnapshot = getSnapshot(),
+  provenance: { optimized_by: string; merit?: Record<string, unknown> } = {
+    optimized_by: 'assembly-editor',
+  },
+): number | null {
+  const store = useSourceDesignStore.getState();
+  if (!store.yamlText) return null;
+  const design = (parse(store.yamlText) ?? {}) as DesignDecl;
+  const keyByPartId = { ...store.keyByPartId };
+
+  const dofValues: Record<string, string | number> = {
+    ...(design.instantiation?.dof_values ?? {}),
+  };
+  let written = 0;
+  for (const part of snap.parts) {
+    const key = keyByPartId[part.id];
+    if (!key) continue;
+    for (const dof of part.dofs) {
+      const dotted = `${key}.${dof.name}`;
+      if (dofValues[dotted] !== dof.value) {
+        dofValues[dotted] = dof.value;
+        written += 1;
+      }
+    }
+  }
+  design.instantiation = { ...(design.instantiation ?? {}), dof_values: dofValues };
+  design.provenance = {
+    ...(design.provenance ?? {}),
+    optimized_by: provenance.optimized_by,
+    run: new Date().toISOString().slice(0, 19),
+    ...(provenance.merit ? { merit: provenance.merit } : {}),
+  };
+  store.setSource(serializeDesign(design), keyByPartId);
+  return written;
+}
+
 function slug(s: string): string {
   return s
     .toLowerCase()

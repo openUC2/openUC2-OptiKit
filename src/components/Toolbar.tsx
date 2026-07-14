@@ -48,6 +48,7 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
+import { SyncChip } from './sync/SyncChip';
 
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
@@ -507,6 +508,7 @@ openUC2 team via GitHub repository
               </Button>
             </Tooltip>
           )}
+          {isEditorPage && <SyncChip />}
           {isEditorPage && (
             <Tooltip title="Legacy 2D grid builder">
               <Button

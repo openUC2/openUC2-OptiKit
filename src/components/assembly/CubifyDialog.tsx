@@ -4,6 +4,7 @@
  * DRC findings — reviewed before acceptance, never applied silently.
  */
 
+import { useState } from 'react';
 import {
   Alert,
   Button,
@@ -12,7 +13,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -31,18 +34,46 @@ export function CubifyDialog() {
   const review = useAssemblyStore(s => s.review);
   const applyCubify = useAssemblyStore(s => s.applyCubify);
   const dismissCubify = useAssemblyStore(s => s.dismissCubify);
+  const hasBaseline = useAssemblyStore(s => s.acceptedSignatures !== null);
+  const [showAll, setShowAll] = useState(false);
   if (!review) return null;
 
   const errorCount = review.findings.filter(f => f.severity === 'error').length;
+  const changedCount = review.rows.filter(r => r.changed).length;
+  // Re-cubify (WP-17): default to the diff — only what moved since the last
+  // accept. The first cubify has no baseline and shows everything.
+  const diffMode = hasBaseline && !showAll;
+  const rows = diffMode ? review.rows.filter(r => r.changed) : review.rows;
 
   return (
     <Dialog open onClose={dismissCubify} maxWidth="md" fullWidth>
-      <DialogTitle>Cubify — world poses → grid poses</DialogTitle>
+      <DialogTitle>
+        {hasBaseline ? 'Update assembly from schematic' : 'Cubify — world poses → grid poses'}
+      </DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           p = S·g + δ, R = R24·ΔR — the world geometry is unchanged; this
           review accepts the decomposition and its design-rule findings.
         </Typography>
+        {hasBaseline && (
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Chip
+              size="small"
+              color={changedCount > 0 ? 'warning' : 'success'}
+              label={
+                changedCount > 0
+                  ? `${changedCount} part(s) changed since the last accept`
+                  : 'no grid-pose changes since the last accept'
+              }
+            />
+            <FormControlLabel
+              control={
+                <Switch size="small" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
+              }
+              label={<Typography variant="caption">show unchanged parts</Typography>}
+            />
+          </Stack>
+        )}
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -55,8 +86,12 @@ export function CubifyDialog() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {review.rows.map(row => (
-              <TableRow key={row.componentKey} hover>
+            {rows.map(row => (
+              <TableRow
+                key={row.componentKey}
+                hover
+                sx={row.changed && hasBaseline ? { '& td': { color: 'warning.light' } } : undefined}
+              >
                 <TableCell sx={{ fontFamily: 'monospace' }}>{row.componentKey}</TableCell>
                 <TableCell sx={{ fontFamily: 'monospace' }}>{fmtVec(row.cell)}</TableCell>
                 <TableCell sx={{ fontFamily: 'monospace' }}>{fmtVec(row.offsetMm, 2)}</TableCell>

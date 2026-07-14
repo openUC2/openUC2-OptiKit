@@ -95,6 +95,15 @@ export function SchematicPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cross-probing (WP-17): arriving from another view with a selection frames
+  // the selected part here (selection itself is document-level already).
+  useEffect(() => {
+    if (!selectedId) return;
+    const timer = setTimeout(() => zoomToPart(selectedId), 350); // scene mount
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // DEV-only: expose the document facade + .dsn session for console debugging
   // and e2e drivers.
   useEffect(() => {
