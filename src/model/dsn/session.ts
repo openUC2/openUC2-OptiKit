@@ -6,6 +6,7 @@
 
 import {
   addPart,
+  categoryOf,
   getSnapshot,
   makePortRef,
   removePart,
@@ -15,17 +16,22 @@ import {
   setPath,
   listParts,
   listPaths,
+  useSourceDesignStore,
 } from '../../document';
 import { useAppStore } from '../../stores/appStore';
 import { usePathsStore } from '../../document/pathsStore';
 import type { DsnFiles } from './io';
-import { designFromFiles, serializeDesign, zipDsn, DESIGN_DECL_FILE } from './io';
-import { designToParts, snapshotToDesign } from './convert';
+import { designFromFiles, zipDsn, DESIGN_DECL_FILE } from './io';
+import { designToParts } from './convert';
+import { serviceFiles } from './serviceExport';
 
-/** Serialize the current document to a .dsn file map. */
+/**
+ * Serialize the current document to a .dsn file map. When a source design was
+ * imported this is the merged document (its optics/template/dof blocks
+ * survive the round trip); otherwise the plain snapshot.
+ */
 export function exportDsnFiles(): DsnFiles {
-  const { design } = snapshotToDesign(getSnapshot());
-  return { [DESIGN_DECL_FILE]: serializeDesign(design) };
+  return serviceFiles();
 }
 
 /** Export the current document as a downloadable .dsn zip. */
@@ -53,22 +59,36 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
   const store = useAppStore.getState();
   const skipped: string[] = [];
   const warnings = [...imported.warnings];
+  const rawYaml =
+    (files[DESIGN_DECL_FILE] ??
+      Object.entries(files).find(([p]) => p.endsWith(`/${DESIGN_DECL_FILE}`))?.[1]) as
+      | string
+      | undefined;
 
   // Clear the current document (parts + paths).
   for (const part of listParts()) removePart(part.id);
   for (const path of listPaths()) usePathsStore.getState().removePath(path.name);
 
+  // Unknown library refs: prefer a wildcard module, else the first module of
+  // the same optical category, so foreign designs stay visible/editable.
   const wildcard = store.modules.find(m => m.isWildCard)?.id;
+  const byCategory = (category: string): string | undefined =>
+    category
+      ? store.modules.find(m => categoryOf(m.id, m) === category)?.id
+      : undefined;
   const idByKey: Record<string, string> = {};
   for (const part of imported.parts) {
     const known = store.modules.some(m => m.id === part.libraryRef);
-    const moduleId = known ? part.libraryRef : wildcard;
+    const fallback = wildcard ?? byCategory(part.category) ?? store.modules[0]?.id;
+    const moduleId = known ? part.libraryRef : fallback;
     if (!moduleId) {
       skipped.push(part.key);
       continue;
     }
     if (!known) {
-      warnings.push(`'${part.key}': unknown library ref '${part.libraryRef}' — placed as wildcard`);
+      warnings.push(
+        `'${part.key}': unknown library ref '${part.libraryRef}' — placed as '${moduleId}'`,
+      );
     }
     const id = addPart(moduleId, part.positionMm);
     if (!id) {
@@ -95,6 +115,17 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
       name: imported.meta.name || store.setupMetadata.name,
       description: imported.meta.description || store.setupMetadata.description,
     });
+  }
+
+  // Park the verbatim design so service calls keep the blocks the store
+  // cannot represent (optics, templates, DOF declarations, locations).
+  if (rawYaml) {
+    const keyByPartId = Object.fromEntries(
+      Object.entries(idByKey).map(([key, id]) => [id, key]),
+    );
+    useSourceDesignStore.getState().setSource(rawYaml, keyByPartId);
+  } else {
+    useSourceDesignStore.getState().clear();
   }
 
   return { placed: Object.keys(idByKey).length, skipped, warnings };

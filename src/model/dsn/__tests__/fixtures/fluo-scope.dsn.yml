@@ -15,6 +15,7 @@ design:
 components:
   laser:
     type: primitive
+    category: source
     primitive:
       type: step
       model: BUY - Laser - 488nm collimated.stp
@@ -35,6 +36,7 @@ components:
 
   excitation-filter:
     type: primitive
+    category: filter
     primitive:
       type: step
       model: BUY - Filter - BP470-490.stp
@@ -58,6 +60,7 @@ components:
 
   dichroic:
     type: primitive
+    category: dichroic
     primitive:
       type: step
       model: BUY - Dichroic - DMLP505.stp
@@ -89,6 +92,7 @@ components:
 
   objective:
     type: primitive
+    category: lens
     primitive:
       type: step
       model: SUB - 0023 - LEND40F50 - V04 - virt ass.stp
@@ -131,6 +135,7 @@ components:
 
   sample:
     type: location
+    category: sample
     optics:
       frames:
         optical: {z-mm: 0.0}
@@ -142,6 +147,7 @@ components:
 
   tube-lens:
     type: primitive
+    category: lens
     primitive:
       type: step
       model: SUB - 0023 - LEND40F50 - V04 - virt ass.stp
@@ -172,6 +178,7 @@ components:
 
   camera:
     type: primitive
+    category: detector
     primitive:
       type: step
       model: BUY - Camera - CS165MU.stp

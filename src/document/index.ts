@@ -43,3 +43,10 @@ export {
 } from './mapping';
 export { AXIS_DIRS, decomposeRot24, rot24Matrix } from './rot24';
 export type { AxisDir, Rot24 } from './rot24';
+export {
+  componentKeyOf,
+  partIdOfComponent,
+  useSourceDesignStore,
+} from './sourceDesignStore';
+export type { SourceProvenance } from './sourceDesignStore';
+export { getDocRevision, useDocRevision } from './revision';

@@ -36,6 +36,7 @@ import { useAppStore } from '../../stores/appStore';
 import type { PortRef } from '../../document';
 import {
   addPart,
+  getPart,
   removePart,
   selectPart,
   setPath,
@@ -46,6 +47,7 @@ import {
 import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
+import { ServicePanel } from './ServicePanel';
 
 export function SchematicPage() {
   const muiTheme = useTheme();
@@ -68,6 +70,23 @@ export function SchematicPage() {
   const loadModules = useAppStore(s => s.loadModules);
   const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
+
+  /** ERC marker click: frame the part without changing the view direction. */
+  const zoomToPart = useCallback((partId: string) => {
+    const part = getPart(partId);
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!part || !camera || !controls) return;
+    const [x, y, z] = part.worldPose.positionMm;
+    const target = new THREE.Vector3(x, z, -y);
+    const offset = camera.position.clone().sub(controls.target);
+    const distance = Math.max(180, Math.min(400, offset.length()));
+    offset.setLength(distance);
+    controls.target.copy(target);
+    camera.position.copy(target.clone().add(offset));
+    controls.update();
+  }, []);
 
   useEffect(() => {
     if (modules.length === 0) {
@@ -76,11 +95,15 @@ export function SchematicPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // DEV-only: expose the document facade for console debugging / e2e drivers.
+  // DEV-only: expose the document facade + .dsn session for console debugging
+  // and e2e drivers.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     import('../../document').then(doc => {
       (window as unknown as Record<string, unknown>).__optikitDoc = doc;
+    });
+    import('../../model/dsn/session').then(session => {
+      (window as unknown as Record<string, unknown>).__optikitSession = session;
     });
   }, []);
 
@@ -208,6 +231,7 @@ export function SchematicPage() {
               chainDraft={chainDraft}
               onPinClick={onPinClick}
               cameraRef={cameraRef}
+              controlsRef={controlsRef}
             />
 
             {/* Bottom toolbar: snap / rays / working plane */}
@@ -327,6 +351,7 @@ export function SchematicPage() {
                 onFinishChain={finishChain}
                 onCancelChain={() => setChainDraft(null)}
               />
+              <ServicePanel onZoomToPart={zoomToPart} />
             </Box>
           </Drawer>
         </Box>

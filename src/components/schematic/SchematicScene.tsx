@@ -22,11 +22,13 @@ import {
   UC2_GRID_MM,
 } from '../../document';
 import { wavelengthToColor } from '../../utils/sceneBuilder';
+import { AuthoritativeRays } from './AuthoritativeRays';
 import { GLYPH_COLORS } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
 import { portsOf, resolvePortRef } from './ports';
 import type { SchematicPort } from './ports';
 import { useSchematicSim } from './useSchematicSim';
+import { useSimFreshness } from './serviceStore';
 
 export interface SchematicSettings {
   planeZMm: number;
@@ -40,6 +42,8 @@ interface SceneProps {
   chainDraft: PortRef[] | null;
   onPinClick: (ref: PortRef) => void;
   cameraRef: React.MutableRefObject<THREE.PerspectiveCamera | null>;
+  /** OrbitControls handle, for ERC "zoom to part" (WP-15). */
+  controlsRef?: React.MutableRefObject<{ target: THREE.Vector3; update: () => void } | null>;
 }
 
 // ── coordinate helpers (doc frame ↔ three scene) ─────────────────────────────
@@ -432,11 +436,14 @@ function CameraCapture({ cameraRef }: { cameraRef: SceneProps['cameraRef'] }) {
   return null;
 }
 
-function SceneContent({ settings, chainDraft, onPinClick, cameraRef }: SceneProps) {
+function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef }: SceneProps) {
   const parts = useDocParts();
   const paths = useDocPaths();
   const [orbitEnabled, setOrbitEnabled] = useState(true);
   const planeY = settings.planeZMm;
+  // The approximate 2D preview yields to fresh authoritative rays and
+  // reappears when the document changes under them (WP-15).
+  const simFreshness = useSimFreshness();
 
   return (
     <>
@@ -447,6 +454,7 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef }: SceneProp
 
       <OrbitControls
         makeDefault
+        ref={controlsRef as React.Ref<never>}
         enabled={orbitEnabled}
         enableDamping
         dampingFactor={0.12}
@@ -492,7 +500,10 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef }: SceneProp
       </Suspense>
 
       <PathLines parts={parts} paths={paths} draft={chainDraft} />
-      {settings.showRays && <RayOverlay planeZMm={settings.planeZMm} enabled />}
+      {settings.showRays && simFreshness !== 'fresh' && (
+        <RayOverlay planeZMm={settings.planeZMm} enabled />
+      )}
+      <AuthoritativeRays />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
         <GizmoViewport

@@ -12,3 +12,13 @@ export const GLYPH_COLORS: Record<DocCategory, string> = {
   sample: '#7cc142',
   other: '#8a8f98',
 };
+
+/**
+ * Per-path colors for the authoritative service rays (WP-15), distinct from
+ * the approximate overlay's wavelength tints.
+ */
+export const PATH_COLORS = ['#37e8a3', '#69d2ff', '#ff9f43', '#e478ff', '#f5e663'];
+
+export function pathColor(index: number): string {
+  return PATH_COLORS[index % PATH_COLORS.length];
+}

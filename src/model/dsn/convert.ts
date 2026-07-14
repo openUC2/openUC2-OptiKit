@@ -47,19 +47,7 @@ export function snapshotToDesign(snap: DocSnapshot): ExportResult {
     const comp: CompSpec = {
       type: 'primitive',
       primitive: { type: 'glb', model: part.libraryRef },
-      pose: {
-        rotation: {
-          type: 'grid',
-          grid: gridSpecOf(part.gridPose.rot24),
-          ...(Math.abs(part.gridPose.residualYawDeg) > 1e-9
-            ? { 'offset-deg': { z: round6(part.gridPose.residualYawDeg) } }
-            : {}),
-        },
-        translation: {
-          ...(vecToXyz(part.gridPose.cell, true) && { 'offset-grid': vecToXyz(part.gridPose.cell, true) }),
-          ...(vecToXyz(part.gridPose.offsetMm, false) && { 'offset-mm': vecToXyz(part.gridPose.offsetMm, false) }),
-        },
-      },
+      pose: poseSpecOf(part),
     };
     components[key] = comp;
     for (const dof of part.dofs) {
@@ -90,6 +78,25 @@ export function snapshotToDesign(snap: DocSnapshot): ExportResult {
       : {}),
   };
   return { design, keyByPartId };
+}
+
+/** Absolute (anchor-free) pose block for a part's current grid pose. */
+export function poseSpecOf(part: {
+  gridPose: { rot24: Rot24; residualYawDeg: number; cell: Vec3; offsetMm: Vec3 };
+}): NonNullable<CompSpec['pose']> {
+  return {
+    rotation: {
+      type: 'grid',
+      grid: gridSpecOf(part.gridPose.rot24),
+      ...(Math.abs(part.gridPose.residualYawDeg) > 1e-9
+        ? { 'offset-deg': { z: round6(part.gridPose.residualYawDeg) } }
+        : {}),
+    },
+    translation: {
+      ...(vecToXyz(part.gridPose.cell, true) && { 'offset-grid': vecToXyz(part.gridPose.cell, true) }),
+      ...(vecToXyz(part.gridPose.offsetMm, false) && { 'offset-mm': vecToXyz(part.gridPose.offsetMm, false) }),
+    },
+  };
 }
 
 function gridSpecOf(rot24: Rot24): RotGridSpec | undefined {
@@ -126,6 +133,8 @@ export interface ImportedPart {
   key: string;
   /** primitive.model / sub-design path — resolved to a module by the applier. */
   libraryRef: string;
+  /** Optical role from the declaration (guides module fallback on import). */
+  category: string;
   positionMm: Vec3;
   rot24: Rot24;
   residualYawDeg: number;
@@ -195,6 +204,7 @@ export function designToParts(decl: DesignDecl): ImportedDesign {
     parts.push({
       key,
       libraryRef: comp.primitive?.model || comp.design || '',
+      category: comp.category ?? '',
       positionMm: flattened.get(key) ?? [0, 0, 0],
       rot24,
       residualYawDeg,
