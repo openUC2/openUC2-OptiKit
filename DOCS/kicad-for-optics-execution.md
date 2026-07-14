@@ -63,7 +63,8 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-11…13 | document boundary, generated TS types + .dsn zip, 2.5D schematic | ✅ done (this repo `c0fbdaf`→`86e5662`) |
 | WP-14 | component ("symbol") editor `/configurator/components` | ✅ done (`5dd9908`) — AC254-050-A acceptance validated against optikit-core |
 | WP-15 | service round trip in the UI (check / simulate / optimize) | ✅ done (`33f15f1` + core `611e332`) — acceptance verified live: fluo-scope imports, 127-ray fans, focus-DOF optimize with delta review |
-| WP-16…18 | assembly editor, cross-probing, manufacturing export | ⬜ next |
+| WP-16 | assembly ("board") editor: cubify review, GLB scene, DRC markers, T2 insert drag | ✅ done (`10094e4`) — acceptance verified live (cubify table, clamp at +7.5, undo bracket, export) |
+| WP-17…18 | cross-probing + sync chip, manufacturing export | ⬜ next |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
