@@ -52,7 +52,8 @@ export type { AxisDir, Rot24 } from './rot24';
 export {
   componentKeyOf,
   partIdOfComponent,
+  sourcePortsOf,
   useSourceDesignStore,
 } from './sourceDesignStore';
-export type { SourceProvenance } from './sourceDesignStore';
+export type { SourcePort, SourceProvenance } from './sourceDesignStore';
 export { getDocRevision, useDocRevision } from './revision';

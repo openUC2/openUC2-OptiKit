@@ -17,6 +17,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { parse } from 'yaml';
 
 export interface SourceProvenance {
   optimized_by: string;
@@ -59,4 +60,75 @@ export function componentKeyOf(partId: string): string | undefined {
 export function partIdOfComponent(key: string): string | undefined {
   const map = useSourceDesignStore.getState().keyByPartId;
   return Object.keys(map).find(id => map[id] === key);
+}
+
+// ── source optics (real ports/frames the store cannot represent) ─────────────
+
+export interface SourcePort {
+  name: string;
+  /** Beam direction in component-local document axes: '+x' … '-z'. */
+  direction: string;
+  /** Datum-frame offset in component-local mm. */
+  positionMm: [number, number, number];
+  afterSurface: number | null;
+}
+
+interface RawOptics {
+  frames?: Record<string, Record<string, unknown>>;
+  ports?: Record<
+    string,
+    { frame?: string; direction?: string; 'after-surface'?: number | null }
+  >;
+}
+
+// Parsed once per imported YAML (module-level cache keyed by the text).
+let portsCacheKey: string | null = null;
+let portsCache: Record<string, SourcePort[]> = {};
+
+function num(v: unknown): number {
+  return typeof v === 'number' ? v : 0;
+}
+
+function buildPortsCache(yamlText: string): Record<string, SourcePort[]> {
+  const out: Record<string, SourcePort[]> = {};
+  let doc: { components?: Record<string, { optics?: RawOptics } | null> };
+  try {
+    doc = parse(yamlText) ?? {};
+  } catch {
+    return out;
+  }
+  for (const [key, comp] of Object.entries(doc.components ?? {})) {
+    const optics = comp?.optics;
+    if (!optics?.ports) continue;
+    const ports: SourcePort[] = [];
+    for (const [name, port] of Object.entries(optics.ports)) {
+      const frame = optics.frames?.[port.frame ?? ''] ?? {};
+      ports.push({
+        name,
+        direction: port.direction ?? '+z',
+        positionMm: [num(frame['x-mm']), num(frame['y-mm']), num(frame['z-mm'])],
+        afterSurface: port['after-surface'] ?? null,
+      });
+    }
+    if (ports.length > 0) out[key] = ports;
+  }
+  return out;
+}
+
+/**
+ * The real `optics.ports` of the imported component a part maps to (with the
+ * datum-frame offsets resolved to local mm), or null for parts without a
+ * retained source. The schematic uses these for pin placement and for
+ * orienting the glyph along the part's true optical axis.
+ */
+export function sourcePortsOf(partId: string): SourcePort[] | null {
+  const { yamlText, keyByPartId } = useSourceDesignStore.getState();
+  if (!yamlText) return null;
+  const key = keyByPartId[partId];
+  if (!key) return null;
+  if (portsCacheKey !== yamlText) {
+    portsCache = buildPortsCache(yamlText);
+    portsCacheKey = yamlText;
+  }
+  return portsCache[key] ?? null;
 }

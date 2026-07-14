@@ -647,8 +647,9 @@ lists the Thorlabs lens with MPN.
 
 Bene's field-test findings after WP-1…16, triaged. Bugs fixed immediately are
 in the "quick fixes" list at the end; everything needing design or real scope
-became a WP below. Ordering: **WP-19 and WP-23 before WP-17/18** — the part
-database and the editor UX are what make the assembly/sync work meaningful.
+became a WP below. Ordering: **WP-28 (full rotations) and WP-23 (editor UX)
+first, then WP-19 (part binding), then WP-17/18** — orientation correctness
+and editor ergonomics are what make everything downstream testable.
 
 ### WP-19 — Part-binding workbench (mechanical ↔ optical registration)
 
@@ -863,6 +864,38 @@ PROMPT (repo: openUC2-OptiKit DOCS + optikit-core DOCS)
    [seed version added to WORKING_WITH_FRONTEND.md 2026-07-14]
 ```
 
+### WP-28 — Full orientation: pitch/roll/yaw residuals (HIGH — with WP-23)
+
+```
+PROMPT (repo: openUC2-OptiKit)
+
+The schematic edits only yaw; mirrors/dichroics need fine tilts about all
+three axes. The schema already carries them (pose.rotation.offset-deg is an
+extrinsic-ZXY x/y/z residual on top of the 24-rotation) — the STORE is the
+bottleneck (rot24 + a single free yaw).
+
+1. Document layer: replace DOC_PARAMS freeYawDeg with an offsetDeg triple
+   {x,y,z} (extrinsic ZXY, exactly the schema/cubify convention
+   R = R24 · Rz(z)·Rx(x)·Ry(y)); mapping.ts worldPoseOf composes it,
+   splitDocYaw generalizes, rotatePart keeps its yaw-only API and a new
+   tiltPart(partId, {x?,y?}) joins it. Migrate persisted layouts
+   (freeYawDeg → offsetDeg.z).
+2. convert.ts: export writes the full offset-deg triple; import STOPS
+   dropping x/y tilts (delete the "not representable — dropped" warning and
+   its test); round-trip test with a tilted mirror.
+3. Property panel: Yaw becomes Pitch(x) / Roll(y) / Yaw(z) number fields
+   with the same grid-residual display; the yaw ring stays, tilt stays
+   numeric (a 3D tilt gizmo is follow-up, not this WP).
+4. Back-annotation TILT_UPDATE deltas (rotation-kind DOFs) become appliable
+   in the WP-15 dialog once the store can hold them.
+5. Cubify/DRC already handle ΔR — verify DRC_T1_MOVED fires on a tilted T1
+   part end-to-end.
+
+Acceptance: tilt a mirror 2° about x in the panel → export shows
+offset-deg {x: 2}; re-import reproduces the tilt; the service round trip
+(check/simulate) sees the tilted pose; undo works.
+```
+
 ### Quick fixes landed with this triage (2026-07-14)
 
 - **Stale-venv crash** (`ModuleNotFoundError: anyio._backends`): the server
@@ -882,6 +915,13 @@ PROMPT (repo: openUC2-OptiKit DOCS + optikit-core DOCS)
   DEPLOY.md (WP-25 seed).
 - **Default route**: `/configurator` → schematic; legacy grid builder at
   `/configurator/grid` with a nav button.
+- **Wrong part orientation in the schematic** (imported designs rendered
+  every glyph/pin on the +x palette convention — the vertical fluo-scope
+  emission stack showed sideways lenses): pins and glyph orientation now
+  derive from the retained source design's real `optics.ports` + datum
+  frames (`sourcePortsOf` in the document layer); `opticalAxisOf` rotates
+  each glyph onto its true beam axis; path polylines anchor traversal refs
+  (`front>back`) at the entry port. Palette parts keep the old convention.
 
 Open items parked (need input): logo PNG (not attached yet — resend), FRAME
 configurator UX rework (needs a spec conversation).
