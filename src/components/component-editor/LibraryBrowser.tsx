@@ -1,0 +1,220 @@
+/**
+ * Library browser: published index components (read-only metadata with
+ * vendor/MPN badges) + locally saved workspace records (editable), with
+ * category filter chips and a configurable index URL.
+ */
+
+import { useMemo, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Chip,
+  IconButton,
+  InputAdornment,
+  List,
+  ListItemButton,
+  ListItemText,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import {
+  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
+import { GLYPH_COLORS } from '../schematic/colors';
+import type { DocCategory } from '../../document';
+import { useLibraryIndex, type IndexComponent } from '../../model/libraryIndex';
+import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
+import type { ComponentRecord } from '../../model/dsn/generated/library-component';
+import { RECORD_CATEGORIES } from '../../model/componentRecord';
+
+function CategoryDot({ category }: { category: string }) {
+  const color = GLYPH_COLORS[category as DocCategory] ?? '#8899aa';
+  return (
+    <Box component="span" sx={{
+      display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+      bgcolor: color, mr: 1, flexShrink: 0,
+    }} />
+  );
+}
+
+function ComponentCard({
+  id, version, category, description, vendorName, mpn, eflMm, review, onClick, onDelete,
+}: {
+  id: string; version: string; category: string; description: string;
+  vendorName: string; mpn: string; eflMm: number | null; review: boolean;
+  onClick?: () => void; onDelete?: () => void;
+}) {
+  return (
+    <ListItemButton onClick={onClick} sx={{ alignItems: 'flex-start', borderRadius: 1 }}>
+      <ListItemText
+        primary={
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
+            <CategoryDot category={category} />
+            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{id}</Typography>
+            <Typography variant="caption" color="text.secondary">@{version}</Typography>
+          </Stack>
+        }
+        secondary={
+          <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5, mt: 0.5 }} component="span">
+            {vendorName && (
+              <Chip size="small" label={mpn ? `${vendorName} · ${mpn}` : vendorName} component="span"
+                sx={{ height: 18, fontSize: 11 }} />
+            )}
+            {eflMm !== null && (
+              <Chip size="small" variant="outlined" label={`EFL ${eflMm.toFixed(1)} mm`} component="span"
+                sx={{ height: 18, fontSize: 11 }} />
+            )}
+            {review && (
+              <Chip size="small" color="warning" label="review" component="span" sx={{ height: 18, fontSize: 11 }} />
+            )}
+            {description && (
+              <Typography variant="caption" color="text.secondary" component="span" sx={{ width: '100%' }}>
+                {description}
+              </Typography>
+            )}
+          </Stack>
+        }
+        secondaryTypographyProps={{ component: 'div' }}
+      />
+      {onDelete && (
+        <IconButton size="small" onClick={e => { e.stopPropagation(); onDelete(); }}>
+          <DeleteIcon fontSize="inherit" />
+        </IconButton>
+      )}
+    </ListItemButton>
+  );
+}
+
+export function LibraryBrowser({
+  onOpenRecord,
+}: {
+  onOpenRecord: (record: ComponentRecord) => void;
+}) {
+  const [tab, setTab] = useState<'index' | 'workspace'>('index');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const index = useLibraryIndex();
+  const workspace = useWorkspaceLibrary();
+  const [urlDraft, setUrlDraft] = useState<string | null>(null);
+
+  const indexComponents = useMemo(
+    () => index.components.filter(c => !categoryFilter || c.category === categoryFilter),
+    [index.components, categoryFilter],
+  );
+  const workspaceRecords = useMemo(
+    () =>
+      Object.values(workspace.records).filter(
+        r => !categoryFilter || (r as { category?: string }).category === categoryFilter,
+      ),
+    [workspace.records, categoryFilter],
+  );
+
+  const categories = RECORD_CATEGORIES.filter(c =>
+    tab === 'index'
+      ? index.components.some(x => x.category === c)
+      : workspaceRecords.length === 0 || Object.values(workspace.records).some(
+          r => (r as { category?: string }).category === c),
+  );
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={{ minHeight: 38 }}>
+        <Tab value="index" label={`index (${index.components.length})`} sx={{ minHeight: 38 }} />
+        <Tab value="workspace" label={`workspace (${Object.keys(workspace.records).length})`} sx={{ minHeight: 38 }} />
+      </Tabs>
+
+      <Stack direction="row" spacing={0.5} sx={{ p: 1, flexWrap: 'wrap', rowGap: 0.5 }}>
+        {categories.map(c => (
+          <Chip
+            key={c} size="small" label={c}
+            color={categoryFilter === c ? 'primary' : 'default'}
+            onClick={() => setCategoryFilter(f => (f === c ? null : c))}
+            sx={{ height: 20, fontSize: 11 }}
+          />
+        ))}
+      </Stack>
+
+      <Box sx={{ flex: 1, overflow: 'auto', px: 0.5 }}>
+        {tab === 'index' && (
+          <>
+            {index.error && (
+              <Alert severity="warning" sx={{ m: 1 }}>
+                index not reachable: {index.error}
+              </Alert>
+            )}
+            <List dense disablePadding>
+              {indexComponents.map((c: IndexComponent) => (
+                <ComponentCard
+                  key={c.id}
+                  id={c.id} version={c.version} category={c.category}
+                  description={c.description}
+                  vendorName={c.vendor?.name ?? ''} mpn={c.vendor?.mpn ?? ''}
+                  eflMm={c.efl_mm} review={c.review}
+                />
+              ))}
+            </List>
+            {!index.loading && !index.error && indexComponents.length === 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ p: 2, display: 'block' }}>
+                no components in the index{categoryFilter ? ` for '${categoryFilter}'` : ''}
+              </Typography>
+            )}
+          </>
+        )}
+        {tab === 'workspace' && (
+          <List dense disablePadding>
+            {workspaceRecords.map(record => {
+              const rec = record as ComponentRecord & { category?: string; description?: string };
+              return (
+                <ComponentCard
+                  key={rec.id}
+                  id={rec.id} version={rec.version}
+                  category={rec.category ?? 'other'}
+                  description={rec.description ?? ''}
+                  vendorName={rec.vendor?.name ?? ''} mpn={rec.vendor?.mpn ?? ''}
+                  eflMm={rec.effective_focal_length_mm ?? null}
+                  review={Boolean(rec.review?.length)}
+                  onClick={() => onOpenRecord(record)}
+                  onDelete={() => workspace.remove(rec.id)}
+                />
+              );
+            })}
+            {workspaceRecords.length === 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ p: 2, display: 'block' }}>
+                nothing saved yet — “Save to workspace library” keeps records here (user.*)
+              </Typography>
+            )}
+          </List>
+        )}
+      </Box>
+
+      <Box sx={{ p: 1, borderTop: theme => `1px solid ${theme.palette.divider}` }}>
+        <TextField
+          size="small" fullWidth label="library index URL"
+          value={urlDraft ?? index.url}
+          onChange={e => setUrlDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && urlDraft !== null) {
+              index.setUrl(urlDraft);
+              setUrlDraft(null);
+            }
+          }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <Tooltip title="reload index">
+                  <IconButton size="small" onClick={() => { index.setUrl(urlDraft ?? index.url); setUrlDraft(null); }}>
+                    <RefreshIcon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+    </Box>
+  );
+}

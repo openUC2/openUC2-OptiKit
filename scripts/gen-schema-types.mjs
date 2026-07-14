@@ -39,3 +39,15 @@ const ts = await compile(schema, 'DesignDecl', {
 });
 writeFileSync(join(outDir, 'design-decl.ts'), ts);
 console.log(`wrote src/model/dsn/generated/design-decl.ts (from ${schemaDir})`);
+
+// Library records (WP-14 component editor edits these).
+const componentSchema = JSON.parse(
+  readFileSync(join(schemaDir, 'library-component.schema.json'), 'utf8'),
+);
+const componentTs = await compile(componentSchema, 'ComponentRecord', {
+  bannerComment: banner,
+  additionalProperties: true,
+  style: { singleQuote: true },
+});
+writeFileSync(join(outDir, 'library-component.ts'), componentTs);
+console.log(`wrote src/model/dsn/generated/library-component.ts (from ${schemaDir})`);

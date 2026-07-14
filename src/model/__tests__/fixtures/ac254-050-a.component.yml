@@ -1,0 +1,57 @@
+kind: optical_component
+id: user.lens.ac254-050-a
+version: 0.1.0
+category: lens
+description: Thorlabs AC254-050-A f=50 mm Ø25.4 mm achromatic doublet (datasheet values)
+tags:
+  - authored
+vendor:
+  name: Thorlabs
+  mpn: AC254-050-A
+  url: ""
+optics:
+  frames:
+    optical:
+      z-mm: 0
+    exit:
+      z-mm: 11.5
+    mount:
+      z-mm: 5.75
+  ports:
+    front:
+      frame: optical
+      direction: -z
+    back:
+      frame: exit
+      direction: +z
+      after-surface: 2
+  fragment:
+    surfaces:
+      - type: standard
+        geometry:
+          type: StandardGeometry
+          radius: 33.34
+          conic: 0
+        material_post:
+          type: Material
+          name: N-BAF10
+        thickness: 9
+        is_stop: true
+        semi_aperture: 12.7
+      - type: standard
+        geometry:
+          type: StandardGeometry
+          radius: -22.28
+          conic: 0
+        material_post:
+          type: Material
+          name: N-SF10
+        thickness: 2.5
+        semi_aperture: 12.7
+      - type: standard
+        geometry:
+          type: StandardGeometry
+          radius: -291.07
+          conic: 0
+        semi_aperture: 12.7
+effective_focal_length_mm: 50.1768

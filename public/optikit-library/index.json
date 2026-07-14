@@ -1,0 +1,149 @@
+{
+  "schema": "optikit-library-index/v0",
+  "count": 1,
+  "modules": [
+    {
+      "id": "openuc2.cube.lens_z",
+      "version": "1.0.0",
+      "kind": "cube_module",
+      "description": "Motorizable focus lens cube (25 mm achromat on a \u00b17.5 mm z insert)",
+      "tags": [
+        "cube",
+        "cube/lens",
+        "cube/motorized"
+      ],
+      "category": "lens",
+      "thumbnail": null,
+      "footprint_grid": [
+        1,
+        1,
+        1
+      ],
+      "review": false,
+      "component": {
+        "ref": "openuc2.lens.achromat_25mm_f50@^1",
+        "resolved": "1.0.0",
+        "vendor": {
+          "name": "Thorlabs",
+          "mpn": "AC254-050-A",
+          "url": ""
+        },
+        "efl_mm": 50.0
+      },
+      "template": {
+        "ref": "openuc2.tpl.lens_insert_25mm@^1",
+        "resolved": "1.0.0",
+        "class": "adaptive",
+        "actuatable": true
+      },
+      "electronics": {
+        "pcb": "kicad:z_stage_driver@2.1",
+        "firmware-contract": "uc2:can:motor_axis@1",
+        "axis-map": [
+          {
+            "dof": "dz",
+            "can-object": 24674
+          }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "openuc2.detector.camera_cs165",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "detector",
+      "description": "CS165MU 1.6 MP CMOS camera (sensor plane detector)",
+      "tags": [
+        "detector",
+        "detector/camera"
+      ],
+      "vendor": {
+        "name": "Thorlabs",
+        "mpn": "CS165MU",
+        "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 0,
+      "review": false
+    },
+    {
+      "id": "openuc2.lens.achromat_25mm_f50",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "lens",
+      "description": "25 mm biconvex singlet, f = 50 mm (achromat placeholder)",
+      "tags": [
+        "lens",
+        "lens/convex"
+      ],
+      "vendor": {
+        "name": "Thorlabs",
+        "mpn": "AC254-050-A",
+        "url": ""
+      },
+      "efl_mm": 50.0,
+      "n_surfaces": 2,
+      "review": false
+    },
+    {
+      "id": "openuc2.mirror.flat_45",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "mirror",
+      "description": "Flat first-surface mirror mounted at 45\u00b0",
+      "tags": [
+        "mirror",
+        "mirror/flat",
+        "mirror/single-sided"
+      ],
+      "vendor": {
+        "name": "",
+        "mpn": "",
+        "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 1,
+      "review": false
+    },
+    {
+      "id": "openuc2.source.laser_488",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "source",
+      "description": "Collimated 488 nm laser diode module",
+      "tags": [
+        "source",
+        "source/laser"
+      ],
+      "vendor": {
+        "name": "openUC2",
+        "mpn": "LASER-488-COL",
+        "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 0,
+      "review": false
+    },
+    {
+      "id": "thorlabs.lens.ac254-050-a",
+      "version": "0.1.0",
+      "kind": "optical_component",
+      "category": "lens",
+      "description": "AC254-050-A AC254-050-A POSITIVE VISIBLE ACHROMATS: Infinite 50",
+      "tags": [
+        "imported",
+        "zmx"
+      ],
+      "vendor": {
+        "name": "Thorlabs",
+        "mpn": "AC254-050-A",
+        "url": ""
+      },
+      "efl_mm": 50.169421,
+      "n_surfaces": 3,
+      "review": true
+    }
+  ]
+}

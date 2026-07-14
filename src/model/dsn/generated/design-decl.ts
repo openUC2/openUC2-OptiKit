@@ -12,6 +12,7 @@ export type Name = string;
 export type Version = string;
 export type Variant = string;
 export type Type = string;
+export type Category = string;
 export type Design = string;
 export type Type1 = string;
 export type Model = string;
@@ -110,6 +111,7 @@ export interface Components {
  */
 export interface CompSpec {
   type?: Type;
+  category?: Category;
   design?: Design;
   primitive?: PrimSpec;
   pose?: PoseSpec;
