@@ -6,7 +6,10 @@ This app is becoming the editor pair (schematic + assembly) of the "KiCad for
 optics" toolchain. Strategy and work packages: `DOCS/kicad-for-optics-execution.md`
 (execution plan, per-WP prompts) and `DOCS/kicad-for-optics-workplan.md` /
 `DOCS/datamodel-unification.md` (rationale). The normative datamodel lives in the
-sibling repo `../optikit-core` (Pydantic → JSON Schema in `schema/dist/`).
+sibling repo `../optikit-core` (Pydantic → JSON Schema in `schema/dist/`). For
+what that repo actually does, its relationship to the Go repo, and the
+day-to-day workflow between the two repos, see `../optikit-core/DOCS/ARCHITECTURE.md`,
+`GO_INTEGRATION.md`, and `WORKING_WITH_FRONTEND.md`.
 
 ## Hard rule: the document boundary
 
@@ -19,6 +22,13 @@ conventions (document frame: mm, z-up, right-handed; store frame: grid cells,
 layer, three 90° rotations) are documented in `src/document/mapping.ts` — read it
 before touching any coordinate code. Legacy components (GridCanvas, PropertyPanel,
 Toolbar, …) still use appStore; do not add new appStore consumers.
+
+The component ("symbol") editor lives at `/configurator/components`
+(`src/components/component-editor/`); its record model, YAML serialization,
+and validation are pure functions in `src/model/componentRecord.ts`. Records
+it produces must always validate in optikit-core (`library validate`) —
+asserted by the committed fixture
+`src/model/__tests__/fixtures/ac254-050-a.component.yml`.
 
 ## Conventions
 

@@ -51,6 +51,22 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
            WP-12 → WP-14 → WP-15 → WP-16 → WP-17 → WP-18
 ```
 
+## Status ledger (2026-07-14)
+
+| WP | Deliverable | Status |
+|---|---|---|
+| WP-1…6 | schema v0, geometry, compiler, chain inference, back-annotation, FastAPI service | ✅ done (optikit-core `a6923d5`…`6dc677d`) |
+| WP-7 | library records + semver index + CI governance | ✅ done (`fac85b5`) |
+| WP-8 | glb2template Inventor ingestion | ✅ done (`3f032c4`; naming contract in `DOCS/inventor-naming-contract.md`) |
+| WP-9 | Thorlabs/Zemax importer (`import zmx` / `import thorlabs`) | ✅ done (`3738142`) — ⚠ fixture shelf has 5 real .zmx files; drop more into `tests/fixtures/zmx/` to hit the ≥10 acceptance bar |
+| WP-10 | CadQuery T3 harness (`generate`, keyed artifacts, CI job) | ✅ done (`c4bc01e`) |
+| WP-11…13 | document boundary, generated TS types + .dsn zip, 2.5D schematic | ✅ done (this repo `c0fbdaf`→`86e5662`) |
+| WP-14 | component ("symbol") editor `/configurator/components` | ✅ done (`5dd9908`) — AC254-050-A acceptance validated against optikit-core |
+| WP-15 | service round trip in the UI (check / simulate / optimize) | ⬜ next |
+| WP-16…18 | assembly editor, cross-probing, manufacturing export | ⬜ open |
+
+Nothing pushed to any remote yet — all of the above are local commits.
+
 ---
 
 # Part 1 · optikit-core (Python) — work packages with Claude Code prompts
