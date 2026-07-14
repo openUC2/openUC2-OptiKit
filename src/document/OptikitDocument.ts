@@ -225,6 +225,59 @@ export function selectPart(partId: string | null): void {
   useAppStore.getState().selectItem(partId, partId ? 'module' : null);
 }
 
+/**
+ * Undo bracket for continuous interactions (e.g. an insert drag): capture the
+ * pre-interaction state at pointer-down, commit once at pointer-up. The
+ * legacy history applies `history[index-1]` on undo, so a committed step
+ * pushes the pre-state AND the post-state — one undo then restores the
+ * pre-interaction state, one redo re-applies the result.
+ */
+export interface UndoToken {
+  snapshot: ReturnType<typeof storeSnapshot>;
+}
+
+function storeSnapshot() {
+  const s = useAppStore.getState();
+  return {
+    placedModules: s.placedModules,
+    annotations: s.annotations,
+    layers: s.layers,
+    activeLayerId: s.activeLayerId,
+    selectedItems: s.selectedItems,
+    selectedItemId: s.selectedItemId,
+    selectedItemType: s.selectedItemType,
+  };
+}
+
+export function captureUndo(): UndoToken {
+  return { snapshot: storeSnapshot() };
+}
+
+export function commitUndo(token: UndoToken): void {
+  const s = useAppStore.getState();
+  s.pushToHistory(token.snapshot);
+  s.pushToHistory(storeSnapshot());
+}
+
+export function undo(): void {
+  useAppStore.getState().undo();
+}
+
+export function redo(): void {
+  useAppStore.getState().redo();
+}
+
+export interface PartRenderInfo {
+  glbUrl?: string;
+  glbOffset?: [number, number, number];
+}
+
+/** Presentation assets for a library ref (GLB model), for the assembly view. */
+export function renderInfoOf(libraryRef: string): PartRenderInfo {
+  const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
+  return { glbUrl: def?.glbUrl, glbOffset: def?.glbOffset };
+}
+
 function setDocParams(partId: string, patch: Partial<ReturnType<typeof getDocParams>>): void {
   const store = useAppStore.getState();
   const m = store.placedModules.find(p => p.id === partId);

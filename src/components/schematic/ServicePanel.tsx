@@ -14,9 +14,6 @@ import {
   Divider,
   IconButton,
   InputAdornment,
-  List,
-  ListItemButton,
-  ListItemText,
   Stack,
   Switch,
   TextField,
@@ -24,9 +21,6 @@ import {
   Typography,
 } from '@mui/material';
 import {
-  ErrorOutline as ErrorIcon,
-  WarningAmber as WarningIcon,
-  InfoOutlined as InfoIcon,
   PlayArrow as SimulateIcon,
   Rule as CheckIcon,
   TrackChanges as OptimizeIcon,
@@ -35,14 +29,9 @@ import {
 import { DEFAULT_CORE_URL, getCoreUrl, setCoreUrl } from '../../api/coreClient';
 import { selectPart, useDocPaths, useDocRevision } from '../../document';
 import { pathColor } from './colors';
+import { MarkerList } from './MarkerList';
 import { OptimizeDialog } from './OptimizeDialog';
-import { useServiceStore, useSimFreshness, type ErcMarker } from './serviceStore';
-
-const SEVERITY_ICONS = {
-  error: <ErrorIcon fontSize="small" color="error" />,
-  warning: <WarningIcon fontSize="small" color="warning" />,
-  info: <InfoIcon fontSize="small" color="info" />,
-} as const;
+import { useServiceStore, useSimFreshness } from './serviceStore';
 
 function SpotDiagram({ x, y, color }: { x: number[]; y: number[]; color: string }) {
   const size = 120;
@@ -85,31 +74,6 @@ function SpotDiagram({ x, y, color }: { x: number[]; y: number[]; color: string 
 const PARAXIAL_LABELS: Record<string, string> = {
   f2: 'EFL', FNO: 'f/#', EPD: 'entrance pupil', magnification: 'mag',
 };
-
-function Marker({ marker, onJump }: { marker: ErcMarker; onJump: (partId: string) => void }) {
-  return (
-    <ListItemButton
-      dense
-      onClick={() => marker.partId && onJump(marker.partId)}
-      sx={{ borderRadius: 1, alignItems: 'flex-start', opacity: marker.partId ? 1 : 0.85 }}
-    >
-      <Box sx={{ mr: 1, mt: 0.25 }}>{SEVERITY_ICONS[marker.severity]}</Box>
-      <ListItemText
-        primary={
-          <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-            {marker.code}
-            {marker.where && `  ·  ${marker.where}`}
-          </Typography>
-        }
-        secondary={
-          <Typography variant="caption" color="text.secondary">
-            {marker.message}
-          </Typography>
-        }
-      />
-    </ListItemButton>
-  );
-}
 
 export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) => void }) {
   const store = useServiceStore();
@@ -193,11 +157,7 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
               ? 'check: no findings — design is clean'
               : `check: ${errorCount} error(s), ${store.markers.length - errorCount} note(s)`}
           </Typography>
-          <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
-            {store.markers.map(marker => (
-              <Marker key={marker.id} marker={marker} onJump={jump} />
-            ))}
-          </List>
+          <MarkerList markers={store.markers} onJump={jump} />
           {store.proposals.length > 0 && (
             <Alert severity="info" sx={{ mt: 0.5 }}>
               chain inference proposes {store.proposals.length} additional path(s):{' '}

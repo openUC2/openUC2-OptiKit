@@ -6,27 +6,33 @@
 export * from './types';
 export {
   addPart,
+  captureUndo,
   categoryOf,
+  commitUndo,
   getPart,
   getSnapshot,
   listParts,
   listPaths,
   movePartGrid,
   movePartWorld,
+  redo,
   removePart,
   removePath,
   renamePart,
+  renderInfoOf,
   rotatePart,
   selectPart,
   setDofValue,
   setPartOrientation,
   setPath,
   subscribe,
+  undo,
   useDocPart,
   useDocParts,
   useDocPaths,
   useSelectedPartId,
 } from './OptikitDocument';
+export type { PartRenderInfo, UndoToken } from './OptikitDocument';
 export {
   DOC_PARAMS_KEY,
   docPosToThree,

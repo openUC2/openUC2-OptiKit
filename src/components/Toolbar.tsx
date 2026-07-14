@@ -55,10 +55,11 @@ export const Toolbar: React.FC = () => {
   const isThreeD = location.pathname.startsWith('/configurator/3d');
   const isSchematic = location.pathname.startsWith('/configurator/schematic');
   const isComponentEditor = location.pathname.startsWith('/configurator/components');
+  const isAssembly = location.pathname.startsWith('/configurator/assembly');
   const is2DEditor = location.pathname === '/configurator' || location.pathname === '/configurator/' || location.pathname === '/';
-  // The 2D, 3D and schematic editors share the same toolbar (edit/annotate/file/save);
-  // they differ only in the rendering surface in the center.
-  const isEditorPage = is2DEditor || isThreeD || isSchematic || isComponentEditor;
+  // The 2D, 3D, schematic and assembly editors share the same toolbar
+  // (edit/annotate/file/save); they differ only in the center surface.
+  const isEditorPage = is2DEditor || isThreeD || isSchematic || isComponentEditor || isAssembly;
 
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
@@ -478,6 +479,25 @@ openUC2 team via GitHub repository
               >
                 <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
                   Components
+                </Typography>
+              </Button>
+            </Tooltip>
+          )}
+          {isEditorPage && (
+            <Tooltip title="Assembly editor: cube modules on the grid with DRC (the board editor)">
+              <Button
+                color="inherit"
+                onClick={() => navigate('/configurator/assembly')}
+                size="small"
+                sx={{
+                  textTransform: 'none',
+                  minWidth: { xs: '40px', sm: 'auto' },
+                  px: { xs: 1, sm: 2 },
+                  fontWeight: isAssembly ? 700 : 400,
+                }}
+              >
+                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Assembly
                 </Typography>
               </Button>
             </Tooltip>

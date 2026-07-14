@@ -101,6 +101,30 @@ const drcFindingSchema = z.object({
   axis: z.string().default(''),
   message: z.string(),
 });
+export type DrcFinding = z.infer<typeof drcFindingSchema>;
+
+/** One component's grid pose from /v1/cubify (schema-v0 `pose:` mapping). */
+const cubifiedPoseSchema = z.object({
+  rotation: z.object({
+    type: z.string().default('grid'),
+    grid: z.record(z.string(), z.string()).optional(),
+    'offset-deg': z.record(z.string(), anyNumber).optional(),
+  }),
+  translation: z.object({
+    'offset-grid': z.record(z.string(), z.number()).optional(),
+    'offset-mm': z.record(z.string(), anyNumber).optional(),
+  }),
+});
+export type CubifiedPose = z.infer<typeof cubifiedPoseSchema>;
+
+const cubifySchema = z.object({
+  poses: z.record(z.string(), cubifiedPoseSchema),
+  findings: z.array(drcFindingSchema),
+});
+export type CubifyResponse = z.infer<typeof cubifySchema>;
+
+const drcSchema = z.object({ findings: z.array(drcFindingSchema) });
+export type DrcResponse = z.infer<typeof drcSchema>;
 
 const optimizeSchema = z.object({
   dof_values: z.record(z.string(), anyNumber),
@@ -189,6 +213,14 @@ export function simulatePath(
     simulateSchema,
     signal,
   );
+}
+
+export function cubifyDesign(files: DsnFiles, signal?: AbortSignal): Promise<CubifyResponse> {
+  return post('/v1/cubify', { files }, cubifySchema, signal);
+}
+
+export function runDrc(files: DsnFiles, signal?: AbortSignal): Promise<DrcResponse> {
+  return post('/v1/drc', { files }, drcSchema, signal);
 }
 
 export function optimizeDesign(

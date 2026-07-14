@@ -204,6 +204,68 @@ export function listRangedDofs(snap?: DocSnapshot): RangedDof[] {
   return out;
 }
 
+export interface TranslationDof {
+  /** dotted key, e.g. "objective.dz" */
+  key: string;
+  name: string;
+  axis: 'x' | 'y' | 'z';
+  range: [number, number];
+  unit: string;
+  value: number;
+  actuatable: boolean;
+}
+
+export interface PartMechanics {
+  partId: string;
+  componentKey: string;
+  /** fixed (T1) | adaptive (T2) | generative (T3) | null = no template bound. */
+  templateClass: string | null;
+  /** Ranged translation DOFs — the draggable insert axes (T2). */
+  translationDofs: TranslationDof[];
+}
+
+/**
+ * Mechanical bindings per placed part, from the merged design: the template
+ * class and the draggable (ranged translation) DOFs with current values.
+ */
+export function listPartMechanics(snap?: DocSnapshot): PartMechanics[] {
+  const { design, keyByPartId } = buildServiceDesign(snap);
+  const dofValues = design.instantiation?.dof_values ?? {};
+  const out: PartMechanics[] = [];
+  for (const [partId, key] of Object.entries(keyByPartId)) {
+    const comp = design.components?.[key];
+    if (!comp) continue;
+    const translationDofs: TranslationDof[] = [];
+    for (const dof of comp.dof ?? []) {
+      if ((dof.kind ?? 'translation') !== 'translation') continue;
+      const axis = dof.axis;
+      if (axis !== 'x' && axis !== 'y' && axis !== 'z') continue;
+      const range = dof.range;
+      if (!range || range.length !== 2) continue;
+      const [lo, hi] = range;
+      if (typeof lo !== 'number' || typeof hi !== 'number') continue;
+      const dotted = `${key}.${dof.name}`;
+      const value = dofValues[dotted];
+      translationDofs.push({
+        key: dotted,
+        name: dof.name,
+        axis,
+        range: [lo, hi],
+        unit: dof.unit ?? 'mm',
+        value: typeof value === 'number' ? value : 0,
+        actuatable: Boolean(dof.actuatable),
+      });
+    }
+    out.push({
+      partId,
+      componentKey: key,
+      templateClass: comp.template?.class ?? null,
+      translationDofs,
+    });
+  }
+  return out;
+}
+
 function slug(s: string): string {
   return s
     .toLowerCase()

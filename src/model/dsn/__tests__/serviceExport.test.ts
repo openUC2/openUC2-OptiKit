@@ -11,7 +11,12 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { DocPart, DocSnapshot } from '../../../document';
 import { useSourceDesignStore } from '../../../document/sourceDesignStore';
-import { buildServiceDesign, listRangedDofs, serviceFiles } from '../serviceExport';
+import {
+  buildServiceDesign,
+  listPartMechanics,
+  listRangedDofs,
+  serviceFiles,
+} from '../serviceExport';
 import { parseDesign } from '../io';
 
 const FLUO_YAML = readFileSync(
@@ -199,6 +204,32 @@ describe('listRangedDofs', () => {
       value: 1.85,
       partId: 'p-objective',
     });
+  });
+});
+
+describe('listPartMechanics (WP-16)', () => {
+  it('exposes template classes and the draggable translation DOF', () => {
+    seedSource();
+    const mechanics = listPartMechanics(fluoSnapshot());
+    const byKey = Object.fromEntries(mechanics.map(m => [m.componentKey, m]));
+    // objective: T2 adaptive with the dz insert axis, current value 1.85.
+    expect(byKey.objective.templateClass).toBe('adaptive');
+    expect(byKey.objective.translationDofs).toEqual([
+      {
+        key: 'objective.dz',
+        name: 'dz',
+        axis: 'z',
+        range: [-7.5, 7.5],
+        unit: 'mm',
+        value: 1.85,
+        actuatable: true,
+      },
+    ]);
+    // dichroic: T1 fixed — insert locked, nothing draggable.
+    expect(byKey.dichroic.templateClass).toBe('fixed');
+    expect(byKey.dichroic.translationDofs).toEqual([]);
+    // laser: no template bound at all (ghost box + "no template" badge).
+    expect(byKey.laser.templateClass).toBeNull();
   });
 });
 
