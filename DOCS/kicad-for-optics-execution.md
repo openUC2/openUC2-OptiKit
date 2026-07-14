@@ -62,8 +62,8 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-10 | CadQuery T3 harness (`generate`, keyed artifacts, CI job) | ✅ done (`c4bc01e`) |
 | WP-11…13 | document boundary, generated TS types + .dsn zip, 2.5D schematic | ✅ done (this repo `c0fbdaf`→`86e5662`) |
 | WP-14 | component ("symbol") editor `/configurator/components` | ✅ done (`5dd9908`) — AC254-050-A acceptance validated against optikit-core |
-| WP-15 | service round trip in the UI (check / simulate / optimize) | ⬜ next |
-| WP-16…18 | assembly editor, cross-probing, manufacturing export | ⬜ open |
+| WP-15 | service round trip in the UI (check / simulate / optimize) | ✅ done (`33f15f1` + core `611e332`) — acceptance verified live: fluo-scope imports, 127-ray fans, focus-DOF optimize with delta review |
+| WP-16…18 | assembly editor, cross-probing, manufacturing export | ⬜ next |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
