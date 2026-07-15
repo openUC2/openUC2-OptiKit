@@ -93,6 +93,8 @@ components:
   objective:
     type: primitive
     category: lens
+    # Commercial provenance (extra field, consumed by the WP-18 BOM).
+    vendor: {name: Thorlabs, mpn: AC254-050-A}
     primitive:
       type: step
       model: SUB - 0023 - LEND40F50 - V04 - virt ass.stp
@@ -148,6 +150,8 @@ components:
   tube-lens:
     type: primitive
     category: lens
+    # Commercial provenance (extra field, consumed by the WP-18 BOM).
+    vendor: {name: Thorlabs, mpn: AC254-050-A}
     primitive:
       type: step
       model: SUB - 0023 - LEND40F50 - V04 - virt ass.stp

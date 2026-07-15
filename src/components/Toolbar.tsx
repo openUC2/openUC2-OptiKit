@@ -112,6 +112,30 @@ export const Toolbar: React.FC = () => {
     }
   };
 
+  const handleExportReleaseBundle = async () => {
+    try {
+      const { buildReleaseBundle } = await import('../model/dsn/releaseBundle');
+      const { zipDsn } = await import('../model/dsn/io');
+      const bundle = await buildReleaseBundle();
+      const slug = bundle.designName.replace(/[^a-zA-Z0-9-_]+/g, '-');
+      const blob = await zipDsn(bundle.files, `${slug}-release`);
+      saveAs(blob, `${slug}-release.zip`);
+      addNotification({
+        type: 'success',
+        title: 'release bundle exported',
+        message: `${Object.keys(bundle.files).length} file(s) — verify with: optikit-core rebuild ${slug}-release.zip`,
+        duration: 8000,
+      });
+    } catch (e) {
+      addNotification({
+        type: 'error',
+        title: 'release bundle export failed',
+        message: e instanceof Error ? e.message : String(e),
+        duration: 8000,
+      });
+    }
+  };
+
   const handleImportDsn = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -670,6 +694,10 @@ openUC2 team via GitHub repository
               <MenuItem onClick={() => { handleImportDsn(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Import .dsn (zip)</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleExportReleaseBundle(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><STLIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Export Release Bundle (zip)</ListItemText>
               </MenuItem>
               <Divider />
               <MenuItem onClick={() => { handleGenerateShareableLink(); setFileMenuAnchor(null); }}>

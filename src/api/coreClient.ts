@@ -126,6 +126,19 @@ export type CubifyResponse = z.infer<typeof cubifySchema>;
 const drcSchema = z.object({ findings: z.array(drcFindingSchema) });
 export type DrcResponse = z.infer<typeof drcSchema>;
 
+/** /v1/compile: the optic dict is passed through opaquely (provenance files). */
+const compileSchema = z.object({
+  paths: z.record(
+    z.string(),
+    z.object({
+      optic: z.record(z.string(), z.unknown()),
+      manifest: z.array(z.record(z.string(), z.unknown())),
+      warnings: z.array(z.string()).default([]),
+    }),
+  ),
+});
+export type CompileResponse = z.infer<typeof compileSchema>;
+
 const optimizeSchema = z.object({
   dof_values: z.record(z.string(), anyNumber),
   merit: z.object({
@@ -226,6 +239,10 @@ export function simulatePath(
 
 export function cubifyDesign(files: DsnFiles, signal?: AbortSignal): Promise<CubifyResponse> {
   return post('/v1/cubify', { files }, cubifySchema, signal);
+}
+
+export function compileDesign(files: DsnFiles, signal?: AbortSignal): Promise<CompileResponse> {
+  return post('/v1/compile', { files }, compileSchema, signal);
 }
 
 export function runDrc(files: DsnFiles, signal?: AbortSignal): Promise<DrcResponse> {
