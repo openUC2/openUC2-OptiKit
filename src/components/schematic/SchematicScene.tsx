@@ -35,6 +35,8 @@ export interface SchematicSettings {
   snapGrid: boolean;
   snapYaw: boolean;
   showRays: boolean;
+  /** Locked 2.5D camera (WP-23): LMB is for parts; orbit on RMB only. */
+  lockView: boolean;
 }
 
 interface SceneProps {
@@ -201,18 +203,22 @@ function SchematicPart({
           <SchematicGlyph category={part.category} label={part.ref} />
           <OpticalAxisArrow color={selected ? '#ffd24d' : '#8f9aa6'} />
         </group>
-        {(hovered || selected) && (
-          <mesh>
-            <sphereGeometry args={[20, 16, 12]} />
-            <meshBasicMaterial
-              color={selected ? '#FFAA00' : '#88CCFF'}
-              wireframe
-              transparent
-              opacity={0.28}
-            />
-          </mesh>
-        )}
       </group>
+
+      {/* Selection/hover: a flat ground ring (the wireframe sphere read as
+          "mystery geometry" — WP-23 legend feedback). */}
+      {(hovered || selected) && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
+          <ringGeometry args={selected ? [24, 28, 48] : [25, 27, 48]} />
+          <meshBasicMaterial
+            color={selected ? '#FFAA00' : '#88CCFF'}
+            transparent
+            opacity={selected ? 0.75 : 0.4}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
 
       {/* Reference label (billboarded by keeping it out of the part rotation). */}
       <Text
@@ -474,15 +480,26 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
         minDistance={40}
         maxDistance={8000}
         maxPolarAngle={Math.PI * 0.495}
-        mouseButtons={{
-          LEFT: THREE.MOUSE.ROTATE,
-          MIDDLE: THREE.MOUSE.DOLLY,
-          RIGHT: THREE.MOUSE.PAN,
-        }}
+        mouseButtons={
+          settings.lockView
+            ? {
+                // SimCity mode: the left button belongs to the PARTS.
+                LEFT: -1 as unknown as THREE.MOUSE,
+                MIDDLE: THREE.MOUSE.PAN,
+                RIGHT: THREE.MOUSE.ROTATE,
+              }
+            : {
+                LEFT: THREE.MOUSE.ROTATE,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.PAN,
+              }
+        }
       />
       <CameraCapture cameraRef={cameraRef} />
 
-      {/* Working plane */}
+      {/* Working plane at the OPTICAL-AXIS height. Lines are offset by half a
+          cell so they draw the cube BOUNDARIES — snapped parts land in cell
+          centers, SimCity-style (WP-23 snap semantics). */}
       <Grid
         args={[2000, 2000]}
         cellSize={UC2_GRID_MM[0]}
@@ -494,7 +511,7 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
         infiniteGrid
         fadeDistance={9000}
         fadeStrength={1.1}
-        position={[0, planeY, 0]}
+        position={[UC2_GRID_MM[0] / 2, planeY, UC2_GRID_MM[1] / 2]}
       />
 
       <axesHelper args={[80]} position={[0, planeY + 0.2, 0]} />

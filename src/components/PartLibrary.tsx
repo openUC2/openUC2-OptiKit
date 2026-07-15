@@ -29,6 +29,8 @@ import {
   Biotech as PhysicsIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { categoryOf } from '../document';
+import { GlyphThumb } from './schematic/GlyphThumb';
 import { loadThumbnailManifest, defaultOrientation, thumbnailUrl, type ThumbnailManifest } from '../utils/moduleThumbnails';
 import { ModuleCreationWizard } from './ModuleCreationWizard';
 import { MODULE_SIMULATION_MODELS } from '../types';
@@ -97,7 +99,10 @@ const MiniPhysicalIcon: React.FC<MiniPhysicalIconProps> = ({ module, size = 58 }
   );
 };
 
-export const PartLibrary: React.FC<{ glbThumbnails?: boolean }> = ({ glbThumbnails = false }) => {
+export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: boolean }> = ({
+  glbThumbnails = false,
+  opticalGlyphs = false,
+}) => {
   const { modules, loadModules, placeModule, placedModules, layers, activeLayerId } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
@@ -391,7 +396,10 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean }> = ({ glbThumbnai
               mb: 1,
             }}
           >
-            {iconMode === 'canvas' ? (
+            {opticalGlyphs ? (
+              // Schematic palette (WP-23): the optical symbol, not the cube.
+              <GlyphThumb category={categoryOf(module.id, module)} size={58} />
+            ) : iconMode === 'canvas' ? (
               <MiniPhysicalIcon module={module} size={58} />
             ) : imgSrc ? (
               <img
@@ -537,6 +545,16 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean }> = ({ glbThumbnai
         >
           Create Custom Module
         </Button>
+        {opticalGlyphs && (
+          <Button
+            variant="outlined"
+            onClick={() => { window.location.assign('/configurator/bind'); }}
+            fullWidth
+            sx={{ mb: 1 }}
+          >
+            Load STP / GLB… (part binding)
+          </Button>
+        )}
       </Paper>
       
       {/* Content */}

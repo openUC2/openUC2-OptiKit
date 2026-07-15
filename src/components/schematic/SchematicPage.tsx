@@ -23,6 +23,9 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   GridOn as SnapGridIcon,
+  HelpOutline as HelpIcon,
+  Lock as LockIcon,
+  LockOpen as LockOpenIcon,
   Rotate90DegreesCcw as SnapYawIcon,
   Timeline as RaysIcon,
   KeyboardArrowDown as DownIcon,
@@ -46,6 +49,7 @@ import {
 } from '../../document';
 import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
+import { SchematicLegend, LEGEND_SEEN_KEY } from './SchematicLegend';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
 import { ServicePanel } from './ServicePanel';
 
@@ -60,7 +64,16 @@ export function SchematicPage() {
     snapGrid: false,
     snapYaw: false,
     showRays: true,
+    lockView: true,
   });
+  // Affordance legend (WP-23): opens itself once, then lives behind "?".
+  const [legendOpen, setLegendOpen] = useState(
+    () => localStorage.getItem(LEGEND_SEEN_KEY) !== '1',
+  );
+  const closeLegend = () => {
+    localStorage.setItem(LEGEND_SEEN_KEY, '1');
+    setLegendOpen(false);
+  };
   const [chainDraft, setChainDraft] = useState<PortRef[] | null>(null);
   const paths = useDocPaths();
   const activePathName = `path-${paths.length + 1}`;
@@ -209,7 +222,8 @@ export function SchematicPage() {
               },
             }}
           >
-            <PartLibrary glbThumbnails />
+            {/* Schematic palette: optical symbols, not cube renders (WP-23). */}
+            <PartLibrary opticalGlyphs />
           </Drawer>
 
           <Box
@@ -242,6 +256,7 @@ export function SchematicPage() {
               cameraRef={cameraRef}
               controlsRef={controlsRef}
             />
+            {legendOpen && <SchematicLegend onClose={closeLegend} />}
 
             {/* Bottom toolbar: snap / rays / working plane */}
             <Paper
@@ -281,6 +296,30 @@ export function SchematicPage() {
                   sx={{ '&.Mui-selected': { color: '#00e5ff' } }}
                 >
                   <RaysIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip
+                title={settings.lockView
+                  ? 'View locked (SimCity mode): left button is for parts; right-drag orbits. Click to unlock free orbit.'
+                  : 'View unlocked: left-drag orbits. Click to lock the view for part editing.'}
+              >
+                <ToggleButton
+                  value="lockView"
+                  selected={settings.lockView}
+                  size="small"
+                  onChange={() => setSettings(s => ({ ...s, lockView: !s.lockView }))}
+                >
+                  {settings.lockView ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title="What do the pins, rings and colors mean?">
+                <ToggleButton
+                  value="legend"
+                  selected={legendOpen}
+                  size="small"
+                  onChange={() => (legendOpen ? closeLegend() : setLegendOpen(true))}
+                >
+                  <HelpIcon fontSize="small" />
                 </ToggleButton>
               </Tooltip>
 

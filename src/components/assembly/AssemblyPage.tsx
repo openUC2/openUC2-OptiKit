@@ -15,6 +15,8 @@ import {
   Drawer,
   Stack,
   TextField,
+  ToggleButton,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -22,6 +24,8 @@ import {
 import { ThemeProvider } from '@mui/material/styles';
 import {
   Apps as CubifyIcon,
+  Lock as LockIcon,
+  LockOpen as LockOpenIcon,
   Rule as DrcIcon,
 } from '@mui/icons-material';
 import * as THREE from 'three';
@@ -47,6 +51,7 @@ export function AssemblyPage() {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [rightOpen] = useState(true);
+  const [lockView, setLockView] = useState(true);
   const store = useAssemblyStore();
   const revision = useDocRevision();
   const parts = useDocParts();
@@ -124,9 +129,26 @@ export function AssemblyPage() {
           <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
             <AssemblyScene
               mechanics={mechanics}
+              lockView={lockView}
               cameraRef={cameraRef}
               controlsRef={controlsRef}
             />
+            <Tooltip
+              title={lockView
+                ? 'View locked: left button selects/drags; right-drag orbits. Click to unlock.'
+                : 'View unlocked: left-drag orbits. Click to lock for part editing.'}
+            >
+              <ToggleButton
+                value="lockView" size="small" selected={lockView}
+                onChange={() => setLockView(v => !v)}
+                sx={{
+                  position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                  bgcolor: 'rgba(23,28,36,0.88)', zIndex: 10,
+                }}
+              >
+                {lockView ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
+              </ToggleButton>
+            </Tooltip>
             {parts.length === 0 && (
               <Alert
                 severity="info"

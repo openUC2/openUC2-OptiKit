@@ -27,6 +27,7 @@ import {
   commitUndo,
   docQuatToThree,
   renderInfoOf,
+  rot24Matrix,
   selectPart,
   setDofValue,
   useDocParts,
@@ -35,6 +36,8 @@ import {
 } from '../../document';
 import type { UndoToken } from '../../document';
 import { GLYPH_COLORS } from '../schematic/colors';
+import { SchematicGlyph } from '../schematic/glyphs';
+import { opticalAxisOf } from '../schematic/ports';
 import { GLBErrorBoundary } from '../../three/GLBErrorBoundary';
 import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExport';
 import type { Marker } from '../schematic/MarkerList';
@@ -228,11 +231,33 @@ function AssemblyPart({
   const selectedId = useSelectedPartId();
   const selected = selectedId === part.id;
   const [hovered, setHovered] = useState(false);
-  const pos = toThree(part.worldPose.positionMm);
-  const quat = useMemo(
+  // T-rule rendering (WP-23): the cube SHELL always sits axis-aligned on the
+  // grid (cell position + R24 only); the residual yaw / δ offsets show up on
+  // the INSERT content inside it. DRC flags residuals on T1 shells as before.
+  const shellPos = toThree([
+    part.gridPose.cell[0] * UC2_GRID_MM[0],
+    part.gridPose.cell[1] * UC2_GRID_MM[1],
+    part.gridPose.cell[2] * UC2_GRID_MM[2],
+  ]);
+  const shellQuat = useMemo(() => {
+    const docQuat = new THREE.Quaternion().setFromRotationMatrix(
+      rot24Matrix(part.gridPose.rot24),
+    );
+    return docQuatToThree([docQuat.x, docQuat.y, docQuat.z, docQuat.w]);
+  }, [part.gridPose.rot24]);
+  // The insert (optical element) at its FULL world pose, incl. residuals.
+  const insertPos = toThree(part.worldPose.positionMm);
+  const insertQuat = useMemo(
     () => docQuatToThree(part.worldPose.rotation),
     [part.worldPose.rotation],
   );
+  const insertAxisQuat = useMemo(() => {
+    const axis = opticalAxisOf(part);
+    return new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(axis[0], axis[2], -axis[1]).normalize(),
+    );
+  }, [part]);
   const render = renderInfoOf(part.libraryRef);
   const color = GLYPH_COLORS[part.category];
   const templateClass = mechanics?.templateClass ?? null;
@@ -240,9 +265,9 @@ function AssemblyPart({
   const locked = templateClass === 'fixed';
 
   return (
-    <group position={pos}>
+    <group position={shellPos}>
       <group
-        quaternion={quat}
+        quaternion={shellQuat}
         onClick={e => {
           e.stopPropagation();
           selectPart(part.id);
@@ -281,6 +306,16 @@ function AssemblyPart({
         )}
       </group>
 
+      {/* Insert content at the true world pose (residual yaw + δ visible
+          against the axis-aligned shell). */}
+      <group position={[insertPos[0] - shellPos[0], insertPos[1] - shellPos[1], insertPos[2] - shellPos[2]]}>
+        <group quaternion={insertQuat} scale={0.55}>
+          <group quaternion={insertAxisQuat}>
+            <SchematicGlyph category={part.category} label={part.ref} />
+          </group>
+        </group>
+      </group>
+
       <Text
         position={[0, 34, 0]}
         fontSize={7}
@@ -317,6 +352,8 @@ function AssemblyPart({
 
 interface AssemblySceneProps {
   mechanics: PartMechanics[];
+  /** Locked 2.5D camera (WP-23): LMB is for parts; orbit on RMB only. */
+  lockView: boolean;
   cameraRef: React.MutableRefObject<THREE.PerspectiveCamera | null>;
   controlsRef?: React.MutableRefObject<{ target: THREE.Vector3; update: () => void } | null>;
 }
@@ -335,7 +372,7 @@ function CameraCapture({ cameraRef }: { cameraRef: AssemblySceneProps['cameraRef
   return null;
 }
 
-function SceneContent({ mechanics, cameraRef, controlsRef }: AssemblySceneProps) {
+function SceneContent({ mechanics, lockView, cameraRef, controlsRef }: AssemblySceneProps) {
   const parts = useDocParts();
   const markers = useAssemblyStore(s => s.markers);
   const mechanicsById = useMemo(
@@ -358,9 +395,23 @@ function SceneContent({ mechanics, cameraRef, controlsRef }: AssemblySceneProps)
         minDistance={60}
         maxDistance={8000}
         maxPolarAngle={Math.PI * 0.495}
+        mouseButtons={
+          lockView
+            ? {
+                LEFT: -1 as unknown as THREE.MOUSE,
+                MIDDLE: THREE.MOUSE.PAN,
+                RIGHT: THREE.MOUSE.ROTATE,
+              }
+            : {
+                LEFT: THREE.MOUSE.ROTATE,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.PAN,
+              }
+        }
       />
       <CameraCapture cameraRef={cameraRef} />
 
+      {/* Lines at cube boundaries: snapped shells land in cell centers. */}
       <Grid
         args={[2000, 2000]}
         cellSize={UC2_GRID_MM[0]}
@@ -372,7 +423,7 @@ function SceneContent({ mechanics, cameraRef, controlsRef }: AssemblySceneProps)
         infiniteGrid
         fadeDistance={9000}
         fadeStrength={1.1}
-        position={[0, -UC2_GRID_MM[2] / 2, 0]}
+        position={[UC2_GRID_MM[0] / 2, -UC2_GRID_MM[2] / 2, UC2_GRID_MM[1] / 2]}
       />
       <axesHelper args={[80]} position={[0, -UC2_GRID_MM[2] / 2 + 0.2, 0]} />
 
