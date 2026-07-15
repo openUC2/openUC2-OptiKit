@@ -1,7 +1,8 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState, lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
+import { AppShell } from './components/AppShell'
 import { EditorPage } from './components/EditorPage'
 import { SetupBrowser } from './components/SetupBrowser'
 import { CollectionView } from './components/CollectionView'
@@ -11,6 +12,7 @@ import { NotificationDisplay } from './components/NotificationDisplay'
 import { useAppStore } from './stores/appStore'
 import { materialTheme } from './theme/materialTheme'
 import { trackUserVisit } from './utils/statisticsHandler'
+import './styles/fonts.css'
 import './styles/brand.css'
 import './App.css'
 
@@ -154,6 +156,15 @@ function App() {
     };
   }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, setStartupDialogClosed]);
 
+  // Every route renders inside the shared AppShell (WP-24): editors on the
+  // dark theme, document-style pages (setups, collections, FRAME) on light.
+  const dark = (node: ReactNode) => (
+    <AppShell mode="dark"><Suspense fallback={null}>{node}</Suspense></AppShell>
+  );
+  const light = (node: ReactNode) => (
+    <AppShell mode="light"><Suspense fallback={null}>{node}</Suspense></AppShell>
+  );
+
   return (
     <ThemeProvider theme={materialTheme}>
       <CssBaseline />
@@ -161,21 +172,21 @@ function App() {
         <Routes>
           {/* The schematic is the primary editor; the legacy 2D grid builder
               stays reachable at /configurator/grid (feedback round 1). */}
-          <Route path="/configurator" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
-          <Route path="/configurator/" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
-          <Route path="/configurator/grid" element={<EditorPage />} />
-          <Route path="/configurator/frame" element={<FrameWizardPage />} />
-          <Route path="/configurator/setups" element={<SetupBrowser />} />
-          <Route path="/configurator/3d" element={<Suspense fallback={null}><Editor3DPage /></Suspense>} />
-          <Route path="/configurator/schematic" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
-          <Route path="/configurator/components" element={<Suspense fallback={null}><ComponentEditorPage /></Suspense>} />
-          <Route path="/configurator/assembly" element={<Suspense fallback={null}><AssemblyPage /></Suspense>} />
-          <Route path="/configurator/bind" element={<Suspense fallback={null}><BindPage /></Suspense>} />
-          <Route path="/configurator/:collectionName" element={<CollectionView />} />
+          <Route path="/configurator" element={dark(<SchematicPage />)} />
+          <Route path="/configurator/" element={dark(<SchematicPage />)} />
+          <Route path="/configurator/grid" element={dark(<EditorPage />)} />
+          <Route path="/configurator/frame" element={light(<FrameWizardPage />)} />
+          <Route path="/configurator/setups" element={light(<SetupBrowser />)} />
+          <Route path="/configurator/3d" element={dark(<Editor3DPage />)} />
+          <Route path="/configurator/schematic" element={dark(<SchematicPage />)} />
+          <Route path="/configurator/components" element={dark(<ComponentEditorPage />)} />
+          <Route path="/configurator/assembly" element={dark(<AssemblyPage />)} />
+          <Route path="/configurator/bind" element={dark(<BindPage />)} />
+          <Route path="/configurator/:collectionName" element={light(<CollectionView />)} />
           {/* Legacy routes for backward compatibility */}
-          <Route path="/" element={<EditorPage />} />
-          <Route path="/setups" element={<SetupBrowser />} />
-          <Route path="/:collectionName" element={<CollectionView />} />
+          <Route path="/" element={dark(<EditorPage />)} />
+          <Route path="/setups" element={light(<SetupBrowser />)} />
+          <Route path="/:collectionName" element={light(<CollectionView />)} />
         </Routes>
         
         {/* Startup Dialog */}

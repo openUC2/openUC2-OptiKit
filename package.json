@@ -24,7 +24,8 @@
     "preview": "vite preview",
     "thumbnails": "node scripts/generate-glb-thumbnails.mjs",
     "test": "vitest run",
-    "gen:schema": "node scripts/gen-schema-types.mjs"
+    "gen:schema": "node scripts/gen-schema-types.mjs",
+    "vr": "node scripts/visual-regression.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

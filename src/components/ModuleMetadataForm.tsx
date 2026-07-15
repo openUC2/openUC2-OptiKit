@@ -40,8 +40,8 @@ const moduleGroups = [
 ];
 
 const moduleColors = [
-  { value: '#1e4670', label: 'Blue' },
-  { value: '#7cc142', label: 'Green' },
+  { value: '#023773', label: 'Blue' },
+  { value: '#85b918', label: 'Green' },
   { value: '#dc3545', label: 'Red' },
   { value: '#4a9b8e', label: 'Teal' },
   { value: '#ff9800', label: 'Orange' },

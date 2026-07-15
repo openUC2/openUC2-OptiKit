@@ -152,7 +152,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
   const [metadata, setMetadata] = useState<ModuleMetadata>({
     name: '',
     group: 'custom',
-    color: '#1e4670',
+    color: '#023773',
     description: '',
     price: undefined,
     notification: '',
@@ -221,7 +221,7 @@ export const ModuleCreationWizard: React.FC<ModuleCreationWizardProps> = ({
     setMetadata({
       name: '',
       group: 'custom',
-      color: '#1e4670',
+      color: '#023773',
       description: '',
       price: undefined,
       notification: '',

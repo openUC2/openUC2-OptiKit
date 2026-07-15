@@ -620,11 +620,11 @@ export const SetupBrowser: React.FC = () => {
   }
 
   return (
-    <Container 
-      maxWidth="lg" 
-      sx={{ 
-        height: '100vh', 
-        overflow: 'auto', 
+    <Container
+      maxWidth="lg"
+      sx={{
+        height: '100%',
+        overflow: 'auto',
         pb: 4,
         // Mobile-specific styles
         '@media (max-width: 768px)': {

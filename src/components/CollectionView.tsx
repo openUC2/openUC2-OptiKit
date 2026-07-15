@@ -248,11 +248,11 @@ export const CollectionView: React.FC = () => {
   }
 
   return (
-    <Container 
-      maxWidth="lg" 
-      sx={{ 
-        height: '100vh', 
-        overflow: 'auto', 
+    <Container
+      maxWidth="lg"
+      sx={{
+        height: '100%',
+        overflow: 'auto',
         pb: 4,
         '@media (max-width: 768px)': {
           px: 1,

@@ -21,7 +21,6 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { ThemeProvider } from '@mui/material/styles';
 import {
   Apps as CubifyIcon,
   Lock as LockIcon,
@@ -29,8 +28,6 @@ import {
   Rule as DrcIcon,
 } from '@mui/icons-material';
 import * as THREE from 'three';
-import { materialThemeDark } from '../../theme/materialTheme';
-import { Toolbar } from '../Toolbar';
 // Same legacy bootstrap as SchematicPage/Editor3DPage: the module catalog and
 // the stored layout live in appStore until the .dsn document replaces it.
 import { useAppStore } from '../../stores/appStore';
@@ -121,11 +118,10 @@ export function AssemblyPage() {
         ? ('current' as const)
         : ('outdated' as const);
 
+  // Rendered inside the AppShell (WP-24): the shell provides theme + toolbar.
   return (
-    <ThemeProvider theme={materialThemeDark}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
-        <Toolbar />
-        <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+    <>
+      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
             <AssemblyScene
               mechanics={mechanics}
@@ -262,9 +258,8 @@ export function AssemblyPage() {
               )}
             </Box>
           </Drawer>
-        </Box>
       </Box>
       <CubifyDialog />
-    </ThemeProvider>
+    </>
   );
 }

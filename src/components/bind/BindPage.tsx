@@ -26,7 +26,6 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { ThemeProvider } from '@mui/material/styles';
 import {
   Delete as DeleteIcon,
   Download as DownloadIcon,
@@ -39,8 +38,6 @@ import {
   ViewInAr as CubeIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
-import { materialThemeDark } from '../../theme/materialTheme';
-import { Toolbar } from '../Toolbar';
 import { CoreServiceError, convertStepToGlb, saveLibraryRecords } from '../../api/coreClient';
 import {
   bindToRecords,
@@ -154,11 +151,9 @@ export function BindPage() {
 
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
 
+  // Rendered inside the AppShell (WP-24): the shell provides theme + toolbar.
   return (
-    <ThemeProvider theme={materialThemeDark}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
-        <Toolbar />
-        <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+    <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
             <BindScene />
 
@@ -367,8 +362,6 @@ export function BindPage() {
               </Stack>
             </Box>
           </Drawer>
-        </Box>
-      </Box>
-    </ThemeProvider>
+    </Box>
   );
 }

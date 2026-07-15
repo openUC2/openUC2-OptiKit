@@ -1,0 +1,35 @@
+/*
+ * Stolzl webfont slots (brand guide typography). The font is commercial and
+ * NOT bundled — drop the licensed files into public/brand/fonts/ as:
+ *
+ *   Stolzl-Thin.woff2      (weight 300 — tagline/headline/body)
+ *   Stolzl-Regular.woff2   (weight 400 — heading/subheading/CTA)
+ *   Stolzl-Bold.woff2      (weight 700 — logo/emphasis)
+ *
+ * Until the files exist, browsers silently fall back to the system stack
+ * declared in src/theme/tokens.ts.
+ */
+
+@font-face {
+  font-family: 'Stolzl';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/configurator/brand/fonts/Stolzl-Thin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Stolzl';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/configurator/brand/fonts/Stolzl-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Stolzl';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/configurator/brand/fonts/Stolzl-Bold.woff2') format('woff2');
+}

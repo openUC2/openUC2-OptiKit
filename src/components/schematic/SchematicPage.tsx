@@ -18,7 +18,6 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { ThemeProvider } from '@mui/material/styles';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
@@ -32,8 +31,6 @@ import {
   KeyboardArrowUp as UpIcon,
 } from '@mui/icons-material';
 import * as THREE from 'three';
-import { materialThemeDark } from '../../theme/materialTheme';
-import { Toolbar } from '../Toolbar';
 import { PartLibrary } from '../PartLibrary';
 import { useAppStore } from '../../stores/appStore';
 import type { PortRef } from '../../document';
@@ -203,11 +200,9 @@ export function SchematicPage() {
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
   const layerIndex = Math.round(settings.planeZMm / UC2_GRID_MM[2]);
 
+  // Rendered inside the AppShell (WP-24): the shell provides theme + toolbar.
   return (
-    <ThemeProvider theme={materialThemeDark}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
-        <Toolbar />
-        <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+    <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           <Drawer
             variant={isMobile ? 'temporary' : 'persistent'}
             anchor="left"
@@ -402,8 +397,6 @@ export function SchematicPage() {
               <ServicePanel onZoomToPart={zoomToPart} />
             </Box>
           </Drawer>
-        </Box>
-      </Box>
-    </ThemeProvider>
+    </Box>
   );
 }

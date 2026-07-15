@@ -25,7 +25,6 @@ import { BOMPanel } from './BOMPanel';
 import { AnnotationPanel } from './AnnotationPanel';
 import { ChatPanel } from './ChatPanel';
 import { SimulationPanel } from './SimulationPanel';
-import { Toolbar } from './Toolbar';
 import { Tutorial } from './Tutorial';
 import { useAppStore } from '../stores/appStore';
 
@@ -67,11 +66,9 @@ export const Layout: React.FC = () => {
     ? Math.min(350, window.innerWidth * 0.85)
     : 400;
 
+  // Rendered inside the AppShell (WP-24): the shell provides theme + toolbar.
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Toolbar */}
-      <Toolbar />
-      
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* Mobile Controls bar – shown on screens narrower than md (< 900 px) */}
       {isMobile && (
         <Paper 

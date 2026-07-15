@@ -7,7 +7,7 @@
 
 .bom-panel h3 {
   margin: 0 0 16px 0;
-  color: #1e4670;
+  color: var(--openuc2-blue);
   font-size: 18px;
   font-weight: 600;
 }
@@ -44,7 +44,7 @@
   grid-template-columns: 1fr 60px 80px 80px;
   gap: 8px;
   padding: 12px;
-  background: #1e4670;
+  background: var(--openuc2-blue);
   color: white;
   font-weight: 600;
   font-size: 12px;
@@ -88,7 +88,7 @@
 
 .module-inventor {
   font-size: 11px;
-  color: #7cc142;
+  color: var(--openuc2-green);
   font-style: italic;
 }
 
@@ -105,7 +105,7 @@
 }
 
 .total-price {
-  color: #1e4670;
+  color: var(--openuc2-blue);
   font-weight: 600;
 }
 

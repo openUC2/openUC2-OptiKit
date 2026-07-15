@@ -30,7 +30,6 @@ import {
   GitHub as GitHubIcon,
   Help as HelpIcon,
   Lock as PrivacyIcon,
-  ViewInAr as LogoIcon,
   Clear as ClearIcon,
   Link as LinkIcon,
   Dashboard as SetupIcon,
@@ -49,6 +48,7 @@ import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 import { SyncChip } from './sync/SyncChip';
+import { BrandLogo } from './BrandLogo';
 
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
@@ -415,20 +415,10 @@ openUC2 team via GitHub repository
           overflow: 'hidden'
         }}
       >
-        {/* Logo Section */}
+        {/* Logo Section — the AppBar is always brand blue, so use the white
+            logo version (brand guide p.2) on both themes. */}
         <Box sx={{ display: 'flex', alignItems: 'center', mr: { xs: 1, sm: 2 } }}>
-          <LogoIcon sx={{ fontSize: { xs: 28, sm: 32 }, mr: 1, color: 'secondary.main' }} />
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ 
-              fontWeight: 500,
-              fontSize: { xs: '1rem', sm: '1.25rem' },
-              display: { xs: 'none', sm: 'block' }
-            }}
-          >
-            openUC2
-          </Typography>
+          <BrandLogo variant="dark" height={28} />
         </Box>
 
         {/* Navigation Section - Always visible */}

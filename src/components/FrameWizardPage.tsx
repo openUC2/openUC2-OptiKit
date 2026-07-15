@@ -139,15 +139,17 @@ export function FrameWizardPage() {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
         <CircularProgress size={60} />
         <Typography sx={{ ml: 2 }} variant="h6">Loading FRAME libraries...</Typography>
       </Box>
     );
   }
 
+  // Rendered inside the AppShell (WP-24): theme + global toolbar come from
+  // the shell; this header is the wizard's own secondary bar.
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#f5f5f5' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, bgcolor: 'background.default' }}>
       {/* Header */}
       <Paper
         elevation={2}
@@ -157,8 +159,8 @@ export function FrameWizardPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           borderRadius: 0,
-          bgcolor: '#1e4670',
-          color: 'white',
+          bgcolor: 'primary.main',
+          color: 'primary.contrastText',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -180,7 +182,7 @@ export function FrameWizardPage() {
           <Chip
             icon={<ShoppingCart />}
             label={`Total: $${totalPrice.toLocaleString()}`}
-            sx={{ bgcolor: '#fff', color: '#1e4670', fontWeight: 'bold', fontSize: '1rem', p: 1 }}
+            sx={{ bgcolor: '#fff', color: 'primary.main', fontWeight: 'bold', fontSize: '1rem', p: 1 }}
           />
           <Tooltip title="Load preconfigured preset">
             <Button

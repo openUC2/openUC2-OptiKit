@@ -3,8 +3,6 @@ import {
   Box, Button, ButtonGroup, CircularProgress, Divider, Drawer, IconButton, Paper,
   Tab, Tabs, Tooltip, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
-import { ThemeProvider } from '@mui/material/styles';
-import { materialTheme, materialThemeDark } from '../theme/materialTheme';
 import {
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
@@ -21,7 +19,6 @@ import {
   Close as CloseIcon,
 } from '@mui/icons-material';
 import { Scene3D } from '../three/Scene3D';
-import { Toolbar } from './Toolbar';
 import { PartLibrary } from './PartLibrary';
 import { PropertyPanel } from './PropertyPanel';
 import { LayerPanel } from './LayerPanel';
@@ -123,14 +120,11 @@ export function Editor3DPage() {
 
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
 
+  // Rendered inside the AppShell (WP-24): the shell provides theme + toolbar.
+  // The light/dark toggle now only switches the 3D scene colours.
   return (
-    <ThemeProvider theme={isDark ? materialThemeDark : materialTheme}>
     <Settings3DContext.Provider value={settingsCtx}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
-        {/* Shared toolbar (File/save, Edit, Annotate, nav, View 2D) */}
-        <Toolbar />
-
-        <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           {/* Left: part library (double-tap to place into the 3D scene) */}
           <Drawer
             variant={isMobile ? 'temporary' : 'persistent'}
@@ -317,9 +311,7 @@ export function Editor3DPage() {
               </Box>
             </Box>
           </Drawer>
-        </Box>
       </Box>
     </Settings3DContext.Provider>
-    </ThemeProvider>
   );
 }

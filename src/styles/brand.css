@@ -1,17 +1,18 @@
 /* OpenUC2 Brand Colors and Styling */
 
 :root {
-  /* OpenUC2 Brand Colors - extracted from logo */
-  --openuc2-blue: #1e4670;
-  --openuc2-dark-blue: #0f2a47;
-  --openuc2-light-blue: #3d73a8;
-  --openuc2-green: #7cc142;
-  --openuc2-dark-green: #5fa32a;
-  --openuc2-teal: #4a9b8e;
-  --openuc2-light-gray: #f8f9fa;
-  --openuc2-gray: #6c757d;
-  --openuc2-dark-gray: #343a40;
-  
+  /* openUC2 brand colors — normative values from openuc2_brandguide.pdf.
+     Keep in sync with src/theme/tokens.ts (the TS source of truth). */
+  --openuc2-blue: #023773;
+  --openuc2-dark-blue: #012849;
+  --openuc2-light-blue: #3d6fae;
+  --openuc2-green: #85b918;
+  --openuc2-dark-green: #6a950e;
+  --openuc2-teal: #1f9c7c;
+  --openuc2-light-gray: #FAF9F9;
+  --openuc2-gray: #999999;
+  --openuc2-dark-gray: #1c2b3a;
+
   /* Application specific colors */
   --primary-color: var(--openuc2-blue);
   --secondary-color: var(--openuc2-green);
@@ -27,7 +28,7 @@
 
 /* Global brand styling */
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Stolzl', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   background-color: var(--background-color);
   color: var(--text-color);
   margin: 0;

@@ -48,7 +48,7 @@ function moduleColor(id: string): string {
   if (id.includes('electronics')) return '#607D8B';
   if (id.includes('wellplate') || id.includes('slide')) return '#795548';
   if (id.includes('revolver')) return '#3F51B5';
-  if (id.includes('frame-body')) return '#1e4670';
+  if (id.includes('frame-body')) return '#023773';
   if (id.includes('af') || id.includes('autofocus')) return '#E91E63';
   return '#9E9E9E';
 }
