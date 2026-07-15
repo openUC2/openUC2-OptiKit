@@ -64,7 +64,9 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-14 | component ("symbol") editor `/configurator/components` | ✅ done (`5dd9908`) — AC254-050-A acceptance validated against optikit-core |
 | WP-15 | service round trip in the UI (check / simulate / optimize) | ✅ done (`33f15f1` + core `611e332`) — acceptance verified live: fluo-scope imports, 127-ray fans, focus-DOF optimize with delta review |
 | WP-16 | assembly ("board") editor: cubify review, GLB scene, DRC markers, T2 insert drag | ✅ done (`10094e4`) — acceptance verified live (cubify table, clamp at +7.5, undo bracket, export) |
-| WP-17…18 | cross-probing + sync chip, manufacturing export | ⬜ next |
+| WP-17 | cross-probing + sync chip (fingerprint states, re-cubify diff, back-annotate to source) | ✅ done (`5107ee7`) — acceptance verified live |
+| WP-18 | manufacturing export (release bundle: BOM/notes/lock/optics) + `optikit-core rebuild` | ✅ done (`e91729b` + core `5d1824d`) — a real browser export verified REPRODUCIBLE, both paths bit-identical |
+| — | next: WP-28 (full rotations) → WP-23 (editor UX) → WP-19 (part binding), per feedback round 1 | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
