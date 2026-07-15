@@ -62,10 +62,12 @@ export const Toolbar: React.FC = () => {
     location.pathname === '/configurator/';
   const isComponentEditor = location.pathname.startsWith('/configurator/components');
   const isAssembly = location.pathname.startsWith('/configurator/assembly');
+  const isBind = location.pathname.startsWith('/configurator/bind');
   const is2DEditor = location.pathname === '/configurator/grid' || location.pathname === '/';
   // The 2D, 3D, schematic and assembly editors share the same toolbar
   // (edit/annotate/file/save); they differ only in the center surface.
-  const isEditorPage = is2DEditor || isThreeD || isSchematic || isComponentEditor || isAssembly;
+  const isEditorPage =
+    is2DEditor || isThreeD || isSchematic || isComponentEditor || isAssembly || isBind;
 
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
@@ -509,6 +511,25 @@ openUC2 team via GitHub repository
               >
                 <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
                   Components
+                </Typography>
+              </Button>
+            </Tooltip>
+          )}
+          {isEditorPage && (
+            <Tooltip title="Part binding: register an STP/GLB against the cube and author its optical datums">
+              <Button
+                color="inherit"
+                onClick={() => navigate('/configurator/bind')}
+                size="small"
+                sx={{
+                  textTransform: 'none',
+                  minWidth: { xs: '40px', sm: 'auto' },
+                  px: { xs: 1, sm: 2 },
+                  fontWeight: isBind ? 700 : 400,
+                }}
+              >
+                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Bind
                 </Typography>
               </Button>
             </Tooltip>

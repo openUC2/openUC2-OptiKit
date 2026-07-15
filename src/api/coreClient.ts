@@ -245,6 +245,66 @@ export function compileDesign(files: DsnFiles, signal?: AbortSignal): Promise<Co
   return post('/v1/compile', { files }, compileSchema, signal);
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/**
+ * STEP → GLB via the service's cadquery stack (WP-19). Returns the GLB bytes
+ * (mm units). The STEP stays the mechanical source of truth.
+ */
+export async function convertStepToGlb(
+  filename: string,
+  stepBytes: Uint8Array,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  const response = await fetch(`${getCoreUrl()}/v1/convert/step-to-glb`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, data_b64: bytesToBase64(stepBytes) }),
+    signal,
+  }).catch(err => {
+    throw new CoreServiceError('E_UNREACHABLE', String(err), null, 0);
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { code?: string; message?: string; context?: unknown };
+    } | null;
+    throw new CoreServiceError(
+      payload?.detail?.code ?? `E_HTTP_${response.status}`,
+      payload?.detail?.message ?? `conversion failed with HTTP ${response.status}`,
+      payload?.detail?.context ?? null,
+      response.status,
+    );
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+const librarySaveSchema = z.object({ written: z.array(z.string()) });
+
+/** Developer fast path: write records into the repo library (env-gated). */
+export function saveLibraryRecords(
+  records: string[],
+  assets: Record<string, Uint8Array> = {},
+  signal?: AbortSignal,
+): Promise<{ written: string[] }> {
+  return post(
+    '/v1/library/save',
+    {
+      records,
+      assets: Object.fromEntries(
+        Object.entries(assets).map(([name, bytes]) => [name, bytesToBase64(bytes)]),
+      ),
+    },
+    librarySaveSchema,
+    signal,
+  );
+}
+
 export function runDrc(files: DsnFiles, signal?: AbortSignal): Promise<DrcResponse> {
   return post('/v1/drc', { files }, drcSchema, signal);
 }

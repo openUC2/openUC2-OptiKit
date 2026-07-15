@@ -27,6 +27,9 @@ const ComponentEditorPage = lazy(() =>
 const AssemblyPage = lazy(() =>
   import('./components/assembly/AssemblyPage').then(m => ({ default: m.AssemblyPage }))
 );
+const BindPage = lazy(() =>
+  import('./components/bind/BindPage').then(m => ({ default: m.BindPage }))
+);
 
 function App() {
   const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
@@ -167,6 +170,7 @@ function App() {
           <Route path="/configurator/schematic" element={<Suspense fallback={null}><SchematicPage /></Suspense>} />
           <Route path="/configurator/components" element={<Suspense fallback={null}><ComponentEditorPage /></Suspense>} />
           <Route path="/configurator/assembly" element={<Suspense fallback={null}><AssemblyPage /></Suspense>} />
+          <Route path="/configurator/bind" element={<Suspense fallback={null}><BindPage /></Suspense>} />
           <Route path="/configurator/:collectionName" element={<CollectionView />} />
           {/* Legacy routes for backward compatibility */}
           <Route path="/" element={<EditorPage />} />
