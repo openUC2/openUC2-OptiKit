@@ -67,7 +67,8 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-17 | cross-probing + sync chip (fingerprint states, re-cubify diff, back-annotate to source) | ✅ done (`5107ee7`) — acceptance verified live |
 | WP-18 | manufacturing export (release bundle: BOM/notes/lock/optics) + `optikit-core rebuild` | ✅ done (`e91729b` + core `5d1824d`) — a real browser export verified REPRODUCIBLE, both paths bit-identical |
 | WP-19 | part-binding workbench (`/configurator/bind`): STEP→GLB conversion, ghost-cube placement, datum authoring → bound records; placeholder laser/mirror/camera parts; env-gated dev writes | ✅ done (`6f41ccb` + core `b5bf95d`) — laser emission datum verified to drive chain inference from the authored point |
-| — | next: WP-28 (full rotations) → WP-23 (editor UX), per feedback round 1; then WP-20 (Inventor datums, connect PyInventor) | ⬜ |
+| WP-21 | boolean auto-holder T3 generator (per-half artifacts, M3 cut-off fastening) | ✅ done (core `ce9a0e7`) — AC254-050-A holder verified: cavity clears, halves fit, keys regenerate |
+| — | next: WP-28 (full rotations) → WP-23 (editor UX), per feedback round 1; then WP-20 (Inventor datums, connect PyInventor), WP-22 (library registry) | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
