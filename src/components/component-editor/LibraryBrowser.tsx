@@ -43,14 +43,23 @@ function CategoryDot({ category }: { category: string }) {
 }
 
 function ComponentCard({
-  id, version, category, description, vendorName, mpn, eflMm, review, onClick, onDelete,
+  id, version, category, description, vendorName, mpn, eflMm, review, thumbnail, onClick, onDelete,
 }: {
   id: string; version: string; category: string; description: string;
   vendorName: string; mpn: string; eflMm: number | null; review: boolean;
+  /** Data-URL snapshot of the bound geometry (WP-31), when one exists. */
+  thumbnail?: string | null;
   onClick?: () => void; onDelete?: () => void;
 }) {
   return (
     <ListItemButton onClick={onClick} sx={{ alignItems: 'flex-start', borderRadius: 1 }}>
+      {thumbnail && (
+        <Box
+          component="img" src={thumbnail} alt=""
+          sx={{ width: 44, height: 44, borderRadius: 1, mr: 1, mt: 0.5, objectFit: 'cover',
+                border: '1px solid', borderColor: 'divider', flexShrink: 0 }}
+        />
+      )}
       <ListItemText
         primary={
           <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
@@ -177,6 +186,7 @@ export function LibraryBrowser({
                   vendorName={rec.vendor?.name ?? ''} mpn={rec.vendor?.mpn ?? ''}
                   eflMm={rec.effective_focal_length_mm ?? null}
                   review={Boolean(rec.review?.length)}
+                  thumbnail={workspace.thumbnails[rec.id] ?? null}
                   onClick={() => onOpenRecord(record)}
                   onDelete={() => workspace.remove(rec.id)}
                 />

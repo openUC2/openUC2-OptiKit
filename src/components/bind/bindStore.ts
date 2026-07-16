@@ -1,7 +1,8 @@
 /**
- * UI state for the part-binding workbench (WP-19). Everything lives in the
- * cube frame: the mesh transform places the part relative to the 50 mm cube
- * origin, and datums are authored at their final coordinates.
+ * UI state for the part-binding workbench (WP-19, reworked in WP-31).
+ * The mesh transform places the part relative to the 50 mm cube origin;
+ * datums live in the PART frame so they follow the part when it moves or
+ * rotates (world = transform ∘ datum, see model/bindRecord.ts).
  */
 
 import { create } from 'zustand';
@@ -9,6 +10,7 @@ import type { Vec3 } from '../../document';
 import type { BindDatum, DatumKind, MeshTransform } from '../../model/bindRecord';
 
 export type BindMode = 'translate' | 'rotate' | 'datum';
+export type OrthoView = 'top' | 'front' | 'side';
 
 interface BindState {
   /** Parsed GLB bytes of the loaded part (render copy). */
@@ -24,13 +26,20 @@ interface BindState {
   nextKind: DatumKind;
   busy: boolean;
   error: string | null;
+  /** Single perspective view or the linked 2×2 ortho layout (WP-31). */
+  quadView: boolean;
+  /** Per-ortho-view flip: top→bottom, front→back, side(right)→left. */
+  orthoFlip: Record<OrthoView, boolean>;
 
   loadMesh: (file: string, glb: Uint8Array, step: Uint8Array | null) => void;
   setTransform: (t: MeshTransform) => void;
   setMode: (m: BindMode) => void;
   toggleGhostCube: () => void;
   toggleSnap: () => void;
+  toggleQuadView: () => void;
+  flipOrtho: (view: OrthoView) => void;
   setNextKind: (k: DatumKind) => void;
+  /** Part-frame point + direction (the scene converts the click hit). */
   addDatum: (pointMm: Vec3, direction: Vec3) => void;
   updateDatum: (id: string, patch: Partial<BindDatum>) => void;
   removeDatum: (id: string) => void;
@@ -62,6 +71,8 @@ export const useBindStore = create<BindState>((set, get) => ({
   nextKind: 'source',
   busy: false,
   error: null,
+  quadView: false,
+  orthoFlip: { top: false, front: false, side: false },
 
   loadMesh: (meshFile, glbBytes, stepBytes) =>
     set({
@@ -76,6 +87,9 @@ export const useBindStore = create<BindState>((set, get) => ({
   setMode: mode => set({ mode }),
   toggleGhostCube: () => set(s => ({ ghostCube: !s.ghostCube })),
   toggleSnap: () => set(s => ({ snap: !s.snap })),
+  toggleQuadView: () => set(s => ({ quadView: !s.quadView })),
+  flipOrtho: view =>
+    set(s => ({ orthoFlip: { ...s.orthoFlip, [view]: !s.orthoFlip[view] } })),
   setNextKind: nextKind => set({ nextKind }),
 
   addDatum: (pointMm, direction) => {

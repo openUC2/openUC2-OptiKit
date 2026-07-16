@@ -1,10 +1,12 @@
 /**
- * Part-binding model (WP-19): datums authored on a mechanical part become
- * library records.
+ * Part-binding model (WP-19, reworked in WP-31): datums authored on a
+ * mechanical part become library records.
  *
  * A `BindDatum` is a point + direction (+ optional circular area) in the
- * CUBE frame — the part mesh has already been placed relative to the cube
- * origin, so datum coordinates are final. The mapping:
+ * PART frame — datums belong to the mesh, so moving or rotating the part
+ * carries them along (the mechanical intuition; the STEP is the source of
+ * truth). Cube-frame coordinates are derived: world = meshTransform ∘ datum.
+ * The record mapping (in the CUBE frame, unchanged from WP-19):
  *
  * - each datum → one `optics.frames` entry (full x/y/z-mm offset);
  * - each datum → one `optics.ports` entry; schema-v0 port directions are
@@ -13,10 +15,15 @@
  * - the mesh placement transform → the template's `mesh-offset` extra;
  * - the records bind into component + template + module, mirroring the
  *   WP-8/WP-9 importer conventions so all roads into the library look alike.
+ *   Binding to an EXISTING optical component (the KiCad symbol↔footprint
+ *   association) skips the stub component: the module references the chosen
+ *   component id and only template + module are emitted.
  */
 
+import * as THREE from 'three';
 import { stringify } from 'yaml';
 import type { Vec3 } from '../document';
+import { offsetDegMatrix } from '../document';
 
 export type DatumKind = 'source' | 'sensor' | 'reflective' | 'front' | 'back' | 'custom';
 
@@ -24,9 +31,9 @@ export interface BindDatum {
   id: string;
   name: string;
   kind: DatumKind;
-  /** Cube-frame position, mm (the mesh is already placed). */
+  /** PART-frame position, mm (document axes; moves with the mesh). */
   pointMm: Vec3;
-  /** Unit direction the beam travels at this datum (cube frame). */
+  /** Unit direction the beam travels at this datum (part frame). */
   direction: Vec3;
   /** Clear-aperture disc diameter, when meaningful. */
   areaDiameterMm: number | null;
@@ -35,6 +42,38 @@ export interface BindDatum {
 export interface MeshTransform {
   positionMm: Vec3;
   rotationDeg: Vec3; // extrinsic ZXY, matching the schema's offset-deg
+}
+
+/** Rotation matrix (document axes) of a mesh transform. */
+function transformMatrix(t: MeshTransform): THREE.Matrix4 {
+  return offsetDegMatrix({ x: t.rotationDeg[0], y: t.rotationDeg[1], z: t.rotationDeg[2] });
+}
+
+/** Part-frame datum → cube-frame point + direction (world = T ∘ part). */
+export function datumToCube(
+  datum: Pick<BindDatum, 'pointMm' | 'direction'>,
+  t: MeshTransform,
+): { pointMm: Vec3; direction: Vec3 } {
+  const m = transformMatrix(t);
+  const p = new THREE.Vector3(...datum.pointMm)
+    .applyMatrix4(m)
+    .add(new THREE.Vector3(...t.positionMm));
+  const d = new THREE.Vector3(...datum.direction).transformDirection(m).normalize();
+  return { pointMm: [p.x, p.y, p.z], direction: [d.x, d.y, d.z] };
+}
+
+/** Cube-frame point + direction → part frame (for click authoring). */
+export function cubeToDatum(
+  pointMm: Vec3,
+  direction: Vec3,
+  t: MeshTransform,
+): { pointMm: Vec3; direction: Vec3 } {
+  const inv = transformMatrix(t).invert();
+  const p = new THREE.Vector3(...pointMm)
+    .sub(new THREE.Vector3(...t.positionMm))
+    .applyMatrix4(inv);
+  const d = new THREE.Vector3(...direction).transformDirection(inv).normalize();
+  return { pointMm: [p.x, p.y, p.z], direction: [d.x, d.y, d.z] };
 }
 
 export interface BindInput {
@@ -46,10 +85,17 @@ export interface BindInput {
   meshTransform: MeshTransform;
   datums: BindDatum[];
   description?: string;
+  /**
+   * Bind the mechanics to an EXISTING optical component instead of
+   * generating a stub (WP-31): the module references this id and no
+   * component record is emitted.
+   */
+  existingComponent?: { id: string; version: string } | null;
 }
 
 export interface BoundRecords {
-  component: Record<string, unknown>;
+  /** null when binding to an existing component (nothing to emit). */
+  component: Record<string, unknown> | null;
   template: Record<string, unknown>;
   module: Record<string, unknown>;
   warnings: string[];
@@ -96,14 +142,19 @@ const round3 = (v: number) => Math.round(v * 1e3) / 1e3;
 
 export function bindToRecords(input: BindInput): BoundRecords {
   const warnings: string[] = [];
-  const componentId = `${input.namespace}.${input.category}.${input.name}`;
+  const componentId = input.existingComponent
+    ? input.existingComponent.id
+    : `${input.namespace}.${input.category}.${input.name}`;
   const templateId = `${input.namespace}.tpl.${input.name}`;
   const moduleId = `${input.namespace}.cube.${input.name}`;
 
   const frames: Record<string, unknown> = { optical: { 'z-mm': 0.0 } };
   const ports: Record<string, unknown> = {};
   input.datums.forEach((datum, i) => {
-    const snap = snapToAxis(datum.direction);
+    // Records speak the CUBE frame: part-frame datums travel through the
+    // mesh placement first (WP-31 — datums follow the part).
+    const cube = datumToCube(datum, input.meshTransform);
+    const snap = snapToAxis(cube.direction);
     if (snap.deviationDeg > AXIS_SNAP_WARN_DEG) {
       warnings.push(
         `datum '${datum.name}' points ${snap.deviationDeg.toFixed(1)}° off the ${snap.axis} ` +
@@ -116,9 +167,9 @@ export function bindToRecords(input: BindInput): BoundRecords {
     let name = datum.name || defaultPortName(datum.kind, i);
     if (name === 'optical' || name in frames) name = `${name}-${i}`;
     const frame: Record<string, number> = {};
-    if (datum.pointMm[0]) frame['x-mm'] = round3(datum.pointMm[0]);
-    if (datum.pointMm[1]) frame['y-mm'] = round3(datum.pointMm[1]);
-    frame['z-mm'] = round3(datum.pointMm[2]);
+    if (cube.pointMm[0]) frame['x-mm'] = round3(cube.pointMm[0]);
+    if (cube.pointMm[1]) frame['y-mm'] = round3(cube.pointMm[1]);
+    frame['z-mm'] = round3(cube.pointMm[2]);
     frames[name] = frame;
     ports[name] = { frame: name, direction: snap.axis };
   });
@@ -126,26 +177,29 @@ export function bindToRecords(input: BindInput): BoundRecords {
     warnings.push('no datums authored — the record has no ports; chaining will not work');
   }
 
-  const component: Record<string, unknown> = {
-    kind: 'optical_component',
-    id: componentId,
-    version: '0.1.0',
-    category: input.category,
-    description: input.description ?? `${input.name} (bound in the part-binding workbench)`,
-    tags: ['bound'],
-    optics: { frames, ports },
-  };
-  // Reflective parts carry a minimal flat-fold fragment (WP-8 convention).
-  if (input.datums.some(d => d.kind === 'reflective')) {
-    (component.optics as Record<string, unknown>).fragment = {
-      surfaces: [
-        {
-          type: 'standard',
-          geometry: { type: 'StandardGeometry', radius: Infinity, conic: 0 },
-          interaction_model: { type: 'refractive_reflective', is_reflective: true },
-        },
-      ],
+  let component: Record<string, unknown> | null = null;
+  if (!input.existingComponent) {
+    component = {
+      kind: 'optical_component',
+      id: componentId,
+      version: '0.1.0',
+      category: input.category,
+      description: input.description ?? `${input.name} (bound in the part-binding workbench)`,
+      tags: ['bound'],
+      optics: { frames, ports },
     };
+    // Reflective parts carry a minimal flat-fold fragment (WP-8 convention).
+    if (input.datums.some(d => d.kind === 'reflective')) {
+      (component.optics as Record<string, unknown>).fragment = {
+        surfaces: [
+          {
+            type: 'standard',
+            geometry: { type: 'StandardGeometry', radius: Infinity, conic: 0 },
+            interaction_model: { type: 'refractive_reflective', is_reflective: true },
+          },
+        ],
+      };
+    }
   }
 
   const t = input.meshTransform;
@@ -172,13 +226,19 @@ export function bindToRecords(input: BindInput): BoundRecords {
     footprint_grid: [1, 1, 1],
   };
 
+  // The module's component ref: a caret range on the existing component's
+  // major.minor, or the stub's ^0.1.
+  const componentRef = input.existingComponent
+    ? `${componentId}@^${input.existingComponent.version.split('.').slice(0, 2).join('.')}`
+    : `${componentId}@^0.1`;
+
   const module: Record<string, unknown> = {
     kind: 'cube_module',
     id: moduleId,
     version: '0.1.0',
     description: `${input.name} in a 1x1 cube (bound)`,
     tags: ['bound'],
-    component: `${componentId}@^0.1`,
+    component: componentRef,
     template: `${templateId}@^0.1`,
     footprint_grid: [1, 1, 1],
   };
@@ -191,14 +251,40 @@ function yamlText(record: Record<string, unknown>): string {
   return stringify(record, { indent: 2, lineWidth: 100, aliasDuplicateObjects: false });
 }
 
-/** File map for the "Download records" zip (library-PR layout). */
-export function recordsToFiles(records: BoundRecords): Record<string, string> {
-  const componentId = records.component.id as string;
+export interface BindAssets {
+  /** Original STEP bytes (mechanical source of truth). */
+  step?: Uint8Array | null;
+  /** Converted GLB bytes (render copy). */
+  glb?: Uint8Array | null;
+  /** Scene snapshot for library tiles. */
+  thumbnailPng?: Uint8Array | null;
+}
+
+/**
+ * File map for the "Download records" zip AND the dev write (library-PR
+ * layout). WP-31: the mesh assets ship WITH the records — a record without
+ * its STP/GLB is not reviewable. Binding to an existing component emits no
+ * component.yml.
+ */
+export function recordsToFiles(
+  records: BoundRecords,
+  meshFile = 'part.step',
+  assets: BindAssets = {},
+): Record<string, string | Uint8Array> {
   const templateId = records.template.id as string;
   const moduleId = records.module.id as string;
-  return {
-    [`components/${componentId}/component.yml`]: yamlText(records.component),
-    [`templates/${templateId}/template.yml`]: yamlText(records.template),
-    [`modules/${moduleId}/module.yml`]: yamlText(records.module),
-  };
+  const files: Record<string, string | Uint8Array> = {};
+  if (records.component) {
+    files[`components/${records.component.id as string}/component.yml`] =
+      yamlText(records.component);
+  }
+  files[`templates/${templateId}/template.yml`] = yamlText(records.template);
+  files[`modules/${moduleId}/module.yml`] = yamlText(records.module);
+  const stepName = meshFile.replace(/\.(glb|gltf)$/i, '.step');
+  if (assets.step) files[`templates/${templateId}/${stepName}`] = assets.step;
+  if (assets.glb) {
+    files[`templates/${templateId}/${stepName.replace(/\.(step|stp)$/i, '.glb')}`] = assets.glb;
+  }
+  if (assets.thumbnailPng) files[`templates/${templateId}/thumbnail.png`] = assets.thumbnailPng;
+  return files;
 }

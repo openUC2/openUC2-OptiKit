@@ -1,12 +1,18 @@
 /**
- * The binding canvas (WP-19): the loaded part against a toggleable ghost
- * 50 mm cube at the origin. Translate/rotate via TransformControls (with
- * snapping); in datum mode a click on the part surface authors an optical
- * datum at the hit point along the face normal.
+ * The binding canvas (WP-19, reworked in WP-31): the loaded part against a
+ * toggleable ghost 50 mm cube at the origin. Translate/rotate via
+ * TransformControls (with snapping); in datum mode a click on the part
+ * surface authors an optical datum at the hit point along the face normal —
+ * stored in the PART frame, so datums follow the part when it moves.
  *
- * Frames: this scene works directly in the CUBE frame rendered as
- * three-space with y up — datums convert to the document convention
- * (z up) when stored: doc(x, y, z) = three(x, −z, y).
+ * Views: a single perspective viewport, or a linked 2×2 layout
+ * (perspective + top/front/side orthographic, each flippable to its
+ * opposite). All viewports render the same store state, so edits in any
+ * view appear in all of them.
+ *
+ * Frames: the scene renders the CUBE frame as three-space with y up —
+ * conversions to the document convention (z up): doc(x, y, z) =
+ * three(x, −z, y).
  */
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,14 +26,18 @@ import {
   Grid,
   Line,
   OrbitControls,
+  OrthographicCamera,
   Text,
   TransformControls,
 } from '@react-three/drei';
+import { Box, IconButton, Tooltip } from '@mui/material';
+import { SwapVert as FlipIcon } from '@mui/icons-material';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Vec3 } from '../../document';
-import type { BindDatum } from '../../model/bindRecord';
-import { snapToAxis } from '../../model/bindRecord';
+import type { BindDatum, MeshTransform } from '../../model/bindRecord';
+import { datumToCube, snapToAxis } from '../../model/bindRecord';
 import { useBindStore } from './bindStore';
+import type { OrthoView } from './bindStore';
 
 const NO_RAYCAST = () => null;
 
@@ -60,12 +70,14 @@ function GhostCube() {
   );
 }
 
-function DatumPin({ datum }: { datum: BindDatum }) {
-  const p = docToThree(datum.pointMm);
-  const dirDoc = datum.direction;
-  const dir = new THREE.Vector3(...docToThree(dirDoc)).normalize();
+function DatumPin({ datum, transform }: { datum: BindDatum; transform: MeshTransform }) {
+  // Part-frame datum → cube frame through the live mesh placement (WP-31):
+  // moving or rotating the part carries the pin along.
+  const world = datumToCube(datum, transform);
+  const p = docToThree(world.pointMm);
+  const dir = new THREE.Vector3(...docToThree(world.direction)).normalize();
   const tip = new THREE.Vector3(...p).add(dir.clone().multiplyScalar(12));
-  const snap = snapToAxis(dirDoc);
+  const snap = snapToAxis(world.direction);
   const color = KIND_COLORS[datum.kind] ?? '#ffffff';
   const discQuat = useMemo(
     () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir),
@@ -142,14 +154,16 @@ function PartMesh() {
   }, [transform.rotationDeg]);
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    if (mode !== 'datum' || !e.face) return;
+    if (mode !== 'datum' || !e.face || !groupRef.current) return;
     e.stopPropagation();
-    const point = threeToDoc(e.point);
-    const normal = e.face.normal
-      .clone()
-      .transformDirection(e.object.matrixWorld)
-      .normalize();
-    addDatum(point, threeToDoc(normal));
+    // Convert the world hit into the PART frame (WP-31): datums belong to
+    // the mesh and follow it through later transforms.
+    const g = groupRef.current;
+    const localPoint = g.worldToLocal(e.point.clone());
+    const worldNormal = e.face.normal.clone().transformDirection(e.object.matrixWorld);
+    const groupQuat = g.getWorldQuaternion(new THREE.Quaternion());
+    const localNormal = worldNormal.applyQuaternion(groupQuat.invert()).normalize();
+    addDatum(threeToDoc(localPoint), threeToDoc(localNormal));
   };
 
   const commitTransform = () => {
@@ -200,22 +214,16 @@ function PartMesh() {
   );
 }
 
-export function BindScene() {
+/** Shared scene content — identical in every viewport. */
+function SceneContent() {
   const ghostCube = useBindStore(s => s.ghostCube);
   const datums = useBindStore(s => s.datums);
-  const mode = useBindStore(s => s.mode);
-
+  const transform = useBindStore(s => s.transform);
   return (
-    <Canvas
-      camera={{ position: [120, 100, 140], near: 0.5, far: 10000, fov: 45 }}
-      style={{ width: '100%', height: '100%' }}
-      gl={{ alpha: false, preserveDrawingBuffer: true }}
-      scene={{ background: new THREE.Color('#171c24') }}
-    >
+    <>
       <hemisphereLight args={['#ffffff', '#8a929c', 0.8]} />
       <directionalLight position={[150, 250, 120]} intensity={1.1} />
       <directionalLight position={[-120, 150, -140]} intensity={0.4} />
-      <OrbitControls makeDefault enableDamping dampingFactor={0.12} enabled={mode !== 'datum'} />
       <Grid
         args={[500, 500]} cellSize={10} sectionSize={50}
         cellColor="#3c4654" sectionColor="#55637a"
@@ -226,11 +234,99 @@ export function BindScene() {
         <PartMesh />
       </Suspense>
       {datums.map(datum => (
-        <DatumPin key={datum.id} datum={datum} />
+        <DatumPin key={datum.id} datum={datum} transform={transform} />
       ))}
-      <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
-        <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
-      </GizmoHelper>
+    </>
+  );
+}
+
+/** Camera pose per orthographic view (three-space; doc z renders up). */
+const ORTHO_POSES: Record<OrthoView, { normal: [number, number, number]; flipped: [number, number, number]; up: [number, number, number]; label: string; flipLabel: string }> = {
+  top: { normal: [0, 300, 0], flipped: [0, -300, 0], up: [0, 0, -1], label: 'top', flipLabel: 'bottom' },
+  front: { normal: [0, 0, 300], flipped: [0, 0, -300], up: [0, 1, 0], label: 'front', flipLabel: 'back' },
+  side: { normal: [300, 0, 0], flipped: [-300, 0, 0], up: [0, 1, 0], label: 'right', flipLabel: 'left' },
+};
+
+function Viewport({ ortho }: { ortho: OrthoView | null }) {
+  const mode = useBindStore(s => s.mode);
+  const flip = useBindStore(s => (ortho ? s.orthoFlip[ortho] : false));
+  const pose = ortho ? ORTHO_POSES[ortho] : null;
+  return (
+    <Canvas
+      camera={ortho ? undefined : { position: [120, 100, 140], near: 0.5, far: 10000, fov: 45 }}
+      style={{ width: '100%', height: '100%' }}
+      gl={{ alpha: false, preserveDrawingBuffer: true }}
+      scene={{ background: new THREE.Color('#171c24') }}
+    >
+      {pose && (
+        <OrthographicCamera
+          makeDefault
+          position={flip ? pose.flipped : pose.normal}
+          up={pose.up}
+          zoom={4}
+          near={0.5}
+          far={10000}
+        />
+      )}
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.12}
+        enabled={mode !== 'datum'}
+        enableRotate={!ortho}
+      />
+      <SceneContent />
+      {!ortho && (
+        <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
+          <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
+        </GizmoHelper>
+      )}
     </Canvas>
+  );
+}
+
+function OrthoCell({ view }: { view: OrthoView }) {
+  const flip = useBindStore(s => s.orthoFlip[view]);
+  const flipOrtho = useBindStore(s => s.flipOrtho);
+  const pose = ORTHO_POSES[view];
+  return (
+    <Box sx={{ position: 'relative', borderLeft: '1px solid #2a3442', borderTop: '1px solid #2a3442' }}>
+      <Viewport ortho={view} />
+      <Tooltip title={`flip to ${flip ? pose.label : pose.flipLabel}`}>
+        <IconButton
+          size="small"
+          onClick={() => flipOrtho(view)}
+          sx={{
+            position: 'absolute', top: 4, left: 4, zIndex: 5,
+            bgcolor: 'rgba(23,28,36,0.8)', fontSize: 11, borderRadius: 1, px: 0.75,
+          }}
+        >
+          <FlipIcon sx={{ fontSize: 14, mr: 0.5 }} />
+          {flip ? pose.flipLabel : pose.label}
+        </IconButton>
+      </Tooltip>
+    </Box>
+  );
+}
+
+export function BindScene() {
+  const quadView = useBindStore(s => s.quadView);
+  if (!quadView) return <Viewport ortho={null} />;
+  // Linked 2×2: perspective + top / front / side, all rendering the same
+  // store state — a gizmo drag or datum click in any view shows everywhere.
+  return (
+    <Box
+      sx={{
+        display: 'grid', width: '100%', height: '100%',
+        gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr',
+      }}
+    >
+      <Box sx={{ position: 'relative' }}>
+        <Viewport ortho={null} />
+      </Box>
+      <OrthoCell view="top" />
+      <OrthoCell view="front" />
+      <OrthoCell view="side" />
+    </Box>
   );
 }
