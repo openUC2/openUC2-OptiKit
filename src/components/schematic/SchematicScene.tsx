@@ -25,7 +25,7 @@ import { wavelengthToColor } from '../../utils/sceneBuilder';
 import { AuthoritativeRays } from './AuthoritativeRays';
 import { GLYPH_COLORS } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
-import { opticalAxisOf, portsOf, resolvePortRef } from './ports';
+import { beamAxesOf, glyphQuatOf, portsOf, resolvePortRef } from './ports';
 import type { SchematicPort } from './ports';
 import { useSchematicSim } from './useSchematicSim';
 import { useSimFreshness } from './serviceStore';
@@ -85,17 +85,11 @@ function SchematicPart({
     [part.worldPose.rotation],
   );
   const ports = useMemo(() => portsOf(part), [part]);
-  // Glyphs are authored with +x as the optical axis; rotate them onto the
-  // part's REAL axis (from its imported ports) so a vertical emission stack
-  // renders vertical lenses instead of sideways ones.
-  const glyphQuat = useMemo(() => {
-    const axis = opticalAxisOf(part);
-    const target = new THREE.Vector3(axis[0], axis[2], -axis[1]); // doc→three, local
-    return new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(1, 0, 0),
-      target.normalize(),
-    );
-  }, [part]);
+  // Glyphs are authored with +x as the optical axis (and the fold arm toward
+  // +y); orient them onto the part's REAL entry/exit axes from its record
+  // ports — the same convention for palette and imported parts (WP-29).
+  const glyphQuat = useMemo(() => glyphQuatOf(part), [part]);
+  const foldDeg = useMemo(() => beamAxesOf(part).foldDeg, [part]);
 
   const intersectDragPlane = useCallback(
     (e: ThreeEvent<PointerEvent>, mode: 'plane' | 'height'): Vec3 | null => {
@@ -200,8 +194,8 @@ function SchematicPart({
         }}
       >
         <group quaternion={glyphQuat}>
-          <SchematicGlyph category={part.category} label={part.ref} />
-          <OpticalAxisArrow color={selected ? '#ffd24d' : '#8f9aa6'} />
+          <SchematicGlyph category={part.category} label={part.ref} foldDeg={foldDeg} />
+          <OpticalAxisArrow color={selected ? '#ffd24d' : '#8f9aa6'} foldDeg={foldDeg} />
         </group>
       </group>
 

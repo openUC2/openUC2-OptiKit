@@ -37,7 +37,7 @@ import {
 import type { UndoToken } from '../../document';
 import { GLYPH_COLORS } from '../schematic/colors';
 import { SchematicGlyph } from '../schematic/glyphs';
-import { opticalAxisOf } from '../schematic/ports';
+import { beamAxesOf, glyphQuatOf } from '../schematic/ports';
 import { GLBErrorBoundary } from '../../three/GLBErrorBoundary';
 import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExport';
 import type { Marker } from '../schematic/MarkerList';
@@ -251,13 +251,10 @@ function AssemblyPart({
     () => docQuatToThree(part.worldPose.rotation),
     [part.worldPose.rotation],
   );
-  const insertAxisQuat = useMemo(() => {
-    const axis = opticalAxisOf(part);
-    return new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(1, 0, 0),
-      new THREE.Vector3(axis[0], axis[2], -axis[1]).normalize(),
-    );
-  }, [part]);
+  // Same convention as the schematic (WP-29): entry/exit axes + fold angle
+  // come from the record ports, for palette and imported parts alike.
+  const insertAxisQuat = useMemo(() => glyphQuatOf(part), [part]);
+  const insertFoldDeg = useMemo(() => beamAxesOf(part).foldDeg, [part]);
   const render = renderInfoOf(part.libraryRef);
   const color = GLYPH_COLORS[part.category];
   const templateClass = mechanics?.templateClass ?? null;
@@ -311,7 +308,7 @@ function AssemblyPart({
       <group position={[insertPos[0] - shellPos[0], insertPos[1] - shellPos[1], insertPos[2] - shellPos[2]]}>
         <group quaternion={insertQuat} scale={0.55}>
           <group quaternion={insertAxisQuat}>
-            <SchematicGlyph category={part.category} label={part.ref} />
+            <SchematicGlyph category={part.category} label={part.ref} foldDeg={insertFoldDeg} />
           </group>
         </group>
       </group>

@@ -13,8 +13,9 @@
 
 import { useMemo } from 'react';
 import type { DocPart } from '../../document';
-import { useDocParts } from '../../document';
+import { rotateDocVec, useDocParts } from '../../document';
 import { runSimulation } from '../../simulation/SimulationEngine';
+import { opticalAxisOf } from './ports';
 import { MODULE_SIMULATION_MODELS } from '../../types';
 import type {
   OpticalElement,
@@ -50,13 +51,29 @@ export function partToElement(part: DocPart): OpticalElement | null {
       if (v !== undefined) (params as Record<string, unknown>)[simParam] = v;
     }
   }
-  const yawSimDeg = (360 - part.worldPose.yawDeg) % 360;
+  // The element's sim rotation comes from the part's TRUE world beam axis
+  // (record ports rotated by the pose), not just its yaw — so a torch whose
+  // record emits along a non-+x axis still fans along its beam (WP-29). For
+  // out-of-plane beams the in-plane preview keeps the yaw approximation.
+  const worldAxis = rotateDocVec(part.worldPose.rotation, opticalAxisOf(part));
+  const inPlane = Math.hypot(worldAxis[0], worldAxis[1]) > 0.5;
+  const axisSimDeg = inPlane
+    ? ((Math.atan2(-worldAxis[1], worldAxis[0]) * 180) / Math.PI + 360) % 360
+    : (360 - part.worldPose.yawDeg) % 360;
+  // MODULE_SIMULATION_MODELS.rotationOffset corrects the 2D GRID BUILDER's
+  // SVG drawings and must NOT apply here: the schematic glyph already faces
+  // the record axis (a torch's 270° offset was exactly the "rotated fan"
+  // bug). The splitter family is the exception — there the +90° aligns the
+  // ENGINE's reflected arm with the catalog convention (reflected → doc −y,
+  // same side as the 45° mirror; verified empirically against the engine).
+  const engineArmOffset =
+    sim.elementType === 'beamsplitter' || sim.elementType === 'dichroic' ? 90 : 0;
   return {
     id: `schematic-${part.id}`,
     moduleInstanceId: part.id,
     type: sim.elementType,
     position: { x: part.worldPose.positionMm[0], y: -part.worldPose.positionMm[1] },
-    rotation: yawSimDeg + (sim.rotationOffset ?? 0),
+    rotation: axisSimDeg + engineArmOffset,
     params,
   };
 }

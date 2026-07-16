@@ -1,8 +1,13 @@
 /**
  * Schematic glyphs: category-specific 3D symbols (not cubes). Authored in
- * three.js local coordinates with X = optical axis, Y = up; the part's
- * document-frame quaternion is converted by the scene (mapping.docQuatToThree)
- * so these render in the right orientation.
+ * three.js local coordinates with X = optical axis (entry beam) and — for
+ * folding glyphs — the exit arm toward +Y; the scene orients the group with
+ * `glyphQuatOf` so these render on the part's REAL beam axes.
+ *
+ * WP-29: mirror/splitter plates are no longer hardcoded — the plate normal
+ * follows the reflection law from the record's fold angle
+ * (n ∝ exit − entry), so a 45°-mounted mirror draws a 45° plate and a
+ * normal-incidence mirror draws a perpendicular one.
  */
 
 import { Line, Text } from '@react-three/drei';
@@ -11,6 +16,17 @@ import { GLYPH_COLORS } from './colors';
 
 /** Overlay lines must never intercept pointer raycasts. */
 const NO_RAYCAST = () => null;
+
+/**
+ * Plate rotation (about glyph z) whose face normal bisects entry→exit:
+ * entry beam is +x, exit at `foldDeg` in the xy-plane, so the mirror normal
+ * n ∝ (exit − entry) sits at atan2(sin f, cos f − 1). 90° fold → 135°
+ * (a 45° plate); 180° retro → 180° (plate perpendicular to the beam).
+ */
+function plateAngle(foldDeg: number): number {
+  const f = (foldDeg * Math.PI) / 180;
+  return Math.atan2(Math.sin(f), Math.cos(f) - 1);
+}
 
 function LensGlyph({ color }: { color: string }) {
   // Biconvex disc: a sphere squashed along the optical axis.
@@ -29,10 +45,12 @@ function LensGlyph({ color }: { color: string }) {
   );
 }
 
-function MirrorGlyph({ color }: { color: string }) {
-  // Thin plate whose face normal is the optical axis.
+function MirrorGlyph({ color, foldDeg }: { color: string; foldDeg: number }) {
+  // Thin plate oriented by the record's fold angle (180° = normal incidence).
+  const n = plateAngle(foldDeg);
   return (
-    <group>
+    <group rotation={[0, 0, n - Math.PI]}>
+      {/* authored with the reflective face toward -x (the incoming beam) */}
       <mesh rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[14, 14, 2.5, 32]} />
         <meshStandardMaterial color={color} metalness={0.9} roughness={0.15} />
@@ -75,15 +93,23 @@ function DetectorGlyph({ color }: { color: string }) {
   );
 }
 
-function SplitterGlyph({ color, plateColor }: { color: string; plateColor: string }) {
+function SplitterGlyph({
+  color,
+  plateColor,
+  foldDeg,
+}: {
+  color: string;
+  plateColor: string;
+  foldDeg: number;
+}) {
   return (
     <group>
       <mesh>
         <boxGeometry args={[24, 24, 24]} />
         <meshPhysicalMaterial color={color} transparent opacity={0.18} roughness={0.05} />
       </mesh>
-      {/* Diagonal plate: normal halfway between −x and +z(local up → deflects up/side). */}
-      <mesh rotation={[0, 0, Math.PI / 4]}>
+      {/* Internal plate oriented by the reflected arm's real fold angle. */}
+      <mesh rotation={[0, 0, plateAngle(foldDeg)]}>
         <boxGeometry args={[1.2, 32, 23]} />
         <meshStandardMaterial color={plateColor} transparent opacity={0.75} metalness={0.5} roughness={0.2} />
       </mesh>
@@ -123,22 +149,37 @@ function FallbackGlyph({ color, label }: { color: string; label: string }) {
   );
 }
 
-/** Arrow along the local optical axis (+x), always drawn. */
-export function OpticalAxisArrow({ color = '#ffcf5c' }: { color?: string }) {
+/**
+ * Arrow along the local optical axis (+x). For folding parts the arrow bends
+ * at the element: entry from −x, exit along the record's fold angle — so the
+ * symbol shows the routing the compiled optic will actually take (WP-29).
+ */
+export function OpticalAxisArrow({
+  color = '#ffcf5c',
+  foldDeg = null,
+}: {
+  color?: string;
+  foldDeg?: number | null;
+}) {
+  const folded = foldDeg !== null && foldDeg > 1;
+  const f = ((foldDeg ?? 0) * Math.PI) / 180;
+  const exit: [number, number, number] = [30 * Math.cos(f), 30 * Math.sin(f), 0];
+  const head = folded ? exit : ([30, 0, 0] as const);
+  const headAngle = folded ? f - Math.PI / 2 : -Math.PI / 2;
   return (
     <group>
       <Line
-          raycast={NO_RAYCAST}
-        points={[
-          [-30, 0, 0],
-          [30, 0, 0],
-        ]}
+        raycast={NO_RAYCAST}
+        points={folded ? [[-30, 0, 0], [0, 0, 0], exit] : [[-30, 0, 0], [30, 0, 0]]}
         color={color}
         lineWidth={1.5}
         transparent
         opacity={0.85}
       />
-      <mesh position={[32, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+      <mesh
+        position={[head[0] * 1.07, head[1] * 1.07, 0]}
+        rotation={[0, 0, headAngle]}
+      >
         <coneGeometry args={[2.4, 7, 12]} />
         <meshBasicMaterial color={color} />
       </mesh>
@@ -149,24 +190,35 @@ export function OpticalAxisArrow({ color = '#ffcf5c' }: { color?: string }) {
 export function SchematicGlyph({
   category,
   label,
+  foldDeg = null,
 }: {
   category: DocCategory;
   label: string;
+  /** Fold angle from the record ports (beamAxesOf); null = straight-through. */
+  foldDeg?: number | null;
 }) {
   const color = GLYPH_COLORS[category];
+  // 180° (normal incidence) is the safe default when no fold is known.
+  const fold = foldDeg ?? 180;
   switch (category) {
     case 'lens':
       return <LensGlyph color={color} />;
     case 'mirror':
-      return <MirrorGlyph color={color} />;
+      return <MirrorGlyph color={color} foldDeg={fold} />;
     case 'source':
       return <SourceGlyph color={color} />;
     case 'detector':
       return <DetectorGlyph color={color} />;
     case 'beamsplitter':
-      return <SplitterGlyph color={color} plateColor={color} />;
+      return <SplitterGlyph color={color} plateColor={color} foldDeg={foldDeg ?? 90} />;
     case 'dichroic':
-      return <SplitterGlyph color={color} plateColor={GLYPH_COLORS.dichroic} />;
+      return (
+        <SplitterGlyph
+          color={color}
+          plateColor={GLYPH_COLORS.dichroic}
+          foldDeg={foldDeg ?? 90}
+        />
+      );
     case 'filter':
       return <FilterGlyph color={color} />;
     case 'sample':
