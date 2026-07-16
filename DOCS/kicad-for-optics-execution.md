@@ -77,7 +77,9 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-30 | component editor round 2: true element profiles (conic sag arcs + glass fill — radii reshape the DRAWN lens), non-optical categories electronics/mechanics first-class (no optics block; editor hides the sections; core validates), real UC2 electronics records | ✅ done (`5a26501` + core `7136e7a`) — verified live: R 50→15 mm bulges the sketch, EFL 49→22.8 |
 | WP-22 | library registry: the service serves `/v1/library/index` (fresh per request) + `/v1/library/assets/…`; frontend defaults to the registry with the bundled snapshot as automatic offline fallback; contribution flow in `optikit-core/DOCS/LIBRARY.md` | ✅ done (core `564b388` + `25d926c`) — verified live incl. the fallback banner |
 | WP-20 | Inventor datum contract v2 + PyInventor | 🔶 in progress (Bene, async — batch_iam_to_stp_glb.py + stamp_datums.py exist in PyInventor) |
-| — | next: WP-27 (tutorials, amended — the step-by-step model-authoring walkthrough), WP-26 (actuation bridge); FRAME UX rework still needs a spec conversation | ⬜ |
+| — | feedback round 3 triaged (2026-07-16, Part 2d): WP-32 auto-chaining, WP-33 bind bug + one authoring flow, WP-34 palette⇄registry + T-class badges, WP-35 T1/T2/T3 strategies, WP-36 Ethan subassemblies sync, WP-37 light polish + View-3D retirement | 📋 |
+| — | done with round-3 triage: light brand theme is the app default; `inventor-naming-contract.md` → v2.1 (PyInventor pipeline, marker geometries) | ✅ |
+| — | next: WP-32 → WP-33 → WP-36, then WP-34/35/37; WP-27 (tutorials) after; FRAME UX rework still needs a spec conversation | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
@@ -1095,6 +1097,261 @@ generic lens glyph.
 - **WP-20** — in progress on Bene's side (Inventor + PyInventor, async);
   connect the live Inventor instance when the glb2template parsing half
   starts here.
+
+---
+
+# Part 2d · Feedback round 3 (2026-07-16) — triage + new work packages
+
+Bene's third field-test round, plus his T1/T2/T3 strategy note. Root causes
+verified in code where possible. Each WP carries a **For humans** paragraph —
+what will visibly change and how it gets done. Ordering: **WP-32 first**
+(auto-chaining + palette↔registry are the same root problem and block everyday
+use), then WP-33 (bind bug is data-corrupting), WP-36 (Ethan sync — his branch
+fixes E1), then WP-34/35/37.
+
+Done immediately with this triage (not WPs): the light brand theme is now the
+app-wide default (canvases stay dark drawing surfaces); v2.1 of
+`DOCS/inventor-naming-contract.md` documents the real PyInventor pipeline
+(`stamp_datums.py` workflow, `batch_iam_to_stp_glb.py`, marker geometries).
+
+| Finding | Root cause (verified) | Lands in |
+|---|---|---|
+| `E_BAD_PORT at laser-405nm.out: component declares no port 'out'` | Palette parts export as **bare components** — the WP-29 port catalog exists only frontend-side; the .dsn sent to the service has no `optics`, so chain/compile can't see any ports | WP-32 |
+| `E_NO_PATHS: no optical paths declared — chain ports first` — "should work out of the box" | Chaining is opt-in in the UI even though `/v1/chain/infer` exists and the 2D preview already traces the beam | WP-32 |
+| "routing of the parts is still odd … we should not wire the beampath" | Same as above: manual wiring is the only path today | WP-32 |
+| Bind: part jumps back to origin when switching to datum mode | **Confirmed bug:** drei `TransformControls` without an `object` prop attaches to its own internal group — our group (which `commitTransform` reads) never moves, so gizmo drags are visual-only and revert when the gizmo unmounts | WP-33 |
+| Upload-STP + annotate parameters should be ONE flow with the components view | Bind and the component editor are separate pages that both author halves of the same record pair | WP-33 |
+| Library-saved part doesn't appear in the schematic sidebar | The palette reads the legacy CSV module catalog, not the registry index/workspace — the bridge was deferred in WP-31.8 | WP-34 |
+| T1 parts should be position-locked in the cube (+ show the cube bbox); sidebar parts need T1/T2/T3 badges | The palette/schematic have no template-class awareness at all | WP-34 |
+| T1/T2/T3 strategy (Bene's note) needs to live in the platform | No property-matching (T1), no optikit→Inventor pipeline (T2), T3 wrap exists but isn't wired to placement | WP-35 |
+| Sync with Ethan `origin/subassemblies` | 7 commits: **E1 (cm→mm) fixed**, recursive subassembly transform chaining for reports & STEP | WP-36 |
+| Does View 3D still have meaning? Associate primitives with cubes | View 3D predates the schematic/assembly pair; the assembly already renders shells + insert glyphs | WP-37 |
+| Light theme + brand colours | ✅ done with this triage (default flipped); floating scene overlays + sync chip still assume dark chrome | WP-37 (polish) |
+
+### WP-32 — Auto-chaining: the beam path works out of the box
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+Two halves of one problem: palette parts export without optics (E_BAD_PORT),
+and paths must be wired by hand (E_NO_PATHS).
+
+1. Palette parts export their record identity: serviceExport enriches every
+   bare component with `optics.frames/ports` derived from the SAME catalog
+   the schematic renders (src/document/portCatalog.ts) plus a minimal
+   fragment where the palette declares one (lens focal length → thin-lens
+   fragment; mirror → reflective flat). One convention end to end: what you
+   see chained in the browser is what the service compiles. Parts placed
+   from library modules (WP-34) carry their real record optics instead.
+2. Auto-chain by default: when a design reaches check/simulate/cubify with
+   NO paths, the frontend calls /v1/chain/infer first and adopts the result
+   (with a toast naming the inferred paths); the manual pin-to-pin wiring
+   stays as an override for ambiguous topologies. E_NO_PATHS disappears
+   from the happy path; E_AMBIGUOUS_CHAIN surfaces the pin-wiring UI.
+3. The inferred chains render exactly like hand-wired ones (same path
+   store), and the sync chip treats an inference like a chain edit.
+
+Acceptance: place laser-405nm → mirror 45° → camera from the palette, press
+check with zero manual wiring — validation passes, the inferred path shows,
+simulate traces it; E_BAD_PORT is impossible for palette parts.
+```
+
+**For humans:** placing parts and pressing *check* will just work — no more
+clicking pin-to-pin before the service accepts the design, and no more
+`E_BAD_PORT`/`E_NO_PATHS`. Under the hood the browser sends the same port
+information it already draws (the WP-29 catalog) along with the design, and
+asks the backend's existing chain-inference to discover the beam path the
+same way the visible ray preview already does. Manual wiring remains as the
+escape hatch when a topology is genuinely ambiguous (e.g. two cameras).
+
+### WP-33 — Bind workbench round 3: the drag bug + one authoring flow
+
+```
+PROMPT (repo: openUC2-OptiKit)
+
+1. Fix the jump-back bug (VERIFIED root cause): drei TransformControls
+   without an `object` prop attaches to its own internal group, so
+   commitTransform reads our never-moved group and the store keeps the old
+   transform — the part snaps back when the gizmo unmounts (and the
+   template's mesh-offset silently records the stale pose). Pass the
+   content group explicitly (object={groupRef}) or read the transform off
+   the controls' attached object; add a regression test on the store
+   transform after a simulated drag; audit AssemblyScene for the same
+   pattern.
+2. One authoring flow: merge the bind workbench into the component editor
+   as its "mechanics" half — upload STP → place vs ghost cube → datums on
+   one tab, surfaces/frames/ports on the other, both writing ONE record
+   pair (component + template + module) with the association made at
+   creation. /configurator/bind stays as a route that deep-links to the
+   mechanics tab. The record panel (ns/name/category/T-class/existing-
+   component picker) is shared, not duplicated.
+
+Acceptance: drag the part 20 mm, switch to datum mode — it stays put and
+the sidebar placement shows the dragged value; author surfaces AND datums
+for one part without switching pages; the saved pair resolves in the index.
+```
+
+**For humans:** two things get fixed. First, the bug where a moved STP part
+snaps back to the origin when you switch to datum mode — the 3D gizmo was
+moving a throwaway wrapper object instead of the real part, so the movement
+was never saved; it will now write through to the stored placement. Second,
+uploading an STP and setting its optical parameters become one page instead
+of two: the component editor gains a "mechanics" tab holding today's bind
+workbench, so the symbol (optics) and footprint (mechanics) of a part are
+authored together and saved as one linked record set.
+
+### WP-34 — Palette ⇄ registry: library parts in the schematic sidebar, with T-classes
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. The schematic palette gains a "Library" group fed from the registry
+   (useLibraryIndex modules + workspace records), auto-refreshing after a
+   dev write / workspace save (the missing reload Bene hit). Placing a
+   library module creates a part whose libraryRef is the MODULE id; its
+   record optics drive ports/glyph (WP-29 path) and its GLB/thumbnail
+   renders on the tile (WP-31 thumbs) and in the assembly.
+2. T-class becomes visible and BINDING in the editors: every tile shows a
+   T1/T2/T3 badge (template.class via the module ref). In the schematic,
+   a T1 part's intra-cube offset is LOCKED (it drags cell-to-cell but δ
+   snaps to the record's fixed pose; the property panel greys the offset
+   fields) and its cube bounding box renders as a ghost outline; T2 shows
+   its DOF axis; T3 places freely inside the cube (the generator will wrap
+   it). CSV palette entries get a best-effort class from their records
+   where one exists; unclassified stays unbadged.
+3. Index entries carry what the palette needs: the registry index gains
+   template class + thumbnail/GLB asset URLs per module
+   (/v1/library/assets/...), so the palette needs no extra requests.
+
+Acceptance: save a bound part → it appears in the sidebar without a manual
+reload and places with its real geometry; a T1 module refuses intra-cube
+nudges in the schematic and draws its cube outline; every library tile
+shows its T-class badge.
+```
+
+**For humans:** parts you create (via bind or the component editor) will
+show up in the schematic's part palette immediately, alongside the built-in
+ones — today they only land in the library and the palette never looks
+there. Each palette tile will also carry a small T1/T2/T3 badge so you know
+whether a part is fixed, adjustable, or generated, and the editor will
+enforce it: a T1 part can't be nudged inside its cube (you see its cube
+outline instead), while a T3 part can be placed freely for the generator to
+wrap.
+
+### WP-35 — The T1/T2/T3 strategies, encoded (Bene's note → platform behavior)
+
+```
+PROMPT (repo: optikit-core + openUC2-OptiKit + PyInventor)
+
+T1 · fixed: MATCH properties between the optiland model and the exported
+   STP. The record's optics.fragment surfaces get correlated with the
+   mechanics: the reflective surface of a mirror record maps to the datum
+   marker (PLN - OPT) pose in the STP/GLB, verified at ingest —
+   glb2template cross-checks fragment surface count/type against the
+   markers and review-flags mismatches ("record says reflective flat, no
+   PLN marker on the mirror face"). Add a `library verify-t1 <module>`
+   check that compiles the fragment and asserts the datum pose sits on the
+   fixed insert pose declared by the template.
+T2 · adaptive: the optikit → Inventor pipeline. After /v1/optimize writes
+   dof_values, a new exporter emits an "fx parameter" changeset
+   (optikit-fx.json: {template-id, parameter, value-mm}) per T2 part; a new
+   PyInventor script (apply_fx_params.py) reads it on the Windows machine,
+   sets the Inventor user parameters (fx list) on the master-insert part,
+   and re-runs batch_iam_to_stp_glb.py for the touched assemblies. Document
+   the parameter naming (fx name == dof name, e.g. `dz`). The motor/
+   firmware alternative stays WP-26 (same dof value, different actuator).
+T3 · generative: wire placement to generation — a T3 part placed in the
+   schematic (WP-34) carries its intra-cube pose into the generator params
+   (boolean_holder_1x1: part_position_mm/part_rotation_deg), so "cubify"
+   on a T3 part regenerates the holder around the primitive at its ACTUAL
+   pose. The release bundle records the generator params + artifact hash
+   (already in the lockfile) so the printed part matches the optics.
+
+Acceptance: a T1 mirror module fails verify-t1 when its marker pose and
+fragment disagree; optimizing a T2 focus dz produces optikit-fx.json and
+(on the Inventor machine) an updated STP whose insert sits at the new dz;
+moving a T3 lens 3 mm off-center regenerates a holder whose cavity is 3 mm
+off-center.
+```
+
+**For humans:** this turns your T1/T2/T3 note into concrete machinery. For
+fixed parts (T1) the system will actually check that the optical model and
+the CAD file agree — e.g. that the mirror's reflecting surface in the
+simulation sits exactly where the datum marker says the physical mirror is.
+For adjustable parts (T2), an optimization result in optikit will export a
+small parameter file that a new PyInventor script applies to Inventor's fx
+parameter list, so the CAD updates itself and re-exports STP/GLB — closing
+the optiland → Inventor loop. For generated parts (T3), wherever you place
+the optic inside the cube is where the auto-generated holder will put its
+cavity.
+
+### WP-36 — Sync with Ethan's `origin/subassemblies`
+
+```
+PROMPT (repo: optikit-core + /Users/bene/Downloads/optikit-ethan)
+
+Ethan's branch (7 commits ahead) fixes E1 (UC2 grid spacings cm→mm) and
+adds recursive transformation chaining for subassemblies in reports & STEP
+generation.
+
+1. Review the branch diff (git -C optikit-ethan diff main...origin/
+   subassemblies); write a short conformance note: what changed in
+   DesignDecl/PrimReport semantics, especially nested-subassembly pose
+   composition vs our flatten.py ("rotations don't compose along anchor
+   chains" — does his recursive chaining change that contract?).
+2. Regenerate the cross-impl fixtures: his Go repo emits the
+   tests/fixtures/prim-reports/ goldens — rerun them from the branch and
+   diff against ours; adapt flatten.py where his semantics are the agreed
+   contract, PR back where they diverge from the 07-07 decisions.
+3. Close E1 in the ledger (his fix) and check golden/ethan/ examples
+   still round-trip; add one nested-subassembly design to golden/ as the
+   new conformance case.
+
+Acceptance: optikit-core's flatten matches the branch's PrimReports on a
+nested-subassembly fixture, or a written divergence note exists with the
+PR/issue link where it's his to change.
+```
+
+**For humans:** Ethan has been working in parallel on the Go reference
+implementation — his branch fixes the long-standing units bug we flagged
+(E1) and adds proper handling of assemblies nested inside assemblies. This
+task compares his implementation against our Python engine on shared test
+fixtures, adopts his semantics where they're the agreed contract, and files
+issues where the two disagree — so the two implementations can't silently
+drift apart.
+
+### WP-37 — Light-theme polish + retire View 3D into the assembly
+
+```
+PROMPT (repo: openUC2-OptiKit)
+
+1. Light-theme polish (the flip landed with this triage): the floating
+   scene overlays (working-plane toolbar, bind mode bar, lock/help chips)
+   and the sync chip hardcode dark rgba backgrounds — theme them
+   (theme.palette.background.paper + elevation) so they read on light
+   chrome; sweep GLYPH label outline colors for the light canvas; the
+   visual-regression set is regenerated as the new reference.
+2. Retire View 3D: its two jobs are now better served elsewhere — GLB cube
+   rendering lives in the assembly, glyph placement in the schematic. Turn
+   /configurator/3d into a redirect to the assembly and fold its one
+   unique feature (module GLB browsing with light/dark scene toggle) into
+   the assembly's view options. The assembly becomes THE place where
+   optical primitives associate with cubes: selecting an insert highlights
+   its component record (id + T-class + link to the component editor) in
+   the side panel.
+
+Acceptance: no hardcoded dark chips on light chrome anywhere; /configurator/
+3d lands in the assembly with a deprecation toast; clicking an assembly
+insert shows which optical component + template it realizes.
+```
+
+**For humans:** the app is now light by default (your preference — the
+brand's light grey and white with the blue header), but a few floating
+buttons still carry their old dark backgrounds and will be restyled. The
+separate "View 3D" page will retire: the assembly view already renders the
+cubes in 3D and is the natural home for "which optical part lives in which
+cube" — clicking a cube's insert will name its optical component and
+template class, linking straight to the component editor.
 
 ---
 

@@ -1,9 +1,32 @@
 # Inventor → GLB node-naming contract
 
-**Status:** contract · v2 · 2026-07-15
+**Status:** contract · v2.1 · 2026-07-16
 **Consumed by:** `optikit-core import glb` (`src/optikit_core/importers/glb2template.py`)
 **Authored/validated by:** `stamp_datums.py` (PyInventor, runs on the Inventor machine)
+**Exported by:** `batch_iam_to_stp_glb.py` (PyInventor — the `.iam → .stp → .glb` pipeline)
 **How to work with it:** [`mechanical-engineering-guide.md`](mechanical-engineering-guide.md)
+
+## The export pipeline (PyInventor)
+
+Two scripts on the Inventor (Windows) machine own the boundary:
+
+```bash
+# 1 · stamp/validate datums on the OPEN assembly
+python stamp_datums.py --init-lib              # once: generate DATUM-*.ipt marker parts
+python stamp_datums.py --from-work-features    # contract-named work features → marker occurrences
+python stamp_datums.py --validate --strict     # exit 1 on any contract violation
+
+# 2 · batch-export a folder of assemblies
+python batch_iam_to_stp_glb.py <iam_folder> [stp_out] [glb_out] --overwrite
+```
+
+`batch_iam_to_stp_glb.py` opens every `.iam` via Inventor COM and `SaveAs`-copies
+it to `.stp` (per-file isolated, one bad file can't poison the batch), then
+converts each STEP to GLB with **cascadio** and injects the **`__mm_scale__`**
+root node (scale exactly 1000): STEP is millimetres but cascadio writes glTF
+metres, and glTF carries no unit of its own. Without the node every length
+reaches optikit 1000× too small — silently, because the envelope calculation
+clamps the resulting zero up to one grid cell rather than failing.
 
 > **v2 adds named datum markers.** Before v2 the optical frame was inferred from
 > the `BUY` node's origin and ports were assumed `±z`. That guess is now a
@@ -73,14 +96,16 @@ their full transform. Verified both ways on Inventor 2025.3.
 Marker parts live in the shared library and are placed repeatedly; only the
 occurrence name and the placement change:
 
-| Marker part | Geometry | Carries |
+| Marker part | Geometry (as `--init-lib` creates it) | Carries |
 |---|---|---|
-| `DATUM-DISC.ipt` | thin disc, ⌀ = the clear aperture, 0.1 mm thick | origin, normal, **aperture diameter** |
-| `DATUM-AXIS.ipt` | thin rod along its local +z, 0.1 mm ⌀ | origin, direction |
-| `DATUM-PT.ipt` | 0.2 mm sphere | origin only |
+| `DATUM-DISC.ipt` | disc, created ⌀ 1 mm × 0.1 mm thick — **scale each occurrence to the true clear aperture** | origin, normal, **aperture diameter** |
+| `DATUM-AXIS.ipt` | rod along its local +z, ⌀ 0.1 mm × 5 mm long | origin, direction |
+| `DATUM-PT.ipt` | stub cylinder, ⌀ 0.2 mm × 0.2 mm tall | origin only |
 
 Because the disc's diameter *is* the clear aperture, one marker states the frame
-and the aperture together — model the disc at the true optical clear diameter.
+and the aperture together — scale the placed disc to the true optical clear
+diameter (`stamp_datums.py --init-lib` deliberately makes it 1 mm so an
+unscaled disc is obvious in review).
 
 ### Semantics
 

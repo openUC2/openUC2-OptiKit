@@ -156,11 +156,10 @@ function App() {
     };
   }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, setStartupDialogClosed]);
 
-  // Every route renders inside the shared AppShell (WP-24): editors on the
-  // dark theme, document-style pages (setups, collections, FRAME) on light.
-  const dark = (node: ReactNode) => (
-    <AppShell mode="dark"><Suspense fallback={null}>{node}</Suspense></AppShell>
-  );
+  // Every route renders inside the shared AppShell (WP-24). Feedback round 3:
+  // the LIGHT brand theme (guide body colours #FAF9F9/white) is the default
+  // everywhere — the 3D/2D canvases stay dark drawing surfaces inside light
+  // chrome, the KiCad pattern.
   const light = (node: ReactNode) => (
     <AppShell mode="light"><Suspense fallback={null}>{node}</Suspense></AppShell>
   );
@@ -172,19 +171,19 @@ function App() {
         <Routes>
           {/* The schematic is the primary editor; the legacy 2D grid builder
               stays reachable at /configurator/grid (feedback round 1). */}
-          <Route path="/configurator" element={dark(<SchematicPage />)} />
-          <Route path="/configurator/" element={dark(<SchematicPage />)} />
-          <Route path="/configurator/grid" element={dark(<EditorPage />)} />
+          <Route path="/configurator" element={light(<SchematicPage />)} />
+          <Route path="/configurator/" element={light(<SchematicPage />)} />
+          <Route path="/configurator/grid" element={light(<EditorPage />)} />
           <Route path="/configurator/frame" element={light(<FrameWizardPage />)} />
           <Route path="/configurator/setups" element={light(<SetupBrowser />)} />
-          <Route path="/configurator/3d" element={dark(<Editor3DPage />)} />
-          <Route path="/configurator/schematic" element={dark(<SchematicPage />)} />
-          <Route path="/configurator/components" element={dark(<ComponentEditorPage />)} />
-          <Route path="/configurator/assembly" element={dark(<AssemblyPage />)} />
-          <Route path="/configurator/bind" element={dark(<BindPage />)} />
+          <Route path="/configurator/3d" element={light(<Editor3DPage />)} />
+          <Route path="/configurator/schematic" element={light(<SchematicPage />)} />
+          <Route path="/configurator/components" element={light(<ComponentEditorPage />)} />
+          <Route path="/configurator/assembly" element={light(<AssemblyPage />)} />
+          <Route path="/configurator/bind" element={light(<BindPage />)} />
           <Route path="/configurator/:collectionName" element={light(<CollectionView />)} />
           {/* Legacy routes for backward compatibility */}
-          <Route path="/" element={dark(<EditorPage />)} />
+          <Route path="/" element={light(<EditorPage />)} />
           <Route path="/setups" element={light(<SetupBrowser />)} />
           <Route path="/:collectionName" element={light(<CollectionView />)} />
         </Routes>
