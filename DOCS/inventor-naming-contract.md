@@ -1,7 +1,15 @@
 # Inventor → GLB node-naming contract
 
-**Status:** contract · 2026-07-13
+**Status:** contract · v2 · 2026-07-15
 **Consumed by:** `optikit-core import glb` (`src/optikit_core/importers/glb2template.py`)
+**Authored/validated by:** `stamp_datums.py` (PyInventor, runs on the Inventor machine)
+**How to work with it:** [`mechanical-engineering-guide.md`](mechanical-engineering-guide.md)
+
+> **v2 adds named datum markers.** Before v2 the optical frame was inferred from
+> the `BUY` node's origin and ports were assumed `±z`. That guess is now a
+> fallback that gets **review-flagged**; a part that carries datum markers states
+> its frames, its optical axis, and its clear aperture explicitly. See
+> [Datum markers](#datum-markers).
 
 The openUC2 Inventor export pipeline names every node in the GLB by a fixed
 convention. `glb2template` relies on it to derive a mechanical template, an
@@ -11,7 +19,9 @@ automatic; deviating from it forces the fields into the record's `review:`
 block instead of failing.
 
 Verified against `ASS - 2028 - CUBLEND12.7F40 - V04`
-(the 12.7 mm f/40 plano-convex lens cube).
+(the 12.7 mm f/40 plano-convex lens cube). The v2 datum-marker rules were
+verified on Inventor 2025.3 by round-tripping stamped markers through the real
+`.iam → .stp → .glb` pipeline (see [Datum markers](#datum-markers)).
 
 ## Node prefixes
 
@@ -23,9 +33,113 @@ Verified against `ASS - 2028 - CUBLEND12.7F40 - V04`
 | `PRT - <num> - <name>` | printed part | `CUBHLF*` = cube half, `MASLCK` = lock, `MASINS*` = insert body; contribute to the envelope bbox |
 | `BUY - <descr>` | purchased part | if `<descr>` names an optic (`Lens`/`Mirror`/`Filter`/`Window`/`Prism`) it defines the optical component; the optical datum frame sits at this node's origin |
 | `TP <descr>` | trade part (screws, adhesive pads) | ignored for optics |
+| `PLN - <ROLE> - <frame>` | **datum marker** — plane | → `optics.frames.<frame>` (origin + rotation) and the clear-aperture disc |
+| `AXIS - <ROLE>` | **datum marker** — axis | → `optics.ports.*.direction` |
+| `PT - <name>` | **datum marker** — point | → `optics.frames.<name>` (origin only) |
 
 Every node name may carry a glTF instance suffix `:N` (e.g. `…:1`); it is
 stripped before matching.
+
+Note `PT` and `PRT` are distinct prefixes, as are `PT -` (datum point) and
+`TP ` (trade part). Matching is on the whole prefix token, so they never
+collide.
+
+## Datum markers
+
+### Why markers and not work planes
+
+**Inventor work planes, work axes and work points do not survive export.** They
+are construction geometry: the STEP translator never writes them (their names do
+not appear anywhere in the STEP text), and neither the cascadio STEP→GLB
+converter nor Inventor's own glTF translator emits a node for them. Verified on
+Inventor 2025.3 — a part carrying `PLN - SRC - out`, `PLN - SNS - sensor` and
+`PT - FOCUS` as work features exported to a GLB containing exactly one node, the
+solid.
+
+So a datum has to be **real geometry** to cross the export boundary. A datum
+marker is a tiny, dedicated **part** placed into the assembly, whose *occurrence
+name* carries the datum name.
+
+### The occurrence rule
+
+> A datum marker MUST be a placed **part occurrence**. It MUST NOT be a solid
+> **body** inside a larger part.
+
+This is not a style preference. Body names reach the STEP file but are lost in
+GLB conversion — OCCT collapses a multi-body part into a single node named after
+the part, discarding body names. Occurrence names survive as node names with
+their full transform. Verified both ways on Inventor 2025.3.
+
+Marker parts live in the shared library and are placed repeatedly; only the
+occurrence name and the placement change:
+
+| Marker part | Geometry | Carries |
+|---|---|---|
+| `DATUM-DISC.ipt` | thin disc, ⌀ = the clear aperture, 0.1 mm thick | origin, normal, **aperture diameter** |
+| `DATUM-AXIS.ipt` | thin rod along its local +z, 0.1 mm ⌀ | origin, direction |
+| `DATUM-PT.ipt` | 0.2 mm sphere | origin only |
+
+Because the disc's diameter *is* the clear aperture, one marker states the frame
+and the aperture together — model the disc at the true optical clear diameter.
+
+### Semantics
+
+`PLN - <ROLE> - <frame>` → an entry in `optics.frames` keyed `<frame>`:
+
+- **origin** — the marker node's origin, in the `__mm_scale__` (mm) frame,
+  expressed relative to the `ASS` root → `x-mm`, `y-mm`, `z-mm`.
+- **rotation** — the marker's local +z (the disc normal) → `frames.<frame>.rotation`
+  as a `[x, y, z, w]` quaternion. An axis-aligned disc yields identity.
+- **clear aperture** — the disc's in-plane diameter → the frame's
+  `clear-aperture-mm`.
+
+`AXIS - <ROLE>` → a beam direction. The marker's local +z is mapped to the
+nearest of the six axis literals `±x ±y ±z` that `ports.direction` accepts.
+`ROLE = OPT` is the component's optical axis and sets the direction of both
+ports. A marker more than **1°** off the snapped axis is review-flagged; more
+than **20°** is an error (it exceeds the compiler's `ANGLE_TOL_DEG`).
+
+`PT - <name>` → an entry in `optics.frames` keyed `<name>`, origin only,
+identity rotation, no aperture. `PT - FOCUS` conventionally marks the focal
+point of the component.
+
+### Roles
+
+| `<ROLE>` | Meaning |
+|---|---|
+| `SRC` | a source's emission datum |
+| `SNS` | a sensor's active-area datum |
+| `OPT` | the optical datum of a passive component; `AXIS - OPT` is its axis |
+
+Worked example — a lens cube exporting an explicit datum set:
+
+```
+ASS - 2028 - CUBLEND12.7F40 - V04
+├── PRT - 1003 - CUBHLF111 - V04
+├── BUY - Lens - f40 D12.7 sI2.8 R25 pl-cx
+├── PLN - OPT - optical      (DATUM-DISC ⌀12.7 @ z = 12.5)
+├── AXIS - OPT               (DATUM-AXIS along +z)
+└── PT - FOCUS               (DATUM-PT @ z = 52.5)
+```
+
+yields
+
+```yaml
+optics:
+  frames:
+    optical: {x-mm: 0, y-mm: 0, z-mm: 12.5, clear-aperture-mm: 12.7}
+    focus:   {x-mm: 0, y-mm: 0, z-mm: 52.5}
+  ports:
+    front: {frame: optical, direction: -z}
+    back:  {frame: optical, direction: +z, after-surface: 1}
+```
+
+### Markers are not geometry
+
+Marker occurrences are excluded from the envelope bounding box and from the
+mechanical template's mesh. They are metadata that happens to be shaped like a
+solid; a marker must never be printed, and the ME guide's export step strips
+them from the mechanical STP.
 
 ## BUY optic prescription
 
@@ -64,6 +178,13 @@ The parser never guesses these silently — they land in `review:` and on stderr
 - **DOF range** — a T2 insert's travel (`dz.range`) is left `null`; measure the
   insert's mechanical travel and fill it in.
 - Any **unparsed prescription token** or **missing thickness**.
+- **datum fallback** — a component with no `PLN`/`AXIS` marker falls back to the
+  pre-v2 behaviour (optical frame at the `BUY` node origin, ports assumed `±z`).
+  This is a guess and is always flagged: *"no datum markers — optical frame fell
+  back to the BUY node origin; add PLN/AXIS markers"*. Adding markers is how a
+  part stops being a draft.
+- **off-axis marker** — an `AXIS` marker more than 1° from the axis it snapped to.
+- **missing aperture** — a `PLN` marker whose disc diameter could not be measured.
 
 ## Adding new conventions
 
