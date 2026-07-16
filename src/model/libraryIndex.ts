@@ -1,12 +1,15 @@
 /**
- * Published library index (optikit-core `library/dist/index.json`).
+ * Published library index (WP-22: the optikit-core service IS the registry).
  *
- * The URL is configurable (persisted); the default points at the dev snapshot
- * bundled under public/optikit-library/. In production this becomes the raw
- * URL of the published optikit-core index.
+ * The default URL points at the service's `/v1/library/index` (built fresh
+ * from the library tree, so dev writes appear immediately); the static
+ * snapshot bundled under public/optikit-library/ is the OFFLINE FALLBACK
+ * only — `useLibraryIndex` falls back to it automatically when the service
+ * is unreachable. A user-entered URL (persisted) always wins.
  */
 
 import { useEffect, useState } from 'react';
+import { getCoreUrl } from '../api/coreClient';
 
 export interface IndexComponent {
   id: string;
@@ -29,7 +32,10 @@ export interface LibraryIndex {
 }
 
 const URL_STORAGE_KEY = 'optikit-library-index-url';
-export const DEFAULT_INDEX_URL = `${import.meta.env.BASE_URL}optikit-library/index.json`;
+/** Bundled dev snapshot — the offline fallback. */
+export const FALLBACK_INDEX_URL = `${import.meta.env.BASE_URL}optikit-library/index.json`;
+/** The service registry (WP-22): fresh from the library tree. */
+export const DEFAULT_INDEX_URL = `${getCoreUrl()}/v1/library/index`;
 
 export function getIndexUrl(): string {
   return localStorage.getItem(URL_STORAGE_KEY) ?? DEFAULT_INDEX_URL;
@@ -74,9 +80,24 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
         if (cancelled) return;
         setState({ loading: false, error: null, components: index.components ?? [] });
       })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setState({ loading: false, error: String(err), components: [] });
+      .catch(async (err: unknown) => {
+        // Service unreachable → the bundled snapshot keeps the browser
+        // working offline (WP-22). Surface where the data came from.
+        if (cancelled || url === FALLBACK_INDEX_URL) {
+          if (!cancelled) setState({ loading: false, error: String(err), components: [] });
+          return;
+        }
+        try {
+          const fallback = await fetchLibraryIndex(FALLBACK_INDEX_URL);
+          if (cancelled) return;
+          setState({
+            loading: false,
+            error: `registry unreachable (${String(err)}) — showing the bundled offline snapshot`,
+            components: fallback.components ?? [],
+          });
+        } catch {
+          if (!cancelled) setState({ loading: false, error: String(err), components: [] });
+        }
       });
     return () => {
       cancelled = true;
