@@ -18,7 +18,15 @@ import { z } from 'zod';
 import type { DsnFiles } from '../model/dsn/io';
 
 const URL_STORAGE_KEY = 'optikit-core-url';
-export const DEFAULT_CORE_URL = 'http://localhost:8000';
+
+// Same-origin deployment (WP-25): behind the production Caddy, the API and
+// the frontend share one https origin, so no CORS and no URL to configure.
+// Plain-http contexts (localhost dev, LAN) keep the local service default;
+// a user-entered URL in localStorage always wins.
+export const DEFAULT_CORE_URL =
+  typeof window !== 'undefined' && window.location.protocol === 'https:'
+    ? window.location.origin
+    : 'http://localhost:8000';
 
 export function getCoreUrl(): string {
   return localStorage.getItem(URL_STORAGE_KEY) ?? DEFAULT_CORE_URL;
