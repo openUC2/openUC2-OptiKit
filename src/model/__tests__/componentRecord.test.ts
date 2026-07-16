@@ -20,6 +20,8 @@ import {
   paraxialEflMm,
   recordId,
   recordToYaml,
+  sagAt,
+  surfaceProfiles,
   validateDraft,
 } from '../componentRecord';
 import { ac254Draft } from './ac254Fixture';
@@ -111,5 +113,60 @@ describe('acceptance fixture', () => {
       'utf8',
     );
     expect(recordToYaml(draftToRecord(ac254Draft()))).toBe(fixture);
+  });
+});
+
+// ── WP-30: true element profiles + non-optical records ───────────────────────
+
+describe('surface profiles (WP-30)', () => {
+  it('sagAt follows the conic sag equation and clamps beyond the extent', () => {
+    // Sphere R=50 at y=10: z = c y²/(1+√(1−c²y²)) = 2/(1+√0.96) ≈ 1.0102
+    expect(sagAt(50, 0, 10)).toBeCloseTo(1.0102, 3);
+    expect(sagAt(50, 0, 0)).toBe(0);
+    expect(sagAt(null, 0, 10)).toBe(0); // flat
+    expect(sagAt(-50, 0, 10)).toBeCloseTo(-1.0102, 3); // concave-left
+    expect(sagAt(5, 0, 10)).toBe(0); // beyond the hemisphere — clamped
+  });
+
+  it('editing the radius reshapes the drawn profile, not just the rays', () => {
+    const draft = ac254Draft();
+    const wide = surfaceProfiles(draft.surfaces);
+    draft.surfaces[0].radiusMm = 25; // 50 → 25 mm: twice the curvature
+    const bent = surfaceProfiles(draft.surfaces);
+    const yEdge = wide[0].points[0][1];
+    expect(Math.abs(bent[0].points[0][0])).toBeGreaterThan(
+      Math.abs(wide[0].points[0][0]),
+    );
+    expect(bent[0].points[0][1]).toBe(yEdge); // same sampled heights
+    // The exit surface sits at the center thickness along the axis.
+    expect(wide[wide.length - 1].vertexX).toBeCloseTo(centerThicknessMm(draft.surfaces), 6);
+  });
+});
+
+describe('non-optical records (WP-30)', () => {
+  it('electronics drafts validate WITHOUT surfaces or ports', () => {
+    const draft = defaultDraft('electronics');
+    draft.name = 'uc2e-esp32';
+    draft.vendorName = 'openUC2';
+    expect(validateDraft(draft)).toEqual([]);
+    expect(recordId(draft)).toBe('user.electronics.uc2e-esp32');
+  });
+
+  it('stray optics on a non-optical draft are rejected', () => {
+    const draft = defaultDraft('electronics');
+    draft.name = 'bad';
+    draft.ports = [{ name: 'front', frame: 'optical', direction: '-z', afterSurface: null }];
+    expect(validateDraft(draft).join()).toMatch(/carry no ports/);
+  });
+
+  it('serializes without an optics block and round-trips', () => {
+    const draft = defaultDraft('mechanics');
+    draft.name = 'baseplate';
+    const record = draftToRecord(draft);
+    expect((record as unknown as Record<string, unknown>).optics).toBeUndefined();
+    const back = draftFromRecord(record);
+    expect(back.category).toBe('mechanics');
+    expect(back.surfaces).toEqual([]);
+    expect(back.ports).toEqual([]);
   });
 });

@@ -1,7 +1,77 @@
 {
   "schema": "optikit-library-index/v0",
-  "count": 1,
+  "count": 4,
   "modules": [
+    {
+      "id": "openuc2.cube.camera_cs165",
+      "version": "0.1.0",
+      "kind": "cube_module",
+      "description": "CS165MU camera in a 1x1 cube (placeholder housing)",
+      "tags": [
+        "cube",
+        "cube/detector"
+      ],
+      "category": "detector",
+      "thumbnail": null,
+      "footprint_grid": [
+        1,
+        1,
+        1
+      ],
+      "review": false,
+      "component": {
+        "ref": "openuc2.detector.camera_cs165@^1",
+        "resolved": "1.1.0",
+        "vendor": {
+          "name": "Thorlabs",
+          "mpn": "CS165MU",
+          "url": ""
+        },
+        "efl_mm": null
+      },
+      "template": {
+        "ref": "openuc2.tpl.camera_mount_1x1@^0.1",
+        "resolved": "0.1.0",
+        "class": "fixed",
+        "actuatable": false
+      },
+      "electronics": null
+    },
+    {
+      "id": "openuc2.cube.laser_488",
+      "version": "0.1.0",
+      "kind": "cube_module",
+      "description": "488 nm collimated laser in a 1x1 cube (placeholder housing)",
+      "tags": [
+        "cube",
+        "cube/source"
+      ],
+      "category": "source",
+      "thumbnail": null,
+      "footprint_grid": [
+        1,
+        1,
+        1
+      ],
+      "review": false,
+      "component": {
+        "ref": "openuc2.source.laser_488@^1",
+        "resolved": "1.1.0",
+        "vendor": {
+          "name": "openUC2",
+          "mpn": "LASER-488-COL",
+          "url": ""
+        },
+        "efl_mm": null
+      },
+      "template": {
+        "ref": "openuc2.tpl.laser_pointer_1x1@^0.1",
+        "resolved": "0.1.0",
+        "class": "fixed",
+        "actuatable": false
+      },
+      "electronics": null
+    },
     {
       "id": "openuc2.cube.lens_z",
       "version": "1.0.0",
@@ -46,15 +116,50 @@
           }
         ]
       }
+    },
+    {
+      "id": "openuc2.cube.mirror_45",
+      "version": "0.1.0",
+      "kind": "cube_module",
+      "description": "Flat first-surface mirror in a 1x1 cube (placeholder mount)",
+      "tags": [
+        "cube",
+        "cube/mirror"
+      ],
+      "category": "mirror",
+      "thumbnail": null,
+      "footprint_grid": [
+        1,
+        1,
+        1
+      ],
+      "review": false,
+      "component": {
+        "ref": "openuc2.mirror.flat_45@^1",
+        "resolved": "1.0.0",
+        "vendor": {
+          "name": "",
+          "mpn": "",
+          "url": ""
+        },
+        "efl_mm": null
+      },
+      "template": {
+        "ref": "openuc2.tpl.mirror_mount_1x1@^0.1",
+        "resolved": "0.1.0",
+        "class": "fixed",
+        "actuatable": false
+      },
+      "electronics": null
     }
   ],
   "components": [
     {
       "id": "openuc2.detector.camera_cs165",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "optical_component",
       "category": "detector",
-      "description": "CS165MU 1.6 MP CMOS camera (sensor plane detector)",
+      "description": "CS165MU 1.6 MP CMOS camera (sensor datum at z = -10 mm)",
       "tags": [
         "detector",
         "detector/camera"
@@ -63,6 +168,45 @@
         "name": "Thorlabs",
         "mpn": "CS165MU",
         "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 0,
+      "review": false
+    },
+    {
+      "id": "openuc2.electronics.motor_driver_28byj",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "electronics",
+      "description": "Stepper driver board for 28BYJ-48 motorized inserts (CAN node)",
+      "tags": [
+        "electronics",
+        "motor-driver"
+      ],
+      "vendor": {
+        "name": "openUC2",
+        "mpn": "UC2E-MOT-28BYJ",
+        "url": "https://openuc2.com"
+      },
+      "efl_mm": null,
+      "n_surfaces": 0,
+      "review": false
+    },
+    {
+      "id": "openuc2.electronics.uc2e_esp32",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "electronics",
+      "description": "UC2e ESP32 controller board (CAN master, WiFi/USB, UC2-REST firmware)",
+      "tags": [
+        "electronics",
+        "controller",
+        "esp32"
+      ],
+      "vendor": {
+        "name": "openUC2",
+        "mpn": "UC2E-ESP32-V3",
+        "url": "https://openuc2.com"
       },
       "efl_mm": null,
       "n_surfaces": 0,
@@ -88,6 +232,26 @@
       "review": false
     },
     {
+      "id": "openuc2.mirror.flat_0",
+      "version": "1.0.0",
+      "kind": "optical_component",
+      "category": "mirror",
+      "description": "Flat first-surface mirror at normal incidence (reflects straight back)",
+      "tags": [
+        "mirror",
+        "mirror/flat",
+        "mirror/normal-incidence"
+      ],
+      "vendor": {
+        "name": "",
+        "mpn": "",
+        "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 1,
+      "review": false
+    },
+    {
       "id": "openuc2.mirror.flat_45",
       "version": "1.0.0",
       "kind": "optical_component",
@@ -109,10 +273,10 @@
     },
     {
       "id": "openuc2.source.laser_488",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "optical_component",
       "category": "source",
-      "description": "Collimated 488 nm laser diode module",
+      "description": "Collimated 488 nm laser diode module (emission datum at z = +20 mm)",
       "tags": [
         "source",
         "source/laser"

@@ -16,13 +16,14 @@ import {
   Typography,
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import type { DocCategory } from '../../document';
 import {
   centerThicknessMm,
   FRAGMENTLESS_CATEGORIES,
+  NONOPTICAL_CATEGORIES,
   PORT_DIRECTIONS,
   RECORD_CATEGORIES,
   defaultDraft,
+  type RecordCategory,
   type RecordDraft,
 } from '../../model/componentRecord';
 import { SurfacesTable } from './SurfacesTable';
@@ -43,7 +44,8 @@ export function RecordForm({
   onChange: (draft: RecordDraft) => void;
 }) {
   const set = (patch: Partial<RecordDraft>) => onChange({ ...draft, ...patch });
-  const hasFragment = !FRAGMENTLESS_CATEGORIES.includes(draft.category);
+  const nonOptical = NONOPTICAL_CATEGORIES.includes(draft.category);
+  const hasFragment = !nonOptical && !FRAGMENTLESS_CATEGORIES.includes(draft.category);
   const ct = centerThicknessMm(draft.surfaces);
 
   const deriveFrames = () => {
@@ -62,7 +64,7 @@ export function RecordForm({
         <TextField
           select size="small" label="category" value={draft.category}
           onChange={e => {
-            const category = e.target.value as DocCategory;
+            const category = e.target.value as RecordCategory;
             const fresh = defaultDraft(category);
             // Keep identity fields; reset the geometry to the category default.
             set({
@@ -185,7 +187,9 @@ export function RecordForm({
         </Box>
       )}
 
-      {/* ── frames ───────────────────────────────────────────────────────── */}
+      {/* ── frames + ports: hidden for non-optical records (WP-30) ───────── */}
+      {!nonOptical && (
+      <>
       <Box>
         <Divider sx={{ mb: 1 }}>
           <Typography variant="overline">datum frames (z along the optical axis)</Typography>
@@ -291,6 +295,14 @@ export function RecordForm({
           </Row>
         </Stack>
       </Box>
+      </>
+      )}
+      {nonOptical && (
+        <Typography variant="caption" color="text.secondary">
+          {draft.category} records are BOM-only: vendor/MPN identity, no
+          surfaces, frames or ports — chain inference and optics-DRC skip them.
+        </Typography>
+      )}
     </Stack>
   );
 }

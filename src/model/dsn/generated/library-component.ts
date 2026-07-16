@@ -49,7 +49,7 @@ export interface ComponentRecord {
   review?: Review;
   kind?: Kind;
   category: Category;
-  optics: OpticsSpec;
+  optics?: OpticsSpec;
   vendor?: VendorSpec;
   effective_focal_length_mm?: EffectiveFocalLengthMm;
   [k: string]: unknown;

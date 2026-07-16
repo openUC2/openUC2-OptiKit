@@ -18,7 +18,14 @@ import { parse, stringify } from 'yaml';
 import type { ComponentRecord } from './dsn/generated/library-component';
 import type { DocCategory } from '../document';
 
-export const RECORD_CATEGORIES: DocCategory[] = [
+/**
+ * Record categories = the schematic's optical categories plus the
+ * NON-OPTICAL first-class kinds (WP-30): electronics and mechanics records
+ * carry vendor/BOM identity but no optics block at all.
+ */
+export type RecordCategory = DocCategory | 'electronics' | 'mechanics';
+
+export const RECORD_CATEGORIES: RecordCategory[] = [
   'lens',
   'mirror',
   'filter',
@@ -27,11 +34,16 @@ export const RECORD_CATEGORIES: DocCategory[] = [
   'source',
   'detector',
   'sample',
+  'electronics',
+  'mechanics',
   'other',
 ];
 
 /** Categories whose records normally carry no surface fragment. */
-export const FRAGMENTLESS_CATEGORIES: DocCategory[] = ['source', 'detector', 'sample'];
+export const FRAGMENTLESS_CATEGORIES: RecordCategory[] = ['source', 'detector', 'sample'];
+
+/** Non-optical parts (WP-30): no surfaces, no frames, no ports — BOM only. */
+export const NONOPTICAL_CATEGORIES: RecordCategory[] = ['electronics', 'mechanics'];
 
 const ID_SEGMENT_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
@@ -68,7 +80,7 @@ export interface RecordDraft {
   namespace: string; // user | openuc2 | thorlabs
   name: string; // last id segment, e.g. "ac254-050-a"
   version: string;
-  category: DocCategory;
+  category: RecordCategory;
   description: string;
   vendorName: string;
   vendorMpn: string;
@@ -97,7 +109,7 @@ const surface = (over: Partial<SurfaceDraft> = {}): SurfaceDraft => ({
   ...over,
 });
 
-export function defaultDraft(category: DocCategory): RecordDraft {
+export function defaultDraft(category: RecordCategory): RecordDraft {
   const base: RecordDraft = {
     namespace: 'user',
     name: '',
@@ -119,6 +131,10 @@ export function defaultDraft(category: DocCategory): RecordDraft {
     detectorSensorMm: null,
     detectorPixelPitchUm: null,
   };
+  if (NONOPTICAL_CATEGORIES.includes(category)) {
+    // Non-optical records carry NO optics at all (WP-30).
+    return { ...base, surfaces: [], frames: [], ports: [] };
+  }
   switch (category) {
     case 'lens':
       base.surfaces = [
@@ -226,6 +242,52 @@ export function maxSemiApertureMm(surfaces: SurfaceDraft[]): number {
   return semis.length ? Math.max(...semis) : 12.7;
 }
 
+/**
+ * Surface sag at height y (mm): the standard conic sag equation
+ * z(y) = c·y² / (1 + √(1 − (1+k)·c²·y²)), c = 1/R. Flat surfaces (R = ∞)
+ * and heights beyond the surface's real extent return 0 (WP-30 — the drawn
+ * element geometry, not just the traced rays, responds to the radii).
+ */
+export function sagAt(radiusMm: number | null, conic: number, y: number): number {
+  if (radiusMm === null || radiusMm === 0) return 0;
+  const c = 1 / radiusMm;
+  const disc = 1 - (1 + conic) * c * c * y * y;
+  if (disc <= 0) return 0;
+  return (c * y * y) / (1 + Math.sqrt(disc));
+}
+
+export interface SurfaceProfile {
+  /** Vertex position along the axis (z of the record frame; drawn as x). */
+  vertexX: number;
+  semiAperture: number;
+  /** Sampled [x, y] polyline of the surface cross-section. */
+  points: [number, number][];
+  /** Glass follows this surface (fill the gap to the next profile). */
+  glassAfter: boolean;
+}
+
+/** Cross-section profiles of the surface stack for the 2D element sketch. */
+export function surfaceProfiles(surfaces: SurfaceDraft[], samples = 24): SurfaceProfile[] {
+  let x = 0;
+  const fallbackSemi = maxSemiApertureMm(surfaces);
+  return surfaces.map((s, i) => {
+    const semi = s.semiApertureMm ?? fallbackSemi;
+    const points: [number, number][] = [];
+    for (let k = 0; k <= samples; k++) {
+      const y = -semi + (2 * semi * k) / samples;
+      points.push([x + sagAt(s.radiusMm, s.conic, y), y]);
+    }
+    const profile: SurfaceProfile = {
+      vertexX: x,
+      semiAperture: semi,
+      points,
+      glassAfter: Boolean(s.material) && i < surfaces.length - 1,
+    };
+    x += s.thicknessMm ?? 0;
+    return profile;
+  });
+}
+
 // ── validation ───────────────────────────────────────────────────────────────
 
 export function recordId(draft: RecordDraft): string {
@@ -240,6 +302,14 @@ export function validateDraft(draft: RecordDraft): string[] {
   if (!SEMVER_RE.test(draft.version)) errors.push(`version '${draft.version}' is not semver (MAJOR.MINOR.PATCH)`);
   if (!RECORD_CATEGORIES.includes(draft.category)) errors.push(`unknown category '${draft.category}'`);
 
+  const nonOptical = NONOPTICAL_CATEGORIES.includes(draft.category);
+  if (nonOptical) {
+    // WP-30: electronics/mechanics are BOM-only — reject stray optics
+    // instead of demanding them.
+    if (draft.surfaces.length > 0) errors.push(`${draft.category} records carry no surfaces`);
+    if (draft.ports.length > 0) errors.push(`${draft.category} records carry no ports`);
+    return errors;
+  }
   const needsFragment = !FRAGMENTLESS_CATEGORIES.includes(draft.category);
   if (needsFragment && draft.surfaces.length === 0) {
     errors.push(`${draft.category} records need at least one surface`);
@@ -318,8 +388,9 @@ export function draftToRecord(draft: RecordDraft): ComponentRecord {
     description: draft.description,
     tags: ['authored'],
     vendor: { name: draft.vendorName, mpn: draft.vendorMpn, url: draft.vendorUrl },
-    optics,
   };
+  // Non-optical records (WP-30) omit the optics block entirely.
+  if (!NONOPTICAL_CATEGORIES.includes(draft.category)) record.optics = optics;
   const efl = paraxialEflMm(draft.surfaces);
   if (efl !== null && draft.category === 'lens') {
     record.effective_focal_length_mm = Math.round(efl * 1e4) / 1e4;
@@ -366,7 +437,10 @@ export function draftFromRecord(record: ComponentRecord): RecordDraft {
   const rec = record as unknown as Json;
   const id = String(rec.id ?? 'user.component.unnamed');
   const [namespace, , ...rest] = id.split('.');
-  const category = (rec.category as DocCategory) ?? 'other';
+  const rawCategory = String(rec.category ?? 'other');
+  const category: RecordCategory = (RECORD_CATEGORIES as string[]).includes(rawCategory)
+    ? (rawCategory as RecordCategory)
+    : 'other';
   const draft = defaultDraft(category);
   draft.namespace = namespace || 'user';
   draft.name = rest.join('.') || id.split('.').pop() || '';

@@ -13,8 +13,12 @@ import type { DocCategory } from '../../document';
 import type { OpticalElement, RayPath } from '../../types';
 import { runSimulation } from '../../simulation/SimulationEngine';
 import {
+  NONOPTICAL_CATEGORIES,
+  centerThicknessMm,
   maxSemiApertureMm,
   paraxialEflMm,
+  surfaceProfiles,
+  type RecordCategory,
   type SurfaceDraft,
 } from '../../model/componentRecord';
 
@@ -107,22 +111,38 @@ export function RaySketch({
   surfaces,
   mirrorAngleDeg,
 }: {
-  category: DocCategory;
+  category: RecordCategory;
   surfaces: SurfaceDraft[];
   mirrorAngleDeg: number | null;
 }) {
-  const rays = useSketchRays(category, surfaces, mirrorAngleDeg);
+  const nonOptical = NONOPTICAL_CATEGORIES.includes(category);
+  const opticalCategory = (nonOptical ? 'other' : category) as DocCategory;
+  const rays = useSketchRays(opticalCategory, nonOptical ? [] : surfaces, mirrorAngleDeg);
   const efl = paraxialEflMm(surfaces);
   const semi = maxSemiApertureMm(surfaces);
+  // Real element cross-section (WP-30): sag arcs per surface, glass filled
+  // between surface pairs — the DRAWN lens reshapes with the radii.
+  const profiles = useMemo(() => surfaceProfiles(surfaces), [surfaces]);
+  const totalThk = centerThicknessMm(surfaces);
+
+  if (nonOptical) {
+    return (
+      <Typography variant="caption" color="text.secondary">
+        no optics — {category} records carry vendor/BOM identity only
+      </Typography>
+    );
+  }
 
   // World window: beam start to ~2 EFL (or a fixed span), vertically ± aperture.
-  const xMax = Math.max(80, efl !== null && efl > 0 ? efl * 1.6 : 100);
+  const xMax = Math.max(80, totalThk + 40, efl !== null && efl > 0 ? efl * 1.6 : 100);
   const xMin = -70;
   const yHalf = Math.max(semi * 1.4, 20);
   const width = 320;
   const height = 150;
   const sx = (x: number) => ((x - xMin) / (xMax - xMin)) * width;
   const sy = (y: number) => height / 2 + (y / yHalf) * (height / 2 - 6);
+  const toPath = (pts: [number, number][]) =>
+    pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${sx(x).toFixed(2)},${sy(y).toFixed(2)}`).join(' ');
 
   return (
     <Box>
@@ -133,11 +153,35 @@ export function RaySketch({
       >
         {/* optical axis */}
         <line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke="#2a3442" strokeDasharray="4 4" />
-        {/* element plane */}
-        <line
-          x1={sx(0)} y1={sy(-semi)} x2={sx(0)} y2={sy(semi)}
-          stroke="#5b7a99" strokeWidth={2.5} strokeLinecap="round"
-        />
+        {/* glass volumes between consecutive surfaces */}
+        {profiles.map((p, i) =>
+          p.glassAfter && profiles[i + 1] ? (
+            <path
+              key={`glass-${i}`}
+              d={`${toPath(p.points)} ${toPath([...profiles[i + 1].points].reverse()).replace(/^M/, 'L')} Z`}
+              fill="#3f6f95"
+              opacity={0.28}
+            />
+          ) : null,
+        )}
+        {/* surface cross-sections (the sag arcs) */}
+        {profiles.map((p, i) => (
+          <path
+            key={`surf-${i}`}
+            d={toPath(p.points)}
+            fill="none"
+            stroke="#7fa3c4"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+          />
+        ))}
+        {/* fallback element plane when no surfaces are drafted */}
+        {profiles.length === 0 && (
+          <line
+            x1={sx(0)} y1={sy(-semi)} x2={sx(0)} y2={sy(semi)}
+            stroke="#5b7a99" strokeWidth={2.5} strokeLinecap="round"
+          />
+        )}
         {rays.map(ray =>
           ray.segments.map((seg, i) => (
             <line

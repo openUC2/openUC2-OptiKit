@@ -64,7 +64,11 @@ export type OptimizedBy = string;
 export type Run = string;
 
 /**
- * The root document of ``optikit-design.yml`` (Go: DesignDecl, extended). (optikit-core 0.1.0, schema v0)
+ * The root document of ``optikit-design.yml`` (Go: DesignDecl, extended).
+ *
+ * DesignDecl stands for the whole design — components, variants, and
+ * instantiation; "decl" is short for declaration (the Go struct is called
+ * DesignDecl, and the YAML file is optikit-design.yml). (optikit-core 0.1.0, schema v0)
  */
 export interface DesignDecl {
   'optikit-version'?: OptikitVersion;

@@ -149,7 +149,10 @@ export function ComponentEditorPage() {
             }}
           >
             <Typography variant="overline" color="text.secondary">schematic glyph</Typography>
-            <GlyphPreview category={draft.category} label={draft.name || draft.category} />
+            <GlyphPreview
+              category={draft.category === 'electronics' || draft.category === 'mechanics' ? 'other' : draft.category}
+              label={draft.name || draft.category}
+            />
 
             <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
               ray sketch
