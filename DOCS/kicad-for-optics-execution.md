@@ -70,7 +70,9 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-21 | boolean auto-holder T3 generator (per-half artifacts, M3 cut-off fastening) | ✅ done (core `ce9a0e7`) — AC254-050-A holder verified: cavity clears, halves fit, keys regenerate |
 | WP-23 | editor UX round 1: locked 2.5D camera + unlock toggle, affordance legend, flat selection ring, boundary-aligned grid (snap = cube center = optical axis), glyph-thumbnail palette + bind route, assembly T-rule (axis-aligned shells, residuals on insert only) | ✅ done (`858f745`) — schematic verified visually in the browser; assembly T-rule verified structurally (GPU context loss blocked the screenshot) |
 | WP-24 | design-system unification: brand tokens from `openuc2_brandguide.pdf` (`src/theme/tokens.ts`), one AppShell (theme + toolbar) for every route incl. legacy grid + FRAME + setups, brand logo slots (`public/brand/`, white variant derived per guide p.2), Stolzl @font-face slots, visual-regression set (`scripts/visual-regression.sh` → `DOCS/visual-regression/`) | ✅ done — all routes verified in the browser on the unified shell |
-| — | next: WP-28 (full rotations), per feedback round 1; then WP-20 (Inventor datums, connect PyInventor), WP-22 (library registry) | ⬜ |
+| — | feedback round 2 triaged (2026-07-15, Part 2c): WP-29 convention concordance, WP-30 component editor round 2, WP-31 bind workbench round 2; WP-22/WP-27 amended | 📋 |
+| WP-20 | Inventor datum contract v2 + PyInventor | 🔶 in progress (Bene, async) |
+| — | next: WP-28 (full rotations) + WP-29 (conventions) first, then WP-31 (bind round 2), WP-30, WP-22 (amended), WP-27 | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
@@ -931,6 +933,163 @@ offset-deg {x: 2}; re-import reproduces the tilt; the service round trip
 
 Open items parked (need input): logo PNG (not attached yet — resend), FRAME
 configurator UX rework (needs a spec conversation).
+
+---
+
+# Part 2c · Feedback round 2 (2026-07-15) — triage + new work packages
+
+Bene's second field-test round (component editor, bind workbench, schematic
+conventions). Root causes verified in code before triage. WP-20 is in progress
+on Bene's side (Inventor/PyInventor, async). Ordering: **WP-28 + WP-29 first**
+(orientation/convention correctness — same reasoning as round 1), then
+**WP-31** (bind workbench, actively in use), then WP-30, WP-22 (amended),
+WP-27 (amended).
+
+| Finding | Root cause (verified) | Lands in |
+|---|---|---|
+| Mirror at yaw 0° folds like 45° | Round-1 quick fix derives glyph/pins from real record ports **only for imported designs** — palette placements still use the hardcoded +x convention, while `openuc2.mirror.flat_45` (the only mirror record) folds 90° by construction | WP-29 |
+| Torch glyph/ray fan rotated wrongly | Same convention split: palette part axes not derived from record ports | WP-29 |
+| Lens ray sketch ignores radii for the drawn element | Component editor sketches a fixed lens outline; only the traced rays respond to surface data | WP-30 |
+| UC2 electronics are bare placeholders with no optics | No first-class "non-optical part" story — every record is assumed to carry an optics block | WP-30 |
+| Should authored lenses live in the backend? Should index.json? | Yes — that is WP-22's registry; the static `/configurator/optikit-library/index.json` is a dev snapshot that should become the offline fallback only | WP-22 (amended) |
+| "How do I define such a model, step by step?" + user walkthrough docs | Docs gap | WP-27 (amended) |
+| Bind: datums don't follow the part when it moves | Datums are authored and stored in the **cube frame** (`bindStore.ts` header comment states it); the part transform never re-parents them | WP-31 |
+| Bind: click-placed datums not editable numerically | Datum rows render values read-only | WP-31 |
+| Bind: category should constrain datum kinds | No coupling between record category and datum-kind dropdown | WP-31 |
+| Bind: placing the part in the cube is hard in one perspective view | Single-viewport workbench | WP-31 |
+| Bind: dev write fails with E_WRITE_DISABLED by default | `OPTIKIT_ALLOW_LIBRARY_WRITE=1` opt-in even for the local dev service | WP-31 |
+| Bind: PR zip lacks the STP/GLB | `recordsToFiles()` emits only the three YAMLs — no asset bytes at all | WP-31 |
+| Bind: how to link the STP to an existing lens record? | Bind always generates a fresh stub component; there is no "associate with existing optical component" (the KiCad symbol↔footprint link) | WP-31 |
+| Bound part's glyph is generic, not the provided geometry | Palette/components view render the category glyph; the record's GLB/thumbnail is unused there | WP-31 |
+
+### WP-29 — Optical-convention concordance round 2 (mirror, torch, palette parts)
+
+```
+PROMPT (repo: openUC2-OptiKit, possibly small optikit-core library additions)
+
+Round 1 fixed imported designs (glyph/pins derive from the retained source
+design's real optics.ports); palette-placed parts still use the legacy +x
+convention. That split is the bug factory: a palette mirror at yaw 0° routes
+and renders like the 45° record, the torch's ray fan ignores its port axis.
+
+1. One convention, no second path: palette placement binds the part to a real
+   component record at placement time (the palette already maps to module
+   ids); glyph orientation, pin positions/directions, and beam routing ALL
+   derive from that record's optics.ports + frames via the same
+   sourcePortsOf/opticalAxisOf code path used for imports. Delete the
+   palette-only +x fallback.
+2. Mirror semantics: the fold angle IS the angle between entry and exit port
+   directions in the record — never hardcoded. Draw the mirror glyph plate
+   perpendicular to the port-direction bisector so the symbol shows its true
+   mounting angle (flat_45 renders as a 45° plate that folds 90°). Add a
+   normal-incidence mirror record (openuc2.mirror.flat_0, reflect-back) so
+   both behaviors exist as data, and label the palette entries accordingly
+   ("Mirror 45°", "Mirror (normal)").
+3. Torch/LED/laser sources: glyph mesh and ray-fan preview align to the
+   record's emit port direction (all 24 yaw/rot cases), in the schematic AND
+   as the assembly insert glyph.
+4. Regression tests: for every palette entry, opticalAxisOf(placed part)
+   equals the record's exit-port direction rotated by the part pose; a
+   fold-angle unit test pins flat_45 → 90° and flat_0 → 180°.
+
+Acceptance: place Mirror 45° at yaw 0° — the glyph shows a 45° plate and the
+chained beam turns 90° exactly as the compiled optic does; the torch's fan
+tracks its beam axis at every yaw; no palette part renders with an axis that
+disagrees with its record.
+```
+
+### WP-30 — Component editor round 2 (true lens profiles + non-optical parts)
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. Ray sketch draws the real element geometry: surface arcs from radius
+   (sag circle, conic-aware approximation is fine), spaced by thickness,
+   clipped at semi-aperture; element outline closes between first/last
+   surfaces. Editing a radius/thickness/semi-ap visibly reshapes the drawn
+   lens, not just the traced rays. Keep the "approximate — authoritative sim
+   comes from the service" caveat.
+2. Non-optical parts become first-class: categories electronics | mechanics
+   validate WITHOUT an optics block (no surfaces, no ports) in both the
+   editor and optikit-core's library validate; chain inference and
+   optics-DRC skip them; BOM still lists them. Replace the bare UC2
+   electronics placeholders with real records (ESP32 cube, LED driver, …)
+   carrying vendor/MPN + electronics.axis-map where applicable.
+3. Editor UX for (2): choosing a non-optical category hides the
+   surface/frame/port sections instead of failing validation with "lens
+   records need at least one surface".
+
+Acceptance: dragging radius 50→25 mm visibly bends the sketched lens; an
+electronics record with no optics validates in optikit-core, appears in the
+palette, and cannot be chained into a beam path; the fluo-scope BOM lists it.
+```
+
+### WP-31 — Part-binding workbench round 2 (datums follow the part, record linking, assets)
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. Datums live in the PART frame. Store each datum's point/direction relative
+   to the loaded mesh; world pose = part placement ∘ part-frame datum. Moving
+   or rotating the part carries every datum with it (this is the mechanical
+   intuition and matches "the STEP is the source of truth"). Click-placement
+   converts the hit into part frame at creation.
+2. Numeric editing after placement: each datum row gets editable x/y/z (mm,
+   part frame), a direction control (axis dropdown + optional tilt degrees),
+   and ⌀ mm — the gizmo pin updates live; click-placement just seeds these
+   fields.
+3. Category-driven datum kinds: the record category constrains the datum-kind
+   dropdown (lens → front/back port + optical axis; source → emit;
+   detector → sensor plane; mirror → reflective plane), with the warning
+   pipeline (axis-snap, missing-kind) adjusted per category.
+4. Linked orthographic views: 2×2 layout — perspective + top/front/side,
+   each ortho view toggleable to its opposite (bottom/back/left); selection,
+   gizmo drags and datum clicks stay synchronized across views. Single-view
+   mode remains the default toggle for small screens.
+5. Bind to an EXISTING optical component (the KiCad symbol↔footprint link):
+   a picker listing index + workspace components; when chosen, the emitted
+   template/module reference THAT component id (its optics drive the ports)
+   and no stub component is generated. Only unbound categories fall back to
+   generating a fresh user.* component.
+6. Assets ship with the records: recordsToFiles() gains binary support —
+   include the original STP bytes as model.step and the converted GLB as
+   model.glb under the component folder in the PR zip AND in the dev write
+   (/v1/library/save already accepts assets). A record without its mesh is
+   not reviewable.
+7. Dev writes on by default in dev: `optikit-core serve` running from a git
+   checkout enables library writes unless OPTIKIT_ALLOW_LIBRARY_WRITE=0
+   (prod compose pins it to 0 explicitly). Update the error text + docs.
+8. Show the real geometry: components view and schematic palette tiles use
+   the record's GLB thumbnail (WP-8 SVG-thumb path or a small three.js
+   snapshot) for bound parts instead of the generic category glyph; the
+   schematic in-scene glyph may stay symbolic, but the tile must show the
+   part you bound.
+
+Acceptance: rotate the bound AC050-008 STP by 90° — all three datums follow;
+edit datum z from 2.7 → 5.0 mm numerically — the pin moves; bind the STP to
+the existing thorlabs.lens.ac254-050-a component — the module resolves in the
+index, the PR zip contains component.yml + template.yml + module.yml +
+model.step + model.glb; the palette tile shows the collimator housing, not a
+generic lens glyph.
+```
+
+### Amendments to existing WPs (2026-07-15)
+
+- **WP-22 (library registry)** — sharpened by round 2: the service serves the
+  registry (`/v1/library/index` + `/v1/library/assets/<record>/<file>`); the
+  frontend's default index URL points at the service and the static
+  `/configurator/optikit-library/index.json` becomes the offline fallback
+  only. Decision recorded: browser workspace stays browser-local (drafts);
+  publishing = dev write (WP-31.7) or the PR flow — there is no third path.
+- **WP-27 (tutorials)** — leading tutorial is now "define an optical model in
+  the database, step by step": record anatomy (id/category → Optiland
+  fragment surfaces → datum frames → ports → glyph preview → template/module
+  binding → validate → publish), written against the collimator example from
+  this round's testing; then the existing items (three roads, .dsn diagram,
+  ME guide, API how-to).
+- **WP-20** — in progress on Bene's side (Inventor + PyInventor, async);
+  connect the live Inventor instance when the glb2template parsing half
+  starts here.
 
 ---
 
