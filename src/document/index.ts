@@ -26,6 +26,7 @@ export {
   setPartOrientation,
   setPath,
   subscribe,
+  tiltPart,
   undo,
   useDocPart,
   useDocParts,
@@ -39,6 +40,8 @@ export {
   docQuatToThree,
   docYawFromStoreYaw,
   eulerTripleForRot24,
+  offsetDegMatrix,
+  offsetDegOf,
   rotateDocVec,
   threePosToDoc,
   joinWorldPosition,
@@ -47,6 +50,7 @@ export {
   splitWorldPosition,
   storeYawFromDocYaw,
 } from './mapping';
+export type { OffsetDeg } from './mapping';
 export { AXIS_DIRS, decomposeRot24, rot24Matrix } from './rot24';
 export type { AxisDir, Rot24 } from './rot24';
 export {

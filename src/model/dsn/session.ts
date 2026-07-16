@@ -96,7 +96,7 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
       continue;
     }
     idByKey[part.key] = id;
-    setPartOrientation(id, part.rot24, part.residualYawDeg);
+    setPartOrientation(id, part.rot24, part.offsetDeg);
     renamePart(id, part.key);
     for (const [dof, value] of Object.entries(part.dofValues)) {
       setDofValue(id, dof, value);

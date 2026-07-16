@@ -82,15 +82,25 @@ export function snapshotToDesign(snap: DocSnapshot): ExportResult {
 
 /** Absolute (anchor-free) pose block for a part's current grid pose. */
 export function poseSpecOf(part: {
-  gridPose: { rot24: Rot24; residualYawDeg: number; cell: Vec3; offsetMm: Vec3 };
+  gridPose: {
+    rot24: Rot24;
+    offsetDeg: { x: number; y: number; z: number };
+    cell: Vec3;
+    offsetMm: Vec3;
+  };
 }): NonNullable<CompSpec['pose']> {
+  // Full offset-deg triple (WP-28): each non-zero residual axis is written;
+  // ΔR convention R = R24 · ΔR, extrinsic ZXY, part-local frame.
+  const off = part.gridPose.offsetDeg;
+  const offsetDeg: Record<string, number> = {};
+  if (Math.abs(off.x) > 1e-9) offsetDeg.x = round6(off.x);
+  if (Math.abs(off.y) > 1e-9) offsetDeg.y = round6(off.y);
+  if (Math.abs(off.z) > 1e-9) offsetDeg.z = round6(off.z);
   return {
     rotation: {
       type: 'grid',
       grid: gridSpecOf(part.gridPose.rot24),
-      ...(Math.abs(part.gridPose.residualYawDeg) > 1e-9
-        ? { 'offset-deg': { z: round6(part.gridPose.residualYawDeg) } }
-        : {}),
+      ...(Object.keys(offsetDeg).length > 0 ? { 'offset-deg': offsetDeg } : {}),
     },
     translation: {
       ...(vecToXyz(part.gridPose.cell, true) && { 'offset-grid': vecToXyz(part.gridPose.cell, true) }),
@@ -137,7 +147,8 @@ export interface ImportedPart {
   category: string;
   positionMm: Vec3;
   rot24: Rot24;
-  residualYawDeg: number;
+  /** Full rotation residual (R = R24 · ΔR, extrinsic ZXY, degrees) — WP-28. */
+  offsetDeg: { x: number; y: number; z: number };
   dofValues: Record<string, number>;
 }
 
@@ -188,26 +199,21 @@ export function designToParts(decl: DesignDecl): ImportedDesign {
     } else if (rot?.type) {
       warnings.push(`component '${key}': rotation type '${rot.type}' not supported — using identity`);
     }
-    const offsetDeg = rot?.['offset-deg'];
-    let residualYawDeg = 0;
-    if (offsetDeg) {
-      residualYawDeg = numberOr0(offsetDeg.z, key, warnings);
-      if (numberOr0(offsetDeg.x, key, warnings) || numberOr0(offsetDeg.y, key, warnings)) {
-        warnings.push(`component '${key}': offset-deg x/y tilt not representable yet — dropped`);
-      }
-      if (residualYawDeg && rot24.z !== '+z' && rot24.z !== '-z') {
-        warnings.push(
-          `component '${key}': offset-deg.z on a tipped part is approximated as a global yaw`,
-        );
-      }
-    }
+    // Full offset-deg triple (WP-28): x/y tilts import exactly now — no more
+    // "not representable — dropped" and no global-yaw approximation.
+    const rawOffset = rot?.['offset-deg'];
+    const offsetDeg = {
+      x: numberOr0(rawOffset?.x, key, warnings),
+      y: numberOr0(rawOffset?.y, key, warnings),
+      z: numberOr0(rawOffset?.z, key, warnings),
+    };
     parts.push({
       key,
       libraryRef: comp.primitive?.model || comp.design || '',
       category: comp.category ?? '',
       positionMm: flattened.get(key) ?? [0, 0, 0],
       rot24,
-      residualYawDeg,
+      offsetDeg,
       dofValues: {},
     });
   }

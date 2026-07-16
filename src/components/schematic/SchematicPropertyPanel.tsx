@@ -25,12 +25,15 @@ import {
 } from '@mui/icons-material';
 import type { DocPart, Vec3 } from '../../document';
 import {
+  captureUndo,
+  commitUndo,
   movePartWorld,
   removePart,
   removePath,
   renamePart,
   rotatePart,
   setDofValue,
+  tiltPart,
   useDocPart,
   useDocPaths,
   useSelectedPartId,
@@ -70,6 +73,13 @@ function NumberField({
   );
 }
 
+/** One undo step per discrete panel edit (WP-28: tilts must be undoable). */
+function withUndoStep(mutate: () => void): void {
+  const token = captureUndo();
+  mutate();
+  commitUndo(token);
+}
+
 function PartProperties({ part }: { part: DocPart }) {
   const [ref, setRef] = useState(part.ref);
   useEffect(() => setRef(part.ref), [part.ref]);
@@ -78,7 +88,7 @@ function PartProperties({ part }: { part: DocPart }) {
   const setAxis = (axis: 0 | 1 | 2) => (v: number) => {
     const next = [...pos] as Vec3;
     next[axis] = v;
-    movePartWorld(part.id, next);
+    withUndoStep(() => movePartWorld(part.id, next));
   };
 
   return (
@@ -109,19 +119,36 @@ function PartProperties({ part }: { part: DocPart }) {
         <NumberField label="Z" value={pos[2]} onCommit={setAxis(2)} />
       </Stack>
 
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Typography variant="caption" color="text.secondary">
+        Orientation (°) — fine tilts about the part's local axes (WP-28)
+      </Typography>
+      <Stack direction="row" spacing={1}>
         <NumberField
-          label="Yaw °"
+          label="Pitch x°"
+          value={part.gridPose.offsetDeg.x}
+          onCommit={v => withUndoStep(() => tiltPart(part.id, { x: v }))}
+          step={0.5}
+        />
+        <NumberField
+          label="Roll y°"
+          value={part.gridPose.offsetDeg.y}
+          onCommit={v => withUndoStep(() => tiltPart(part.id, { y: v }))}
+          step={0.5}
+        />
+        <NumberField
+          label="Yaw z°"
           value={part.worldPose.yawDeg}
-          onCommit={v => rotatePart(part.id, v)}
+          onCommit={v => withUndoStep(() => rotatePart(part.id, v))}
           step={5}
         />
-        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-          grid cell [{part.gridPose.cell.join(', ')}]
-          {part.gridPose.offsetMm.some(v => Math.abs(v) > 1e-6) &&
-            ` + δ(${part.gridPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm`}
-        </Typography>
       </Stack>
+      <Typography variant="caption" color="text.secondary">
+        grid cell [{part.gridPose.cell.join(', ')}]
+        {part.gridPose.offsetMm.some(v => Math.abs(v) > 1e-6) &&
+          ` + δ(${part.gridPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm`}
+        {(Math.abs(part.gridPose.offsetDeg.x) > 1e-6 || Math.abs(part.gridPose.offsetDeg.y) > 1e-6) &&
+          ` + ΔR(${part.gridPose.offsetDeg.x.toFixed(2)}, ${part.gridPose.offsetDeg.y.toFixed(2)}, ${part.gridPose.offsetDeg.z.toFixed(2)})°`}
+      </Typography>
 
       {part.dofs.length > 0 && (
         <>

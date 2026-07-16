@@ -11,7 +11,13 @@
  *   - `topRotation` / `tiltRotation` — 90°-step rotations about three.js Z / X,
  *     applied inside the yaw group as Euler(tilt, 0, top, 'XYZ').
  *   - continuous residuals live in `params.__doc` (this layer's private bag):
- *     `{ offsetMm: [x,y,z] (document frame), freeYawDeg, dofValues }`.
+ *     `{ offsetMm: [x,y,z] (document frame), offsetDeg: {x,y,z}, dofValues }`.
+ *     `offsetDeg` is the schema's `rotation.offset-deg`: the residual ΔR with
+ *     R = R24 · ΔR, ΔR = Rz(z)·Rx(x)·Ry(y) (extrinsic ZXY, degrees) in the
+ *     part's local frame. Legacy layouts carried `freeYawDeg` (a store-sign
+ *     GLOBAL yaw residual); `getDocParams` migrates it on read
+ *     (offsetDeg.z = -freeYawDeg — identical for upright parts, which is the
+ *     only case the old model represented faithfully).
  *
  * ## Document frame (matches `.dsn` schema v0)
  * Right-handed, millimeters, z UP:
@@ -36,18 +42,43 @@ import { UC2_GRID_MM } from './types';
 /** Reserved key inside PlacedModule.params for document-layer instance data. */
 export const DOC_PARAMS_KEY = '__doc';
 
+export interface OffsetDeg {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface DocParams {
   /** Continuous residual offset from the grid cell, mm, document frame. */
   offsetMm?: Vec3;
-  /** Yaw residual on top of the store's (snapped) rotation, degrees, store sign. */
+  /**
+   * Rotation residual ΔR (R = R24 · ΔR) as extrinsic-ZXY degrees in the
+   * part's local frame — exactly the schema's `rotation.offset-deg`.
+   */
+  offsetDeg?: OffsetDeg;
+  /** @deprecated pre-WP-28 global yaw residual (store sign); migrated on read. */
   freeYawDeg?: number;
   /** Resolved DOF values by name. */
   dofValues?: Record<string, number>;
 }
 
+export const ZERO_OFFSET_DEG: OffsetDeg = { x: 0, y: 0, z: 0 };
+
 export function getDocParams(m: PlacedModule): DocParams {
   const raw = m.params?.[DOC_PARAMS_KEY];
-  return raw && typeof raw === 'object' ? (raw as DocParams) : {};
+  if (!raw || typeof raw !== 'object') return {};
+  const params = raw as DocParams;
+  // Migrate persisted pre-WP-28 layouts: freeYawDeg (store-sign, global z)
+  // becomes offsetDeg.z (doc-sign, local z — identical for upright parts).
+  if (params.offsetDeg === undefined && typeof params.freeYawDeg === 'number' && params.freeYawDeg !== 0) {
+    return { ...params, offsetDeg: { x: 0, y: 0, z: -params.freeYawDeg } };
+  }
+  return params;
+}
+
+/** The part's rotation residual, defaulting to zero. */
+export function offsetDegOf(m: PlacedModule): OffsetDeg {
+  return getDocParams(m).offsetDeg ?? ZERO_OFFSET_DEG;
 }
 
 // ── frame conversion ─────────────────────────────────────────────────────────
@@ -91,11 +122,6 @@ export function rotateDocVec(q: [number, number, number, number], v: Vec3): Vec3
 
 // ── store → document ─────────────────────────────────────────────────────────
 
-/** Effective yaw in store convention (snapped rotation + free residual). */
-export function storeYawDeg(m: PlacedModule): number {
-  return m.rotation + (getDocParams(m).freeYawDeg ?? 0);
-}
-
 /** Document yaw (CCW about +z) from a store yaw. */
 export function docYawFromStoreYaw(storeDeg: number): number {
   return normalizeDeg(-storeDeg);
@@ -109,18 +135,43 @@ export function normalizeDeg(deg: number): number {
   return ((deg % 360) + 360) % 360;
 }
 
+/** ΔR from an offset-deg triple: Rz(z)·Rx(x)·Ry(y) (three.js 'ZXY' order). */
+export function offsetDegMatrix(offsetDeg: OffsetDeg): THREE.Matrix4 {
+  return new THREE.Matrix4().makeRotationFromEuler(
+    new THREE.Euler(
+      THREE.MathUtils.degToRad(offsetDeg.x),
+      THREE.MathUtils.degToRad(offsetDeg.y),
+      THREE.MathUtils.degToRad(offsetDeg.z),
+      'ZXY',
+    ),
+  );
+}
+
 /**
- * Full orientation in the document frame, composed exactly as the 3D view does
- * (outer yaw about three-Y, inner Euler(tilt, 0, top, 'XYZ')), then re-based.
+ * The snapped (axis-aligned) orientation in the document frame, composed
+ * exactly as the 3D view does (outer yaw about three-Y, inner
+ * Euler(tilt, 0, top, 'XYZ')), then re-based.
  */
-export function docRotationMatrix(m: PlacedModule): THREE.Matrix4 {
-  const yaw = THREE.MathUtils.degToRad(-storeYawDeg(m));
+export function snappedDocRotationMatrix(m: PlacedModule): THREE.Matrix4 {
+  const yaw = THREE.MathUtils.degToRad(-m.rotation);
   const tilt = THREE.MathUtils.degToRad(m.tiltRotation ?? 0);
   const top = THREE.MathUtils.degToRad(m.topRotation ?? 0);
   const outer = new THREE.Matrix4().makeRotationY(yaw);
   const inner = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(tilt, 0, top, 'XYZ'));
   const rThree = outer.multiply(inner);
   return THREE_TO_DOC.clone().multiply(rThree).multiply(DOC_TO_THREE);
+}
+
+/**
+ * Full orientation in the document frame: the snapped R24 orientation with
+ * the offset-deg residual right-multiplied (schema convention R = R24 · ΔR —
+ * the residual acts in the part's LOCAL frame).
+ */
+export function docRotationMatrix(m: PlacedModule): THREE.Matrix4 {
+  const snapped = snappedDocRotationMatrix(m);
+  const off = offsetDegOf(m);
+  if (off.x === 0 && off.y === 0 && off.z === 0) return snapped;
+  return snapped.multiply(offsetDegMatrix(off));
 }
 
 export function worldPoseOf(m: PlacedModule): DocWorldPose {
@@ -136,7 +187,10 @@ export function worldPoseOf(m: PlacedModule): DocWorldPose {
   return {
     positionMm,
     rotation: [q.x, q.y, q.z, q.w],
-    yawDeg: docYawFromStoreYaw(storeYawDeg(m)),
+    // For upright parts local z == document z, so the residual adds directly;
+    // for tipped parts a single yaw number is ill-defined anyway — this stays
+    // the 2.5D editor's working value.
+    yawDeg: normalizeDeg(docYawFromStoreYaw(m.rotation) + offsetDegOf(m).z),
   };
 }
 
@@ -148,6 +202,7 @@ export function gridPoseOf(m: PlacedModule): DocGridPose {
     cell: [m.position.x, -m.position.y, m.layer],
     rot24: dec.rot24,
     offsetMm: [...off] as Vec3,
+    offsetDeg: dec.offsetDeg,
     residualYawDeg: dec.offsetDeg.z,
   };
 }

@@ -46,7 +46,12 @@ export interface DocGridPose {
   rot24: Rot24;
   /** Continuous residual offset from the cell origin, mm. */
   offsetMm: Vec3;
-  /** Residual yaw not representable by rot24 (deg; goes to rotation.offset-deg). */
+  /**
+   * Rotation residual ΔR (R = R24 · ΔR) as extrinsic-ZXY degrees in the
+   * part's local frame — the schema's `rotation.offset-deg` (WP-28).
+   */
+  offsetDeg: { x: number; y: number; z: number };
+  /** Convenience alias for offsetDeg.z (the pre-WP-28 yaw-only residual). */
   residualYawDeg: number;
 }
 

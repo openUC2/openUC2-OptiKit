@@ -70,7 +70,7 @@ function part(over: Partial<DocPart> & { id: string; ref: string }): DocPart {
   return {
     category: 'lens',
     worldPose: { positionMm: [0, 0, 0], rotation: [0, 0, 0, 1], yawDeg: 0 },
-    gridPose: { cell: [0, 0, 0], rot24: { z: '+z', x: '+x' }, offsetMm: [0, 0, 0], residualYawDeg: 0 },
+    gridPose: { cell: [0, 0, 0], rot24: { z: '+z', x: '+x' }, offsetMm: [0, 0, 0], offsetDeg: { x: 0, y: 0, z: 0 }, residualYawDeg: 0 },
     libraryRef: 'lens-pos-1x1',
     dofs: [],
     params: {},
@@ -86,7 +86,7 @@ const SNAPSHOT: DocSnapshot = {
       ref: 'Laser 488',
       category: 'source',
       libraryRef: 'laser-488nm',
-      gridPose: { cell: [-2, 0, 0], rot24: { z: '+x', x: '-z' }, offsetMm: [0, 0, 0], residualYawDeg: 0 },
+      gridPose: { cell: [-2, 0, 0], rot24: { z: '+x', x: '-z' }, offsetMm: [0, 0, 0], offsetDeg: { x: 0, y: 0, z: 0 }, residualYawDeg: 0 },
       worldPose: { positionMm: [-100, 0, 0], rotation: [0, 0, 0, 1], yawDeg: 0 },
     }),
     part({
@@ -96,7 +96,7 @@ const SNAPSHOT: DocSnapshot = {
         cell: [1, 3, 2],
         rot24: { z: '+z', x: '+y' },
         offsetMm: [1.5, 0, -2.25],
-        residualYawDeg: -13,
+        offsetDeg: { x: 0, y: 0, z: -13 }, residualYawDeg: -13,
       },
       worldPose: { positionMm: [51.5, 150, 107.75], rotation: [0, 0, 0, 1], yawDeg: 0 },
       dofs: [{ name: 'dz', range: [-7.5, 7.5], unit: 'mm', value: 1.85 }],
@@ -106,7 +106,7 @@ const SNAPSHOT: DocSnapshot = {
       ref: 'Camera',
       category: 'detector',
       libraryRef: 'camera-1x1',
-      gridPose: { cell: [4, 3, 2], rot24: { z: '+z', x: '-x' }, offsetMm: [0, 0, 0], residualYawDeg: 0 },
+      gridPose: { cell: [4, 3, 2], rot24: { z: '+z', x: '-x' }, offsetMm: [0, 0, 0], offsetDeg: { x: 0, y: 0, z: 0 }, residualYawDeg: 0 },
       worldPose: { positionMm: [200, 150, 110], rotation: [0, 0, 0, 1], yawDeg: 0 },
     }),
   ],
@@ -137,8 +137,42 @@ describe('snapshot → design → parts round trip', () => {
       ];
       back!.positionMm.forEach((v, i) => expect(v, `${key}[${i}]`).toBeCloseTo(expected[i], 6));
       expect(back!.rot24).toEqual(original.gridPose.rot24);
-      expect(back!.residualYawDeg).toBeCloseTo(original.gridPose.residualYawDeg, 6);
+      expect(back!.offsetDeg.x).toBeCloseTo(original.gridPose.offsetDeg.x, 6);
+      expect(back!.offsetDeg.y).toBeCloseTo(original.gridPose.offsetDeg.y, 6);
+      expect(back!.offsetDeg.z).toBeCloseTo(original.gridPose.offsetDeg.z, 6);
     }
+  });
+
+  it('round-trips a tilted mirror: full offset-deg triple, no warnings (WP-28)', () => {
+    const tilted: DocSnapshot = {
+      meta: { name: 'tilt', description: '' },
+      parts: [
+        part({
+          id: 'id-mirror',
+          ref: 'Fold Mirror',
+          category: 'mirror',
+          libraryRef: 'mirror-1x1',
+          gridPose: {
+            cell: [1, 0, 0],
+            rot24: { z: '+z', x: '+y' },
+            offsetMm: [0, 0, 0],
+            offsetDeg: { x: 2, y: -0.75, z: -13 },
+            residualYawDeg: -13,
+          },
+        }),
+      ],
+      paths: [],
+    };
+    const { design: d, keyByPartId: keys } = snapshotToDesign(tilted);
+    const comp = d.components?.[keys['id-mirror']];
+    expect(comp?.pose?.rotation?.['offset-deg']).toEqual({ x: 2, y: -0.75, z: -13 });
+
+    const back = designToParts(d);
+    expect(back.warnings).toEqual([]); // x/y tilts import exactly — nothing dropped
+    const mirror = back.parts.find(p => p.key === keys['id-mirror']);
+    expect(mirror?.offsetDeg.x).toBeCloseTo(2, 6);
+    expect(mirror?.offsetDeg.y).toBeCloseTo(-0.75, 6);
+    expect(mirror?.offsetDeg.z).toBeCloseTo(-13, 6);
   });
 
   it('carries DOF values into instantiation.dof_values and back', () => {

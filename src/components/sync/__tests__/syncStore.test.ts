@@ -28,7 +28,7 @@ function makePart(key: string, over: Partial<DocPart> = {}): DocPart {
     category: 'other',
     libraryRef: `glb-${key}`,
     worldPose: { positionMm: [0, 0, 0], rotation: [0, 0, 0, 1] },
-    gridPose: { cell: [0, 0, 0], offsetMm: [0, 0, 0], rot24: { z: '+z', x: '+x' }, residualYawDeg: 0 },
+    gridPose: { cell: [0, 0, 0], offsetMm: [0, 0, 0], rot24: { z: '+z', x: '+x' }, offsetDeg: { x: 0, y: 0, z: 0 }, residualYawDeg: 0 },
     dofs: [],
     params: {},
     ...over,

@@ -10,6 +10,7 @@ import {
   DOC_PARAMS_KEY,
   docRotationMatrix,
   docYawFromStoreYaw,
+  getDocParams,
   gridPoseOf,
   joinWorldPosition,
   splitDocYaw,
@@ -178,5 +179,46 @@ describe('rotation matrices and rot24', () => {
   it('worldPose yaw reflects snapped rotation plus free residual', () => {
     const m = placed({ rotation: 90, params: { [DOC_PARAMS_KEY]: { freeYawDeg: 10 } } });
     expect(worldPoseOf(m).yawDeg).toBeCloseTo(260); // -(90+10) mod 360
+  });
+});
+
+describe('offset-deg residual triple (WP-28)', () => {
+  it('migrates legacy freeYawDeg on read (offsetDeg.z = -freeYawDeg)', () => {
+    const m = placed({ params: { [DOC_PARAMS_KEY]: { freeYawDeg: 10 } } });
+    expect(getDocParams(m).offsetDeg).toEqual({ x: 0, y: 0, z: -10 });
+    // An explicit offsetDeg wins over a stale legacy value.
+    const m2 = placed({
+      params: { [DOC_PARAMS_KEY]: { freeYawDeg: 10, offsetDeg: { x: 1, y: 2, z: 3 } } },
+    });
+    expect(getDocParams(m2).offsetDeg).toEqual({ x: 1, y: 2, z: 3 });
+  });
+
+  it('x/y tilts round-trip exactly through gridPoseOf (R = R24·ΔR)', () => {
+    const offsetDeg = { x: 2, y: -0.75, z: -13 };
+    const m = placed({ rotation: 90, params: { [DOC_PARAMS_KEY]: { offsetDeg } } });
+    const g = gridPoseOf(m);
+    expect(g.rot24.z).toBe('+z');
+    expect(g.offsetDeg.x).toBeCloseTo(2, 6);
+    expect(g.offsetDeg.y).toBeCloseTo(-0.75, 6);
+    expect(g.offsetDeg.z).toBeCloseTo(-13, 6);
+    expect(g.residualYawDeg).toBeCloseTo(-13, 6);
+  });
+
+  it('residual on a TIPPED part is exact (the pre-WP-28 approximation case)', () => {
+    // Lay the part on its side (tilt 90° → local z along a horizontal axis),
+    // then apply a residual yaw about its LOCAL z. Decomposition must return
+    // the same rot24 and the same local residual — no global-yaw smearing.
+    const tipped = placed({ tiltRotation: 90 });
+    const base = gridPoseOf(tipped).rot24;
+    expect(base.z === '+z' || base.z === '-z').toBe(false);
+    const m = placed({
+      tiltRotation: 90,
+      params: { [DOC_PARAMS_KEY]: { offsetDeg: { x: 0, y: 0, z: 5 } } },
+    });
+    const g = gridPoseOf(m);
+    expect(g.rot24).toEqual(base);
+    expect(g.offsetDeg.x).toBeCloseTo(0, 6);
+    expect(g.offsetDeg.y).toBeCloseTo(0, 6);
+    expect(g.offsetDeg.z).toBeCloseTo(5, 6);
   });
 });

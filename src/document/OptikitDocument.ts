@@ -16,6 +16,7 @@ import { MODULE_SIMULATION_MODELS } from '../types';
 import type { ModuleDefinition, PlacedModule } from '../types';
 import {
   DOC_PARAMS_KEY,
+  ZERO_OFFSET_DEG,
   eulerTripleForRot24,
   getDocParams,
   gridPoseOf,
@@ -165,23 +166,51 @@ export function movePartGrid(partId: string, cell: Vec3): void {
   setDocParams(partId, { offsetMm: [0, 0, 0] });
 }
 
-/** Set the part's yaw (degrees CCW about document +z). */
+/**
+ * Set the part's yaw (degrees CCW about document +z). Preserves any x/y tilt
+ * residual; the yaw residual lands in offsetDeg.z (schema `offset-deg`).
+ */
 export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boolean }): void {
   const store = useAppStore.getState();
   const m = store.placedModules.find(p => p.id === partId);
   if (!m) return;
   const { rotation, freeYawDeg } = splitDocYaw(yawDeg, opts?.snap ?? false);
   if (m.rotation !== rotation) store.rotateModule(partId, rotation);
-  setDocParams(partId, { freeYawDeg });
+  const prev = getDocParams(m).offsetDeg ?? ZERO_OFFSET_DEG;
+  // Store free yaw is measured opposite to the document (see mapping.ts).
+  setDocParams(partId, {
+    offsetDeg: { x: prev.x, y: prev.y, z: -freeYawDeg },
+    freeYawDeg: undefined,
+  });
 }
 
 /**
- * Set a full axis-aligned orientation plus a residual yaw (used by the .dsn
- * importer). The residual is applied about the document z axis; for parts whose
- * local z is tipped away from vertical the .dsn `offset-deg` residual is only
- * representable when it is zero — callers should warn in that case.
+ * Set the part's fine tilt residuals (degrees) about its local x (pitch) and
+ * y (roll) axes — the offset-deg components the yaw ring can't reach (WP-28).
+ * Omitted axes keep their value.
  */
-export function setPartOrientation(partId: string, rot24: Rot24, residualYawDeg = 0): void {
+export function tiltPart(partId: string, tilt: { x?: number; y?: number }): void {
+  const store = useAppStore.getState();
+  const m = store.placedModules.find(p => p.id === partId);
+  if (!m) return;
+  const prev = getDocParams(m).offsetDeg ?? ZERO_OFFSET_DEG;
+  setDocParams(partId, {
+    offsetDeg: { x: tilt.x ?? prev.x, y: tilt.y ?? prev.y, z: prev.z },
+    freeYawDeg: undefined,
+  });
+}
+
+/**
+ * Set a full axis-aligned orientation plus the offset-deg residual triple
+ * (used by the .dsn importer). The residual follows the schema convention
+ * R = R24 · ΔR with ΔR = Rz(z)·Rx(x)·Ry(y) in the part's local frame — since
+ * WP-28 this is exact for tipped parts too.
+ */
+export function setPartOrientation(
+  partId: string,
+  rot24: Rot24,
+  offsetDeg: { x?: number; y?: number; z?: number } = {},
+): void {
   const store = useAppStore.getState();
   const m = store.placedModules.find(p => p.id === partId);
   if (!m) return;
@@ -193,8 +222,10 @@ export function setPartOrientation(partId: string, rot24: Rot24, residualYawDeg 
   if ((m.topRotation ?? 0) !== triple.topRotation) {
     store.rotateModuleTop(partId, triple.topRotation);
   }
-  // Store free yaw is measured opposite to the document (see mapping.ts).
-  setDocParams(partId, { freeYawDeg: -residualYawDeg });
+  setDocParams(partId, {
+    offsetDeg: { x: offsetDeg.x ?? 0, y: offsetDeg.y ?? 0, z: offsetDeg.z ?? 0 },
+    freeYawDeg: undefined,
+  });
 }
 
 export function setDofValue(partId: string, dofName: string, value: number): void {
