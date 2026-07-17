@@ -88,7 +88,9 @@ const simulateSchema = z.object({
   warnings: z.array(z.string()).default([]),
   rays_world: z.array(z.array(vec3)).optional(),
   spot: z.object({ x: z.array(numberOrNull), y: z.array(numberOrNull) }).optional(),
-  paraxial: z.record(z.string(), anyNumber).optional(),
+  // Afocal paths (e.g. a fold mirror only) report NaN paraxial values, which
+  // the service encodes as null (WP-32: palette designs hit this).
+  paraxial: z.record(z.string(), numberOrNull).optional(),
 });
 export type SimulateResponse = z.infer<typeof simulateSchema>;
 

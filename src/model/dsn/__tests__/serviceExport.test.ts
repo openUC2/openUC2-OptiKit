@@ -234,9 +234,14 @@ describe('listPartMechanics (WP-16)', () => {
 });
 
 describe('without a retained source', () => {
-  it('degrades to the plain snapshot export', () => {
+  it('degrades to the snapshot export WITH palette optics (WP-32)', () => {
     const { design } = buildServiceDesign(fluoSnapshot());
-    expect(design.components?.objective?.optics).toBeUndefined();
+    // Bare parts now carry catalog-derived optics so chain/compile see the
+    // same ports the schematic draws (no more E_BAD_PORT).
+    const objective = design.components?.objective;
+    expect(objective?.category).toBe('other'); // fixture part carries no category
+    expect(objective?.optics?.passthrough).toBe(true);
+    expect(Object.keys(objective?.optics?.ports ?? {})).toEqual(['front', 'back']);
     expect(design.components?.sample).toBeUndefined();
     expect(design.paths?.emission?.chain?.[0]).toBe('objective.front>back');
   });

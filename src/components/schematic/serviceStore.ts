@@ -13,8 +13,64 @@ import {
   validateDesign,
 } from '../../api/coreClient';
 import type { SimulateResponse } from '../../api/coreClient';
-import { getDocRevision, useDocRevision } from '../../document';
+import { getDocRevision, makePortRef, setPath, useDocRevision } from '../../document';
+import { useAppStore } from '../../stores/appStore';
 import { buildServiceDesign, serviceFiles } from '../../model/dsn/serviceExport';
+
+/**
+ * Auto-chaining (WP-32): when the document declares NO paths, ask
+ * /v1/chain/infer and ADOPT the result into the path store — the beam path
+ * works out of the box; pin-to-pin wiring stays as the override. Returns the
+ * adopted path names (empty when nothing could be inferred). Chain entries
+ * whose component key has no placed part (location components in retained
+ * designs) are dropped, mirroring the .dsn importer.
+ */
+async function inferAndAdoptChains(
+  files: ReturnType<typeof serviceFiles>,
+  keyByPartId: Record<string, string>,
+): Promise<string[]> {
+  const inferred = await inferChains(files);
+  const partIdByKey = Object.fromEntries(
+    Object.entries(keyByPartId).map(([id, key]) => [key, id]),
+  );
+  const adopted: string[] = [];
+  for (const [name, spec] of Object.entries(inferred.paths)) {
+    const chain = (spec.chain ?? [])
+      .map(entry => {
+        const dot = entry.lastIndexOf('.');
+        return { key: entry.slice(0, dot), port: entry.slice(dot + 1) };
+      })
+      .filter(({ key }) => partIdByKey[key])
+      .map(({ key, port }) => makePortRef(partIdByKey[key], port));
+    if (chain.length >= 2) {
+      setPath(name, chain);
+      adopted.push(name);
+    }
+  }
+  if (adopted.length > 0) {
+    useAppStore.getState().addNotification({
+      type: 'success',
+      title: 'beam path inferred',
+      message: `chained automatically: ${adopted.join(', ')} — edit pins to override`,
+      duration: 6000,
+    });
+  }
+  return adopted;
+}
+
+/** Surface an inference failure; ambiguity points at the manual wiring UI. */
+function notifyChainFailure(err: unknown): void {
+  const e = toError(err);
+  useAppStore.getState().addNotification({
+    type: 'warning',
+    title: e.code === 'E_AMBIGUOUS_CHAIN' ? 'beam path is ambiguous' : 'auto-chaining failed',
+    message:
+      e.code === 'E_AMBIGUOUS_CHAIN'
+        ? `${e.message} — chain the pins manually (click one pin, then the next)`
+        : e.message,
+    duration: 8000,
+  });
+}
 
 export interface ErcMarker {
   id: string;
@@ -30,7 +86,8 @@ export interface ErcMarker {
 export interface PathSimResult {
   raysWorld: [number, number, number][][];
   spot: { x: number[]; y: number[] } | null;
-  paraxial: Record<string, number> | null;
+  /** null entries = NaN from the service (afocal paths, WP-32). */
+  paraxial: Record<string, number | null> | null;
   warnings: string[];
   /** Compile/trace failure for this path (other paths may still succeed). */
   error: { code: string; message: string } | null;
@@ -110,11 +167,26 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
     if (get().checkBusy) return;
     set({ checkBusy: true, error: null });
     try {
-      const { design, keyByPartId } = buildServiceDesign();
+      let { design, keyByPartId } = buildServiceDesign();
+      let files = serviceFiles();
+
+      // Auto-chain (WP-32): with no declared paths, adopt the inference and
+      // rebuild the export so validation sees the chained design.
+      if (Object.keys(design.paths ?? {}).length === 0) {
+        try {
+          const adopted = await inferAndAdoptChains(files, keyByPartId);
+          if (adopted.length > 0) {
+            ({ design, keyByPartId } = buildServiceDesign());
+            files = serviceFiles();
+          }
+        } catch (err) {
+          notifyChainFailure(err);
+        }
+      }
+
       const partIdByKey = Object.fromEntries(
         Object.entries(keyByPartId).map(([id, key]) => [key, id]),
       );
-      const files = serviceFiles();
       const markers: ErcMarker[] = [];
       let proposals: { name: string; chain: string[] }[] = [];
 
@@ -175,13 +247,30 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
     const revision = getDocRevision();
     set({ simBusy: true, error: null });
     try {
-      const { design } = buildServiceDesign();
-      const files = serviceFiles();
-      const pathNames = Object.keys(design.paths ?? {});
+      let { design, keyByPartId } = buildServiceDesign();
+      let files = serviceFiles();
+      let pathNames = Object.keys(design.paths ?? {});
+
+      // Auto-chain (WP-32): E_NO_PATHS disappears from the happy path.
+      if (pathNames.length === 0) {
+        try {
+          const adopted = await inferAndAdoptChains(files, keyByPartId);
+          if (adopted.length > 0) {
+            ({ design, keyByPartId } = buildServiceDesign());
+            files = serviceFiles();
+            pathNames = Object.keys(design.paths ?? {});
+          }
+        } catch (err) {
+          notifyChainFailure(err);
+        }
+      }
       if (pathNames.length === 0) {
         set({
           simBusy: false,
-          error: { code: 'E_NO_PATHS', message: 'no optical paths declared — chain ports first' },
+          error: {
+            code: 'E_NO_PATHS',
+            message: 'no beam path could be inferred — chain the pins manually',
+          },
         });
         return;
       }

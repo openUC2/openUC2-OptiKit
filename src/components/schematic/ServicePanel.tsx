@@ -193,7 +193,11 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
                       .filter(([k]) => k in PARAXIAL_LABELS)
                       .map(([k, v]) => (
                         <Typography key={k} variant="caption" sx={{ display: 'block' }}>
-                          {PARAXIAL_LABELS[k]}: <b>{v.toFixed(3)}</b>
+                          {PARAXIAL_LABELS[k]}:{' '}
+                          <b>
+                            {/* afocal paths report NaN (null) / ±∞ (WP-32) */}
+                            {v === null ? '—' : Number.isFinite(v) ? v.toFixed(3) : '∞'}
+                          </b>
                           {k === 'f2' || k === 'EPD' ? ' mm' : ''}
                         </Typography>
                       ))}

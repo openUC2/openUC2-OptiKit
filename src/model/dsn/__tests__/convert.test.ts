@@ -115,6 +115,65 @@ const SNAPSHOT: DocSnapshot = {
   ],
 };
 
+// ── WP-32: palette parts export their catalog optics ──────────────────────────
+
+describe('palette optics enrichment (WP-32)', () => {
+  const componentOf = (p: DocPart) => {
+    const { design, keyByPartId } = snapshotToDesign({
+      meta: { name: 't', description: '' },
+      parts: [p],
+      paths: [],
+    });
+    return design.components![keyByPartId[p.id]]!;
+  };
+
+  it('a palette lens exports a thin-lens fragment + front/back ports', () => {
+    const comp = componentOf(
+      part({ id: 'l', ref: 'Lens', category: 'lens', libraryRef: 'lens-pos-1x1',
+             params: { focalLength: 100 } } as Partial<DocPart> & { id: string; ref: string }),
+    );
+    expect(comp.category).toBe('lens');
+    const optics = comp.optics!;
+    const surfaces = (optics.fragment as { surfaces: { geometry: { radius: number } }[] }).surfaces;
+    expect(surfaces).toHaveLength(2);
+    // R = 2·f·(n−1) with n = 1.5168 → ±103.36 for f = 100.
+    expect(surfaces[0].geometry.radius).toBeCloseTo(103.36, 2);
+    expect(surfaces[1].geometry.radius).toBeCloseTo(-103.36, 2);
+    const ports = optics.ports as Record<string, { direction: string; 'after-surface'?: number }>;
+    expect(ports.front.direction).toBe('-x');
+    expect(ports.back['after-surface']).toBe(1);
+  });
+
+  it('a palette mirror exports a reflective flat with the fold ports', () => {
+    const comp = componentOf(
+      part({ id: 'm', ref: 'Mirror', category: 'mirror', libraryRef: 'mirror-1x1' }),
+    );
+    const optics = comp.optics!;
+    const surfaces = (optics.fragment as {
+      surfaces: { interaction_model: { is_reflective: boolean } }[];
+    }).surfaces;
+    expect(surfaces[0].interaction_model.is_reflective).toBe(true);
+    const ports = optics.ports as Record<string, { direction: string; 'after-surface'?: number }>;
+    expect(ports.reflected).toEqual({ frame: 'optical', direction: '-y', 'after-surface': 0 });
+  });
+
+  it('filters export as passthrough; sources export their emit port', () => {
+    const filter = componentOf(
+      part({ id: 'f', ref: 'Filter', category: 'filter', libraryRef: 'filter-bandpass' }),
+    );
+    expect(filter.optics!.passthrough).toBe(true);
+    expect(filter.optics!.fragment).toBeUndefined();
+
+    const laser = componentOf(
+      part({ id: 's', ref: 'Laser', category: 'source', libraryRef: 'laser-405nm' }),
+    );
+    expect(laser.category).toBe('source');
+    const ports = laser.optics!.ports as Record<string, { direction: string }>;
+    expect(Object.keys(ports)).toEqual(['out']); // E_BAD_PORT at laser.out: gone
+    expect(ports.out.direction).toBe('+x');
+  });
+});
+
 describe('snapshot → design → parts round trip', () => {
   const { design, keyByPartId } = snapshotToDesign(SNAPSHOT);
   const reimported = designToParts(design);

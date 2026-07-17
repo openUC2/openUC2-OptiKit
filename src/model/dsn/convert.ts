@@ -9,8 +9,9 @@
  * (`Flattened()` in the Go/Python reference) so relative designs load too.
  */
 
-import type { AxisDir, DocSnapshot, Rot24, Vec3 } from '../../document';
+import type { AxisDir, DocCategory, DocPart, DocSnapshot, Rot24, Vec3 } from '../../document';
 import { UC2_GRID_MM, parsePortRef } from '../../document';
+import { catalogPortsOf } from '../../document/portCatalog';
 import type {
   CompSpec,
   DesignDecl,
@@ -29,6 +30,109 @@ export interface ExportResult {
   keyByPartId: Record<string, string>;
 }
 
+// ── palette optics enrichment (WP-32) ────────────────────────────────────────
+
+/** A flat surface fragment entry (reflective when asked). */
+const flatSurface = (semiAperture: number, reflective: boolean) => ({
+  type: 'standard',
+  geometry: { type: 'StandardGeometry', radius: Infinity, conic: 0 },
+  interaction_model: { type: 'refractive_reflective', is_reflective: reflective },
+  semi_aperture: round6(semiAperture),
+});
+
+/**
+ * Optics block for a PALETTE part (WP-32): the same catalog the schematic
+ * renders (`portCatalog.ts`) becomes `optics.frames/ports` in the export, so
+ * chain inference and compile see exactly the ports the browser draws —
+ * E_BAD_PORT is impossible for palette parts. Where the palette declares
+ * enough (lens focal length, mirror/splitter reflectivity) a minimal
+ * fragment rides along; filters and other passive parts export as
+ * `passthrough` so they sit in a chain without contributing surfaces.
+ */
+export function paletteOpticsOf(part: {
+  libraryRef: string;
+  category: DocCategory;
+  params: Record<string, unknown>;
+}): NonNullable<CompSpec['optics']> {
+  const ports = catalogPortsOf(part.libraryRef, part.category);
+  const aperture = typeof part.params.aperture === 'number' ? part.params.aperture : 25;
+  const semi = aperture / 2;
+
+  // Minimal fragment per category. Surfaces use the record conventions
+  // (WP-14): standard surfaces, ±Infinity radii serialize as .inf.
+  let surfaces: Record<string, unknown>[] | null = null;
+  let passthrough = false;
+  switch (part.category) {
+    case 'lens': {
+      // Thin biconvex approximation: 1/f ≈ (n−1)(1/R1 − 1/R2) ⇒ R = 2f(n−1).
+      const f = typeof part.params.focalLength === 'number' ? part.params.focalLength : 100;
+      const n = 1.5168; // N-BK7
+      const r = Math.abs(2 * f * (n - 1));
+      const sign = f >= 0 ? 1 : -1;
+      surfaces = [
+        {
+          type: 'standard',
+          geometry: { type: 'StandardGeometry', radius: round6(sign * r), conic: 0 },
+          thickness: 2.0,
+          material_post: { type: 'ideal', name: 'N-BK7' },
+          semi_aperture: round6(semi),
+        },
+        {
+          type: 'standard',
+          geometry: { type: 'StandardGeometry', radius: round6(-sign * r), conic: 0 },
+          semi_aperture: round6(semi),
+        },
+      ];
+      break;
+    }
+    case 'mirror':
+    case 'beamsplitter':
+    case 'dichroic':
+      // One reflective flat: the fold surface; transmitted traversals unfold
+      // it non-reflectively (the compiler's dichroic bleed-through path).
+      surfaces = [flatSurface(semi, true)];
+      break;
+    case 'filter':
+    case 'sample':
+    case 'other':
+      passthrough = true;
+      break;
+    default:
+      break; // source/detector: ports only (fragment-less = collimated)
+  }
+
+  const lastSurface = surfaces ? surfaces.length - 1 : null;
+  const frames: Record<string, unknown> = { optical: { 'z-mm': 0.0 } };
+  const portSpecs: Record<string, unknown> = {};
+  for (const p of ports) {
+    const isEntry = /^(front|sensor|in|plane)$/.test(p.name);
+    const spec: Record<string, unknown> = { frame: 'optical', direction: p.direction };
+    if (!isEntry && lastSurface !== null) {
+      // Exit ports leave after the fold surface (0) or the last lens surface.
+      spec['after-surface'] = p.name === 'reflected' ? 0 : lastSurface;
+    }
+    portSpecs[p.name] = spec;
+  }
+
+  return {
+    ...(surfaces ? { fragment: { surfaces } } : {}),
+    ...(passthrough ? { passthrough: true } : {}),
+    frames,
+    ports: portSpecs,
+  } as NonNullable<CompSpec['optics']>;
+}
+
+/** Component spec for a part with no retained source (palette placement). */
+export function bareComponentSpec(part: DocPart): CompSpec {
+  return {
+    type: 'primitive',
+    primitive: { type: 'glb', model: part.libraryRef },
+    category: part.category,
+    optics: paletteOpticsOf(part),
+    pose: poseSpecOf(part),
+  };
+}
+
 export function snapshotToDesign(snap: DocSnapshot): ExportResult {
   const keyByPartId: Record<string, string> = {};
   const used = new Set<string>();
@@ -44,12 +148,8 @@ export function snapshotToDesign(snap: DocSnapshot): ExportResult {
   const dofValues: Record<string, number> = {};
   for (const part of snap.parts) {
     const key = keyByPartId[part.id];
-    const comp: CompSpec = {
-      type: 'primitive',
-      primitive: { type: 'glb', model: part.libraryRef },
-      pose: poseSpecOf(part),
-    };
-    components[key] = comp;
+    // Palette parts export WITH their catalog optics (WP-32).
+    components[key] = bareComponentSpec(part);
     for (const dof of part.dofs) {
       dofValues[`${key}.${dof.name}`] = dof.value;
     }

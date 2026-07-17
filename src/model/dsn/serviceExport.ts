@@ -30,7 +30,7 @@ import {
 } from '../../document';
 import type { DocPart, DocSnapshot } from '../../document';
 import type { CompSpec, DesignDecl } from './generated/design-decl';
-import { poseSpecOf, snapshotToDesign } from './convert';
+import { bareComponentSpec, poseSpecOf, snapshotToDesign } from './convert';
 import { serializeDesign, DESIGN_DECL_FILE } from './io';
 import type { DsnFiles } from './io';
 
@@ -82,11 +82,9 @@ export function buildServiceDesign(
     if (existing) {
       existing.pose = poseSpecOf(part);
     } else {
-      components[key] = {
-        type: 'primitive',
-        primitive: { type: 'glb', model: part.libraryRef },
-        pose: poseSpecOf(part),
-      };
+      // Post-import palette placements export with their catalog optics
+      // (WP-32) — retained components keep their real record optics above.
+      components[key] = bareComponentSpec(part);
     }
   }
   const deletedKeys = new Set<string>();
