@@ -144,3 +144,80 @@ describe('resolvePortRef', () => {
     expect(resolvePortRef([part], 'p-objective.back')).toEqual([0, 0, 77]);
   });
 });
+
+// ── WP-39/WP-40: continuous directions, anchors, galvo ───────────────────────
+
+import { dirVecOf, anchorFrameMm } from '../ports';
+import {
+  entriesFromIndex,
+  registerLibraryModules,
+} from '../../../document/libraryPalette';
+import type { IndexModule } from '../../../model/libraryIndex';
+
+describe('dirVecOf (WP-39: vector directions)', () => {
+  it('resolves axis literals and normalizes vectors', () => {
+    expect(dirVecOf('-y')).toEqual([0, -1, 0]);
+    const v = dirVecOf([0, 2, 0]);
+    expect(v).toEqual([0, 1, 0]);
+    const tilted = dirVecOf([Math.sin(Math.PI / 6), 0, Math.cos(Math.PI / 6)]);
+    expect(tilted[0]).toBeCloseTo(0.5, 6);
+  });
+});
+
+describe('anchorFrameMm (WP-39: the beam starts at the datum)', () => {
+  it('returns the objective entry frame offset from the retained source', () => {
+    // fluo objective front sits at its optical frame (z=0 → localMm has the
+    // pin stand-off; the FRAME itself is the anchor).
+    expect(anchorFrameMm(makePart('objective'))).toEqual([0, 0, 0]);
+  });
+
+  it('follows the laser out frame', () => {
+    const anchor = anchorFrameMm(makePart('laser'));
+    expect(anchor.length).toBe(3);
+  });
+});
+
+const GALVO_MODULE: IndexModule = {
+  id: 'user.cube.galvo',
+  version: '0.1.0',
+  kind: 'cube_module',
+  description: 'galvo mirror',
+  tags: [],
+  category: 'mirror',
+  thumbnail: null,
+  footprint_grid: [1, 1, 1],
+  review: false,
+  component: { ref: 'user.mirror.galvo@^0.1', resolved: '0.1.0', vendor: null, efl_mm: null },
+  template: {
+    ref: 'user.tpl.galvo@^0.1', id: 'user.tpl.galvo', resolved: '0.1.0',
+    class: 'adaptive', actuatable: true,
+    dof: [{ name: 'tilt', kind: 'rotation', axis: 'y', unit: 'deg', range: [-15, 15], actuatable: true }],
+    states: [],
+  },
+  assets: { thumbnail: null, glb: null, step: null },
+  ports: [
+    { name: 'front', direction: '-x', position_mm: [0, 0, 0], after_surface: null },
+    { name: 'reflected', direction: '-y', position_mm: [0, 0, 0], after_surface: 0 },
+  ],
+  electronics: null,
+};
+
+describe('galvo groundwork (WP-40: rotation DOF swings the arm)', () => {
+  it('a rotation-DOF value of θ swings the exit arm by 2θ', () => {
+    registerLibraryModules(entriesFromIndex([GALVO_MODULE], 'http://x'));
+    const still = beamAxesOf(
+      makePart('galvo', { libraryRef: 'user.cube.galvo', category: 'mirror' }),
+    );
+    expect(still.foldDeg).toBeCloseTo(90, 5);
+    const tilted = beamAxesOf(
+      makePart('galvo', {
+        libraryRef: 'user.cube.galvo',
+        category: 'mirror',
+        dofs: [{ name: 'tilt', range: null, unit: 'deg', value: 15 }],
+      }),
+    );
+    // θ = 15° → the reflected arm swings 30°: fold 90° → 120° (or 60°,
+    // sense set by the fold-plane normal).
+    expect(Math.abs((tilted.foldDeg ?? 0) - 90)).toBeCloseTo(30, 5);
+  });
+});

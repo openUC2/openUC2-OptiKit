@@ -171,3 +171,40 @@ describe('threePoseToMeshTransform (WP-33: the gizmo commit math)', () => {
     expect(t.positionMm).toEqual([1, -3, 2]);
   });
 });
+
+describe('continuous datum directions (WP-39)', () => {
+  it('keeps a 30°-off direction as a unit vector instead of force-snapping', () => {
+    const input = laserInput();
+    input.meshTransform = { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] };
+    input.datums = [{
+      id: 'd1', name: 'out', kind: 'source',
+      pointMm: [0, 0, 10],
+      direction: [Math.sin(Math.PI / 6), 0, Math.cos(Math.PI / 6)], // 30° off +z
+      areaDiameterMm: null,
+    }];
+    const bound = bindToRecords(input);
+    const component = bound.component!;
+    const optics = component.optics as {
+      ports: Record<string, { direction: string | number[] }>;
+    };
+    const dir = optics.ports.out.direction;
+    expect(Array.isArray(dir)).toBe(true);
+    expect((dir as number[])[0]).toBeCloseTo(0.5, 3);
+    expect(bound.warnings.some(w => w.includes('kept the continuous direction'))).toBe(true);
+  });
+
+  it('still snaps within the 2° tolerance', () => {
+    const input = laserInput();
+    input.datums = [{
+      id: 'd1', name: 'out', kind: 'source',
+      pointMm: [0, 0, 10],
+      direction: [0.01, 0, 0.9999], // ~0.6° off +z
+      areaDiameterMm: null,
+    }];
+    const bound = bindToRecords(input);
+    const optics = bound.component!.optics as {
+      ports: Record<string, { direction: string | number[] }>;
+    };
+    expect(optics.ports.out.direction).toBe('+z');
+  });
+});

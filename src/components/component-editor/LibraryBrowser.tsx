@@ -1,7 +1,11 @@
 /**
- * Library browser: published index components (read-only metadata with
- * vendor/MPN badges) + locally saved workspace records (editable), with
+ * Library browser: published registry components + browser-local drafts, with
  * category filter chips and a configurable index URL.
+ *
+ * WP-38: BOTH tabs open records in the editor. The index only carries summary
+ * metadata, so clicking a published card fetches the full `component.yml`
+ * through the registry's asset endpoint and opens it as an editable copy —
+ * "save to workspace" forks it locally, the dev write updates the library.
  */
 
 import { useMemo, useState } from 'react';
@@ -27,10 +31,13 @@ import {
 } from '@mui/icons-material';
 import { GLYPH_COLORS } from '../schematic/colors';
 import type { DocCategory } from '../../document';
-import { useLibraryIndex, type IndexComponent } from '../../model/libraryIndex';
+import { assetsBaseUrl, useLibraryIndex, type IndexComponent } from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
-import { RECORD_CATEGORIES } from '../../model/componentRecord';
+import { RECORD_CATEGORIES, recordFromYaml } from '../../model/componentRecord';
+
+/** Where a record was opened from — drives the editing-a-copy banner (WP-38). */
+export type RecordOrigin = 'index' | 'workspace';
 
 function CategoryDot({ category }: { category: string }) {
   const color = GLYPH_COLORS[category as DocCategory] ?? '#8899aa';
@@ -102,13 +109,28 @@ function ComponentCard({
 export function LibraryBrowser({
   onOpenRecord,
 }: {
-  onOpenRecord: (record: ComponentRecord) => void;
+  onOpenRecord: (record: ComponentRecord, origin: RecordOrigin) => void;
 }) {
   const [tab, setTab] = useState<'index' | 'workspace'>('index');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const index = useLibraryIndex();
   const workspace = useWorkspaceLibrary();
   const [urlDraft, setUrlDraft] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  /** WP-38: the index card carries metadata only — fetch the full record
+   * through the registry's asset endpoint, then open it as an editable copy. */
+  const openIndexRecord = async (id: string) => {
+    setOpenError(null);
+    try {
+      const url = `${assetsBaseUrl(index.url)}/v1/library/assets/components/${id}/component.yml`;
+      const response = await fetch(url, { cache: 'no-cache' });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      onOpenRecord(recordFromYaml(await response.text()), 'index');
+    } catch (err) {
+      setOpenError(`could not fetch ${id}: ${String(err)}`);
+    }
+  };
 
   const indexComponents = useMemo(
     () => index.components.filter(c => !categoryFilter || c.category === categoryFilter),
@@ -132,9 +154,22 @@ export function LibraryBrowser({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={{ minHeight: 38 }}>
-        <Tab value="index" label={`index (${index.components.length})`} sx={{ minHeight: 38 }} />
-        <Tab value="workspace" label={`workspace (${Object.keys(workspace.records).length})`} sx={{ minHeight: 38 }} />
+        <Tab
+          value="index"
+          label={`library · published (${index.components.length})`}
+          sx={{ minHeight: 38, fontSize: 12 }}
+        />
+        <Tab
+          value="workspace"
+          label={`drafts · this browser (${Object.keys(workspace.records).length})`}
+          sx={{ minHeight: 38, fontSize: 12 }}
+        />
       </Tabs>
+      <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, pt: 0.5 }}>
+        {tab === 'index'
+          ? 'records published in the shared optikit-core library (the registry) — click to edit a copy'
+          : 'your local drafts, stored in this browser — “Save to workspace library” puts records here'}
+      </Typography>
 
       <Stack direction="row" spacing={0.5} sx={{ p: 1, flexWrap: 'wrap', rowGap: 0.5 }}>
         {categories.map(c => (
@@ -155,6 +190,11 @@ export function LibraryBrowser({
                 index not reachable: {index.error}
               </Alert>
             )}
+            {openError && (
+              <Alert severity="error" sx={{ m: 1 }} onClose={() => setOpenError(null)}>
+                {openError}
+              </Alert>
+            )}
             <List dense disablePadding>
               {indexComponents.map((c: IndexComponent) => (
                 <ComponentCard
@@ -163,6 +203,7 @@ export function LibraryBrowser({
                   description={c.description}
                   vendorName={c.vendor?.name ?? ''} mpn={c.vendor?.mpn ?? ''}
                   eflMm={c.efl_mm} review={c.review}
+                  onClick={() => void openIndexRecord(c.id)}
                 />
               ))}
             </List>
@@ -187,7 +228,7 @@ export function LibraryBrowser({
                   eflMm={rec.effective_focal_length_mm ?? null}
                   review={Boolean(rec.review?.length)}
                   thumbnail={workspace.thumbnails[rec.id] ?? null}
-                  onClick={() => onOpenRecord(record)}
+                  onClick={() => onOpenRecord(record, 'workspace')}
                   onDelete={() => workspace.remove(rec.id)}
                 />
               );

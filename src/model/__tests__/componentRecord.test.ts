@@ -170,3 +170,44 @@ describe('non-optical records (WP-30)', () => {
     expect(back.ports).toEqual([]);
   });
 });
+
+// ── WP-38/WP-40 ──────────────────────────────────────────────────────────────
+
+import { derivedPortWarnings, derivedReflectedDir, recordFromYaml } from '../componentRecord';
+
+describe('recordFromYaml round trip (WP-38: index records open too)', () => {
+  it('yaml → record → draft → record survives', () => {
+    const draft = defaultDraft('lens');
+    draft.namespace = 'user';
+    draft.name = 'roundtrip';
+    const record = draftToRecord(draft)!;
+    const reparsed = recordFromYaml(recordToYaml(record));
+    expect(reparsed.id).toBe('user.lens.roundtrip');
+    const redraft = draftFromRecord(reparsed);
+    expect(recordToYaml(draftToRecord(redraft)!)).toBe(recordToYaml(record));
+  });
+});
+
+describe('derived port directions (WP-40: surfaces are the truth)', () => {
+  it('45° mount angle implies the -x arm; 0° implies retro', () => {
+    const [x45, , z45] = derivedReflectedDir(45);
+    expect(x45).toBeCloseTo(-1, 6);
+    expect(z45).toBeCloseTo(0, 6);
+    const [, , z0] = derivedReflectedDir(0);
+    expect(z0).toBeCloseTo(-1, 6);
+  });
+
+  it('warns when the enum disagrees with the mount angle', () => {
+    const draft = defaultDraft('mirror');
+    expect(derivedPortWarnings(draft)).toEqual([]); // 45° + '-x' agree
+    draft.mirrorAngleDeg = 30; // arm now 60° off -x
+    const warnings = derivedPortWarnings(draft);
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain("port 'reflected'");
+    expect(warnings[0]).toContain('mount');
+  });
+
+  it('stays quiet for non-mirror categories', () => {
+    expect(derivedPortWarnings(defaultDraft('lens'))).toEqual([]);
+  });
+});

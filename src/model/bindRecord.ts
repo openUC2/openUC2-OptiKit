@@ -181,11 +181,21 @@ export function bindToRecords(input: BindInput): BoundRecords {
     // mesh placement first (WP-31 — datums follow the part).
     const cube = datumToCube(datum, input.meshTransform);
     const snap = snapToAxis(cube.direction);
+    // WP-39: within tolerance the direction snaps to the axis literal; beyond
+    // it the TRUE continuous direction is kept as a unit vector — no more
+    // forced quantization of a 30° galvo mirror to the nearest cube axis.
+    let direction: string | [number, number, number] = snap.axis;
     if (snap.deviationDeg > AXIS_SNAP_WARN_DEG) {
+      const len = Math.hypot(...cube.direction) || 1;
+      direction = [
+        round3(cube.direction[0] / len),
+        round3(cube.direction[1] / len),
+        round3(cube.direction[2] / len),
+      ];
       warnings.push(
         `datum '${datum.name}' points ${snap.deviationDeg.toFixed(1)}° off the ${snap.axis} ` +
-          'axis — schema-v0 ports are axis-aligned; the residual needs offset-deg ' +
-          'on the placed component',
+          'axis — kept the continuous direction (vector ports need schema-v0.1; ' +
+          '`library validate` will warn until ratified)',
       );
     }
     // One name serves as both the frame and the port; 'optical' is reserved
@@ -197,7 +207,7 @@ export function bindToRecords(input: BindInput): BoundRecords {
     if (cube.pointMm[1]) frame['y-mm'] = round3(cube.pointMm[1]);
     frame['z-mm'] = round3(cube.pointMm[2]);
     frames[name] = frame;
-    ports[name] = { frame: name, direction: snap.axis };
+    ports[name] = { frame: name, direction };
   });
   if (input.datums.length === 0) {
     warnings.push('no datums authored — the record has no ports; chaining will not work');

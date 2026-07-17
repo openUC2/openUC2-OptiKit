@@ -34,6 +34,10 @@ interface BindState {
   existingComponentId: string;
   /** Per-ortho-view flip: top→bottom, front→back, side(right)→left. */
   orthoFlip: Record<OrthoView, boolean>;
+  /** Draw the optical model at the datum poses (WP-40). */
+  showOptics: boolean;
+  /** Galvo groundwork (WP-40): mirror-normal tilt, °; the arm swings by 2θ. */
+  galvoTiltDeg: number;
 
   loadMesh: (file: string, glb: Uint8Array, step: Uint8Array | null) => void;
   setTransform: (t: MeshTransform) => void;
@@ -43,6 +47,8 @@ interface BindState {
   toggleQuadView: () => void;
   setTemplateClass: (c: 'fixed' | 'adaptive' | 'generative') => void;
   setExistingComponentId: (id: string) => void;
+  toggleShowOptics: () => void;
+  setGalvoTiltDeg: (deg: number) => void;
   flipOrtho: (view: OrthoView) => void;
   setNextKind: (k: DatumKind) => void;
   /** Part-frame point + direction (the scene converts the click hit). */
@@ -81,6 +87,8 @@ export const useBindStore = create<BindState>((set, get) => ({
   orthoFlip: { top: false, front: false, side: false },
   templateClass: 'fixed',
   existingComponentId: '',
+  showOptics: true,
+  galvoTiltDeg: 0,
 
   loadMesh: (meshFile, glbBytes, stepBytes) =>
     set({
@@ -98,6 +106,8 @@ export const useBindStore = create<BindState>((set, get) => ({
   toggleQuadView: () => set(s => ({ quadView: !s.quadView })),
   setTemplateClass: templateClass => set({ templateClass }),
   setExistingComponentId: existingComponentId => set({ existingComponentId }),
+  toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
+  setGalvoTiltDeg: galvoTiltDeg => set({ galvoTiltDeg }),
   flipOrtho: view =>
     set(s => ({ orthoFlip: { ...s.orthoFlip, [view]: !s.orthoFlip[view] } })),
   setNextKind: nextKind => set({ nextKind }),

@@ -95,6 +95,14 @@ export function getIndexUrl(): string {
   return localStorage.getItem(URL_STORAGE_KEY) ?? DEFAULT_INDEX_URL;
 }
 
+/** Registry origin for asset fetches (WP-38): derived from the index URL when
+ * it is a service index, else the configured core service. */
+export function assetsBaseUrl(indexUrl: string): string {
+  const suffix = '/v1/library/index';
+  if (indexUrl.endsWith(suffix)) return indexUrl.slice(0, -suffix.length);
+  return getCoreUrl().replace(/\/$/, '');
+}
+
 export function setIndexUrl(url: string): void {
   if (url && url !== DEFAULT_INDEX_URL) localStorage.setItem(URL_STORAGE_KEY, url);
   else localStorage.removeItem(URL_STORAGE_KEY);

@@ -1,0 +1,221 @@
+/**
+ * The optical model, drawn inside the mechanics scene (WP-40).
+ *
+ * Surfaces + datum frames are the truth — so SHOW them: at the record's
+ * anchor datum this overlay renders the lens cross-section (surface-of-
+ * revolution from the draft's radii/thickness/⌀), the mirror plane disc, the
+ * detector's sensor plane, beam entry/exit arrows and the frame axes. The
+ * lens outline sitting inside the STP's glass IS the visual verify-t1; a
+ * misplaced datum is something you see, not something a checker reports.
+ *
+ * Galvo groundwork: for mirror-family records a tilt angle θ (bindStore's
+ * galvoTiltDeg) rotates the surface normal about the local x axis, and the
+ * reflected beam arrow swings by 2θ via the reflection law — the first
+ * record-internal continuous DOF made visible (WP-26 will actuate it).
+ */
+
+import { useMemo } from 'react';
+import * as THREE from 'three';
+import type { Vec3 } from '../../document';
+import { datumToCube } from '../../model/bindRecord';
+import {
+  maxSemiApertureMm,
+  surfaceProfiles,
+  type RecordDraft,
+} from '../../model/componentRecord';
+import { useBindStore } from './bindStore';
+
+const docToThree = (v: Vec3): [number, number, number] => [v[0], v[2], -v[1]];
+
+const ENTRY_COLOR = '#f0a53c';
+const EXIT_COLOR = '#2ec4a5';
+const GLASS_COLOR = '#1f9c7c';
+const PLANE_COLOR = '#4aa3ff';
+
+const NO_RAYCAST = () => null;
+
+/** Anchor datum: the optical one if present, else the first authored. */
+const ANCHOR_KINDS = ['reflective', 'source', 'sensor', 'front'];
+
+function BeamArrow({
+  dir,
+  color,
+  lengthMm = 34,
+  fromMm = [0, 0, 0],
+}: {
+  dir: THREE.Vector3;
+  color: string;
+  lengthMm?: number;
+  fromMm?: [number, number, number];
+}) {
+  const quat = useMemo(
+    () =>
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        dir.clone().normalize(),
+      ),
+    [dir],
+  );
+  const mid = dir.clone().normalize().multiplyScalar(lengthMm / 2);
+  const tip = dir.clone().normalize().multiplyScalar(lengthMm);
+  return (
+    <group position={fromMm}>
+      <mesh position={mid} quaternion={quat} raycast={NO_RAYCAST}>
+        <cylinderGeometry args={[0.5, 0.5, lengthMm, 8]} />
+        <meshBasicMaterial color={color} transparent opacity={0.9} depthWrite={false} />
+      </mesh>
+      <mesh position={tip} quaternion={quat} raycast={NO_RAYCAST}>
+        <coneGeometry args={[1.8, 5, 12]} />
+        <meshBasicMaterial color={color} transparent opacity={0.9} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function FrameAxes({ sizeMm = 8 }: { sizeMm?: number }) {
+  const axes: { dir: [number, number, number]; color: string }[] = [
+    { dir: [1, 0, 0], color: '#e0533d' },
+    { dir: [0, 1, 0], color: '#7cc142' },
+    { dir: [0, 0, 1], color: '#2c8fff' },
+  ];
+  return (
+    <group>
+      {axes.map(({ dir, color }, i) => (
+        <mesh
+          key={i}
+          position={[dir[0] * sizeMm / 2, dir[1] * sizeMm / 2, dir[2] * sizeMm / 2]}
+          quaternion={new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            new THREE.Vector3(...dir),
+          )}
+          raycast={NO_RAYCAST}
+        >
+          <cylinderGeometry args={[0.25, 0.25, sizeMm, 6]} />
+          <meshBasicMaterial color={color} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
+  const datums = useBindStore(s => s.datums);
+  const transform = useBindStore(s => s.transform);
+  const showOptics = useBindStore(s => s.showOptics);
+  const galvoTiltDeg = useBindStore(s => s.galvoTiltDeg);
+
+  // The anchor: an optical datum in the CUBE frame (datums follow the part).
+  const anchor = useMemo(() => {
+    const datum =
+      datums.find(d => ANCHOR_KINDS.includes(d.kind)) ?? datums[0] ?? null;
+    if (!datum) {
+      return { pointMm: [0, 0, 0] as Vec3, direction: [0, 0, 1] as Vec3 };
+    }
+    const cube = datumToCube(datum, transform);
+    return { pointMm: cube.pointMm, direction: cube.direction };
+  }, [datums, transform]);
+
+  // Group frame: local +y = the datum's facing direction (the optical axis).
+  const position = docToThree(anchor.pointMm);
+  const quat = useMemo(() => {
+    const d = new THREE.Vector3(...docToThree(anchor.direction));
+    return new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      d.lengthSq() > 0 ? d.normalize() : new THREE.Vector3(0, 1, 0),
+    );
+  }, [anchor.direction]);
+
+  const semi = maxSemiApertureMm(draft.surfaces);
+  const isMirror = ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category);
+  const isDetector = draft.category === 'detector';
+  const isSource = draft.category === 'source';
+  const hasGlass = !isMirror && !isDetector && !isSource && draft.surfaces.length > 0;
+
+  // Lens: one surface of revolution per surface profile (lathe around +y).
+  const latheGeoms = useMemo(() => {
+    if (!hasGlass) return [];
+    return surfaceProfiles(draft.surfaces, 24).map(profile => {
+      const pts: THREE.Vector2[] = [];
+      for (let k = 0; k <= 24; k++) {
+        const r = (profile.semiAperture * k) / 24;
+        const idx = profile.points.findIndex(([, y]) => y >= r);
+        const axial = profile.points[idx >= 0 ? idx : profile.points.length - 1][0];
+        pts.push(new THREE.Vector2(r, axial));
+      }
+      return new THREE.LatheGeometry(pts, 40);
+    });
+  }, [hasGlass, draft.surfaces]);
+
+  // Galvo: tilt the mirror normal about local x; the arm swings by 2θ.
+  const { normal, reflected } = useMemo(() => {
+    const theta = (galvoTiltDeg * Math.PI) / 180;
+    const n = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), theta);
+    const beam = new THREE.Vector3(0, -1, 0); // arrives against the facing
+    const r = beam.clone().sub(n.clone().multiplyScalar(2 * beam.dot(n)));
+    return { normal: n, reflected: r };
+  }, [galvoTiltDeg]);
+
+  if (!showOptics) return null;
+
+  return (
+    <group position={position} quaternion={quat}>
+      <FrameAxes />
+
+      {hasGlass &&
+        latheGeoms.map((geom, i) => (
+          <mesh key={i} geometry={geom} raycast={NO_RAYCAST}>
+            <meshStandardMaterial
+              color={GLASS_COLOR} transparent opacity={0.35}
+              side={THREE.DoubleSide} depthWrite={false}
+            />
+          </mesh>
+        ))}
+
+      {isMirror && (
+        <group
+          quaternion={new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0), normal,
+          )}
+        >
+          <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
+            <circleGeometry args={[semi, 48]} />
+            <meshStandardMaterial
+              color={PLANE_COLOR} transparent opacity={0.4}
+              side={THREE.DoubleSide} depthWrite={false}
+            />
+          </mesh>
+        </group>
+      )}
+
+      {isDetector && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
+          <planeGeometry args={[semi * 1.6, semi * 1.2]} />
+          <meshStandardMaterial
+            color={PLANE_COLOR} transparent opacity={0.4}
+            side={THREE.DoubleSide} depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* Beam arrows: emit along the facing (source), arrive against it
+          (everything else); mirrors add the reflection-law arm. */}
+      {isSource ? (
+        <BeamArrow dir={new THREE.Vector3(0, 1, 0)} color={EXIT_COLOR} />
+      ) : (
+        <BeamArrow
+          dir={new THREE.Vector3(0, -1, 0)}
+          color={ENTRY_COLOR}
+          fromMm={[0, 34, 0]}
+        />
+      )}
+      {isMirror && <BeamArrow dir={reflected} color={EXIT_COLOR} />}
+      {hasGlass && (
+        <BeamArrow
+          dir={new THREE.Vector3(0, -1, 0)}
+          color={EXIT_COLOR}
+          fromMm={[0, -Math.max(4, ...draft.surfaces.map(s => s.thicknessMm ?? 0)), 0]}
+        />
+      )}
+    </group>
+  );
+}

@@ -22,6 +22,7 @@ import {
   Divider,
   IconButton,
   MenuItem,
+  Slider,
   Stack,
   TextField,
   ToggleButton,
@@ -38,6 +39,7 @@ import {
   Rotate90DegreesCcw as RotateIcon,
   RadioButtonChecked as DatumIcon,
   Storage as DevWriteIcon,
+  Visibility as OpticsIcon,
   ViewInAr as CubeIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
@@ -109,13 +111,18 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   return bytes;
 }
 
+/** WP-38: how the open record's mesh resolution went (null = nothing opened). */
+export type MeshStatus = 'loading' | 'loaded' | 'none' | null;
+
 export function MechanicsPanel({
   draft,
   record,
+  meshStatus = null,
 }: {
   draft: RecordDraft;
   /** The draft's validated component record (null while incomplete). */
   record: ComponentRecord | null;
+  meshStatus?: MeshStatus;
 }) {
   const store = useBindStore();
   const saveThumbnail = useWorkspaceLibrary(s => s.saveThumbnail);
@@ -268,7 +275,7 @@ export function MechanicsPanel({
 
       {/* ── the workbench scene ─────────────────────────────────────────── */}
       <Box id="bind-scene" sx={{ position: 'relative', height: '46vh', minHeight: 320, borderRadius: 1, overflow: 'hidden' }}>
-        <BindScene />
+        <BindScene draft={draft} />
         <Stack
           direction="row" spacing={1} alignItems="center"
           sx={{
@@ -319,8 +326,43 @@ export function MechanicsPanel({
               <QuadViewIcon fontSize="small" />
             </ToggleButton>
           </Tooltip>
+          <Tooltip title="overlay the optical model at the datum poses (WP-40) — the visual verify-t1">
+            <ToggleButton
+              value="optics" size="small" selected={store.showOptics}
+              onChange={() => store.toggleShowOptics()}
+            >
+              <OpticsIcon fontSize="small" />
+            </ToggleButton>
+          </Tooltip>
+          {store.showOptics && ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category) && (
+            <Tooltip title="galvo groundwork: tilt the mirror normal by θ — the reflected arm swings by 2θ">
+              <Slider
+                size="small" min={-30} max={30} step={1}
+                value={store.galvoTiltDeg}
+                onChange={(_, v) => store.setGalvoTiltDeg(v as number)}
+                valueLabelDisplay="auto"
+                valueLabelFormat={v => `θ ${v}°`}
+                sx={{ width: 90, mx: 1 }}
+              />
+            </Tooltip>
+          )}
         </Stack>
-        {!store.glbBytes && (
+        {!store.glbBytes && meshStatus === 'loading' && (
+          <Chip
+            icon={<CircularProgress size={12} />}
+            label="fetching the record's mesh from the registry…"
+            sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)' }}
+          />
+        )}
+        {!store.glbBytes && meshStatus === 'none' && (
+          <Alert
+            severity="info"
+            sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)' }}
+          >
+            no STP bound to this record yet — load one or bind it in the workbench
+          </Alert>
+        )}
+        {!store.glbBytes && meshStatus === null && (
           <Alert
             severity="info"
             sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)' }}

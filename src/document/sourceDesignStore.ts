@@ -64,10 +64,14 @@ export function partIdOfComponent(key: string): string | undefined {
 
 // ── source optics (real ports/frames the store cannot represent) ─────────────
 
+/** A port's beam direction: an axis literal ('+x' … '-z') or, since WP-39,
+ * a continuous unit vector in component-local axes. */
+export type PortDirection = string | [number, number, number];
+
 export interface SourcePort {
   name: string;
-  /** Beam direction in component-local document axes: '+x' … '-z'. */
-  direction: string;
+  /** Beam direction in component-local document axes. */
+  direction: PortDirection;
   /** Datum-frame offset in component-local mm. */
   positionMm: [number, number, number];
   afterSurface: number | null;
@@ -77,7 +81,7 @@ interface RawOptics {
   frames?: Record<string, Record<string, unknown>>;
   ports?: Record<
     string,
-    { frame?: string; direction?: string; 'after-surface'?: number | null }
+    { frame?: string; direction?: string | number[]; 'after-surface'?: number | null }
   >;
 }
 
@@ -103,9 +107,15 @@ function buildPortsCache(yamlText: string): Record<string, SourcePort[]> {
     const ports: SourcePort[] = [];
     for (const [name, port] of Object.entries(optics.ports)) {
       const frame = optics.frames?.[port.frame ?? ''] ?? {};
+      const raw = port.direction;
+      const direction: PortDirection = Array.isArray(raw) && raw.length === 3
+        ? [num(raw[0]), num(raw[1]), num(raw[2])]
+        : typeof raw === 'string' && raw
+          ? raw
+          : '+z';
       ports.push({
         name,
-        direction: port.direction ?? '+z',
+        direction,
         positionMm: [num(frame['x-mm']), num(frame['y-mm']), num(frame['z-mm'])],
         afterSurface: port['after-surface'] ?? null,
       });

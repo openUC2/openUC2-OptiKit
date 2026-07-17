@@ -82,8 +82,10 @@ function toAxisDir(v: THREE.Vector3): AxisDir {
 
 /** Beam TRAVEL direction of a port (entry ports face against the beam). */
 function beamDir(port: SourcePort): THREE.Vector3 {
-  const dir = AXIS_VEC[port.direction] ?? AXIS_VEC['+z'];
-  return INPUT_PORT_NAMES.test(port.name) ? dir.clone().negate() : dir.clone();
+  const dir = Array.isArray(port.direction)
+    ? new THREE.Vector3(...port.direction).normalize() // WP-39 vector form
+    : (AXIS_VEC[port.direction] ?? AXIS_VEC['+z']).clone();
+  return INPUT_PORT_NAMES.test(port.name) ? dir.negate() : dir;
 }
 
 /**

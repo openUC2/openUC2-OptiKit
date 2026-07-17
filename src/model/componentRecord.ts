@@ -288,6 +288,53 @@ export function surfaceProfiles(surfaces: SurfaceDraft[], samples = 24): Surface
   });
 }
 
+// ── derived directions (WP-40: surfaces are the truth) ───────────────────────
+
+const PORT_AXIS_VECTORS: Record<string, [number, number, number]> = {
+  '+x': [1, 0, 0], '-x': [-1, 0, 0],
+  '+y': [0, 1, 0], '-y': [0, -1, 0],
+  '+z': [0, 0, 1], '-z': [0, 0, -1],
+};
+
+/** The reflected beam a mount angle θ implies (entry beam +z, tilt about y):
+ * r = (−sin 2θ, 0, −cos 2θ) — θ=45° → '-x', θ=0 → retro. */
+export function derivedReflectedDir(mountAngleDeg: number): [number, number, number] {
+  const two = (2 * mountAngleDeg * Math.PI) / 180;
+  return [-Math.sin(two), 0, -Math.cos(two)];
+}
+
+/**
+ * Cross-check the authored port directions against what the surfaces imply
+ * (WP-40 — the frontend mirror of optikit-core's `check_port_directions`).
+ * A mirror record whose `mount angle` says 30° while the `reflected` port
+ * enum still claims '-x' gets warned: the enum is a statement ABOUT the
+ * geometry, not a second source of truth.
+ */
+export function derivedPortWarnings(draft: RecordDraft): string[] {
+  const mirrorFamily = ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category);
+  if (!mirrorFamily || draft.mirrorAngleDeg === null) return [];
+  if (!draft.surfaces.some(s => s.reflective)) return [];
+  const implied = derivedReflectedDir(draft.mirrorAngleDeg);
+  const warnings: string[] = [];
+  for (const port of draft.ports) {
+    if (/^(front|sensor|in|plane)$/.test(port.name)) continue;
+    const authored = PORT_AXIS_VECTORS[port.direction];
+    if (!authored) continue;
+    const dot = Math.max(-1, Math.min(1,
+      authored[0] * implied[0] + authored[1] * implied[1] + authored[2] * implied[2]));
+    const deviationDeg = (Math.acos(dot) * 180) / Math.PI;
+    if (deviationDeg > 2) {
+      warnings.push(
+        `port '${port.name}': authored direction '${port.direction}' is ` +
+        `${deviationDeg.toFixed(1)}° off what the ${draft.mirrorAngleDeg}° mount ` +
+        `angle implies ([${implied.map(v => v.toFixed(3)).join(', ')}]) — ` +
+        'the surfaces are the truth',
+      );
+    }
+  }
+  return warnings;
+}
+
 // ── validation ───────────────────────────────────────────────────────────────
 
 export function recordId(draft: RecordDraft): string {

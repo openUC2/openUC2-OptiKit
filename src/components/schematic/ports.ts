@@ -14,9 +14,9 @@
 
 import * as THREE from 'three';
 import type { DocPart, PortRef, Vec3 } from '../../document';
-import { makePortRef, rotateDocVec, sourcePortsOf } from '../../document';
+import { libraryEntryOf, makePortRef, rotateDocVec, sourcePortsOf } from '../../document';
 import { catalogPortsOf } from '../../document/portCatalog';
-import type { SourcePort } from '../../document/sourceDesignStore';
+import type { PortDirection, SourcePort } from '../../document/sourceDesignStore';
 
 export interface SchematicPort {
   name: string;
@@ -37,6 +37,16 @@ const AXIS_VECTORS: Record<string, Vec3> = {
   '+z': [0, 0, 1], '-z': [0, 0, -1],
 };
 
+/** Resolve a port direction — axis literal OR continuous unit vector (WP-39)
+ * — to a unit Vec3 in part-local document axes. */
+export function dirVecOf(direction: PortDirection): Vec3 {
+  if (Array.isArray(direction)) {
+    const len = Math.hypot(direction[0], direction[1], direction[2]) || 1;
+    return [direction[0] / len, direction[1] / len, direction[2] / len];
+  }
+  return AXIS_VECTORS[direction] ?? [1, 0, 0];
+}
+
 /** Ports whose beam ENTERS the part (everything else is treated as exit). */
 const INPUT_PORT_NAMES = /^(front|sensor|in|plane)$/;
 
@@ -52,7 +62,7 @@ export function recordPortsOf(part: DocPart): SourcePort[] {
 
 export function portsOf(part: DocPart): SchematicPort[] {
   return recordPortsOf(part).map(p => {
-    const dir = AXIS_VECTORS[p.direction] ?? [1, 0, 0];
+    const dir = dirVecOf(p.direction);
     return {
       name: p.name,
       ref: makePortRef(part.id, p.name),
@@ -68,7 +78,7 @@ export function portsOf(part: DocPart): SchematicPort[] {
 }
 
 function beamDirOf(port: SourcePort): Vec3 {
-  const dir = AXIS_VECTORS[port.direction] ?? [1, 0, 0];
+  const dir = dirVecOf(port.direction);
   // Entry ports face against the beam; negate to get the travel direction.
   const sign = INPUT_PORT_NAMES.test(port.name) ? -1 : 1;
   // `|| 0` folds JavaScript's -0 back to 0.
@@ -93,6 +103,16 @@ export function opticalAxisOf(part: DocPart): Vec3 {
   return beamDirOf(entryPortOf(recordPortsOf(part)));
 }
 
+/**
+ * The entry/emit port's datum-frame offset in part-local mm (WP-39): where
+ * the beam actually starts/lands on this part. The 2D preview offsets its sim
+ * element by this, so a source whose `out` frame sits at z=+20 launches its
+ * rays from the annotated anchor — matching the pin and the service trace.
+ */
+export function anchorFrameMm(part: DocPart): Vec3 {
+  return entryPortOf(recordPortsOf(part)).positionMm;
+}
+
 export interface BeamAxes {
   /** Beam travel direction into the part (local doc frame). */
   entry: Vec3;
@@ -109,6 +129,10 @@ export interface BeamAxes {
  * Entry/exit beam axes derived purely from the record ports (WP-29): the fold
  * angle IS the angle between port directions — never hardcoded. flat_45-style
  * records yield 90°, retro mirrors 180°, straight-through parts null.
+ *
+ * WP-40 galvo groundwork: a library part whose template declares a ROTATION
+ * DOF tilts its exit arm live — the dof value θ swings the reflected beam by
+ * 2θ about the fold-plane normal, in the glyph, the pins and the 2D preview.
  */
 export function beamAxesOf(part: DocPart): BeamAxes {
   const ports = recordPortsOf(part);
@@ -127,6 +151,26 @@ export function beamAxesOf(part: DocPart): BeamAxes {
       exit = dir;
     }
   }
+
+  // Galvo: rotation-DOF value → the mirror normal tilts θ, the arm swings 2θ.
+  if (exit) {
+    const rotDof = libraryEntryOf(part.libraryRef)?.dofs.find(d => d.kind === 'rotation');
+    const theta = rotDof
+      ? part.dofs.find(d => d.name === rotDof.name)?.value ?? 0
+      : 0;
+    if (rotDof && theta) {
+      const u = new THREE.Vector3(entry[0], entry[1], entry[2]);
+      const e = new THREE.Vector3(exit[0], exit[1], exit[2]);
+      const w = new THREE.Vector3().crossVectors(u, e);
+      if (w.lengthSq() > 1e-9) {
+        e.applyAxisAngle(w.normalize(), (2 * theta * Math.PI) / 180);
+        exit = [e.x, e.y, e.z];
+        const dot = entry[0] * exit[0] + entry[1] * exit[1] + entry[2] * exit[2];
+        foldDeg = (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI;
+      }
+    }
+  }
+
   if (foldDeg === null || foldDeg < 1e-3) return { entry, exit: null, foldDeg: null };
   return { entry, exit, foldDeg };
 }

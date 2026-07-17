@@ -11,7 +11,7 @@
  * /configurator/bind deep-links here with the mechanics tab active.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Accordion,
   AccordionDetails,
@@ -37,6 +37,7 @@ import {
 import { saveAs } from 'file-saver';
 import {
   defaultDraft,
+  derivedPortWarnings,
   draftFromRecord,
   draftToRecord,
   recordId,
@@ -46,11 +47,14 @@ import {
 } from '../../model/componentRecord';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
-import { LibraryBrowser } from './LibraryBrowser';
+import { loadBindMesh, saveBindMesh } from '../../model/bindMeshStore';
+import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
+import { LibraryBrowser, type RecordOrigin } from './LibraryBrowser';
 import { RecordForm } from './RecordForm';
 import { GlyphPreview } from './GlyphPreview';
 import { RaySketch } from './RaySketch';
-import { MechanicsPanel } from '../bind/MechanicsPanel';
+import { MechanicsPanel, type MeshStatus } from '../bind/MechanicsPanel';
+import { useBindStore } from '../bind/bindStore';
 
 export function ComponentEditorPage({
   initialTab = 'optics',
@@ -64,8 +68,20 @@ export function ComponentEditorPage({
   const [draft, setDraft] = useState<RecordDraft>(() => defaultDraft('lens'));
   const saveRecord = useWorkspaceLibrary(s => s.save);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  // WP-38: where the open record came from (drives the editing-a-copy banner)
+  // and whether its mesh could be resolved into the mechanics tab.
+  const [openedFrom, setOpenedFrom] = useState<
+    { origin: RecordOrigin; id: string; version: string } | null
+  >(null);
+  const [meshStatus, setMeshStatus] = useState<MeshStatus>(null);
+  const index = useLibraryIndex();
+  const bindGlb = useBindStore(s => s.glbBytes);
+  const bindStep = useBindStore(s => s.stepBytes);
+  const bindMeshFile = useBindStore(s => s.meshFile);
 
   const errors = useMemo(() => validateDraft(draft), [draft]);
+  // WP-40: authored port directions cross-checked against the surfaces.
+  const directionWarnings = useMemo(() => derivedPortWarnings(draft), [draft]);
   const record = useMemo(
     () => (errors.length === 0 ? draftToRecord(draft) : null),
     [draft, errors],
@@ -85,7 +101,62 @@ export function ComponentEditorPage({
     setTimeout(() => setSavedFlash(null), 2500);
   };
 
-  const openRecord = (rec: ComponentRecord) => setDraft(draftFromRecord(rec));
+  /** WP-38: the mechanics tab follows the record. Priority: a locally bound
+   * mesh (IndexedDB, survives reloads) → the registry's published template
+   * assets (via the module that references this component) → honest "none". */
+  const resolveMesh = async (recordId: string) => {
+    setMeshStatus('loading');
+    const bind = useBindStore.getState();
+    try {
+      const local = await loadBindMesh(recordId).catch(() => null);
+      if (local) {
+        bind.loadMesh(local.meshFile, local.glb, local.step);
+        setMeshStatus('loaded');
+        return;
+      }
+      const module = index.modules.find(m =>
+        m.component?.ref?.startsWith(`${recordId}@`),
+      );
+      const glbPath = module?.assets?.glb;
+      if (glbPath) {
+        const base = assetsBaseUrl(index.url);
+        const abs = (p: string) => (p.startsWith('http') ? p : `${base}${p}`);
+        const glbRes = await fetch(abs(glbPath), { cache: 'no-cache' });
+        if (!glbRes.ok) throw new Error(`${glbRes.status} for ${glbPath}`);
+        const glb = new Uint8Array(await glbRes.arrayBuffer());
+        let step: Uint8Array | null = null;
+        const stepPath = module?.assets?.step;
+        if (stepPath) {
+          const stepRes = await fetch(abs(stepPath), { cache: 'no-cache' });
+          if (stepRes.ok) step = new Uint8Array(await stepRes.arrayBuffer());
+        }
+        bind.loadMesh(glbPath.split('/').pop() ?? 'model.glb', glb, step);
+        setMeshStatus('loaded');
+        return;
+      }
+      bind.clear();
+      setMeshStatus('none');
+    } catch {
+      bind.clear();
+      setMeshStatus('none');
+    }
+  };
+
+  const openRecord = (rec: ComponentRecord, origin: RecordOrigin) => {
+    setDraft(draftFromRecord(rec));
+    setOpenedFrom({ origin, id: rec.id, version: rec.version });
+    void resolveMesh(rec.id);
+  };
+
+  // Persist the bound mesh per record id so drafts survive a reload (WP-38).
+  useEffect(() => {
+    if (!record || !bindGlb || !bindMeshFile || meshStatus === 'loading') return;
+    void saveBindMesh(record.id, {
+      meshFile: bindMeshFile,
+      glb: bindGlb,
+      step: bindStep,
+    }).catch(() => undefined);
+  }, [record, bindGlb, bindStep, bindMeshFile, meshStatus]);
 
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 340;
 
@@ -114,10 +185,27 @@ export function ComponentEditorPage({
                   {recordId(draft)}@{draft.version}
                 </Typography>
               </Typography>
-              <Button size="small" startIcon={<NewIcon />} onClick={() => setDraft(defaultDraft(draft.category))}>
+              <Button
+                size="small" startIcon={<NewIcon />}
+                onClick={() => {
+                  setDraft(defaultDraft(draft.category));
+                  setOpenedFrom(null);
+                  setMeshStatus(null);
+                  useBindStore.getState().clear();
+                }}
+              >
                 new
               </Button>
             </Stack>
+
+            {/* WP-38: published records open as editable copies. */}
+            {openedFrom?.origin === 'index' && (
+              <Alert severity="info" sx={{ mb: 1.5 }}>
+                editing a copy of <b>{openedFrom.id}@{openedFrom.version}</b> — “Save to
+                workspace library” forks it into your drafts; “Write into
+                ../optikit-core/library” updates the published record
+              </Alert>
+            )}
 
             <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, minHeight: 36 }}>
               <Tab value="optics" label="optics — the symbol" sx={{ minHeight: 36 }} />
@@ -135,6 +223,16 @@ export function ComponentEditorPage({
                     </Typography>
                     {errors.map((e, i) => (
                       <Typography key={i} variant="caption" sx={{ display: 'block' }}>• {e}</Typography>
+                    ))}
+                  </Alert>
+                )}
+                {directionWarnings.length > 0 && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      direction ↔ surface mismatch (WP-40):
+                    </Typography>
+                    {directionWarnings.map((w, i) => (
+                      <Typography key={i} variant="caption" sx={{ display: 'block' }}>• {w}</Typography>
                     ))}
                   </Alert>
                 )}
@@ -160,7 +258,9 @@ export function ComponentEditorPage({
                 </Stack>
               </>
             )}
-            {tab === 'mechanics' && <MechanicsPanel draft={draft} record={record} />}
+            {tab === 'mechanics' && (
+              <MechanicsPanel draft={draft} record={record} meshStatus={meshStatus} />
+            )}
           </Box>
 
           {/* right: preview */}

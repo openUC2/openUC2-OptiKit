@@ -38,6 +38,8 @@ import type { Vec3 } from '../../document';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
 import { datumToCube, snapToAxis, threePoseToMeshTransform } from '../../model/bindRecord';
 import { useBindStore } from './bindStore';
+import { OpticsOverlay } from './OpticsOverlay';
+import type { RecordDraft } from '../../model/componentRecord';
 import { useSceneColors } from '../../theme/sceneColors';
 import type { OrthoView } from './bindStore';
 
@@ -214,7 +216,13 @@ function PartMesh() {
 }
 
 /** Shared scene content — identical in every viewport. */
-function SceneContent({ colors }: { colors: ReturnType<typeof useSceneColors> }) {
+function SceneContent({
+  colors,
+  draft,
+}: {
+  colors: ReturnType<typeof useSceneColors>;
+  draft?: RecordDraft;
+}) {
   const ghostCube = useBindStore(s => s.ghostCube);
   const datums = useBindStore(s => s.datums);
   const transform = useBindStore(s => s.transform);
@@ -235,6 +243,8 @@ function SceneContent({ colors }: { colors: ReturnType<typeof useSceneColors> })
       {datums.map(datum => (
         <DatumPin key={datum.id} datum={datum} transform={transform} />
       ))}
+      {/* WP-40: the optical model drawn where the record claims it sits. */}
+      {draft && <OpticsOverlay draft={draft} />}
     </>
   );
 }
@@ -246,7 +256,7 @@ const ORTHO_POSES: Record<OrthoView, { normal: [number, number, number]; flipped
   side: { normal: [300, 0, 0], flipped: [-300, 0, 0], up: [0, 1, 0], label: 'right', flipLabel: 'left' },
 };
 
-function Viewport({ ortho }: { ortho: OrthoView | null }) {
+function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDraft }) {
   const mode = useBindStore(s => s.mode);
   const flip = useBindStore(s => (ortho ? s.orthoFlip[ortho] : false));
   const pose = ortho ? ORTHO_POSES[ortho] : null;
@@ -276,7 +286,7 @@ function Viewport({ ortho }: { ortho: OrthoView | null }) {
         enabled={mode !== 'datum'}
         enableRotate={!ortho}
       />
-      <SceneContent colors={colors} />
+      <SceneContent colors={colors} draft={draft} />
       {!ortho && (
         <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
           <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
@@ -286,13 +296,13 @@ function Viewport({ ortho }: { ortho: OrthoView | null }) {
   );
 }
 
-function OrthoCell({ view }: { view: OrthoView }) {
+function OrthoCell({ view, draft }: { view: OrthoView; draft?: RecordDraft }) {
   const flip = useBindStore(s => s.orthoFlip[view]);
   const flipOrtho = useBindStore(s => s.flipOrtho);
   const pose = ORTHO_POSES[view];
   return (
     <Box sx={{ position: 'relative', borderLeft: '1px solid #2a3442', borderTop: '1px solid #2a3442' }}>
-      <Viewport ortho={view} />
+      <Viewport ortho={view} draft={draft} />
       <Tooltip title={`flip to ${flip ? pose.label : pose.flipLabel}`}>
         <IconButton
           size="small"
@@ -310,9 +320,9 @@ function OrthoCell({ view }: { view: OrthoView }) {
   );
 }
 
-export function BindScene() {
+export function BindScene({ draft }: { draft?: RecordDraft }) {
   const quadView = useBindStore(s => s.quadView);
-  if (!quadView) return <Viewport ortho={null} />;
+  if (!quadView) return <Viewport ortho={null} draft={draft} />;
   // Linked 2×2: perspective + top / front / side, all rendering the same
   // store state — a gizmo drag or datum click in any view shows everywhere.
   return (
@@ -323,11 +333,11 @@ export function BindScene() {
       }}
     >
       <Box sx={{ position: 'relative' }}>
-        <Viewport ortho={null} />
+        <Viewport ortho={null} draft={draft} />
       </Box>
-      <OrthoCell view="top" />
-      <OrthoCell view="front" />
-      <OrthoCell view="side" />
+      <OrthoCell view="top" draft={draft} />
+      <OrthoCell view="front" draft={draft} />
+      <OrthoCell view="side" draft={draft} />
     </Box>
   );
 }

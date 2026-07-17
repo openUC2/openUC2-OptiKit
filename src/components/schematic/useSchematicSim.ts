@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 import type { DocPart } from '../../document';
 import { libraryEntryOf, rotateDocVec, useDocParts } from '../../document';
 import { runSimulation } from '../../simulation/SimulationEngine';
-import { opticalAxisOf } from './ports';
+import { anchorFrameMm, opticalAxisOf } from './ports';
 import { MODULE_SIMULATION_MODELS } from '../../types';
 import type {
   OpticalElement,
@@ -115,11 +115,19 @@ export function partToElement(part: DocPart): OpticalElement | null {
   // same side as the 45° mirror; verified empirically against the engine).
   const engineArmOffset =
     sim.elementType === 'beamsplitter' || sim.elementType === 'dichroic' ? 90 : 0;
+  // WP-39: the sim element sits at the part's ANCHOR (the entry/emit port's
+  // datum frame, rotated by the pose) — not the part center. A source whose
+  // `out` frame is at z=+20 launches its rays 20 mm along the beam axis,
+  // matching where the pin already is and what the service traces.
+  const anchor = rotateDocVec(part.worldPose.rotation, anchorFrameMm(part));
   return {
     id: `schematic-${part.id}`,
     moduleInstanceId: part.id,
     type: sim.elementType,
-    position: { x: part.worldPose.positionMm[0], y: -part.worldPose.positionMm[1] },
+    position: {
+      x: part.worldPose.positionMm[0] + anchor[0],
+      y: -(part.worldPose.positionMm[1] + anchor[1]),
+    },
     rotation: axisSimDeg + engineArmOffset,
     params,
   };
