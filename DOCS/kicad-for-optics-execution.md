@@ -78,6 +78,7 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-22 | library registry: the service serves `/v1/library/index` (fresh per request) + `/v1/library/assets/…`; frontend defaults to the registry with the bundled snapshot as automatic offline fallback; contribution flow in `optikit-core/DOCS/LIBRARY.md` | ✅ done (core `564b388` + `25d926c`) — verified live incl. the fallback banner |
 | WP-20 | Inventor datum contract v2 + PyInventor | 🔶 in progress (Bene, async — batch_iam_to_stp_glb.py + stamp_datums.py exist in PyInventor) |
 | — | feedback round 3 triaged (2026-07-16, Part 2d): WP-32 auto-chaining, WP-33 bind bug + one authoring flow, WP-34 palette⇄registry + T-class badges, WP-35 T1/T2/T3 strategies, WP-36 Ethan subassemblies sync, WP-37 light polish + View-3D retirement | 📋 |
+| WP-32 | auto-chaining: palette parts export catalog optics (`bareComponentSpec`); check/simulate auto-run `/v1/chain/infer` with no declared paths and adopt the result; afocal paraxial (null/∞) handled | ✅ done (`84de350`) — verified live: laser→mirror→camera with zero wiring checks clean, path auto-adopted, 127 rays traced through the fold |
 | — | done with round-3 triage: light brand theme is the app default; `inventor-naming-contract.md` → v2.1 (PyInventor pipeline, marker geometries) | ✅ |
 | — | next: WP-32 → WP-33 → WP-36, then WP-34/35/37; WP-27 (tutorials) after; FRAME UX rework still needs a spec conversation | ⬜ |
 
