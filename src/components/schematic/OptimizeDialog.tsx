@@ -5,6 +5,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { saveAs } from 'file-saver';
 import {
   Alert,
   Box,
@@ -278,6 +279,23 @@ export function OptimizeDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={close}>close</Button>
+        {/* WP-35 T2: the Inventor-side changeset — feed to PyInventor's
+            apply_fx_params.py to update the CAD's fx parameters. */}
+        {result?.fx && result.fx.changes.length > 0 && (
+          <Tooltip title="fx-parameter changeset for the Inventor machine (apply_fx_params.py)">
+            <Button
+              variant="text"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(result.fx, null, 2) + '\n'], {
+                  type: 'application/json;charset=utf-8',
+                });
+                saveAs(blob, 'optikit-fx.json');
+              }}
+            >
+              download optikit-fx.json
+            </Button>
+          </Tooltip>
+        )}
         <Button
           variant="outlined"
           onClick={run}

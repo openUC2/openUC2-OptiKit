@@ -211,6 +211,46 @@ The parser never guesses these silently — they land in `review:` and on stderr
 - **off-axis marker** — an `AXIS` marker more than 1° from the axis it snapped to.
 - **missing aperture** — a `PLN` marker whose disc diameter could not be measured.
 
+## fx parameters (WP-35 — the optikit → Inventor T2 loop)
+
+The adaptive (T2) direction of the pipeline: optikit writes optimized dof
+values, Inventor's parametric model follows.
+
+**Naming rule: the Inventor USER PARAMETER (fx) name IS the dof name.** A
+template record declaring `dof: [{name: dz, …}]` requires a user parameter
+`dz` on the **master-insert part** (`PRT - … - MASINS…`). Units are always
+millimetres in the changeset; `apply_fx_params.py` converts to Inventor's
+internal centimetres.
+
+Flow:
+
+```console
+# optikit side (after /v1/optimize wrote instantiation.dof_values):
+optikit-core fx my-setup.dsn -o optikit-fx.json
+
+# Inventor machine (assembly open):
+python apply_fx_params.py optikit-fx.json --dry-run   # inspect
+python apply_fx_params.py optikit-fx.json --export    # apply + re-export STP/GLB
+```
+
+The changeset (`optikit-fx/v0`) carries one entry per T2 part:
+`{component, template-id, parameter, value-mm}` plus, for groove-lattice
+templates (`TemplateRecord.grooves`), a `groove: {pair, midpoint-mm,
+delta-mm}` decomposition — the **pair** is which grooves the holder clamps
+(physical, not a dimension), and if the master insert declares
+`<dof>_midpoint` / `<dof>_delta` user parameters they receive the decomposed
+values instead of the raw dz.
+
+T1 states (positional representations): a change with `parameter: state`
+selects the Inventor positional representation named by its value (e.g. the
+45° mirror's `XY` ⇄ `YZ`) before export — T1 has no dimensions to set, only a
+configuration to pick. The motor/firmware alternative for actuated dofs is
+WP-26 (same dof value, different actuator).
+
+ME-guide warning (from the mechanical-templates doc): Inventor parts and
+assemblies are cross-linked between designs — **always copy a design before
+editing**; never apply fx changes to a library master in place.
+
 ## Adding new conventions
 
 If a future part needs a field the contract cannot express (a new optic type, a

@@ -149,6 +149,22 @@ const compileSchema = z.object({
 });
 export type CompileResponse = z.infer<typeof compileSchema>;
 
+/** WP-35 T2: the Inventor-side fx changeset the service derives from the
+ * optimized dof values (fx user-parameter name == dof name). */
+const fxChangeSchema = z.object({
+  component: z.string(),
+  'template-id': z.string().nullable(),
+  parameter: z.string(),
+  'value-mm': anyNumber,
+  groove: z
+    .object({
+      pair: z.array(z.number()),
+      'midpoint-mm': anyNumber,
+      'delta-mm': anyNumber,
+    })
+    .optional(),
+});
+
 const optimizeSchema = z.object({
   dof_values: z.record(z.string(), anyNumber),
   merit: z.object({
@@ -158,6 +174,9 @@ const optimizeSchema = z.object({
   }),
   deltas: z.array(deltaSchema),
   findings: z.array(drcFindingSchema),
+  fx: z
+    .object({ schema: z.string(), changes: z.array(fxChangeSchema) })
+    .optional(),
 });
 export type OptimizeResponse = z.infer<typeof optimizeSchema>;
 
