@@ -13,9 +13,11 @@ import { GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, Text } from '@re
 import type { DocPart, DocPath, PortRef, Vec3 } from '../../document';
 import {
   docQuatToThree,
+  libraryEntryOf,
   movePartWorld,
   rotatePart,
   selectPart,
+  templateClassOf,
   useDocParts,
   useDocPaths,
   useSelectedPartId,
@@ -91,6 +93,28 @@ function SchematicPart({
     [part.worldPose.rotation],
   );
   const ports = useMemo(() => portsOf(part), [part]);
+  // Mechanical template class (WP-34): T1 draws its cube envelope, T2 its
+  // DOF travel axes.
+  const tClass = templateClassOf(part.libraryRef);
+  const dofAxes = useMemo(() => {
+    if (tClass !== 'adaptive') return [];
+    const lib = libraryEntryOf(part.libraryRef);
+    return (lib?.dofs ?? [])
+      .filter(d => d.kind === 'translation')
+      .map(d => {
+        const local: Vec3 =
+          d.axis === 'x' ? [1, 0, 0] : d.axis === 'y' ? [0, 1, 0] : [0, 0, 1];
+        const threeAxis = new THREE.Vector3(local[0], local[2], -local[1]);
+        return {
+          name: d.name,
+          quat: new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            threeAxis,
+          ),
+          lengthMm: d.range ? d.range[1] - d.range[0] : 40,
+        };
+      });
+  }, [tClass, part.libraryRef]);
   // Glyphs are authored with +x as the optical axis (and the fold arm toward
   // +y); orient them onto the part's REAL entry/exit axes from its record
   // ports — the same convention for palette and imported parts (WP-29).
@@ -253,6 +277,31 @@ function SchematicPart({
       {selected && (
         <YawRing part={part} snap={settings.snapYaw} setOrbitEnabled={setOrbitEnabled} />
       )}
+
+      {/* T1 fixed template (WP-34): the part is locked to its cube — draw the
+          cube envelope as a ghost outline instead of pretending δ is free. */}
+      {tClass === 'fixed' && (
+        <lineSegments raycast={NO_RAYCAST}>
+          <edgesGeometry
+            args={[new THREE.BoxGeometry(UC2_GRID_MM[0], UC2_GRID_MM[2], UC2_GRID_MM[1])]}
+          />
+          <lineBasicMaterial
+            color={selected ? '#FFAA00' : colors.gridSection}
+            transparent
+            opacity={selected ? 0.8 : 0.35}
+          />
+        </lineSegments>
+      )}
+
+      {/* T2 adaptive template: show the declared DOF travel axis. */}
+      {tClass === 'adaptive' && selected && dofAxes.map(dof => (
+        <group key={dof.name} quaternion={quat}>
+          <mesh quaternion={dof.quat} raycast={NO_RAYCAST}>
+            <cylinderGeometry args={[0.7, 0.7, dof.lengthMm, 8]} />
+            <meshBasicMaterial color="#85b918" transparent opacity={0.8} depthWrite={false} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }

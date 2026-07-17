@@ -29,7 +29,18 @@ import {
   Biotech as PhysicsIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
-import { categoryOf } from '../document';
+import {
+  LIBRARY_GROUP,
+  T_CLASS_LABEL,
+  categoryOf,
+  entriesFromIndex,
+  entriesFromWorkspace,
+  registerLibraryModules,
+  templateClassOf,
+} from '../document';
+import { useLibraryIndex } from '../model/libraryIndex';
+import { useWorkspaceLibrary } from '../model/workspaceLibrary';
+import { getCoreUrl } from '../api/coreClient';
 import { GlyphThumb } from './schematic/GlyphThumb';
 import { loadThumbnailManifest, defaultOrientation, thumbnailUrl, type ThumbnailManifest } from '../utils/moduleThumbnails';
 import { ModuleCreationWizard } from './ModuleCreationWizard';
@@ -118,6 +129,20 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
   useEffect(() => {
     if (glbThumbnails) loadThumbnailManifest().then(setThumbManifest);
   }, [glbThumbnails]);
+
+  // WP-34: registry + workspace parts join the palette as the "Library"
+  // group. Re-registers whenever the index refreshes (bumpLibraryIndex after
+  // a dev write / workspace save) or a loadModules() call wiped the list.
+  const libraryIndex = useLibraryIndex();
+  const workspaceRecords = useWorkspaceLibrary(s => s.records);
+  const workspaceThumbs = useWorkspaceLibrary(s => s.thumbnails);
+  useEffect(() => {
+    const registry = entriesFromIndex(libraryIndex.modules, getCoreUrl());
+    const registryIds = new Set(registry.map(e => e.moduleId));
+    const workspace = entriesFromWorkspace(workspaceRecords, workspaceThumbs)
+      .filter(e => !registryIds.has(e.moduleId));
+    registerLibraryModules([...registry, ...workspace]);
+  }, [libraryIndex.modules, workspaceRecords, workspaceThumbs, modules]);
 
   useEffect(() => {
     loadModules();
@@ -353,6 +378,10 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
     // keep the SVG symbol.
     const glbOrient = glbThumbnails ? defaultOrientation(thumbManifest, module.id) : null;
     const imgSrc = (glbOrient ? thumbnailUrl(module.id, glbOrient) : null) || module.thumbnail;
+    const isLibrary = module.group === LIBRARY_GROUP;
+    // T-class badge (WP-34): registry modules always have one; CSV parts get
+    // a best-effort class where a library record with the same id exists.
+    const tClass = templateClassOf(module.id);
     return (
       <Card
         key={module.id}
@@ -397,8 +426,17 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
             }}
           >
             {opticalGlyphs ? (
-              // Schematic palette (WP-23): the optical symbol, not the cube.
-              <GlyphThumb category={categoryOf(module.id, module)} size={58} />
+              // Schematic palette (WP-23): the optical symbol, not the cube —
+              // except library parts with a real thumbnail (WP-34).
+              isLibrary && module.thumbnail ? (
+                <img
+                  src={module.thumbnail}
+                  alt={module.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 4 }}
+                />
+              ) : (
+                <GlyphThumb category={categoryOf(module.id, module)} size={58} />
+              )
             ) : iconMode === 'canvas' ? (
               <MiniPhysicalIcon module={module} size={58} />
             ) : imgSrc ? (
@@ -457,12 +495,30 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
               {module.name}
             </Typography>
             
-            <Chip 
+            {tClass && (
+              <Tooltip
+                title={
+                  tClass === 'fixed'
+                    ? 'T1 — fixed template: the pose comes from the record'
+                    : tClass === 'adaptive'
+                      ? 'T2 — adaptive template: moves along its declared DOF axes'
+                      : 'T3 — generative template: placed freely, the generator wraps it'
+                }
+              >
+                <Chip
+                  label={T_CLASS_LABEL[tClass]}
+                  size="small"
+                  color={tClass === 'fixed' ? 'default' : tClass === 'adaptive' ? 'success' : 'secondary'}
+                  sx={{ height: 18, fontSize: '0.6rem', flexShrink: 0, fontWeight: 700 }}
+                />
+              </Tooltip>
+            )}
+            <Chip
               label={`${module.footprint.width}×${module.footprint.height}`}
               size="small"
               variant="outlined"
-              sx={{ 
-                height: 18, 
+              sx={{
+                height: 18,
                 fontSize: '0.6rem',
                 flexShrink: 0,
               }}

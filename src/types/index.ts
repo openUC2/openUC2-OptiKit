@@ -33,6 +33,9 @@ export interface ModuleDefinition {
   docsUrl?: string;
   glbUrl?: string;
   glbOffset?: [number, number, number];
+  /** Explicit schematic category for library-registry modules (WP-34) —
+   * checked before the group-name heuristics in `categoryOf`. */
+  docCategory?: string;
   /** Intra-cube placement offsets sourced from CSV (mirrors optikit_exporter conventions). */
   placementOffset?: {
     dx_mm: number;        // transverse X offset within cube (mm)

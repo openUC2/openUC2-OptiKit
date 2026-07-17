@@ -13,16 +13,59 @@
 
 import { useMemo } from 'react';
 import type { DocPart } from '../../document';
-import { rotateDocVec, useDocParts } from '../../document';
+import { libraryEntryOf, rotateDocVec, useDocParts } from '../../document';
 import { runSimulation } from '../../simulation/SimulationEngine';
 import { opticalAxisOf } from './ports';
 import { MODULE_SIMULATION_MODELS } from '../../types';
 import type {
   OpticalElement,
   OpticalElementParams,
+  OpticalElementType,
   RayPath,
   SimulationConfig,
 } from '../../types';
+
+/**
+ * Synthetic sim models for library-registry parts (WP-34): the palette entry
+ * has no MODULE_SIMULATION_MODELS row, so approximate one from the record
+ * category (+ EFL where declared). Categories the 2D engine can't model
+ * return null and simply don't participate in the in-plane preview.
+ */
+function libraryElementModel(
+  part: DocPart,
+): { elementType: OpticalElementType; defaultParams: OpticalElementParams } | null {
+  const lib = libraryEntryOf(part.libraryRef);
+  if (!lib) return null;
+  switch (lib.category) {
+    case 'lens':
+      return {
+        elementType: 'lens',
+        defaultParams: { focalLength: lib.eflMm ?? 100, aperture: 25 },
+      };
+    case 'mirror':
+      return {
+        elementType: 'mirror',
+        defaultParams: { curvature: 0, reflectivity: 0.99, aperture: 25, angle: -45 },
+      };
+    case 'beamsplitter':
+    case 'dichroic':
+      return {
+        elementType: 'beamsplitter',
+        defaultParams: { splitRatio: 0.5, aperture: 25, angle: 45 },
+      };
+    case 'source':
+      return {
+        elementType: 'laser',
+        defaultParams: { wavelength: 532, power: 5, divergence: 0, beamDiameter: 2, rayCount: 5 },
+      };
+    case 'detector':
+      return { elementType: 'detector', defaultParams: { width: 12, height: 8, aperture: 25 } };
+    case 'filter':
+      return { elementType: 'filter', defaultParams: { aperture: 25 } };
+    default:
+      return null;
+  }
+}
 
 const SIM_CONFIG: SimulationConfig = {
   enabled: true,
@@ -42,10 +85,14 @@ const SIM_CONFIG: SimulationConfig = {
 const PLANE_TOLERANCE_MM = 27.5;
 
 export function partToElement(part: DocPart): OpticalElement | null {
-  const sim = MODULE_SIMULATION_MODELS[part.libraryRef];
+  const csvSim = MODULE_SIMULATION_MODELS[part.libraryRef];
+  const sim =
+    csvSim && csvSim.elementType !== 'compound'
+      ? csvSim
+      : libraryElementModel(part); // registry/workspace parts (WP-34)
   if (!sim || sim.elementType === 'compound') return null;
   const params: OpticalElementParams = { ...sim.defaultParams };
-  if (sim.parameterMappings) {
+  if ('parameterMappings' in sim && sim.parameterMappings) {
     for (const [moduleParam, simParam] of Object.entries(sim.parameterMappings)) {
       const v = part.params[moduleParam];
       if (v !== undefined) (params as Record<string, unknown>)[simParam] = v;

@@ -12,6 +12,7 @@
 import type { AxisDir, DocCategory, DocPart, DocSnapshot, Rot24, Vec3 } from '../../document';
 import { UC2_GRID_MM, parsePortRef } from '../../document';
 import { catalogPortsOf } from '../../document/portCatalog';
+import { libraryEntryOf } from '../../document/libraryPalette';
 import type {
   CompSpec,
   DesignDecl,
@@ -55,6 +56,8 @@ export function paletteOpticsOf(part: {
   params: Record<string, unknown>;
 }): NonNullable<CompSpec['optics']> {
   const ports = catalogPortsOf(part.libraryRef, part.category);
+  // Library-registry parts (WP-34) carry real port offsets and an EFL.
+  const lib = libraryEntryOf(part.libraryRef);
   const aperture = typeof part.params.aperture === 'number' ? part.params.aperture : 25;
   const semi = aperture / 2;
 
@@ -65,7 +68,10 @@ export function paletteOpticsOf(part: {
   switch (part.category) {
     case 'lens': {
       // Thin biconvex approximation: 1/f ≈ (n−1)(1/R1 − 1/R2) ⇒ R = 2f(n−1).
-      const f = typeof part.params.focalLength === 'number' ? part.params.focalLength : 100;
+      const f =
+        typeof part.params.focalLength === 'number'
+          ? part.params.focalLength
+          : (lib?.eflMm ?? 100);
       const n = 1.5168; // N-BK7
       const r = Math.abs(2 * f * (n - 1));
       const sign = f >= 0 ? 1 : -1;
@@ -106,7 +112,17 @@ export function paletteOpticsOf(part: {
   const portSpecs: Record<string, unknown> = {};
   for (const p of ports) {
     const isEntry = /^(front|sensor|in|plane)$/.test(p.name);
-    const spec: Record<string, unknown> = { frame: 'optical', direction: p.direction };
+    // Ports with a real datum offset (library records) get their own frame.
+    let frameName = 'optical';
+    if (p.positionMm.some(v => v !== 0)) {
+      frameName = p.name;
+      frames[frameName] = {
+        'x-mm': round6(p.positionMm[0]),
+        'y-mm': round6(p.positionMm[1]),
+        'z-mm': round6(p.positionMm[2]),
+      };
+    }
+    const spec: Record<string, unknown> = { frame: frameName, direction: p.direction };
     if (!isEntry && lastSurface !== null) {
       // Exit ports leave after the fold surface (0) or the last lens surface.
       spec['after-surface'] = p.name === 'reflected' ? 0 : lastSurface;

@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ComponentRecord } from './dsn/generated/library-component';
+import { bumpLibraryIndex } from './libraryIndex';
 
 interface WorkspaceLibraryState {
   /** id → full record (latest saved version wins). */
@@ -25,8 +26,11 @@ export const useWorkspaceLibrary = create<WorkspaceLibraryState>()(
     set => ({
       records: {},
       thumbnails: {},
-      save: record =>
-        set(s => ({ records: { ...s.records, [record.id]: record } })),
+      save: record => {
+        set(s => ({ records: { ...s.records, [record.id]: record } }));
+        // WP-34: freshly saved parts appear in the palette without a reload.
+        bumpLibraryIndex();
+      },
       saveThumbnail: (id, dataUrl) =>
         set(s => ({ thumbnails: { ...s.thumbnails, [id]: dataUrl } })),
       remove: id =>

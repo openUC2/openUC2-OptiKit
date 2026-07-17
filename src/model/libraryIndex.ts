@@ -6,9 +6,15 @@
  * snapshot bundled under public/optikit-library/ is the OFFLINE FALLBACK
  * only — `useLibraryIndex` falls back to it automatically when the service
  * is unreachable. A user-entered URL (persisted) always wins.
+ *
+ * WP-34: module entries are typed (T-class, assets, ports) and the hook
+ * refetches when `bumpLibraryIndex()` fires — the component editor's save
+ * and the bind workbench's dev write call it, so freshly authored parts
+ * appear in the schematic palette without a manual reload.
  */
 
 import { useEffect, useState } from 'react';
+import { create } from 'zustand';
 import { getCoreUrl } from '../api/coreClient';
 
 export interface IndexComponent {
@@ -24,10 +30,58 @@ export interface IndexComponent {
   review: boolean;
 }
 
+/** A record port with its frame offset resolved to local mm (WP-34). */
+export interface IndexPort {
+  name: string;
+  direction: string;
+  position_mm: [number, number, number];
+  after_surface: number | null;
+}
+
+export interface IndexDof {
+  name: string;
+  kind: 'translation' | 'rotation' | 'parameter';
+  axis: string;
+  unit: string;
+  range: [number, number] | null;
+  actuatable: boolean;
+}
+
+export interface IndexModule {
+  id: string;
+  version: string;
+  kind: 'cube_module';
+  description: string;
+  tags: string[];
+  category: string;
+  thumbnail: string | null;
+  footprint_grid: [number, number, number];
+  review: boolean;
+  component: {
+    ref: string;
+    resolved: string | null;
+    vendor: { name: string; mpn: string; url: string } | null;
+    efl_mm: number | null;
+  };
+  template: {
+    ref: string;
+    id?: string | null;
+    resolved: string | null;
+    class: 'fixed' | 'adaptive' | 'generative' | null;
+    actuatable: boolean;
+    dof?: IndexDof[];
+    states?: string[];
+  };
+  /** Service asset URL paths (`/v1/library/assets/...`), origin-relative. */
+  assets?: { thumbnail: string | null; glb: string | null; step: string | null };
+  ports?: IndexPort[];
+  electronics: unknown | null;
+}
+
 export interface LibraryIndex {
   schema: string;
   count: number;
-  modules: unknown[];
+  modules: IndexModule[];
   components?: IndexComponent[];
 }
 
@@ -46,11 +100,30 @@ export function setIndexUrl(url: string): void {
   else localStorage.removeItem(URL_STORAGE_KEY);
 }
 
+// ── refresh signal (WP-34) ────────────────────────────────────────────────────
+
+interface LibraryRefreshState {
+  version: number;
+  bump: () => void;
+}
+
+const useLibraryRefresh = create<LibraryRefreshState>(set => ({
+  version: 0,
+  bump: () => set(s => ({ version: s.version + 1 })),
+}));
+
+/** Signal that the library changed (dev write / workspace save) — every
+ * mounted `useLibraryIndex` refetches. */
+export function bumpLibraryIndex(): void {
+  useLibraryRefresh.getState().bump();
+}
+
 export interface IndexState {
   url: string;
   loading: boolean;
   error: string | null;
   components: IndexComponent[];
+  modules: IndexModule[];
 }
 
 export async function fetchLibraryIndex(url: string): Promise<LibraryIndex> {
@@ -63,13 +136,16 @@ export async function fetchLibraryIndex(url: string): Promise<LibraryIndex> {
   return data;
 }
 
-/** Load the index from the configured URL; refetches when the URL changes. */
+/** Load the index from the configured URL; refetches when the URL changes or
+ * `bumpLibraryIndex()` fires. */
 export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void } {
   const [url, setUrlState] = useState(getIndexUrl);
+  const refreshVersion = useLibraryRefresh(s => s.version);
   const [state, setState] = useState<Omit<IndexState, 'url'>>({
     loading: true,
     error: null,
     components: [],
+    modules: [],
   });
 
   useEffect(() => {
@@ -78,13 +154,20 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
     fetchLibraryIndex(url)
       .then(index => {
         if (cancelled) return;
-        setState({ loading: false, error: null, components: index.components ?? [] });
+        setState({
+          loading: false,
+          error: null,
+          components: index.components ?? [],
+          modules: index.modules ?? [],
+        });
       })
       .catch(async (err: unknown) => {
         // Service unreachable → the bundled snapshot keeps the browser
         // working offline (WP-22). Surface where the data came from.
         if (cancelled || url === FALLBACK_INDEX_URL) {
-          if (!cancelled) setState({ loading: false, error: String(err), components: [] });
+          if (!cancelled) {
+            setState({ loading: false, error: String(err), components: [], modules: [] });
+          }
           return;
         }
         try {
@@ -94,15 +177,18 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
             loading: false,
             error: `registry unreachable (${String(err)}) — showing the bundled offline snapshot`,
             components: fallback.components ?? [],
+            modules: fallback.modules ?? [],
           });
         } catch {
-          if (!cancelled) setState({ loading: false, error: String(err), components: [] });
+          if (!cancelled) {
+            setState({ loading: false, error: String(err), components: [], modules: [] });
+          }
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, refreshVersion]);
 
   const setUrl = (next: string) => {
     setIndexUrl(next);

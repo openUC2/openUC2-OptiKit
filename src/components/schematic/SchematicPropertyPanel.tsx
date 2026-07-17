@@ -13,6 +13,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  MenuItem,
   Slider,
   Stack,
   TextField,
@@ -25,14 +26,17 @@ import {
 } from '@mui/icons-material';
 import type { DocPart, Vec3 } from '../../document';
 import {
+  T_CLASS_LABEL,
   captureUndo,
   commitUndo,
+  libraryEntryOf,
   movePartWorld,
   removePart,
   removePath,
   renamePart,
   rotatePart,
   setDofValue,
+  setPartParam,
   tiltPart,
   useDocPart,
   useDocPaths,
@@ -44,11 +48,13 @@ function NumberField({
   value,
   onCommit,
   step = 1,
+  disabled = false,
 }: {
   label: string;
   value: number;
   onCommit: (v: number) => void;
   step?: number;
+  disabled?: boolean;
 }) {
   const [text, setText] = useState(value.toFixed(2));
   useEffect(() => setText(value.toFixed(2)), [value]);
@@ -62,6 +68,7 @@ function NumberField({
       label={label}
       size="small"
       value={text}
+      disabled={disabled}
       onChange={e => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={e => {
@@ -84,6 +91,11 @@ function PartProperties({ part }: { part: DocPart }) {
   const [ref, setRef] = useState(part.ref);
   useEffect(() => setRef(part.ref), [part.ref]);
   const pos = part.worldPose.positionMm;
+  // Mechanical template class of the part's library record (WP-34).
+  const lib = libraryEntryOf(part.libraryRef);
+  const tClass = lib?.templateClass ?? null;
+  const isT1 = tClass === 'fixed';
+  const stateParam = typeof part.params.state === 'string' ? part.params.state : '';
 
   const setAxis = (axis: 0 | 1 | 2) => (v: number) => {
     const next = [...pos] as Vec3;
@@ -102,6 +114,24 @@ function PartProperties({ part }: { part: DocPart }) {
           onBlur={() => ref !== part.ref && renamePart(part.id, ref)}
           sx={{ flex: 1 }}
         />
+        {tClass && (
+          <Tooltip
+            title={
+              isT1
+                ? 'T1 fixed template: the intra-cube pose comes from the record'
+                : tClass === 'adaptive'
+                  ? 'T2 adaptive template: moves along its declared DOF axes'
+                  : 'T3 generative template: free placement, the generator wraps it'
+            }
+          >
+            <Chip
+              size="small"
+              label={T_CLASS_LABEL[tClass]}
+              color={isT1 ? 'default' : tClass === 'adaptive' ? 'success' : 'secondary'}
+              sx={{ fontWeight: 700 }}
+            />
+          </Tooltip>
+        )}
         <Chip size="small" label={part.category} />
         <Tooltip title="Delete part (Del)">
           <IconButton size="small" color="error" onClick={() => removePart(part.id)}>
@@ -121,6 +151,7 @@ function PartProperties({ part }: { part: DocPart }) {
 
       <Typography variant="caption" color="text.secondary">
         Orientation (°) — fine tilts about the part's local axes (WP-28)
+        {isT1 && ' — locked by the T1 template'}
       </Typography>
       <Stack direction="row" spacing={1}>
         <NumberField
@@ -128,12 +159,14 @@ function PartProperties({ part }: { part: DocPart }) {
           value={part.gridPose.offsetDeg.x}
           onCommit={v => withUndoStep(() => tiltPart(part.id, { x: v }))}
           step={0.5}
+          disabled={isT1}
         />
         <NumberField
           label="Roll y°"
           value={part.gridPose.offsetDeg.y}
           onCommit={v => withUndoStep(() => tiltPart(part.id, { y: v }))}
           step={0.5}
+          disabled={isT1}
         />
         <NumberField
           label="Yaw z°"
@@ -142,6 +175,42 @@ function PartProperties({ part }: { part: DocPart }) {
           step={5}
         />
       </Stack>
+
+      {/* T1 with declared states (WP-34 amendment): a discrete configuration
+          switcher (Inventor positional representations), not free pose. */}
+      {isT1 && (lib?.states.length ?? 0) > 0 && (
+        <TextField
+          select
+          size="small"
+          label="Template state"
+          value={stateParam || lib!.states[0]}
+          onChange={e =>
+            withUndoStep(() => setPartParam(part.id, 'state', e.target.value))
+          }
+          helperText="discrete T1 configurations from the template record"
+        >
+          {lib!.states.map(s => (
+            <MenuItem key={s} value={s}>
+              {s}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
+
+      {/* T2: the declared travel axes, even before a value is set. */}
+      {tClass === 'adaptive' && (lib?.dofs.length ?? 0) > 0 && (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+          {lib!.dofs.map(d => (
+            <Chip
+              key={d.name}
+              size="small"
+              variant="outlined"
+              color="success"
+              label={`${d.name}: ${d.axis || '?'}${d.range ? ` ∈ [${d.range[0]}, ${d.range[1]}] ${d.unit}` : ''}`}
+            />
+          ))}
+        </Stack>
+      )}
       <Typography variant="caption" color="text.secondary">
         grid cell [{part.gridPose.cell.join(', ')}]
         {part.gridPose.offsetMm.some(v => Math.abs(v) > 1e-6) &&

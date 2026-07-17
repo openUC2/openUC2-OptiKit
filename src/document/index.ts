@@ -34,6 +34,20 @@ export {
   useSelectedPartId,
 } from './OptikitDocument';
 export type { PartRenderInfo, UndoToken } from './OptikitDocument';
+export { setPartParam } from './OptikitDocument';
+export {
+  DEFAULT_LIB_ROT,
+  LIBRARY_GROUP,
+  T_CLASS_LABEL,
+  defaultRotationFor,
+  docCategoryOfRecord,
+  entriesFromIndex,
+  entriesFromWorkspace,
+  libraryEntryOf,
+  registerLibraryModules,
+  templateClassOf,
+} from './libraryPalette';
+export type { LibraryDof, LibraryPaletteEntry, TemplateClass } from './libraryPalette';
 export {
   DOC_PARAMS_KEY,
   docPosToThree,

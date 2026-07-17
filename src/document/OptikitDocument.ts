@@ -20,10 +20,12 @@ import {
   eulerTripleForRot24,
   getDocParams,
   gridPoseOf,
+  rotateDocVec,
   splitDocYaw,
   splitWorldPosition,
   worldPoseOf,
 } from './mapping';
+import { defaultRotationFor, libraryEntryOf } from './libraryPalette';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
 import type { DocCategory, DocDof, DocPart, DocPath, DocSnapshot, PortRef, Vec3 } from './types';
@@ -46,6 +48,8 @@ const ELEMENT_TYPE_TO_CATEGORY: Record<string, DocCategory> = {
 };
 
 export function categoryOf(moduleId: string, def?: ModuleDefinition): DocCategory {
+  // Library-registry modules carry their record category explicitly (WP-34).
+  if (def?.docCategory) return def.docCategory as DocCategory;
   const sim = MODULE_SIMULATION_MODELS[moduleId];
   if (sim && sim.elementType !== 'compound') {
     return ELEMENT_TYPE_TO_CATEGORY[sim.elementType] ?? 'other';
@@ -137,7 +141,45 @@ export function addPart(
   if (placement.offsetMm.some(v => v !== 0)) {
     setDocParams(created.id, { offsetMm: placement.offsetMm });
   }
+  // Library records author their optics along ±z (schema convention); rotate
+  // the placement so the entry beam runs along document +x and any fold arm
+  // points -y — the WP-29 plane convention (like the golden designs do).
+  const lib = libraryEntryOf(libraryRef);
+  const rot = lib ? defaultRotationFor(lib.ports) : null;
+  if (rot) setPartOrientation(created.id, rot);
   return created.id;
+}
+
+/**
+ * Constrain an intra-cube residual to what the part's mechanical template
+ * class allows (WP-34): T1 fixed templates hold the record pose (δ = 0);
+ * T2 adaptive templates only move along their declared DOF axes, clamped to
+ * the declared range. Unclassified parts move freely.
+ */
+function constrainOffsetToTemplate(m: PlacedModule, offsetMm: Vec3): Vec3 {
+  const lib = libraryEntryOf(m.moduleId);
+  if (!lib?.templateClass) return offsetMm;
+  if (lib.templateClass === 'fixed') return [0, 0, 0];
+  if (lib.templateClass === 'adaptive' && lib.dofs.length > 0) {
+    // Project the residual onto the world-frame images of the declared
+    // translation axes (part-local), each clamped to its range.
+    const constrained: Vec3 = [0, 0, 0];
+    const rotation = worldPoseOf(m).rotation;
+    for (const dof of lib.dofs) {
+      if (dof.kind !== 'translation') continue;
+      const local: Vec3 =
+        dof.axis === 'x' ? [1, 0, 0] : dof.axis === 'y' ? [0, 1, 0] : [0, 0, 1];
+      const axis = rotateDocVec(rotation, local);
+      let along =
+        offsetMm[0] * axis[0] + offsetMm[1] * axis[1] + offsetMm[2] * axis[2];
+      if (dof.range) along = Math.min(dof.range[1], Math.max(dof.range[0], along));
+      constrained[0] += along * axis[0];
+      constrained[1] += along * axis[1];
+      constrained[2] += along * axis[2];
+    }
+    return constrained;
+  }
+  return offsetMm; // generative (T3): free inside the cube — the generator wraps it
 }
 
 /** Move a part to an absolute document-frame position in mm (continuous). */
@@ -146,7 +188,9 @@ export function movePartWorld(partId: string, positionMm: Vec3, opts?: { snap?: 
   const m = store.placedModules.find(p => p.id === partId);
   if (!m) return;
   const placement = splitWorldPosition(positionMm);
-  const offsetMm: Vec3 = opts?.snap ? [0, 0, 0] : placement.offsetMm;
+  const offsetMm: Vec3 = opts?.snap
+    ? [0, 0, 0]
+    : constrainOffsetToTemplate(m, placement.offsetMm);
   if (m.position.x !== placement.position.x || m.position.y !== placement.position.y) {
     store.moveModule(partId, placement.position);
   }
@@ -242,6 +286,12 @@ export function removePart(partId: string): void {
 
 export function renamePart(partId: string, ref: string): void {
   useAppStore.getState().updateModuleCustomText(partId, ref);
+}
+
+/** Set a user-level part parameter (round-trips through `.dsn` params) —
+ * e.g. the selected T1 state (WP-34). */
+export function setPartParam(partId: string, key: string, value: unknown): void {
+  useAppStore.getState().updateModuleParams(partId, { [key]: value });
 }
 
 export function setPath(name: string, chain: PortRef[]): void {

@@ -52,7 +52,7 @@ import {
 import type { Vec3 } from '../../document';
 import { recordToYaml, type RecordDraft } from '../../model/componentRecord';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
-import { useLibraryIndex } from '../../model/libraryIndex';
+import { bumpLibraryIndex, useLibraryIndex } from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import { zipDsn } from '../../model/dsn/io';
 import { BindScene } from './BindScene';
@@ -217,6 +217,9 @@ export function MechanicsPanel({
         else assets[path] = content;
       }
       const result = await saveLibraryRecords(records, assets);
+      // WP-34: the registry index is rebuilt per request — bumping makes the
+      // new part appear in the schematic palette without a manual reload.
+      bumpLibraryIndex();
       setFlash(`wrote ${result.written.length} file(s) into ../optikit-core/library`);
       setTimeout(() => setFlash(null), 5000);
     } catch (err) {

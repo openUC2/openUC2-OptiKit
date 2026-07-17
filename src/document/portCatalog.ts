@@ -22,6 +22,7 @@
 
 import type { DocCategory } from './types';
 import type { SourcePort } from './sourceDesignStore';
+import { libraryEntryOf } from './libraryPalette';
 
 const P = (
   name: string,
@@ -72,7 +73,11 @@ const CATEGORY_PORTS: Record<DocCategory, SourcePort[]> = {
 /**
  * Catalog ports for a palette part. Always returns a non-empty list — the
  * category default is itself catalog data, not a separate code path.
+ * Library-registry parts (WP-34) resolve to their RECORD ports (±z optical
+ * axis — placement compensates with the default grid rotation).
  */
 export function catalogPortsOf(libraryRef: string, category: DocCategory): SourcePort[] {
+  const lib = libraryEntryOf(libraryRef);
+  if (lib && lib.ports.length > 0) return lib.ports;
   return MODULE_PORTS[libraryRef] ?? CATEGORY_PORTS[category] ?? THROUGH;
 }

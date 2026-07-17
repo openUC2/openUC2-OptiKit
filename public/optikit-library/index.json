@@ -31,10 +31,30 @@
       },
       "template": {
         "ref": "openuc2.tpl.camera_mount_1x1@^0.1",
+        "id": "openuc2.tpl.camera_mount_1x1",
         "resolved": "0.1.0",
         "class": "fixed",
-        "actuatable": false
+        "actuatable": false,
+        "dof": [],
+        "states": []
       },
+      "assets": {
+        "thumbnail": null,
+        "glb": "/v1/library/assets/templates/openuc2.tpl.camera_mount_1x1/model.glb",
+        "step": "/v1/library/assets/templates/openuc2.tpl.camera_mount_1x1/model.step"
+      },
+      "ports": [
+        {
+          "name": "sensor",
+          "direction": "-z",
+          "position_mm": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "after_surface": null
+        }
+      ],
       "electronics": null
     },
     {
@@ -66,10 +86,30 @@
       },
       "template": {
         "ref": "openuc2.tpl.laser_pointer_1x1@^0.1",
+        "id": "openuc2.tpl.laser_pointer_1x1",
         "resolved": "0.1.0",
         "class": "fixed",
-        "actuatable": false
+        "actuatable": false,
+        "dof": [],
+        "states": []
       },
+      "assets": {
+        "thumbnail": null,
+        "glb": "/v1/library/assets/templates/openuc2.tpl.laser_pointer_1x1/model.glb",
+        "step": "/v1/library/assets/templates/openuc2.tpl.laser_pointer_1x1/model.step"
+      },
+      "ports": [
+        {
+          "name": "out",
+          "direction": "+z",
+          "position_mm": [
+            0.0,
+            0.0,
+            20.0
+          ],
+          "after_surface": null
+        }
+      ],
       "electronics": null
     },
     {
@@ -102,10 +142,52 @@
       },
       "template": {
         "ref": "openuc2.tpl.lens_insert_25mm@^1",
+        "id": "openuc2.tpl.lens_insert_25mm",
         "resolved": "1.0.0",
         "class": "adaptive",
-        "actuatable": true
+        "actuatable": true,
+        "dof": [
+          {
+            "name": "dz",
+            "kind": "translation",
+            "axis": "z",
+            "unit": "mm",
+            "range": [
+              -7.5,
+              7.5
+            ],
+            "actuatable": true
+          }
+        ],
+        "states": []
       },
+      "assets": {
+        "thumbnail": null,
+        "glb": null,
+        "step": null
+      },
+      "ports": [
+        {
+          "name": "front",
+          "direction": "-z",
+          "position_mm": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "after_surface": null
+        },
+        {
+          "name": "back",
+          "direction": "+z",
+          "position_mm": [
+            0.0,
+            0.0,
+            5.0
+          ],
+          "after_surface": 1
+        }
+      ],
       "electronics": {
         "pcb": "kicad:z_stage_driver@2.1",
         "firmware-contract": "uc2:can:motor_axis@1",
@@ -146,10 +228,43 @@
       },
       "template": {
         "ref": "openuc2.tpl.mirror_mount_1x1@^0.1",
+        "id": "openuc2.tpl.mirror_mount_1x1",
         "resolved": "0.1.0",
         "class": "fixed",
-        "actuatable": false
+        "actuatable": false,
+        "dof": [],
+        "states": [
+          "XY",
+          "YZ"
+        ]
       },
+      "assets": {
+        "thumbnail": null,
+        "glb": "/v1/library/assets/templates/openuc2.tpl.mirror_mount_1x1/model.glb",
+        "step": "/v1/library/assets/templates/openuc2.tpl.mirror_mount_1x1/model.step"
+      },
+      "ports": [
+        {
+          "name": "front",
+          "direction": "-z",
+          "position_mm": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "after_surface": null
+        },
+        {
+          "name": "reflected",
+          "direction": "+x",
+          "position_mm": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "after_surface": 0
+        }
+      ],
       "electronics": null
     }
   ],
