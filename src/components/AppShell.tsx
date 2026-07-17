@@ -13,17 +13,20 @@ import type { ReactNode } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import { Box } from '@mui/material';
 import { materialTheme, materialThemeDark } from '../theme/materialTheme';
+import { useThemeMode } from '../theme/themeMode';
 import { Toolbar } from './Toolbar';
 
 export function AppShell({
   children,
-  mode = 'dark',
 }: {
   children: ReactNode;
+  /** @deprecated the persisted toggle (useThemeMode) decides the mode now. */
   mode?: 'dark' | 'light';
 }) {
-  // No CssBaseline here — the app root owns it; the shell's Box paints the
-  // themed background over the whole viewport.
+  // Feedback round 3: the persisted light/dark toggle owns the mode — light
+  // by default, flipped from the toolbar. No CssBaseline here — the app
+  // root owns it; the shell's Box paints the themed background.
+  const mode = useThemeMode(s => s.mode);
   return (
     <ThemeProvider theme={mode === 'dark' ? materialThemeDark : materialTheme}>
       <Box

@@ -7,6 +7,7 @@ import {
   Divider,
   Box,
   Button,
+  IconButton,
   Menu,
   MenuItem,
   ListItemIcon,
@@ -38,6 +39,8 @@ import {
   SelectAll as SelectIcon,
   Delete as DeleteIcon,
   Memory as ImSwitchIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
   Science as SimulationIcon,
   ThreeDRotation as View3DIcon
 } from '@mui/icons-material';
@@ -49,6 +52,7 @@ import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 import { SyncChip } from './sync/SyncChip';
 import { BrandLogo } from './BrandLogo';
+import { useThemeMode } from '../theme/themeMode';
 
 export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
@@ -76,6 +80,8 @@ export const Toolbar: React.FC = () => {
   const [annotateMenuAnchor, setAnnotateMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [helpMenuAnchor, setHelpMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const themeMode = useThemeMode(s => s.mode);
+  const toggleThemeMode = useThemeMode(s => s.toggle);
   
   const { 
     exportData, 
@@ -747,12 +753,19 @@ openUC2 team via GitHub repository
           </>
         )}
 
+        {/* Light/dark toggle — flips chrome AND the canvases (round 3). */}
+        <Tooltip title={themeMode === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}>
+          <IconButton color="inherit" size="small" onClick={toggleThemeMode} sx={{ ml: 'auto' }}>
+            {themeMode === 'light' ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+
         {/* Help menu — always visible */}
         <Button
           color="inherit"
           size="small"
           onClick={e => setHelpMenuAnchor(e.currentTarget)}
-          sx={{ textTransform: 'none', minWidth: 0, px: 1.5, ml: 'auto' }}
+          sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
         >
           Help
         </Button>

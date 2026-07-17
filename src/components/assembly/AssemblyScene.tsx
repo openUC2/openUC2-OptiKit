@@ -42,6 +42,7 @@ import { GLBErrorBoundary } from '../../three/GLBErrorBoundary';
 import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExport';
 import type { Marker } from '../schematic/MarkerList';
 import { useAssemblyStore } from './assemblyStore';
+import { useSceneColors } from '../../theme/sceneColors';
 
 const NO_RAYCAST = () => null;
 
@@ -369,7 +370,7 @@ function CameraCapture({ cameraRef }: { cameraRef: AssemblySceneProps['cameraRef
   return null;
 }
 
-function SceneContent({ mechanics, lockView, cameraRef, controlsRef }: AssemblySceneProps) {
+function SceneContent({ mechanics, lockView, cameraRef, controlsRef, colors }: AssemblySceneProps & { colors: ReturnType<typeof useSceneColors> }) {
   const parts = useDocParts();
   const markers = useAssemblyStore(s => s.markers);
   const mechanicsById = useMemo(
@@ -415,8 +416,8 @@ function SceneContent({ mechanics, lockView, cameraRef, controlsRef }: AssemblyS
         cellThickness={0.8}
         sectionSize={UC2_GRID_MM[0] * 5}
         sectionThickness={1.3}
-        cellColor="#3c4654"
-        sectionColor="#55637a"
+        cellColor={colors.gridCell}
+        sectionColor={colors.gridSection}
         infiniteGrid
         fadeDistance={9000}
         fadeStrength={1.1}
@@ -456,17 +457,19 @@ function SceneContent({ mechanics, lockView, cameraRef, controlsRef }: AssemblyS
 }
 
 export function AssemblyScene(props: AssemblySceneProps) {
+  // Resolved outside the Canvas (MUI context doesn't cross R3F).
+  const colors = useSceneColors();
   return (
     <Canvas
       camera={{ position: [340, 420, 520], near: 1, far: 30000, fov: 45 }}
       style={{ width: '100%', height: '100%' }}
       gl={{ alpha: false, preserveDrawingBuffer: true }}
-      scene={{ background: new THREE.Color('#171c24') }}
       onPointerMissed={e => {
         if (e.target instanceof HTMLCanvasElement) selectPart(null);
       }}
     >
-      <SceneContent {...props} />
+      <color attach="background" args={[colors.background]} />
+      <SceneContent {...props} colors={colors} />
     </Canvas>
   );
 }

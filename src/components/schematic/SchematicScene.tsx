@@ -26,6 +26,8 @@ import { AuthoritativeRays } from './AuthoritativeRays';
 import { GLYPH_COLORS } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
 import { beamAxesOf, glyphQuatOf, portsOf, resolvePortRef } from './ports';
+import { useSceneColors } from '../../theme/sceneColors';
+import type { SceneColors } from '../../theme/sceneColors';
 import type { SchematicPort } from './ports';
 import { useSchematicSim } from './useSchematicSim';
 import { useSimFreshness } from './serviceStore';
@@ -48,6 +50,8 @@ interface SceneProps {
   controlsRef?: React.MutableRefObject<{ target: THREE.Vector3; update: () => void } | null>;
 }
 
+type SceneContentProps = SceneProps & { colors: SceneColors };
+
 // ── coordinate helpers (doc frame ↔ three scene) ─────────────────────────────
 
 const toThree = (p: Vec3): [number, number, number] => [p[0], p[2], -p[1]];
@@ -63,12 +67,14 @@ function SchematicPart({
   chaining,
   onPinClick,
   setOrbitEnabled,
+  colors,
 }: {
   part: DocPart;
   settings: SchematicSettings;
   chaining: boolean;
   onPinClick: (ref: PortRef) => void;
   setOrbitEnabled: (v: boolean) => void;
+  colors: SceneColors;
 }) {
   const selectedId = useSelectedPartId();
   const selected = selectedId === part.id;
@@ -195,7 +201,10 @@ function SchematicPart({
       >
         <group quaternion={glyphQuat}>
           <SchematicGlyph category={part.category} label={part.ref} foldDeg={foldDeg} />
-          <OpticalAxisArrow color={selected ? '#ffd24d' : '#8f9aa6'} foldDeg={foldDeg} />
+          <OpticalAxisArrow
+            color={selected ? colors.labelSelected : colors.label}
+            foldDeg={foldDeg}
+          />
         </group>
       </group>
 
@@ -218,11 +227,11 @@ function SchematicPart({
       <Text
         position={[0, 26, 0]}
         fontSize={7}
-        color={selected ? '#ffd24d' : '#aeb6c2'}
+        color={selected ? colors.labelSelected : colors.label}
         anchorX="center"
         anchorY="bottom"
         outlineWidth={0.4}
-        outlineColor="#00000088"
+        outlineColor={colors.labelOutline}
       >
         {part.ref}
       </Text>
@@ -449,7 +458,7 @@ function CameraCapture({ cameraRef }: { cameraRef: SceneProps['cameraRef'] }) {
   return null;
 }
 
-function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef }: SceneProps) {
+function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef, colors }: SceneContentProps) {
   const parts = useDocParts();
   const paths = useDocPaths();
   const [orbitEnabled, setOrbitEnabled] = useState(true);
@@ -500,8 +509,8 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
         cellThickness={0.8}
         sectionSize={UC2_GRID_MM[0] * 5}
         sectionThickness={1.3}
-        cellColor="#3c4654"
-        sectionColor="#55637a"
+        cellColor={colors.gridCell}
+        sectionColor={colors.gridSection}
         infiniteGrid
         fadeDistance={9000}
         fadeStrength={1.1}
@@ -519,6 +528,7 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
             chaining={chainDraft !== null}
             onPinClick={onPinClick}
             setOrbitEnabled={setOrbitEnabled}
+            colors={colors}
           />
         ))}
       </Suspense>
@@ -540,17 +550,20 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
 }
 
 export function SchematicScene(props: SceneProps) {
+  // Resolved OUTSIDE the Canvas: MUI theme context does not cross the R3F
+  // boundary. The canvas follows the light/dark toggle (round 3).
+  const colors = useSceneColors();
   return (
     <Canvas
       camera={{ position: [0, 760, 480], near: 1, far: 30000, fov: 45 }}
       style={{ width: '100%', height: '100%' }}
       gl={{ alpha: false, preserveDrawingBuffer: true }}
-      scene={{ background: new THREE.Color('#171c24') }}
       onPointerMissed={e => {
         if (e.target instanceof HTMLCanvasElement) selectPart(null);
       }}
     >
-      <SceneContent {...props} />
+      <color attach="background" args={[colors.background]} />
+      <SceneContent {...props} colors={colors} />
     </Canvas>
   );
 }

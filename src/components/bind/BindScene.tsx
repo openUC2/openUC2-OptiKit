@@ -37,6 +37,7 @@ import type { Vec3 } from '../../document';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
 import { datumToCube, snapToAxis } from '../../model/bindRecord';
 import { useBindStore } from './bindStore';
+import { useSceneColors } from '../../theme/sceneColors';
 import type { OrthoView } from './bindStore';
 
 const NO_RAYCAST = () => null;
@@ -215,7 +216,7 @@ function PartMesh() {
 }
 
 /** Shared scene content — identical in every viewport. */
-function SceneContent() {
+function SceneContent({ colors }: { colors: ReturnType<typeof useSceneColors> }) {
   const ghostCube = useBindStore(s => s.ghostCube);
   const datums = useBindStore(s => s.datums);
   const transform = useBindStore(s => s.transform);
@@ -226,7 +227,7 @@ function SceneContent() {
       <directionalLight position={[-120, 150, -140]} intensity={0.4} />
       <Grid
         args={[500, 500]} cellSize={10} sectionSize={50}
-        cellColor="#3c4654" sectionColor="#55637a"
+        cellColor={colors.gridCell} sectionColor={colors.gridSection}
         position={[0, -25, 0]} infiniteGrid fadeDistance={1500}
       />
       {ghostCube && <GhostCube />}
@@ -251,13 +252,15 @@ function Viewport({ ortho }: { ortho: OrthoView | null }) {
   const mode = useBindStore(s => s.mode);
   const flip = useBindStore(s => (ortho ? s.orthoFlip[ortho] : false));
   const pose = ortho ? ORTHO_POSES[ortho] : null;
+  // Resolved outside the Canvas (MUI context doesn't cross R3F).
+  const colors = useSceneColors();
   return (
     <Canvas
       camera={ortho ? undefined : { position: [120, 100, 140], near: 0.5, far: 10000, fov: 45 }}
       style={{ width: '100%', height: '100%' }}
       gl={{ alpha: false, preserveDrawingBuffer: true }}
-      scene={{ background: new THREE.Color('#171c24') }}
     >
+      <color attach="background" args={[colors.background]} />
       {pose && (
         <OrthographicCamera
           makeDefault
@@ -275,7 +278,7 @@ function Viewport({ ortho }: { ortho: OrthoView | null }) {
         enabled={mode !== 'datum'}
         enableRotate={!ortho}
       />
-      <SceneContent />
+      <SceneContent colors={colors} />
       {!ortho && (
         <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
           <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />

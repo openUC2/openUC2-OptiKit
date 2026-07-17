@@ -1238,6 +1238,11 @@ enforce it: a T1 part can't be nudged inside its cube (you see its cube
 outline instead), while a T3 part can be placed freely for the generator to
 wrap.
 
+*Amended 2026-07-17:* T1 lock refined per the mechanical-templates document —
+a T1 part with declared `states:` shows a state SWITCHER (e.g. mirror plane
+XY ⇄ YZ) instead of nothing; T2 intra-cube dragging snaps to the groove
+lattice with the continuous δ_lens remaining inside the pocket bounds.
+
 ### WP-35 — The T1/T2/T3 strategies, encoded (Bene's note → platform behavior)
 
 ```
@@ -1284,6 +1289,37 @@ parameter list, so the CAD updates itself and re-exports STP/GLB — closing
 the optiland → Inventor loop. For generated parts (T3), wherever you place
 the optic inside the cube is where the auto-generated holder will put its
 cavity.
+
+**Amended 2026-07-17 from `DOCS/mechanical-templates/` (Bene's document,
+reviewed incl. images):**
+
+1. **T1 states.** T1 is not "zero knobs": a fixed design may offer a finite
+   set of named configurations, realized as Inventor *positional
+   representations* (the 45° mirror's `[Primary]` vs `mirror rotated 90°`,
+   i.e. normal in the XY vs YZ plane). Schema: `TemplateRecord.states:`
+   (name → optical plane/pose + Inventor representation name); the placed
+   component gets a state-enum DOF; the property panel shows a state
+   switcher instead of pose fields; the T1 fx changeset selects the
+   representation before export. Model flat_45/flat_0 as two states of one
+   module and verify-t1 per state.
+2. **T2 groove lattice.** Cube grooves sit at `g_n = g_0 + n·d_g`
+   (n = −3…3, pitch from Inventor — confirm the sketch's `d_g` formula);
+   a holder clamps a groove pair (n1, n2) with its origin at the pair
+   midpoint `((g_n1+g_n2)/2, 0, 0)`, and the lens carries a bounded
+   continuous offset δ_lens inside the pocket. Schema:
+   `TemplateRecord.grooves {pitch-mm, count, center-mm}`; the T2 dz DOF
+   decomposes to groove-pair (discrete) + δ_lens (continuous); cubify/DRC
+   snap and validate against the lattice; /v1/optimize results decompose
+   into nearest groove pair + residual for the fx changeset.
+3. **T2 pocket generation.** The MAS-2000 lens-holder pocket generator is
+   the reference (edge thickness + lens ⌀ + axis hole → "Generate Cut" →
+   MAS-2000-CUSTOM.stp): T2 = lattice-placed master insert with a
+   prescription-driven pocket — the pocket parameters derive from the
+   component record's surfaces (edge thickness from sag at ⌀, center
+   thickness, diameter), so binding a lens record to a T2 template can
+   generate the pocket without hand input. T3 stays the free-form cavity.
+4. **ME-guide warning:** always copy an existing Inventor design before
+   editing — parts/assemblies are cross-linked between designs.
 
 ### WP-36 — Sync with Ethan's `origin/subassemblies`
 
