@@ -84,7 +84,8 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-34 | palette ⇄ registry: "Library" palette group from the index + workspace (auto-refresh on save/dev-write via `bumpLibraryIndex`); index carries class/states/dof/assets/ports (core `d851ffd`); placement derives a grid rotation from the record's own ports (entry → +x, fold arm → -y); T1/T2/T3 badges everywhere; T1 δ-lock + cube outline + state switcher; T2 DOF-axis clamp + travel chips | ✅ done — verified live: registry tiles badged, workspace save appears without reload (110→111 tiles), T1 nudge snaps to the cell, T2 δ clamps to dz ∈ ±7.5 along world x, panel greys T1 tilts |
 | WP-36 | Ethan `origin/subassemblies` sync: **E1 CLOSED** (his `3bf6508` fixes cm→mm; pitches agree); conformance note in `optikit-core/DOCS/GO_INTEGRATION.md`; anchor chains stay translation-only (his `Flattened`→`TranslFlattened` rename codifies our contract); subassembly boundaries compose FULL transforms — ported as `flat_design_report()` + `design_dir_loader()`; goldens re-synced + symlinks; 26 prim-report fixtures regenerated FROM the branch (verified reproducible via `go run`); nested simple-3d.dsn is the new conformance case (15 prims, 2 levels, exact match) | ✅ done — divergences filed for E2: Go's new `rotation.type: quaternion` vs our `offset-deg` (E2 ask #7); `static-models` vs `model`; his glTF nested-render FIXME is his to change |
 | WP-35 | T1/T2/T3 encoded: `library verify-t1 <module>` (fragment ↔ template insert frame, E_POSE_MISMATCH/E_MIRROR_NO_REFLECTIVE; states warned per WP-35 amendment); glb2template ingests PLN/AXIS/PT markers → frames + review-flags a mirror without its PLN marker; T2 `optikit-core fx` → `optikit-fx.json` (fx name == dof name; groove lattice `TemplateRecord.grooves` decomposes dz → pair + δ), `/v1/optimize` returns the changeset + dialog download; PyInventor `apply_fx_params.py` (params + states + `--export` re-run); `pocket_params()` derives MAS-2000 pocket inputs from record surfaces; T3 `generate --design --component` regenerates the cavity at the placed pose | ✅ done — acceptance: bad mirror fails verify-t1 (exit 1); fx JSON verified with groove decomposition (3.2 → pair [0,1] + δ 0.7); holder regenerated with cavity at x=3.0 (new artifact key `3e8d5106bb2c`); 322 core tests, 105 frontend tests |
-| — | next: WP-37 (light polish + View-3D retirement); WP-27 (tutorials) after; WP-26 (motor/firmware actuation) picks up the same dof values; FRAME UX rework still needs a spec conversation | ⬜ |
+| — | feedback round 4 triaged (2026-07-17, Part 2e): WP-38 library browser round 2 (index records openable + mesh follows the record), WP-39 anchors drive the beam (frame-offset launch + continuous directions, E2 ask #8), WP-40 surfaces-as-truth (optics overlay in mechanics, derived port directions, galvo groundwork); ports VERDICT: keep as named beam endpoints, demote as geometry — surfaces/frames are the truth | 📋 |
+| — | next: WP-38 → WP-39 → WP-40 (round 4), then WP-37 (light polish + View-3D retirement); WP-27 (tutorials) after; WP-26 (motor/firmware actuation) picks up the same dof values; FRAME UX rework still needs a spec conversation | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
@@ -1393,6 +1394,173 @@ separate "View 3D" page will retire: the assembly view already renders the
 cubes in 3D and is the natural home for "which optical part lives in which
 cube" — clicking a cube's insert will name its optical component and
 template class, linking straight to the component editor.
+
+---
+
+# Part 2e · Feedback round 4 (2026-07-17) — component/bind testing + the ports question
+
+Bene's testing findings on the unified component editor, plus a conceptual
+question: is "ports" the right abstraction for linking the optical model to
+the STP part? Root causes first, then the analysis, then the work packages.
+
+## Root causes
+
+| Symptom | Root cause | WP |
+|---|---|---|
+| user-authored parts land under "index" and can't be opened/edited there (workspace ones can) | The index tab renders `IndexComponent` **summary metadata only** (id/vendor/EFL — the registry index carries no optics block), and its cards have no `onClick`. The full `component.yml` sits in the library tree and IS servable via `/v1/library/assets/components/<id>/component.yml` — nobody fetches it. "index" = the published registry (`../optikit-core/library`, served by the service); "workspace" = browser-local drafts. The naming explains nothing of that | WP-38 |
+| opening a record never loads its STP in the mechanics tab | The bind store is only fed by the explicit "load STP/GLB" button. Registry records with a bound template DO have their mesh published (WP-34 asset URLs: `templates/<tpl>/model.step/.glb` via the module that references the component) — the editor just never follows the link. Workspace-only records genuinely have no mesh (only a thumbnail is persisted) | WP-38 |
+| annotating a source's anchor (xyz + direction) doesn't move the beam in the schematic — it always launches from the part center | Two consumers, one gap: the pins/glyph path (`portsOf`) DOES use the datum-frame offset, but the 2D preview's `partToElement` places the sim element at `worldPose.positionMm` — the port frame offset is dropped, so rays launch from the center. (The authoritative service sim uses the frames correctly via compile.) | WP-39 |
+| only discrete port directions (+x/−y/…), no rotational degrees | Schema-v0 `PortSpec.direction` is an axis enum; the bind workbench even snaps authored datum directions to the nearest axis (warning above 2°) and defers the residual to the placed part's `offset-deg`. That covers *placement* residuals but cannot express *record-internal* continuous geometry (galvo mirror at 30°, off-axis parabola) | WP-39 + E2 ask #8 |
+| the optical model is invisible in the mechanics view — no way to SEE whether the ray model sits where the glass is | The bind scene renders the STP mesh + datum markers, but nothing of the optics: no surface profiles, no beam axes, no frames. The match STP ↔ optics is only checked numerically (verify-t1), never shown | WP-40 |
+
+## The ports question — analysis and judgment
+
+**What ports do today, across the stack.** (1) *Netlist topology*: paths are
+ordered port traversals (`laser.out → mirror.front>reflected → cam.sensor`) —
+chain inference, DRC and the whole KiCad-netlist analogy hang off named beam
+endpoints. (2) *Compile geometry*: `after-surface` + the port's frame tell the
+compiler where to cut/unfold the fragment along a path. (3) *Editor UI*: pins,
+glyph orientation, beam routing. (4) *Cross-impl contract*: schema v0 + the Go
+repo speak the same `ports:` block.
+
+**The conflation Bene spotted.** A port is currently doing two jobs: naming a
+beam ENDPOINT (graph role — good) and *stating geometry* (an axis-enum
+direction + a frame). But the geometry truth already lives elsewhere: the
+fragment's surfaces (a mirror's normal IS its reflective surface; a lens's
+shape IS its radii/thickness; a camera's sensor IS its image plane; a galvo is
+a mirror surface plus a rotation DOF about a pivot frame). Stating direction a
+second time on the port — quantized to 6 axes — creates redundancy where they
+agree and bugs where they disagree.
+
+**Judgment: keep ports, demote them.** Do NOT ditch ports — losing named beam
+endpoints would break paths/netlists, chain inference, cross-probing and the
+Go contract, and "front>reflected" traversals have no surface-only equivalent.
+Instead, re-ground them: **surfaces + datum frames are the geometric truth;
+ports are thin, named handles into that truth** (`port = name + frame +
+surface binding`). Where a fragment exists, the port's beam direction is
+*derived* from the referenced surface's orientation (and validated against the
+authored enum — same MATCH philosophy as verify-t1); the axis enum stays as
+authoring shorthand and as the fallback for fragment-less records. Continuous
+record-internal geometry (galvo angle) then lives where it belongs — on the
+surface/frame, with a schema extension (E2 ask #8: optional continuous frame
+orientation, e.g. `frames.<name>.normal` or Euler triple) rather than on the
+port. And the missing feedback loop is visual: the mechanics view overlays the
+optical model (surface profiles, beam axes, frames) at their declared poses
+inside the STP — you SEE the match, not just trust it.
+
+## Work packages
+
+### WP-38 — Library browser round 2: open anything, load the mesh
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. Index records open too: clicking an index card fetches the full record
+   (`/v1/library/assets/components/<id>/component.yml`), parses it with the
+   existing YAML→draft path, and opens it in the editor. Published records
+   open as an editable COPY headed for the workspace (banner: "editing a
+   copy of openuc2.lens.x@1.0.0 — save lands in your workspace / dev-write
+   updates the library"). Add `recordFromYaml` round-trip coverage.
+2. Rename the tabs to say what they are: "library (published)" and
+   "drafts (this browser)" (keep the counts); one-line helper text under
+   the tab bar explaining where each lives.
+3. The mechanics tab follows the record's mesh: on open, resolve the
+   record's module (index modules carry `component.ref`) → template assets
+   → fetch STP+GLB from the asset URLs into the bind store, showing a
+   loading chip. A record with no bound template shows "no STP bound to
+   this record yet — load one or bind it in the workbench" instead of a
+   silently empty scene. Workspace drafts keep their mesh across the
+   session: persist the bind store's mesh bytes in IndexedDB keyed by
+   record id (localStorage is too small for STEP).
+
+Acceptance: click openuc2.lens.achromat_25mm_f50 in the index → the optics
+form fills AND the mechanics tab shows its insert mesh; click a workspace
+draft bound earlier → its mesh reappears; a never-bound record says "no
+STP bound", not an empty scene.
+```
+
+**For humans:** the two sidebar tabs become "library (published)" — records
+that live in the shared optikit-core library — and "drafts (this browser)"
+for your local work, and BOTH open in the editor (published ones open as an
+editable copy). When a record has a bound STP in the library, opening it now
+actually loads that mesh into the mechanics view; when it doesn't, the editor
+says so instead of showing an empty scene.
+
+### WP-39 — Anchors drive the beam: frame offsets + continuous directions
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. The 2D preview launches from the datum frame, not the part center:
+   `partToElement` offsets the sim element by the emitting/entry port's
+   frame position (rotated by the part pose), so a source whose `out`
+   frame sits at z=+20 launches its rays 20 mm along the beam axis —
+   matching where the pin already is and what the service traces.
+   Sim-vs-pins concordance test.
+2. Continuous port directions, frontend side: `SourcePort.direction`
+   accepts a unit vector alongside the '+x' enum; `portsOf`/`beamAxesOf`/
+   `glyphQuatOf` consume vectors natively (the enum path becomes a vector
+   lookup). The bind workbench stops FORCING the axis snap: within 2° it
+   snaps (as today), beyond it the true direction is kept, exported to the
+   record as `direction: [x, y, z]`, and flagged "needs schema-v0.1" while
+   `library validate` still warns.
+3. Schema side (optikit-core): accept `direction` as EITHER the axis enum
+   or a 3-vector in PortSpec (validated unit-length); compile resolves
+   vectors exactly like enums (fold maps already work on vectors
+   internally). Add E2 ask #8 in GO_INTEGRATION.md: continuous directions
+   as the successor to the enum, aligned with however the quaternion
+   question (ask #7) resolves.
+
+Acceptance: setting a source record's `out` frame to z=+20 moves the 2D
+launch point 20 mm; a bind datum at 30° off-axis round-trips through the
+record and back into the editor at 30°, and the schematic glyph tilts
+accordingly; optikit-core validates and compiles the vector-direction
+record.
+```
+
+**For humans:** the anchor you annotate on a part (where the light actually
+exits, which way a tilted mirror faces) will now really steer the picture:
+rays start at the anchor instead of the part's center, and directions are no
+longer limited to the six cube axes — a 30° galvo mirror stays 30°, in the
+record and on screen.
+
+### WP-40 — Surfaces as truth: the optics overlay in the mechanics view
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. Overlay the optical model in the bind/mechanics 3D scene: at each datum
+   frame's pose render (a) the surface profile from the record — lens
+   cross-section from radii/thickness/⌀ (reuse `surfaceProfiles`/`sagAt`),
+   mirror plane disc at the reflective surface, sensor rectangle for
+   detectors; (b) beam entry/exit arrows from the ports; (c) frame axes.
+   Toggle in the mode toolbar ("show optics"), on by default when a record
+   with a fragment is open. THIS is the visual verify-t1: the lens outline
+   should sit inside the glass of the STP.
+2. Derive, don't restate: where a record has a fragment, `recordPortsOf`
+   (frontend) and a new `derive_port_directions` (core, used by `library
+   validate`) compute each port's beam direction from its bound surface
+   (mirror normal → reflected arm via the reflection law; refractive chain
+   → transmitted axis) and WARN when the authored enum disagrees by >2° —
+   the same MATCH philosophy as verify-t1, now for directions.
+3. Galvo groundwork: a rotation-DOF on a mirror record (kind: rotation,
+   axis + pivot frame) tilts the derived reflected direction live in the
+   overlay and the schematic — the first record-internal continuous DOF
+   consumer (pairs with WP-39's vector directions; WP-26 will actuate it).
+
+Acceptance: opening the AC254 record with its STP shows the lens
+cross-section sitting inside the mesh at the optical frame; authoring a
+mirror record whose enum says `-y` while the marker normal points 30° off
+produces the direction-mismatch warning; sweeping a galvo's rotation DOF
+visibly swings the reflected beam arrow.
+```
+
+**For humans:** the mechanics view will draw the *idea* of the optic on top
+of the *metal and glass*: the lens profile, mirror plane or sensor area
+appears exactly where the record claims it is inside the STP — so a mismatch
+is something you see immediately, not something a checker tells you about
+later. Port directions stop being hand-typed where they can be computed from
+the surfaces themselves, and a galvo's tilting mirror becomes expressible.
 
 ---
 
