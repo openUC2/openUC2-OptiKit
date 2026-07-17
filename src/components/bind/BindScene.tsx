@@ -33,9 +33,10 @@ import {
 import { Box, IconButton, Tooltip } from '@mui/material';
 import { SwapVert as FlipIcon } from '@mui/icons-material';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { RefObject } from 'react';
 import type { Vec3 } from '../../document';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
-import { datumToCube, snapToAxis } from '../../model/bindRecord';
+import { datumToCube, snapToAxis, threePoseToMeshTransform } from '../../model/bindRecord';
 import { useBindStore } from './bindStore';
 import { useSceneColors } from '../../theme/sceneColors';
 import type { OrthoView } from './bindStore';
@@ -170,48 +171,45 @@ function PartMesh() {
   const commitTransform = () => {
     const g = groupRef.current;
     if (!g) return;
-    // Decompose back to doc-frame values: position directly; rotation via the
-    // controls stays in our quaternion composition, so read the deltas from
-    // the group's euler in the same doc-axis order.
-    const p = g.position;
-    const docPos: Vec3 = [
-      Math.round(p.x * 100) / 100,
-      Math.round(-p.z * 100) / 100,
-      Math.round(p.y * 100) / 100,
-    ];
-    // Extract extrinsic doc-ZXY from the group quaternion: doc z=three y,
-    // doc x=three x, doc y=three −z ⇒ three-order YXZ with sign flips.
-    const e = new THREE.Euler().setFromQuaternion(g.quaternion, 'YXZ');
-    const docRot: Vec3 = [
-      Math.round(THREE.MathUtils.radToDeg(e.x) * 10) / 10,
-      Math.round(THREE.MathUtils.radToDeg(-e.z) * 10) / 10,
-      Math.round(THREE.MathUtils.radToDeg(e.y) * 10) / 10,
-    ];
-    setTransform({ positionMm: docPos, rotationDeg: docRot });
+    setTransform(threePoseToMeshTransform(g.position, g.quaternion));
   };
 
   if (!scene) return null;
-  const content = (
-    <group
-      ref={groupRef}
-      position={docToThree(transform.positionMm)}
-      quaternion={quaternion}
-      onClick={onClick}
-    >
-      <primitive object={scene} />
-    </group>
-  );
-
-  if (mode === 'datum') return content;
+  // WP-33 bug fix: the gizmo must attach to OUR group via the explicit
+  // `object` prop. As a child of <TransformControls> the controls attach to
+  // their own internal wrapper group instead — drags moved that throwaway
+  // object, commitTransform read our never-moved group, and the part
+  // "jumped back" when the gizmo unmounted (datum mode), silently recording
+  // a stale mesh-offset. (AssemblyScene audited: its insert drag is custom
+  // pointer math, no TransformControls — unaffected.)
   return (
-    <TransformControls
-      mode={mode}
-      translationSnap={snap ? 1 : null}
-      rotationSnap={snap ? THREE.MathUtils.degToRad(15) : null}
-      onMouseUp={commitTransform}
-    >
-      {content}
-    </TransformControls>
+    <>
+      <group
+        ref={groupRef}
+        position={docToThree(transform.positionMm)}
+        quaternion={quaternion}
+        onClick={onClick}
+      >
+        <primitive object={scene} />
+      </group>
+      {mode !== 'datum' && (
+        <TransformControls
+          ref={controls => {
+            // DEV probe: lets tests assert the gizmo is attached to OUR
+            // group and simulate a drag commit (the WP-33 bug regression).
+            if (import.meta.env.DEV) {
+              (window as unknown as Record<string, unknown>).__bindTC = controls;
+              (window as unknown as Record<string, unknown>).__bindPartGroup = groupRef.current;
+            }
+          }}
+          object={groupRef as RefObject<THREE.Object3D>}
+          mode={mode}
+          translationSnap={snap ? 1 : null}
+          rotationSnap={snap ? THREE.MathUtils.degToRad(15) : null}
+          onMouseUp={commitTransform}
+        />
+      )}
+    </>
   );
 }
 

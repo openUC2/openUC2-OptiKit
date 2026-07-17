@@ -62,6 +62,32 @@ export function datumToCube(
   return { pointMm: [p.x, p.y, p.z], direction: [d.x, d.y, d.z] };
 }
 
+/**
+ * Decompose a three.js group pose (the object the bind gizmo drags) back to
+ * the doc-frame MeshTransform the store keeps (WP-33 regression surface:
+ * this is the exact math `commitTransform` runs on mouse-up — the drag bug
+ * was the gizmo mutating a DIFFERENT object than the one read here).
+ * three(x, y, z) = doc(x, z, −y); rotation extrinsic doc-ZXY ⇒ three 'YXZ'
+ * with sign flips.
+ */
+export function threePoseToMeshTransform(
+  position: { x: number; y: number; z: number },
+  quaternion: THREE.Quaternion,
+): MeshTransform {
+  const positionMm: Vec3 = [
+    Math.round(position.x * 100) / 100,
+    Math.round(-position.z * 100) / 100,
+    Math.round(position.y * 100) / 100,
+  ];
+  const e = new THREE.Euler().setFromQuaternion(quaternion, 'YXZ');
+  const rotationDeg: Vec3 = [
+    Math.round(THREE.MathUtils.radToDeg(e.x) * 10) / 10,
+    Math.round(THREE.MathUtils.radToDeg(-e.z) * 10) / 10,
+    Math.round(THREE.MathUtils.radToDeg(e.y) * 10) / 10,
+  ];
+  return { positionMm, rotationDeg };
+}
+
 /** Cube-frame point + direction → part frame (for click authoring). */
 export function cubeToDatum(
   pointMm: Vec3,

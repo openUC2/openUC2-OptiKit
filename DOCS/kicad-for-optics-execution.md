@@ -80,7 +80,8 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | — | feedback round 3 triaged (2026-07-16, Part 2d): WP-32 auto-chaining, WP-33 bind bug + one authoring flow, WP-34 palette⇄registry + T-class badges, WP-35 T1/T2/T3 strategies, WP-36 Ethan subassemblies sync, WP-37 light polish + View-3D retirement | 📋 |
 | WP-32 | auto-chaining: palette parts export catalog optics (`bareComponentSpec`); check/simulate auto-run `/v1/chain/infer` with no declared paths and adopt the result; afocal paraxial (null/∞) handled | ✅ done (`84de350`) — verified live: laser→mirror→camera with zero wiring checks clean, path auto-adopted, 127 rays traced through the fold |
 | — | done with round-3 triage: light brand theme is the app default; `inventor-naming-contract.md` → v2.1 (PyInventor pipeline, marker geometries) | ✅ |
-| — | next: WP-32 → WP-33 → WP-36, then WP-34/35/37; WP-27 (tutorials) after; FRAME UX rework still needs a spec conversation | ⬜ |
+| WP-33 | bind drag bug fixed (drei `TransformControls` now gets `object={groupRef}` — was attaching to its own internal group, so drags were visual-only) + bind merged into the component editor as its **mechanics** tab (one record pair per part; `/configurator/bind` deep-links) | ✅ done — verified live: +20 mm drag → store `[20,0,0]`, survives datum-mode switch, sidebar shows the dragged placement; optics⇄mechanics tab round-trip keeps mesh/transform/datums; pair file map = component + template + module + STEP/GLB |
+| — | next: WP-36 (Ethan subassemblies sync), then WP-34/35/37; WP-27 (tutorials) after; FRAME UX rework still needs a spec conversation | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 

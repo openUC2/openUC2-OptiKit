@@ -1,10 +1,14 @@
 /**
- * Component ("symbol") editor page — WP-14.
+ * Component editor page — WP-14, unified in WP-33.
  *
- * Create/edit optical component records: the physics of a part (verbatim
- * Optiland fragment + datum frames + ports + vendor provenance), independent
- * of any mechanical template. Records download as library-PR-ready YAML for
- * ../optikit-core/library/ or persist locally in the workspace library.
+ * ONE authoring flow for a part's two halves, as tabs over a shared record
+ * identity (the RecordDraft):
+ *   - "optics" — the SYMBOL: verbatim Optiland fragment + datum frames +
+ *     ports + vendor provenance (the original WP-14 form);
+ *   - "mechanics" — the FOOTPRINT: the former /configurator/bind workbench
+ *     (upload STP → place vs ghost cube → datums → template class), emitting
+ *     template + module records that reference THIS draft's component.
+ * /configurator/bind deep-links here with the mechanics tab active.
  */
 
 import { useMemo, useState } from 'react';
@@ -18,6 +22,8 @@ import {
   Drawer,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   Typography,
   useMediaQuery,
   useTheme,
@@ -44,10 +50,17 @@ import { LibraryBrowser } from './LibraryBrowser';
 import { RecordForm } from './RecordForm';
 import { GlyphPreview } from './GlyphPreview';
 import { RaySketch } from './RaySketch';
+import { MechanicsPanel } from '../bind/MechanicsPanel';
 
-export function ComponentEditorPage() {
+export function ComponentEditorPage({
+  initialTab = 'optics',
+}: {
+  /** 'mechanics' = the /configurator/bind deep link (WP-33). */
+  initialTab?: 'optics' | 'mechanics';
+}) {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const [tab, setTab] = useState<'optics' | 'mechanics'>(initialTab);
   const [draft, setDraft] = useState<RecordDraft>(() => defaultDraft('lens'));
   const saveRecord = useWorkspaceLibrary(s => s.save);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
@@ -92,9 +105,9 @@ export function ComponentEditorPage() {
             <LibraryBrowser onOpenRecord={openRecord} />
           </Drawer>
 
-          {/* center: the form */}
+          {/* center: one identity, two halves (WP-33) */}
           <Box sx={{ flex: 1, overflow: 'auto', p: 2.5 }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ flex: 1 }}>
                 Component editor
                 <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1.5, fontFamily: 'monospace' }}>
@@ -106,38 +119,48 @@ export function ComponentEditorPage() {
               </Button>
             </Stack>
 
-            <RecordForm draft={draft} onChange={setDraft} />
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, minHeight: 36 }}>
+              <Tab value="optics" label="optics — the symbol" sx={{ minHeight: 36 }} />
+              <Tab value="mechanics" label="mechanics — the footprint (STP + datums)" sx={{ minHeight: 36 }} />
+            </Tabs>
 
-            {errors.length > 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  record incomplete:
-                </Typography>
-                {errors.map((e, i) => (
-                  <Typography key={i} variant="caption" sx={{ display: 'block' }}>• {e}</Typography>
-                ))}
-              </Alert>
-            )}
-            {savedFlash && (
-              <Alert severity="success" sx={{ mt: 2 }}>
-                saved {savedFlash} to the workspace library
-              </Alert>
-            )}
+            {tab === 'optics' && (
+              <>
+                <RecordForm draft={draft} onChange={setDraft} />
 
-            <Stack direction="row" spacing={1.5} sx={{ mt: 2.5, mb: 4 }}>
-              <Button
-                variant="contained" startIcon={<DownloadIcon />} disabled={!record}
-                onClick={download}
-              >
-                Download record YAML
-              </Button>
-              <Button
-                variant="outlined" startIcon={<SaveIcon />} disabled={!record}
-                onClick={saveToWorkspace}
-              >
-                Save to workspace library
-              </Button>
-            </Stack>
+                {errors.length > 0 && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      record incomplete:
+                    </Typography>
+                    {errors.map((e, i) => (
+                      <Typography key={i} variant="caption" sx={{ display: 'block' }}>• {e}</Typography>
+                    ))}
+                  </Alert>
+                )}
+                {savedFlash && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    saved {savedFlash} to the workspace library
+                  </Alert>
+                )}
+
+                <Stack direction="row" spacing={1.5} sx={{ mt: 2.5, mb: 4 }}>
+                  <Button
+                    variant="contained" startIcon={<DownloadIcon />} disabled={!record}
+                    onClick={download}
+                  >
+                    Download record YAML
+                  </Button>
+                  <Button
+                    variant="outlined" startIcon={<SaveIcon />} disabled={!record}
+                    onClick={saveToWorkspace}
+                  >
+                    Save to workspace library
+                  </Button>
+                </Stack>
+              </>
+            )}
+            {tab === 'mechanics' && <MechanicsPanel draft={draft} record={record} />}
           </Box>
 
           {/* right: preview */}

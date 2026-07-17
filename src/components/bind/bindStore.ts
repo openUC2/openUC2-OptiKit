@@ -28,6 +28,10 @@ interface BindState {
   error: string | null;
   /** Single perspective view or the linked 2×2 ortho layout (WP-31). */
   quadView: boolean;
+  /** Mechanical template class of the pair being authored (WP-33). */
+  templateClass: 'fixed' | 'adaptive' | 'generative';
+  /** Existing optical component id to bind to ('' = use/generate the draft). */
+  existingComponentId: string;
   /** Per-ortho-view flip: top→bottom, front→back, side(right)→left. */
   orthoFlip: Record<OrthoView, boolean>;
 
@@ -37,6 +41,8 @@ interface BindState {
   toggleGhostCube: () => void;
   toggleSnap: () => void;
   toggleQuadView: () => void;
+  setTemplateClass: (c: 'fixed' | 'adaptive' | 'generative') => void;
+  setExistingComponentId: (id: string) => void;
   flipOrtho: (view: OrthoView) => void;
   setNextKind: (k: DatumKind) => void;
   /** Part-frame point + direction (the scene converts the click hit). */
@@ -73,6 +79,8 @@ export const useBindStore = create<BindState>((set, get) => ({
   error: null,
   quadView: false,
   orthoFlip: { top: false, front: false, side: false },
+  templateClass: 'fixed',
+  existingComponentId: '',
 
   loadMesh: (meshFile, glbBytes, stepBytes) =>
     set({
@@ -88,6 +96,8 @@ export const useBindStore = create<BindState>((set, get) => ({
   toggleGhostCube: () => set(s => ({ ghostCube: !s.ghostCube })),
   toggleSnap: () => set(s => ({ snap: !s.snap })),
   toggleQuadView: () => set(s => ({ quadView: !s.quadView })),
+  setTemplateClass: templateClass => set({ templateClass }),
+  setExistingComponentId: existingComponentId => set({ existingComponentId }),
   flipOrtho: view =>
     set(s => ({ orthoFlip: { ...s.orthoFlip, [view]: !s.orthoFlip[view] } })),
   setNextKind: nextKind => set({ nextKind }),

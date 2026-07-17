@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import {
   AXIS_SNAP_WARN_DEG,
   bindToRecords,
@@ -14,6 +15,7 @@ import {
   datumToCube,
   recordsToFiles,
   snapToAxis,
+  threePoseToMeshTransform,
   type BindInput,
 } from '../bindRecord';
 
@@ -141,5 +143,31 @@ describe('bindToRecords', () => {
     ]);
     expect(files['templates/user.tpl.laser-pointer/laser-housing.step']).toBe(step);
     expect(files['components/user.source.laser-pointer/component.yml']).toContain('z-mm: 15');
+  });
+});
+
+describe('threePoseToMeshTransform (WP-33: the gizmo commit math)', () => {
+  it('decomposes a dragged three-space pose back to the doc-frame transform', () => {
+    // Simulate the drag the bug used to lose: +20mm doc-x, −5mm doc-y (three
+    // z = −doc y), and a 90° yaw about doc z (three y).
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    const t = threePoseToMeshTransform({ x: 20, y: 0, z: 5 }, q);
+    expect(t.positionMm).toEqual([20, -5, 0]);
+    expect(t.rotationDeg[2]).toBeCloseTo(90, 4);
+    expect(t.rotationDeg[0]).toBeCloseTo(0, 4);
+    expect(t.rotationDeg[1]).toBeCloseTo(0, 4);
+  });
+
+  it('is the inverse of the PartMesh quaternion composition', () => {
+    // The same composition PartMesh renders from a stored transform:
+    const rot: [number, number, number] = [10, 20, 30]; // doc extrinsic ZXY
+    const [rx, ry, rz] = rot.map(v => (v * Math.PI) / 180);
+    const qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rz);
+    const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), rx);
+    const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), ry);
+    const q = qz.clone().multiply(qx).multiply(qy);
+    const t = threePoseToMeshTransform({ x: 1, y: 2, z: 3 }, q);
+    t.rotationDeg.forEach((v, i) => expect(v).toBeCloseTo(rot[i], 1));
+    expect(t.positionMm).toEqual([1, -3, 2]);
   });
 });
