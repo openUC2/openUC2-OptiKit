@@ -98,43 +98,33 @@ function FrameAxes({ sizeMm = 8 }: { sizeMm?: number }) {
   );
 }
 
-export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
-  const datums = useBindStore(s => s.datums);
-  const transform = useBindStore(s => s.transform);
-  const showOptics = useBindStore(s => s.showOptics);
-  const galvoTiltDeg = useBindStore(s => s.galvoTiltDeg);
+/**
+ * The optical primitive drawn at the LOCAL origin, facing +y (the optical
+ * axis): lens surface-of-revolution, mirror plane disc, or sensor plane, plus
+ * beam arrows and frame axes. Reused for the WP-40 anchor overlay and for each
+ * gizmo-placed WP-41 instance. Sizes come from the draft's surfaces; a
+ * per-instance `diameterMm` overrides the disc/plane size (a mirror's size).
+ */
+export function OpticGlyph({
+  category,
+  surfaces,
+  diameterMm = null,
+  galvoTiltDeg = 0,
+}: {
+  category: string;
+  surfaces: RecordDraft['surfaces'];
+  diameterMm?: number | null;
+  galvoTiltDeg?: number;
+}) {
+  const semi = diameterMm ? diameterMm / 2 : maxSemiApertureMm(surfaces);
+  const isMirror = ['mirror', 'beamsplitter', 'dichroic'].includes(category);
+  const isDetector = category === 'detector';
+  const isSource = category === 'source';
+  const hasGlass = !isMirror && !isDetector && !isSource && surfaces.length > 0;
 
-  // The anchor: an optical datum in the CUBE frame (datums follow the part).
-  const anchor = useMemo(() => {
-    const datum =
-      datums.find(d => ANCHOR_KINDS.includes(d.kind)) ?? datums[0] ?? null;
-    if (!datum) {
-      return { pointMm: [0, 0, 0] as Vec3, direction: [0, 0, 1] as Vec3 };
-    }
-    const cube = datumToCube(datum, transform);
-    return { pointMm: cube.pointMm, direction: cube.direction };
-  }, [datums, transform]);
-
-  // Group frame: local +y = the datum's facing direction (the optical axis).
-  const position = docToThree(anchor.pointMm);
-  const quat = useMemo(() => {
-    const d = new THREE.Vector3(...docToThree(anchor.direction));
-    return new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      d.lengthSq() > 0 ? d.normalize() : new THREE.Vector3(0, 1, 0),
-    );
-  }, [anchor.direction]);
-
-  const semi = maxSemiApertureMm(draft.surfaces);
-  const isMirror = ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category);
-  const isDetector = draft.category === 'detector';
-  const isSource = draft.category === 'source';
-  const hasGlass = !isMirror && !isDetector && !isSource && draft.surfaces.length > 0;
-
-  // Lens: one surface of revolution per surface profile (lathe around +y).
   const latheGeoms = useMemo(() => {
     if (!hasGlass) return [];
-    return surfaceProfiles(draft.surfaces, 24).map(profile => {
+    return surfaceProfiles(surfaces, 24).map(profile => {
       const pts: THREE.Vector2[] = [];
       for (let k = 0; k <= 24; k++) {
         const r = (profile.semiAperture * k) / 24;
@@ -144,23 +134,20 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
       }
       return new THREE.LatheGeometry(pts, 40);
     });
-  }, [hasGlass, draft.surfaces]);
+  }, [hasGlass, surfaces]);
 
-  // Galvo: tilt the mirror normal about local x; the arm swings by 2θ.
+  // Galvo: tilt the mirror normal about local x; the reflected arm swings 2θ.
   const { normal, reflected } = useMemo(() => {
     const theta = (galvoTiltDeg * Math.PI) / 180;
     const n = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), theta);
-    const beam = new THREE.Vector3(0, -1, 0); // arrives against the facing
+    const beam = new THREE.Vector3(0, -1, 0);
     const r = beam.clone().sub(n.clone().multiplyScalar(2 * beam.dot(n)));
     return { normal: n, reflected: r };
   }, [galvoTiltDeg]);
 
-  if (!showOptics) return null;
-
   return (
-    <group position={position} quaternion={quat}>
+    <group>
       <FrameAxes />
-
       {hasGlass &&
         latheGeoms.map((geom, i) => (
           <mesh key={i} geometry={geom} raycast={NO_RAYCAST}>
@@ -170,12 +157,9 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
             />
           </mesh>
         ))}
-
       {isMirror && (
         <group
-          quaternion={new THREE.Quaternion().setFromUnitVectors(
-            new THREE.Vector3(0, 1, 0), normal,
-          )}
+          quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal)}
         >
           <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
             <circleGeometry args={[semi, 48]} />
@@ -186,7 +170,6 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
           </mesh>
         </group>
       )}
-
       {isDetector && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
           <planeGeometry args={[semi * 1.6, semi * 1.2]} />
@@ -196,26 +179,52 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
           />
         </mesh>
       )}
-
-      {/* Beam arrows: emit along the facing (source), arrive against it
-          (everything else); mirrors add the reflection-law arm. */}
       {isSource ? (
         <BeamArrow dir={new THREE.Vector3(0, 1, 0)} color={EXIT_COLOR} />
       ) : (
-        <BeamArrow
-          dir={new THREE.Vector3(0, -1, 0)}
-          color={ENTRY_COLOR}
-          fromMm={[0, 34, 0]}
-        />
+        <BeamArrow dir={new THREE.Vector3(0, -1, 0)} color={ENTRY_COLOR} fromMm={[0, 34, 0]} />
       )}
       {isMirror && <BeamArrow dir={reflected} color={EXIT_COLOR} />}
       {hasGlass && (
         <BeamArrow
           dir={new THREE.Vector3(0, -1, 0)}
           color={EXIT_COLOR}
-          fromMm={[0, -Math.max(4, ...draft.surfaces.map(s => s.thicknessMm ?? 0)), 0]}
+          fromMm={[0, -Math.max(4, ...surfaces.map(s => s.thicknessMm ?? 0)), 0]}
         />
       )}
+    </group>
+  );
+}
+
+/** WP-40 anchor overlay: draw the optical model at the primary datum's pose
+ * (the non-whole-module case — gizmo-placed instances draw via PlacedOptics). */
+export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
+  const datums = useBindStore(s => s.datums);
+  const transform = useBindStore(s => s.transform);
+  const showOptics = useBindStore(s => s.showOptics);
+  const galvoTiltDeg = useBindStore(s => s.galvoTiltDeg);
+
+  const anchor = useMemo(() => {
+    // Gizmo-placed optics render via PlacedOptics — skip them here.
+    const datum =
+      datums.find(d => !d.quaternion && ANCHOR_KINDS.includes(d.kind)) ??
+      datums.find(d => !d.quaternion) ?? null;
+    if (!datum) return null;
+    return datumToCube(datum, transform);
+  }, [datums, transform]);
+
+  const quat = useMemo(() => {
+    const d = new THREE.Vector3(...docToThree(anchor?.direction ?? [0, 1, 0]));
+    return new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      d.lengthSq() > 0 ? d.normalize() : new THREE.Vector3(0, 1, 0),
+    );
+  }, [anchor?.direction]);
+
+  if (!showOptics || !anchor) return null;
+  return (
+    <group position={docToThree(anchor.pointMm)} quaternion={quat}>
+      <OpticGlyph category={draft.category} surfaces={draft.surfaces} galvoTiltDeg={galvoTiltDeg} />
     </group>
   );
 }

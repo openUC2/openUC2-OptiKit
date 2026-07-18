@@ -36,9 +36,16 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { RefObject } from 'react';
 import type { Vec3 } from '../../document';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
-import { datumToCube, snapToAxis, threePoseToMeshTransform } from '../../model/bindRecord';
+import {
+  datumQuatToCubeQuat,
+  datumToCube,
+  docQuatToThree,
+  snapToAxis,
+  threePoseToDatum,
+  threePoseToMeshTransform,
+} from '../../model/bindRecord';
 import { useBindStore } from './bindStore';
-import { OpticsOverlay } from './OpticsOverlay';
+import { OpticGlyph, OpticsOverlay } from './OpticsOverlay';
 import type { RecordDraft } from '../../model/componentRecord';
 import { useSceneColors } from '../../theme/sceneColors';
 import type { OrthoView } from './bindStore';
@@ -136,7 +143,15 @@ function PartMesh() {
     loader.parse(
       buffer,
       '',
-      gltf => setScene(gltf.scene),
+      gltf => {
+        setScene(gltf.scene);
+        // WP-41: report the mesh bbox center (doc mm) for the fit-to-cube snap.
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        if (!box.isEmpty()) {
+          const c = box.getCenter(new THREE.Vector3());
+          useBindStore.getState().reportMeshBbox(threeToDoc(c));
+        }
+      },
       err => {
         useBindStore.getState().setError(`GLB parse failed: ${String(err)}`);
       },
@@ -194,7 +209,7 @@ function PartMesh() {
       >
         <primitive object={scene} />
       </group>
-      {mode !== 'datum' && (
+      {mode !== 'datum' && mode !== 'optics' && (
         <TransformControls
           ref={controls => {
             // DEV probe: lets tests assert the gizmo is attached to OUR
@@ -215,6 +230,85 @@ function PartMesh() {
   );
 }
 
+/** One gizmo-placed optical primitive against the frozen module mesh (WP-41).
+ * The overlay group IS the gizmo target; on commit its world pose becomes the
+ * datum's part-frame point + direction + orientation quaternion. */
+function PlacedOptic({
+  datum,
+  draft,
+  selected,
+}: {
+  datum: BindDatum;
+  draft?: RecordDraft;
+  selected: boolean;
+}) {
+  const transform = useBindStore(s => s.transform);
+  const mode = useBindStore(s => s.mode);
+  const snap = useBindStore(s => s.snap);
+  const updateDatum = useBindStore(s => s.updateDatum);
+  const selectOptic = useBindStore(s => s.selectOptic);
+  const showOptics = useBindStore(s => s.showOptics);
+  const groupRef = useRef<THREE.Group>(null);
+
+  // Cube pose from the part-frame datum through the mesh placement.
+  const cube = useMemo(() => datumToCube(datum, transform), [datum, transform]);
+  const position = docToThree(cube.pointMm);
+  const quaternion = useMemo(
+    () =>
+      datum.quaternion
+        ? docQuatToThree(datumQuatToCubeQuat(datum.quaternion, transform))
+        : new THREE.Quaternion(),
+    [datum.quaternion, transform],
+  );
+
+  const commit = () => {
+    const g = groupRef.current;
+    if (!g) return;
+    updateDatum(datum.id, threePoseToDatum(g.position, g.quaternion, transform));
+  };
+
+  if (!showOptics) return null;
+  const gizmoOn = mode === 'optics' && selected;
+  return (
+    <>
+      <group
+        ref={groupRef}
+        position={position}
+        quaternion={quaternion}
+        onClick={e => {
+          if (mode === 'optics') {
+            e.stopPropagation();
+            selectOptic(datum.id);
+          }
+        }}
+      >
+        {draft && (
+          <OpticGlyph
+            category={draft.category}
+            surfaces={draft.surfaces}
+            diameterMm={datum.areaDiameterMm}
+          />
+        )}
+        {/* selection ring on the placement plane */}
+        {gizmoOn && (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
+            <ringGeometry args={[(datum.areaDiameterMm ?? 20) / 2 + 1, (datum.areaDiameterMm ?? 20) / 2 + 2.5, 48]} />
+            <meshBasicMaterial color="#ffaa00" transparent opacity={0.9} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+      {gizmoOn && (
+        <TransformControls
+          object={groupRef as RefObject<THREE.Object3D>}
+          mode="translate"
+          translationSnap={snap ? 1 : null}
+          onMouseUp={commit}
+        />
+      )}
+    </>
+  );
+}
+
 /** Shared scene content — identical in every viewport. */
 function SceneContent({
   colors,
@@ -226,6 +320,9 @@ function SceneContent({
   const ghostCube = useBindStore(s => s.ghostCube);
   const datums = useBindStore(s => s.datums);
   const transform = useBindStore(s => s.transform);
+  const selectedOpticId = useBindStore(s => s.selectedOpticId);
+  const placed = datums.filter(d => d.quaternion);
+  const clicked = datums.filter(d => !d.quaternion);
   return (
     <>
       <hemisphereLight args={['#ffffff', '#8a929c', 0.8]} />
@@ -240,10 +337,19 @@ function SceneContent({
       <Suspense fallback={null}>
         <PartMesh />
       </Suspense>
-      {datums.map(datum => (
+      {clicked.map(datum => (
         <DatumPin key={datum.id} datum={datum} transform={transform} />
       ))}
-      {/* WP-40: the optical model drawn where the record claims it sits. */}
+      {/* WP-41: gizmo-placed optics, each independently draggable. */}
+      {placed.map(datum => (
+        <PlacedOptic
+          key={datum.id}
+          datum={datum}
+          draft={draft}
+          selected={datum.id === selectedOpticId}
+        />
+      ))}
+      {/* WP-40: the optical model drawn where a clicked datum sits. */}
       {draft && <OpticsOverlay draft={draft} />}
     </>
   );

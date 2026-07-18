@@ -9,7 +9,7 @@ import { create } from 'zustand';
 import type { Vec3 } from '../../document';
 import type { BindDatum, DatumKind, MeshTransform } from '../../model/bindRecord';
 
-export type BindMode = 'translate' | 'rotate' | 'datum';
+export type BindMode = 'translate' | 'rotate' | 'datum' | 'optics';
 export type OrthoView = 'top' | 'front' | 'side';
 
 interface BindState {
@@ -38,6 +38,13 @@ interface BindState {
   showOptics: boolean;
   /** Galvo groundwork (WP-40): mirror-normal tilt, °; the arm swings by 2θ. */
   galvoTiltDeg: number;
+  /** WP-41: the loaded mesh is the WHOLE cube module (not just an insert). */
+  wholeModule: boolean;
+  /** Bbox center of the loaded mesh in doc mm (reported by the scene), for
+   * the "fit to cube" snap. */
+  meshBboxCenter: Vec3 | null;
+  /** The optic instance (datum id) the placement gizmo drives, or null. */
+  selectedOpticId: string | null;
 
   loadMesh: (file: string, glb: Uint8Array, step: Uint8Array | null) => void;
   setTransform: (t: MeshTransform) => void;
@@ -49,6 +56,13 @@ interface BindState {
   setExistingComponentId: (id: string) => void;
   toggleShowOptics: () => void;
   setGalvoTiltDeg: (deg: number) => void;
+  toggleWholeModule: () => void;
+  reportMeshBbox: (centerMm: Vec3) => void;
+  /** Center the mesh in the 50 mm cube (WP-41 bbox-fit). */
+  fitToCube: () => void;
+  selectOptic: (id: string | null) => void;
+  /** Add a placeable optical primitive at the cube origin (WP-41). */
+  addOptic: (kind: DatumKind) => void;
   flipOrtho: (view: OrthoView) => void;
   setNextKind: (k: DatumKind) => void;
   /** Part-frame point + direction (the scene converts the click hit). */
@@ -89,6 +103,9 @@ export const useBindStore = create<BindState>((set, get) => ({
   existingComponentId: '',
   showOptics: true,
   galvoTiltDeg: 0,
+  wholeModule: false,
+  meshBboxCenter: null,
+  selectedOpticId: null,
 
   loadMesh: (meshFile, glbBytes, stepBytes) =>
     set({
@@ -97,6 +114,8 @@ export const useBindStore = create<BindState>((set, get) => ({
       stepBytes,
       datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
+      meshBboxCenter: null,
+      selectedOpticId: null,
       error: null,
     }),
   setTransform: transform => set({ transform }),
@@ -108,6 +127,38 @@ export const useBindStore = create<BindState>((set, get) => ({
   setExistingComponentId: existingComponentId => set({ existingComponentId }),
   toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
   setGalvoTiltDeg: galvoTiltDeg => set({ galvoTiltDeg }),
+  toggleWholeModule: () => set(s => ({ wholeModule: !s.wholeModule })),
+  reportMeshBbox: meshBboxCenter => set({ meshBboxCenter }),
+  fitToCube: () => {
+    const c = get().meshBboxCenter;
+    if (!c) return;
+    // Center the module's bbox on the cube origin (translation only — the
+    // whole export is already at cube scale/orientation from Inventor).
+    set({ transform: { positionMm: [-c[0], -c[1], -c[2]], rotationDeg: [0, 0, 0] } });
+  },
+  selectOptic: selectedOpticId => set({ selectedOpticId }),
+  addOptic: kind => {
+    const base = DEFAULT_NAMES[kind];
+    const existing = new Set(get().datums.map(d => d.name));
+    let name = base;
+    for (let n = 2; existing.has(name); n++) name = `${base}-${n}`;
+    datumCounter += 1;
+    const id = `optic-${datumCounter}`;
+    // Placed in the CUBE center facing +z; the gizmo moves it onto the face.
+    set(s => ({
+      datums: [
+        ...s.datums,
+        {
+          id, name, kind,
+          pointMm: [0, 0, 0], direction: [0, 0, 1],
+          areaDiameterMm: kind === 'reflective' ? 25 : null,
+          quaternion: [0, 0, 0, 1],
+        },
+      ],
+      selectedOpticId: id,
+      mode: 'optics',
+    }));
+  },
   flipOrtho: view =>
     set(s => ({ orthoFlip: { ...s.orthoFlip, [view]: !s.orthoFlip[view] } })),
   setNextKind: nextKind => set({ nextKind }),
@@ -134,6 +185,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   clear: () =>
     set({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
-      transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] }, error: null,
+      transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
+      meshBboxCenter: null, selectedOpticId: null, error: null,
     }),
 }));

@@ -20,10 +20,12 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Slider,
   Stack,
+  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -41,6 +43,8 @@ import {
   Storage as DevWriteIcon,
   Visibility as OpticsIcon,
   ViewInAr as CubeIcon,
+  CenterFocusStrong as FitIcon,
+  ControlCamera as OpticsPlaceIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb, saveLibraryRecords } from '../../api/coreClient';
@@ -160,9 +164,10 @@ export function MechanicsPanel({
       meshTransform: store.transform,
       datums: store.datums,
       existingComponent: existing,
+      wholeModule: store.wholeModule,
     });
   }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
-      store.meshFile, store.transform, store.datums]);
+      store.meshFile, store.transform, store.datums, store.wholeModule]);
 
   const pairFiles = () => {
     if (!bound) return null;
@@ -258,6 +263,17 @@ export function MechanicsPanel({
         </Button>
         {store.meshFile && <Chip size="small" label={store.meshFile} sx={{ maxWidth: 200 }} />}
         <Box sx={{ flex: 1 }} />
+        {/* WP-41: the loaded STEP is the whole cube module — place the optic
+            against it rather than treating the mesh as an insert body. */}
+        <Tooltip title="the loaded STEP is the WHOLE cube module (cube + insert + optic + screws)">
+          <FormControlLabel
+            control={
+              <Switch size="small" checked={store.wholeModule} onChange={() => store.toggleWholeModule()} />
+            }
+            label={<Typography variant="caption">whole module</Typography>}
+            sx={{ mr: 0 }}
+          />
+        </Tooltip>
         <TextField
           select size="small" label="template class" value={store.templateClass}
           onChange={e => store.setTemplateClass(e.target.value as 'fixed' | 'adaptive' | 'generative')}
@@ -268,6 +284,29 @@ export function MechanicsPanel({
           <MenuItem value="generative">T3 · generative</MenuItem>
         </TextField>
       </Stack>
+
+      {store.wholeModule && (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            size="small" variant="outlined" startIcon={<FitIcon />}
+            disabled={!store.meshBboxCenter} onClick={() => store.fitToCube()}
+          >
+            fit to cube
+          </Button>
+          <Typography variant="caption" color="text.secondary">
+            then place the optical primitive on its face:
+          </Typography>
+          <TextField
+            select size="small" label="add optic" value=""
+            onChange={e => e.target.value && store.addOptic(e.target.value as DatumKind)}
+            sx={{ width: 140 }}
+          >
+            {DATUM_KINDS.filter(k => allowedKinds.includes(k.value)).map(k => (
+              <MenuItem key={k.value} value={k.value}>+ {k.label}</MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+      )}
 
       {store.error && (
         <Alert severity="error" onClose={() => store.setError(null)}>{store.error}</Alert>
@@ -299,6 +338,13 @@ export function MechanicsPanel({
                 <DatumIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
+            {store.wholeModule && (
+              <ToggleButton value="optics">
+                <Tooltip title="place mode: drag the selected optical primitive onto its face">
+                  <OpticsPlaceIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+            )}
           </ToggleButtonGroup>
           {store.mode === 'datum' && (
             <TextField
@@ -388,10 +434,18 @@ export function MechanicsPanel({
             next[i] = Number(v) || 0;
             store.updateDatum(datum.id, { pointMm: next });
           };
+          const isPlaced = Boolean(datum.quaternion);
+          const isSelected = isPlaced && store.selectedOpticId === datum.id;
           return (
             <Stack
               key={datum.id} spacing={0.5}
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75 }}
+              onClick={() => isPlaced && store.selectOptic(datum.id)}
+              sx={{
+                border: '1px solid',
+                borderColor: isSelected ? 'warning.main' : 'divider',
+                borderRadius: 1, p: 0.75,
+                cursor: isPlaced ? 'pointer' : 'default',
+              }}
             >
               <Stack direction="row" spacing={1} alignItems="center">
                 <TextField
@@ -399,7 +453,13 @@ export function MechanicsPanel({
                   onChange={e => store.updateDatum(datum.id, { name: e.target.value })}
                   sx={{ width: 110 }}
                 />
-                <Chip size="small" label={datum.kind} sx={{ height: 18, fontSize: 10 }} />
+                <Chip
+                  size="small"
+                  label={isPlaced ? `${datum.kind} · placed` : datum.kind}
+                  color={isPlaced ? 'warning' : 'default'}
+                  variant={isSelected ? 'filled' : 'outlined'}
+                  sx={{ height: 18, fontSize: 10 }}
+                />
                 {snap.deviationDeg > 2 && (
                   <Typography variant="caption" color="warning.main">
                     +{snap.deviationDeg.toFixed(1)}° off {snap.axis}

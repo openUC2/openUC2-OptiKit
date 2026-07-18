@@ -37,6 +37,13 @@ export interface BindDatum {
   direction: Vec3;
   /** Clear-aperture disc diameter, when meaningful. */
   areaDiameterMm: number | null;
+  /**
+   * Full PART-frame orientation of the optical primitive placed at this datum
+   * (WP-41): [x, y, z, w]. Present only for gizmo-placed optics (whole-module
+   * binding) — a plain clicked datum keeps just `direction`. Written to the
+   * record frame's `rotation` (the continuous form, WP-39).
+   */
+  quaternion?: [number, number, number, number];
 }
 
 export interface MeshTransform {
@@ -88,6 +95,71 @@ export function threePoseToMeshTransform(
   return { positionMm, rotationDeg };
 }
 
+/** Part-frame optic orientation → cube frame (mesh rotation ∘ datum quat).
+ * The record frame's `rotation` is in the CUBE frame, so a placed optic
+ * carries the mesh placement's rotation too (WP-41). */
+export function datumQuatToCubeQuat(
+  quat: [number, number, number, number],
+  t: MeshTransform,
+): THREE.Quaternion {
+  const meshQuat = new THREE.Quaternion().setFromRotationMatrix(transformMatrix(t));
+  return meshQuat.multiply(new THREE.Quaternion(quat[0], quat[1], quat[2], quat[3])).normalize();
+}
+
+export function datumQuatToCube(
+  quat: [number, number, number, number],
+  t: MeshTransform,
+): [number, number, number, number] {
+  const q = datumQuatToCubeQuat(quat, t);
+  return [round6(q.x), round6(q.y), round6(q.z), round6(q.w)];
+}
+
+const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+
+/** The optic's local optical axis (+y) in the cube frame — a placed mirror's
+ * surface normal (WP-41). */
+function cubeNormalOf(datum: BindDatum, t: MeshTransform): THREE.Vector3 {
+  if (!datum.quaternion) return new THREE.Vector3(...datumToCube(datum, t).direction);
+  return new THREE.Vector3(0, 1, 0).applyQuaternion(datumQuatToCubeQuat(datum.quaternion, t));
+}
+
+// Basis change doc↔three: doc(x, y, z) = three(x, −z, y), a −90° rotation
+// about the shared x. A doc-frame orientation quaternion becomes a
+// three-space one by left-composition with this rotation (WP-41 gizmo math).
+const QB = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+
+export function docQuatToThree(q: THREE.Quaternion): THREE.Quaternion {
+  return QB.clone().multiply(q);
+}
+
+export function threeQuatToDoc(q: THREE.Quaternion): THREE.Quaternion {
+  return QB.clone().invert().multiply(q);
+}
+
+/** A three-space gizmo group pose → a PART-frame BindDatum patch (WP-41):
+ * the placed cube pose travels back through the mesh transform to the part
+ * frame, and the orientation is stored as the datum quaternion. */
+export function threePoseToDatum(
+  position: { x: number; y: number; z: number },
+  quaternion: THREE.Quaternion,
+  t: MeshTransform,
+): { pointMm: Vec3; direction: Vec3; quaternion: [number, number, number, number] } {
+  const cubePointMm: Vec3 = [position.x, -position.z, position.y]; // three → doc
+  const cubeQuat = threeQuatToDoc(quaternion);
+  // Part frame = mesh⁻¹ ∘ cube.
+  const meshQuatInv = new THREE.Quaternion()
+    .setFromRotationMatrix(transformMatrix(t))
+    .invert();
+  const partQuat = meshQuatInv.clone().multiply(cubeQuat).normalize();
+  const back = cubeToDatum(cubePointMm, [0, 1, 0], t); // point only; dir recomputed
+  const direction = new THREE.Vector3(0, 1, 0).applyQuaternion(partQuat).normalize();
+  return {
+    pointMm: [round3(back.pointMm[0]), round3(back.pointMm[1]), round3(back.pointMm[2])],
+    direction: [round6(direction.x), round6(direction.y), round6(direction.z)],
+    quaternion: [round6(partQuat.x), round6(partQuat.y), round6(partQuat.z), round6(partQuat.w)],
+  };
+}
+
 /** Cube-frame point + direction → part frame (for click authoring). */
 export function cubeToDatum(
   pointMm: Vec3,
@@ -111,6 +183,13 @@ export interface BindInput {
   meshTransform: MeshTransform;
   datums: BindDatum[];
   description?: string;
+  /**
+   * WP-41: the mesh is the WHOLE cube module (cube + insert + optic + screws,
+   * one Inventor export), not just an insert body. Marks the template
+   * `provenance: whole-module` and promotes the placed optic frames to the
+   * template's declared insert frames (so verify-t1 checks the placed pose).
+   */
+  wholeModule?: boolean;
   /**
    * Bind the mechanics to an EXISTING optical component instead of
    * generating a stub (WP-31): the module references this id and no
@@ -166,6 +245,15 @@ export function defaultPortName(kind: DatumKind, index: number): string {
 
 const round3 = (v: number) => Math.round(v * 1e3) / 1e3;
 
+/** A cube-frame unit vector → an axis literal (within 2°) or the WP-39
+ * continuous form. */
+function dirToPort(v: Vec3): string | [number, number, number] {
+  const snap = snapToAxis(v);
+  if (snap.deviationDeg <= AXIS_SNAP_WARN_DEG) return snap.axis;
+  const len = Math.hypot(...v) || 1;
+  return [round3(v[0] / len), round3(v[1] / len), round3(v[2] / len)];
+}
+
 export function bindToRecords(input: BindInput): BoundRecords {
   const warnings: string[] = [];
   const componentId = input.existingComponent
@@ -176,6 +264,13 @@ export function bindToRecords(input: BindInput): BoundRecords {
 
   const frames: Record<string, unknown> = { optical: { 'z-mm': 0.0 } };
   const ports: Record<string, unknown> = {};
+  // Names of the frames that carry a placed optical primitive (WP-41): these
+  // become the template's declared insert frames in whole-module binding.
+  const opticFrameNames: string[] = [];
+  // One reflective surface per placed mirror (WP-41 multi-mirror: a dual-axis
+  // galvo carries two, each its own fragment surface + frame).
+  const reflectiveDatums = input.datums.filter(d => d.kind === 'reflective');
+  const multiMirror = reflectiveDatums.length > 1;
   input.datums.forEach((datum, i) => {
     // Records speak the CUBE frame: part-frame datums travel through the
     // mesh placement first (WP-31 — datums follow the part).
@@ -202,12 +297,40 @@ export function bindToRecords(input: BindInput): BoundRecords {
     // for the part origin, and empty names fall back to the kind default.
     let name = datum.name || defaultPortName(datum.kind, i);
     if (name === 'optical' || name in frames) name = `${name}-${i}`;
-    const frame: Record<string, number> = {};
+    const frame: Record<string, number | number[]> = {};
     if (cube.pointMm[0]) frame['x-mm'] = round3(cube.pointMm[0]);
     if (cube.pointMm[1]) frame['y-mm'] = round3(cube.pointMm[1]);
     frame['z-mm'] = round3(cube.pointMm[2]);
+    // WP-41: a gizmo-placed optic carries its full orientation onto the frame.
+    if (datum.quaternion) {
+      frame.rotation = datumQuatToCube(datum.quaternion, input.meshTransform);
+      opticFrameNames.push(name);
+    }
     frames[name] = frame;
-    ports[name] = { frame: name, direction };
+
+    // A placed mirror emits BOTH beam endpoints derived from its surface
+    // normal (WP-41 + WP-40 reflection law): a +x-incoming beam reflects off
+    // the placed normal, so the schematic folds accordingly. Everything else
+    // keeps the single datum port.
+    if (datum.kind === 'reflective' && datum.quaternion) {
+      const n = cubeNormalOf(datum, input.meshTransform).normalize();
+      const incoming = new THREE.Vector3(1, 0, 0); // canonical cube optical axis
+      const reflected = incoming.clone().sub(n.clone().multiplyScalar(2 * incoming.dot(n)));
+      const surfaceIdx = reflectiveDatums.indexOf(datum);
+      const entryName = multiMirror ? `${name}-in` : 'front';
+      const exitName = multiMirror ? `${name}-refl` : 'reflected';
+      ports[entryName] = {
+        frame: name,
+        direction: dirToPort([-incoming.x, -incoming.y, -incoming.z]),
+      };
+      ports[exitName] = {
+        frame: name,
+        direction: dirToPort([reflected.x, reflected.y, reflected.z]),
+        'after-surface': surfaceIdx,
+      };
+    } else {
+      ports[name] = { frame: name, direction };
+    }
   });
   if (input.datums.length === 0) {
     warnings.push('no datums authored — the record has no ports; chaining will not work');
@@ -224,16 +347,16 @@ export function bindToRecords(input: BindInput): BoundRecords {
       tags: ['bound'],
       optics: { frames, ports },
     };
-    // Reflective parts carry a minimal flat-fold fragment (WP-8 convention).
-    if (input.datums.some(d => d.kind === 'reflective')) {
+    // One reflective flat-fold surface per placed mirror (WP-8 convention;
+    // WP-41: a dual-axis galvo carries two, indexed by the reflected ports'
+    // after-surface).
+    if (reflectiveDatums.length > 0) {
       (component.optics as Record<string, unknown>).fragment = {
-        surfaces: [
-          {
-            type: 'standard',
-            geometry: { type: 'StandardGeometry', radius: Infinity, conic: 0 },
-            interaction_model: { type: 'refractive_reflective', is_reflective: true },
-          },
-        ],
+        surfaces: reflectiveDatums.map(() => ({
+          type: 'standard',
+          geometry: { type: 'StandardGeometry', radius: Infinity, conic: 0 },
+          interaction_model: { type: 'refractive_reflective', is_reflective: true },
+        })),
       };
     }
   }
@@ -261,6 +384,19 @@ export function bindToRecords(input: BindInput): BoundRecords {
     ),
     footprint_grid: [1, 1, 1],
   };
+
+  // WP-41: the whole module IS the mesh. Mark it, and promote the placed
+  // optic frames to the template's declared insert frames so verify-t1
+  // checks the placed pose against itself (the mesh has no separate insert
+  // body, so the optic pose is the only truth for where the optic sits).
+  if (input.wholeModule) {
+    template.provenance = 'whole-module';
+    const insertFrames: Record<string, unknown> = {};
+    for (const name of opticFrameNames.length ? opticFrameNames : Object.keys(ports)) {
+      if (frames[name]) insertFrames[name] = frames[name];
+    }
+    if (Object.keys(insertFrames).length > 0) template.frames = insertFrames;
+  }
 
   // The module's component ref: a caret range on the existing component's
   // major.minor, or the stub's ^0.1.
