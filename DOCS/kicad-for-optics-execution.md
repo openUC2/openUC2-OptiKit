@@ -88,7 +88,8 @@ frontend:  WP-11 → WP-13 (today)         WP-12 (after WP-1)
 | WP-38 | library browser round 2: index cards fetch the full record via the assets endpoint and open as an editable copy (banner); tabs renamed "library · published" / "drafts · this browser" + helper text; the mechanics tab FOLLOWS the record — IndexedDB draft mesh → registry template assets → honest "no STP bound" message; drafts' meshes persist per record id | ✅ done — verified live: laser_488 opens with the emit z=+20 form filled AND its published GLB+STEP auto-loaded; achromat (no bound mesh) says "no STP bound" |
 | WP-39 | anchors drive the beam: `partToElement` launches from the entry/emit port's datum frame (`anchorFrameMm`); `SourcePort.direction` accepts unit vectors end-to-end (`dirVecOf`); bind keeps continuous directions beyond the 2° snap (records get `direction: [x,y,z]`); core `PortSpec` accepts enum OR unit vector via one resolver (`geometry.rotations.direction_vector`) used by compile/chain/checks; `W_PORT_DIRECTION_VECTOR` until ratified; **E2 ask #8** filed | ✅ done — verified live: laser_488 at [100,150] launches its 2D rays at x=120 (the +20 mm emit datum rotated onto the beam axis); vector-direction design validates+compiles+chains (core tests) |
 | WP-40 | surfaces as truth: `OpticsOverlay` in the bind scene (lens lathe from the surface stack, mirror disc, sensor plane, beam arrows, frame axes; "show optics" toggle, on by default); galvo groundwork — bindStore `galvoTiltDeg` slider swings the reflected arrow by 2θ AND a template rotation-DOF value swings the schematic arm (`beamAxesOf`); directions derived not restated — core `library/derive.py` (`derive_port_directions` + `check_port_directions`, reflection law from frame-rotation quaternions) wired into `library validate` WARNs, frontend `derivedPortWarnings` cross-checks the mount angle in the editor | ✅ done — mismatched enum (mount 30° vs '-x') warns in both editor and `library validate`; galvo θ=15° swings the arm 30° (unit-verified); 344 core + 115 frontend tests |
-| — | next: WP-37 (light polish + View-3D retirement); WP-27 (tutorials) after; WP-26 (motor/firmware actuation) picks up the same dof values; FRAME UX rework still needs a spec conversation | ⬜ |
+| — | feedback round 5 triaged (2026-07-18, Part 2f): WP-41 whole-module STEP binding (grabbable optics overlay, multi-primitive), WP-42 variable surfaces ↔ firmware (DofSpec pivot-frame/surface + axis-map contract, E2 ask #9), WP-43 CSV palette → library migration (ONE database); database concept + T-class facets answer written up in Part 2f | 📋 |
+| — | next: WP-41 → WP-42 → WP-43 (round 5), then WP-37 (light polish + View-3D retirement); WP-27 (tutorials) after; WP-26 (motor/firmware actuation) folds into WP-42's contract; FRAME UX rework still needs a spec conversation | ⬜ |
 
 Nothing pushed to any remote yet — all of the above are local commits.
 
@@ -1564,6 +1565,217 @@ appears exactly where the record claims it is inside the STP — so a mismatch
 is something you see immediately, not something a checker tells you about
 later. Port directions stop being hand-typed where they can be computed from
 the surfaces themselves, and a galvo's tilting mirror becomes expressible.
+
+---
+
+# Part 2f · Feedback round 5 (2026-07-18) — whole-module binding, firmware axes, ONE database
+
+Bene's collected points: T1 modules arrive as ONE Inventor STEP (cube + insert
++ optic + screws) and need their optical primitive(s) placed against the real
+geometry; galvos need per-surface rotation axes bound to firmware commands;
+and everything — including the legacy CSV palette — should live in one
+extensible, viewable database. Answers first, then the work packages
+(to be implemented later).
+
+## The database, as it exists today
+
+There is already exactly ONE normative database: the **record library in the
+`optikit-core` git repo** (`library/`), served live by the service as "the
+registry". Everything else is either a feeder into it or a local cache of it:
+
+```mermaid
+flowchart LR
+  subgraph git["optikit-core git repo — THE database"]
+    LIB["library/<br/>components/&lt;id&gt;/component.yml (symbol)<br/>templates/&lt;id&gt;/template.yml + STP/GLB (footprint)<br/>modules/&lt;id&gt;/module.yml (binding + electronics)"]
+    IDX["library/dist/index.json<br/>(built catalog)"]
+    GOLD["golden/*.dsn — designs,<br/>NOT library records"]
+    LIB -->|"optikit-core library build"| IDX
+  end
+
+  subgraph service["optikit-core service (:8000)"]
+    REG["/v1/library/index — fresh per request<br/>/v1/library/assets/… — YML/STP/GLB<br/>/v1/library/save — dev write (checkout only)"]
+  end
+  LIB --> REG
+
+  subgraph feeders["Feeders"]
+    INV["Inventor exports<br/>(PyInventor STP/GLB + datum markers)"]
+    THOR["Thorlabs / Zemax files"]
+    ED["component editor + bind workbench"]
+  end
+  INV -->|"optikit-core import glb"| LIB
+  THOR -->|"import thorlabs / zmx → thorlabs.*"| LIB
+  ED -->|"dev write → user.*"| REG
+  ED -->|"PR zip → git PR"| LIB
+
+  subgraph browser["Browser-local (drafts + caches)"]
+    WS["workspace drafts<br/>localStorage optikit-workspace-components<br/>+ IndexedDB optikit-bind-meshes"]
+    SNAP["bundled offline snapshot<br/>public/optikit-library/index.json"]
+    CSV["LEGACY CSV palette<br/>modules_updated.csv + Store parts.csv<br/>(not records — WP-43 retires this)"]
+  end
+  ED <--> WS
+  REG -->|"index + assets"| PAL["schematic palette + library browser"]
+  SNAP -.->|offline fallback| PAL
+  CSV -.->|legacy group| PAL
+  WS --> PAL
+```
+
+Key clarifications for the questions asked:
+
+- **Records ≠ designs.** The library stores the three RECORD kinds per part
+  (component = the optical symbol, template = the mechanical footprint,
+  module = the binding + electronics contract), one directory per record,
+  YAML + mesh assets. `.dsn` files are *designs* — arrangements of parts —
+  and live elsewhere (`golden/`, your own setup folders). "A large folder of
+  individual files you can author manually or through the editor" is exactly
+  what `optikit-core/library/` already is — just with per-kind YAML files
+  instead of one `.dsn` per part, because one part is three linked facts.
+- **Where it's stored:** in git, next to the engine. The service is a thin
+  live view of that folder. Deployments ship the same folder read-only.
+- **How to extend it manually:** create `library/components/<ns>.<cat>.<name>/
+  component.yml` (+ template/module dirs), run `optikit-core library
+  validate` (now also warns on direction↔surface mismatches), commit.
+  Namespaces: `openuc2.*` (curated), `thorlabs.*` (imported vendor),
+  `user.*` (yours).
+- **How to extend/view it from the editor:** the library browser's
+  "library · published" tab lists and (since WP-38) OPENS every record; "Write
+  into ../optikit-core/library" is the dev fast path; "Download record pair
+  (PR zip)" is the contribution road. The schematic palette's Library group
+  is the same index. What is NOT yet in the database is the legacy CSV
+  palette — that migration is WP-43.
+
+## Do we need more T-classes, or subtypes?
+
+**No new classes — new FACETS.** T1/T2/T3 answer one question: *where does
+the mechanical geometry come from* (fixed export / parametric master insert /
+generated). The new requirements are orthogonal axes that any class can have,
+and the schema already carries most of them:
+
+| Facet | Question it answers | Where it lives (today / WP) |
+|---|---|---|
+| **States** | finite named configurations? | `TemplateRecord.states` (WP-35) — T1 mirror XY⇄YZ |
+| **DOFs** | continuous knobs? | `TemplateRecord.dof` — kind translation/rotation, range, resolution |
+| **Actuation** | is a DOF motorized? | `DofSpec.actuatable` + the module's `electronics.axis-map` (dof → firmware object) — a galvo IS a T2 whose rotation dofs are actuatable; a motorized z-stage IS a T2 whose `dz` is actuatable. Same record shape, different actuator (WP-26) |
+| **Optic multiplicity** | how many optical primitives in one cube? | the gap — module binds ONE component today; a dual-axis galvo needs two mirror surfaces with their own pivots (WP-41/42 + E2 ask #9) |
+| **Surface binding** | which surface does a DOF move? | the gap — `DofSpec` has axis but no pivot frame / surface ref (WP-42 + E2 ask #9) |
+
+Inventing "T1m/T2g" subtypes would multiply names for combinations the facets
+express better; DRC, the palette badges and cubify all key off the three
+classes and stay untouched.
+
+## Work packages
+
+### WP-41 — Whole-module binding: place the optical primitive against the STEP
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. The mechanics tab accepts a WHOLE cube-module STEP (cube + insert +
+   optic + screws, one Inventor export): the ghost cube auto-snaps the
+   mesh to the 50 mm envelope (bbox-fit button), and the record pair for
+   this flow marks the template `provenance: whole-module` so its mesh IS
+   the module (no separate insert body expected).
+2. Place the PRIMITIVE, not just datums: the WP-40 optics overlay becomes
+   grabbable — a gizmo on the overlay group moves/rotates the optical
+   model (lens profile, mirror disc) against the frozen mesh, writing the
+   result into the record's frames (position + rotation quaternion, the
+   WP-39 continuous form). Editing `mirror size`/radii in the optics tab
+   resizes the overlay live. The 'front' datum stays derived from the
+   overlay pose (one truth), and verify-t1 passes when the disc sits on
+   the physical mirror face.
+3. Multi-primitive groundwork: the overlay supports N primitive instances
+   (add/select in a small list — e.g. galvo mirror-x + mirror-y), each an
+   independent frame + surface binding in ONE component record (fragment
+   surface index ↔ frame name mapping). Module records stay 1-component;
+   the N-optic case lives inside the component's fragment (E2 ask #9
+   documents the alternative of multi-component modules).
+
+Acceptance: load the mirror-cube STEP, drag the mirror disc onto the
+visible reflective face at 45°, save — the record's optical frame carries
+the placed pose (with rotation), verify-t1 is green, and the schematic
+part folds the beam accordingly; a second disc can be added and placed
+independently.
+```
+
+**For humans:** you'll be able to load the complete Inventor module — cube,
+holder, optic, screws, one STEP — tell the editor "this is a mirror", and
+then *drag the mirror's optical plane onto the real reflective surface you
+can see in 3D*, resizing it with the mirror's parameters. The saved record
+remembers exactly where the optics sit inside that module, checkably. And
+one module can carry several optical surfaces (a dual-axis galvo's two
+mirrors), each placed on its own face.
+
+### WP-42 — Variable surfaces ↔ firmware: the actuation contract
+
+```
+PROMPT (repo: optikit-core + openUC2-OptiKit)
+
+1. Schema (E2 ask #9): `DofSpec` gains `pivot-frame` (the frame the DOF
+   rotates/translates about) and `surface` (fragment surface index it
+   moves); regenerate dist. A dual-axis galvo record = one component, two
+   reflective surfaces, template dofs tilt_x/tilt_y each with kind:
+   rotation, its own pivot-frame, surface binding, range and
+   actuatable: true.
+2. Firmware linkage: the module's `electronics.axis-map` (WP-7) binds
+   each actuatable dof to its firmware object — document the galvo and
+   motorized-z-stage contracts in DOCS/LIBRARY.md (dof name == fx name ==
+   axis-map dof, one name everywhere: WP-35's naming rule extended to
+   firmware). `library validate` errors when an axis-map references an
+   unknown dof and warns when an actuatable dof has no axis-map entry.
+3. Editors consume the binding: the WP-40 galvo slider stops being a
+   demo — it reads the record's rotation dofs (per surface, about the
+   REAL pivot frame) in the overlay; the schematic property panel shows
+   actuatable dofs with a ⚡ chip (firmware-bound) and sliders within
+   range; sweeping tilt_x swings the overlay arrow about the x pivot and
+   the schematic arm (beamAxesOf already consumes rotation dofs).
+
+Acceptance: the galvo record validates with both dofs bound; sweeping
+tilt_x in the editor swings only mirror-x's reflected arrow about its own
+pivot; an actuatable dof without an axis-map entry gets flagged; the
+motorized z-stage record reuses the same shape with a translation dof.
+```
+
+**For humans:** this makes "this surface moves, and firmware moves it"
+part of a part's record. A galvo's two mirrors each get their own rotation
+axis with limits, and each axis is linked by name to the firmware command
+that drives it — the same wiring a motorized focus stage uses for its
+lens travel. The editors then show these as live sliders: sweep the x-axis
+and watch exactly that mirror's beam swing.
+
+### WP-43 — One database: retire the CSV palette into the library
+
+```
+PROMPT (repo: openUC2-OptiKit + optikit-core)
+
+1. Migrate: a script (scripts/csv2records.py or a core importer) converts
+   every modules_updated.csv row (+ Store parts.csv) into record trios
+   under `openuc2.*` — category from the WP-29 port catalog, sim params
+   (focal length, wavelength) into the component, GLB refs into the
+   template, footprint/price/docs links preserved as record fields; rows
+   with nothing optical become `mechanics`/`electronics` records (WP-30
+   categories). Review-flag everything auto-converted.
+2. The palette reads ONE source: the schematic palette drops the CSV path
+   once the migrated records serve from the index (keep the CSV loader
+   behind a fallback flag for one release); palette groups become
+   category + namespace driven; "Create Custom Module" routes into the
+   component editor instead of the legacy wizard.
+3. Document the database contract (DOCS/LIBRARY.md + frontend README):
+   where the library lives, the three record kinds, namespaces, manual
+   authoring, editor round-trip (browse → open → edit → dev-write/PR),
+   and the records-vs-designs distinction — the answer to "where is the
+   database and how do I extend it" as one page.
+
+Acceptance: the schematic palette renders entirely from the registry
+index (CSV flag off) with every previously-available part present and
+placeable; `library validate` passes on the migrated corpus; a new part
+authored ONLY through the editor appears alongside the migrated ones.
+```
+
+**For humans:** today the parts you see in the schematic sidebar come from
+an old spreadsheet, while newly authored parts live in the real library —
+two worlds. This migrates the spreadsheet into the library once (flagged
+for review, nothing lost), so there is exactly one database of parts:
+browsable in the sidebar, openable in the editor, extendable by you, and
+versioned in git.
 
 ---
 
