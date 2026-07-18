@@ -48,6 +48,10 @@ interface BindState {
   meshBboxCenter: Vec3 | null;
   /** The optic instance (datum id) the placement gizmo drives, or null. */
   selectedOpticId: string | null;
+  /** Placement gizmo mode in optics mode: move the optic or ROTATE it onto
+   * the face (a 45° fold mirror needs the full rotation, not the ±15°
+   * actuation preview). */
+  opticsGizmoMode: 'translate' | 'rotate';
 
   loadMesh: (file: string, glb: Uint8Array, step: Uint8Array | null) => void;
   setTransform: (t: MeshTransform) => void;
@@ -65,6 +69,7 @@ interface BindState {
   /** Center the mesh in the 50 mm cube (WP-41 bbox-fit). */
   fitToCube: () => void;
   selectOptic: (id: string | null) => void;
+  setOpticsGizmoMode: (m: 'translate' | 'rotate') => void;
   /** Add a placeable optical primitive at the cube origin (WP-41). */
   addOptic: (kind: DatumKind) => void;
   flipOrtho: (view: OrthoView) => void;
@@ -111,6 +116,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   wholeModule: false,
   meshBboxCenter: null,
   selectedOpticId: null,
+  opticsGizmoMode: 'translate',
 
   loadMesh: (meshFile, glbBytes, stepBytes) =>
     set({
@@ -143,6 +149,7 @@ export const useBindStore = create<BindState>((set, get) => ({
     set({ transform: { positionMm: [-c[0], -c[1], -c[2]], rotationDeg: [0, 0, 0] } });
   },
   selectOptic: selectedOpticId => set({ selectedOpticId }),
+  setOpticsGizmoMode: opticsGizmoMode => set({ opticsGizmoMode }),
   addOptic: kind => {
     const base = DEFAULT_NAMES[kind];
     const existing = new Set(get().datums.map(d => d.name));

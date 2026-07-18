@@ -249,6 +249,7 @@ function PlacedOptic({
   const selectOptic = useBindStore(s => s.selectOptic);
   const showOptics = useBindStore(s => s.showOptics);
   const tiltDeg = useBindStore(s => s.opticTilt[datum.id] ?? 0);
+  const gizmoMode = useBindStore(s => s.opticsGizmoMode);
   const groupRef = useRef<THREE.Group>(null);
 
   // Cube pose from the part-frame datum through the mesh placement.
@@ -302,8 +303,9 @@ function PlacedOptic({
       {gizmoOn && (
         <TransformControls
           object={groupRef as RefObject<THREE.Object3D>}
-          mode="translate"
+          mode={gizmoMode}
           translationSnap={snap ? 1 : null}
+          rotationSnap={snap ? THREE.MathUtils.degToRad(15) : null}
           onMouseUp={commit}
         />
       )}

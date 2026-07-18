@@ -346,6 +346,21 @@ export function MechanicsPanel({
               </ToggleButton>
             )}
           </ToggleButtonGroup>
+          {store.mode === 'optics' && (
+            <ToggleButtonGroup
+              size="small" exclusive value={store.opticsGizmoMode}
+              onChange={(_, m) => m && store.setOpticsGizmoMode(m)}
+            >
+              <ToggleButton value="translate">
+                <Tooltip title="move the optic"><TranslateIcon fontSize="small" /></Tooltip>
+              </ToggleButton>
+              <ToggleButton value="rotate">
+                <Tooltip title="rotate the optic onto its face (15° snap — three clicks to 45°)">
+                  <RotateIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
           {store.mode === 'datum' && (
             <TextField
               select size="small" label="datum kind" value={store.nextKind}
@@ -479,18 +494,25 @@ export function MechanicsPanel({
                     inputProps={{ step: 0.1, style: { width: 56, fontSize: 12 } }}
                   />
                 ))}
-                <TextField
-                  select size="small" variant="standard" label="dir" value={snap.axis}
-                  onChange={e => {
-                    const axis = DIRECTION_AXES.find(a => a.value === e.target.value);
-                    if (axis) store.updateDatum(datum.id, { direction: axis.vec });
-                  }}
-                  sx={{ width: 60 }}
+                <Tooltip
+                  title={isPlaced
+                    ? 'a placed optic\'s direction comes from the rotate gizmo — the readout snaps to the nearest axis'
+                    : ''}
                 >
-                  {DIRECTION_AXES.map(a => (
-                    <MenuItem key={a.value} value={a.value}>{a.value}</MenuItem>
-                  ))}
-                </TextField>
+                  <TextField
+                    select size="small" variant="standard" label="dir" value={snap.axis}
+                    disabled={isPlaced}
+                    onChange={e => {
+                      const axis = DIRECTION_AXES.find(a => a.value === e.target.value);
+                      if (axis) store.updateDatum(datum.id, { direction: axis.vec });
+                    }}
+                    sx={{ width: 60 }}
+                  >
+                    {DIRECTION_AXES.map(a => (
+                      <MenuItem key={a.value} value={a.value}>{a.value}</MenuItem>
+                    ))}
+                  </TextField>
+                </Tooltip>
                 <TextField
                   size="small" variant="standard" label="⌀mm" type="number"
                   value={datum.areaDiameterMm ?? ''}
