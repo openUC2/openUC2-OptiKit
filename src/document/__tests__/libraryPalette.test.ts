@@ -111,7 +111,7 @@ describe('entriesFromIndex', () => {
     expect(mirror.glbUrl).toBe('http://localhost:8010/v1/library/assets/templates/t/model.glb');
     expect(mirror.ports.map(p => p.direction)).toEqual(['-z', '+x']);
     expect(lens.templateClass).toBe('adaptive');
-    expect(lens.dofs).toEqual([
+    expect(lens.dofs).toMatchObject([
       { name: 'dz', kind: 'translation', axis: 'z', unit: 'mm', range: [-7.5, 7.5] },
     ]);
     expect(lens.eflMm).toBe(50);

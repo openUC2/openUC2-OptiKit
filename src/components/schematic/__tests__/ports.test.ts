@@ -221,3 +221,38 @@ describe('galvo groundwork (WP-40: rotation DOF swings the arm)', () => {
     expect(Math.abs((tilted.foldDeg ?? 0) - 90)).toBeCloseTo(30, 5);
   });
 });
+
+describe('actuated-DOF beam swing (WP-42)', () => {
+  it('a two-rotation-DOF galvo sums the tilts into the schematic arm swing', () => {
+    const galvo: IndexModule = {
+      ...GALVO_MODULE,
+      id: 'user.cube.galvo2',
+      template: {
+        ...GALVO_MODULE.template,
+        dof: [
+          { name: 'tilt_x', kind: 'rotation', axis: 'x', unit: 'deg', range: [-15, 15], actuatable: true, pivot_frame: 'pivot_x', surface: 0, can_object: 0x6070 },
+          { name: 'tilt_y', kind: 'rotation', axis: 'y', unit: 'deg', range: [-15, 15], actuatable: true, pivot_frame: 'pivot_y', surface: 1, can_object: 0x6071 },
+        ],
+      },
+    };
+    registerLibraryModules(entriesFromIndex([galvo], 'http://x'));
+    const base = beamAxesOf(
+      makePart('g2', { libraryRef: 'user.cube.galvo2', category: 'mirror' }),
+    );
+    expect(base.foldDeg).toBeCloseTo(90, 5);
+    // tilt_x=10 → arm swings 20°; adding tilt_y=5 → 30° total.
+    const one = beamAxesOf(makePart('g2', {
+      libraryRef: 'user.cube.galvo2', category: 'mirror',
+      dofs: [{ name: 'tilt_x', range: null, unit: 'deg', value: 10 }],
+    }));
+    expect(Math.abs((one.foldDeg ?? 0) - 90)).toBeCloseTo(20, 4);
+    const both = beamAxesOf(makePart('g2', {
+      libraryRef: 'user.cube.galvo2', category: 'mirror',
+      dofs: [
+        { name: 'tilt_x', range: null, unit: 'deg', value: 10 },
+        { name: 'tilt_y', range: null, unit: 'deg', value: 5 },
+      ],
+    }));
+    expect(Math.abs((both.foldDeg ?? 0) - 90)).toBeCloseTo(30, 4);
+  });
+});

@@ -248,6 +248,7 @@ function PlacedOptic({
   const updateDatum = useBindStore(s => s.updateDatum);
   const selectOptic = useBindStore(s => s.selectOptic);
   const showOptics = useBindStore(s => s.showOptics);
+  const tiltDeg = useBindStore(s => s.opticTilt[datum.id] ?? 0);
   const groupRef = useRef<THREE.Group>(null);
 
   // Cube pose from the part-frame datum through the mesh placement.
@@ -287,6 +288,7 @@ function PlacedOptic({
             category={draft.category}
             surfaces={draft.surfaces}
             diameterMm={datum.areaDiameterMm}
+            galvoTiltDeg={tiltDeg}
           />
         )}
         {/* selection ring on the placement plane */}

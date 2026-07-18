@@ -152,13 +152,17 @@ export function beamAxesOf(part: DocPart): BeamAxes {
     }
   }
 
-  // Galvo: rotation-DOF value → the mirror normal tilts θ, the arm swings 2θ.
+  // Galvo/actuated mirror: each rotation DOF's value θ swings the exit arm by
+  // 2θ about the fold-plane normal (WP-40 groundwork; WP-42 sums every
+  // actuated rotation DOF, so both galvo axes steer the 2D preview arm — the
+  // per-axis geometry is exact in the mechanics overlay and the service trace).
   if (exit) {
-    const rotDof = libraryEntryOf(part.libraryRef)?.dofs.find(d => d.kind === 'rotation');
-    const theta = rotDof
-      ? part.dofs.find(d => d.name === rotDof.name)?.value ?? 0
-      : 0;
-    if (rotDof && theta) {
+    const rotDofs = (libraryEntryOf(part.libraryRef)?.dofs ?? []).filter(d => d.kind === 'rotation');
+    const theta = rotDofs.reduce(
+      (sum, d) => sum + (part.dofs.find(v => v.name === d.name)?.value ?? 0),
+      0,
+    );
+    if (theta) {
       const u = new THREE.Vector3(entry[0], entry[1], entry[2]);
       const e = new THREE.Vector3(exit[0], exit[1], exit[2]);
       const w = new THREE.Vector3().crossVectors(u, e);

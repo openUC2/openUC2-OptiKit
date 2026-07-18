@@ -96,6 +96,8 @@ function PartProperties({ part }: { part: DocPart }) {
   const tClass = lib?.templateClass ?? null;
   const isT1 = tClass === 'fixed';
   const stateParam = typeof part.params.state === 'string' ? part.params.state : '';
+  // WP-42: firmware-actuated axes drive live sliders (galvo tilt, stage focus).
+  const actuatableDofs = (lib?.dofs ?? []).filter(d => d.actuatable);
 
   const setAxis = (axis: 0 | 1 | 2) => (v: number) => {
     const next = [...pos] as Vec3;
@@ -210,6 +212,46 @@ function PartProperties({ part }: { part: DocPart }) {
             />
           ))}
         </Stack>
+      )}
+
+      {/* WP-42: actuated axes — a live slider per firmware-bound DOF (a galvo's
+          per-mirror tilt, a stage's focus), within the declared range. */}
+      {actuatableDofs.length > 0 && (
+        <>
+          <Divider />
+          <Typography variant="caption" color="text.secondary">
+            Actuated axes
+          </Typography>
+          {actuatableDofs.map(d => {
+            const value = part.dofs.find(v => v.name === d.name)?.value ?? 0;
+            return (
+              <Box key={d.name} sx={{ px: 0.5 }}>
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Tooltip title={d.canObject != null
+                    ? `firmware-bound (CAN object ${typeof d.canObject === 'number'
+                        ? '0x' + d.canObject.toString(16) : d.canObject})`
+                    : 'declared actuatable but no firmware binding'}>
+                    <Chip size="small" color={d.canObject != null ? 'warning' : 'default'}
+                      label={`⚡ ${d.name}`} sx={{ height: 18, fontSize: 10, fontWeight: 700 }} />
+                  </Tooltip>
+                  <Typography variant="caption">
+                    {value.toFixed(2)} {d.unit}
+                    {d.surface != null && ` · surface ${d.surface}`}
+                    {d.pivotFrame && ` · about ${d.pivotFrame}`}
+                  </Typography>
+                </Stack>
+                <Slider
+                  size="small"
+                  value={value}
+                  min={d.range?.[0] ?? -15}
+                  max={d.range?.[1] ?? 15}
+                  step={d.kind === 'rotation' ? 0.1 : 0.05}
+                  onChange={(_, v) => withUndoStep(() => setDofValue(part.id, d.name, v as number))}
+                />
+              </Box>
+            );
+          })}
+        </>
       )}
       <Typography variant="caption" color="text.secondary">
         grid cell [{part.gridPose.cell.join(', ')}]

@@ -1,6 +1,6 @@
 {
   "schema": "optikit-library-index/v0",
-  "count": 4,
+  "count": 5,
   "modules": [
     {
       "id": "openuc2.cube.camera_cs165",
@@ -56,6 +56,114 @@
         }
       ],
       "electronics": null
+    },
+    {
+      "id": "openuc2.cube.galvo",
+      "version": "0.1.0",
+      "kind": "cube_module",
+      "description": "Dual-axis galvo scanner cube (x/y beam steering, firmware-actuated)",
+      "tags": [
+        "cube",
+        "cube/mirror",
+        "cube/galvo"
+      ],
+      "category": "mirror",
+      "thumbnail": null,
+      "footprint_grid": [
+        1,
+        1,
+        1
+      ],
+      "review": false,
+      "component": {
+        "ref": "openuc2.galvo.dual_axis@^0.1",
+        "resolved": "0.1.0",
+        "vendor": {
+          "name": "",
+          "mpn": "",
+          "url": ""
+        },
+        "efl_mm": null
+      },
+      "template": {
+        "ref": "openuc2.tpl.galvo_dual@^0.1",
+        "id": "openuc2.tpl.galvo_dual",
+        "resolved": "0.1.0",
+        "class": "adaptive",
+        "actuatable": true,
+        "dof": [
+          {
+            "name": "tilt_x",
+            "kind": "rotation",
+            "axis": "x",
+            "unit": "deg",
+            "range": [
+              -15.0,
+              15.0
+            ],
+            "actuatable": true,
+            "pivot_frame": "pivot_x",
+            "surface": 0,
+            "can_object": 24688
+          },
+          {
+            "name": "tilt_y",
+            "kind": "rotation",
+            "axis": "y",
+            "unit": "deg",
+            "range": [
+              -15.0,
+              15.0
+            ],
+            "actuatable": true,
+            "pivot_frame": "pivot_y",
+            "surface": 1,
+            "can_object": 24689
+          }
+        ],
+        "states": []
+      },
+      "assets": {
+        "thumbnail": null,
+        "glb": null,
+        "step": null
+      },
+      "ports": [
+        {
+          "name": "front",
+          "direction": "-x",
+          "position_mm": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "after_surface": null
+        },
+        {
+          "name": "reflected",
+          "direction": "-y",
+          "position_mm": [
+            0.0,
+            0.0,
+            6.0
+          ],
+          "after_surface": 1
+        }
+      ],
+      "electronics": {
+        "pcb": "kicad:galvo_driver@1.0",
+        "firmware-contract": "uc2:can:galvo_axis@1",
+        "axis-map": [
+          {
+            "dof": "tilt_x",
+            "can-object": 24688
+          },
+          {
+            "dof": "tilt_y",
+            "can-object": 24689
+          }
+        ]
+      }
     },
     {
       "id": "openuc2.cube.laser_488",
@@ -129,7 +237,7 @@
         1,
         1
       ],
-      "review": false,
+      "review": true,
       "component": {
         "ref": "openuc2.lens.achromat_25mm_f50@^1",
         "resolved": "1.0.0",
@@ -156,7 +264,10 @@
               -7.5,
               7.5
             ],
-            "actuatable": true
+            "actuatable": true,
+            "pivot_frame": "",
+            "surface": null,
+            "can_object": 24674
           }
         ],
         "states": []
@@ -325,6 +436,26 @@
       },
       "efl_mm": null,
       "n_surfaces": 0,
+      "review": false
+    },
+    {
+      "id": "openuc2.galvo.dual_axis",
+      "version": "0.1.0",
+      "kind": "optical_component",
+      "category": "mirror",
+      "description": "Dual-axis galvo scanner (two steering mirrors, x and y)",
+      "tags": [
+        "mirror",
+        "mirror/galvo",
+        "actuated"
+      ],
+      "vendor": {
+        "name": "",
+        "mpn": "",
+        "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 2,
       "review": false
     },
     {

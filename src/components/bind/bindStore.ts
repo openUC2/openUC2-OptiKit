@@ -38,6 +38,9 @@ interface BindState {
   showOptics: boolean;
   /** Galvo groundwork (WP-40): mirror-normal tilt, °; the arm swings by 2θ. */
   galvoTiltDeg: number;
+  /** WP-42: per-placed-mirror actuation tilt (° about its own pivot), keyed by
+   * datum id — sweeping one swings only that mirror's arm. */
+  opticTilt: Record<string, number>;
   /** WP-41: the loaded mesh is the WHOLE cube module (not just an insert). */
   wholeModule: boolean;
   /** Bbox center of the loaded mesh in doc mm (reported by the scene), for
@@ -56,6 +59,7 @@ interface BindState {
   setExistingComponentId: (id: string) => void;
   toggleShowOptics: () => void;
   setGalvoTiltDeg: (deg: number) => void;
+  setOpticTilt: (id: string, deg: number) => void;
   toggleWholeModule: () => void;
   reportMeshBbox: (centerMm: Vec3) => void;
   /** Center the mesh in the 50 mm cube (WP-41 bbox-fit). */
@@ -103,6 +107,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   existingComponentId: '',
   showOptics: true,
   galvoTiltDeg: 0,
+  opticTilt: {},
   wholeModule: false,
   meshBboxCenter: null,
   selectedOpticId: null,
@@ -127,6 +132,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   setExistingComponentId: existingComponentId => set({ existingComponentId }),
   toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
   setGalvoTiltDeg: galvoTiltDeg => set({ galvoTiltDeg }),
+  setOpticTilt: (id, deg) => set(s => ({ opticTilt: { ...s.opticTilt, [id]: deg } })),
   toggleWholeModule: () => set(s => ({ wholeModule: !s.wholeModule })),
   reportMeshBbox: meshBboxCenter => set({ meshBboxCenter }),
   fitToCube: () => {

@@ -35,6 +35,12 @@ export interface LibraryDof {
   axis: string;
   unit: string;
   range: [number, number] | null;
+  /** WP-42: which fragment surface this DOF moves, the frame it pivots about,
+   * and whether firmware drives it. */
+  actuatable?: boolean;
+  pivotFrame?: string;
+  surface?: number | null;
+  canObject?: number | string | null;
 }
 
 export interface LibraryPaletteEntry {
@@ -203,6 +209,10 @@ export function entriesFromIndex(
       axis: d.axis,
       unit: d.unit,
       range: d.range,
+      actuatable: d.actuatable,
+      pivotFrame: d.pivot_frame,
+      surface: d.surface,
+      canObject: d.can_object,
     })),
     footprintGrid: mod.footprint_grid ?? [1, 1, 1],
     thumbnailUrl: abs(mod.assets?.thumbnail),

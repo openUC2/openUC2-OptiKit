@@ -502,6 +502,22 @@ export function MechanicsPanel({
                   inputProps={{ style: { width: 48, fontSize: 12 } }}
                 />
               </Stack>
+              {/* WP-42: a per-mirror actuation tilt — sweeping it swings ONLY
+                  this mirror's reflected arrow about its own pivot. */}
+              {isPlaced && datum.kind === 'reflective' && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Tooltip title="actuation tilt: swings only this mirror about its pivot (WP-42)">
+                    <Chip size="small" color="warning" label="⚡ tilt" sx={{ height: 18, fontSize: 10 }} />
+                  </Tooltip>
+                  <Slider
+                    size="small" min={-15} max={15} step={0.5}
+                    value={store.opticTilt[datum.id] ?? 0}
+                    onChange={(_, v) => store.setOpticTilt(datum.id, v as number)}
+                    valueLabelDisplay="auto" valueLabelFormat={v => `${v}°`}
+                    sx={{ flex: 1 }}
+                  />
+                </Stack>
+              )}
             </Stack>
           );
         })}

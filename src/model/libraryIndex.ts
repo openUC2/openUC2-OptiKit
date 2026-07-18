@@ -45,6 +45,11 @@ export interface IndexDof {
   unit: string;
   range: [number, number] | null;
   actuatable: boolean;
+  /** WP-42: the surface this DOF drives + the frame it moves about, and the
+   * firmware object bound to it (null when not actuated). */
+  pivot_frame?: string;
+  surface?: number | null;
+  can_object?: number | string | null;
 }
 
 export interface IndexModule {
