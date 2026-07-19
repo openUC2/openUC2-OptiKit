@@ -183,3 +183,22 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenUC2 community for the optical cube system concept
 - React-Konva for excellent 2D canvas capabilities
 - Zustand for lightweight state management
+
+## The parts database (one source)
+
+Placeable parts come from ONE database: the record library in the sibling
+`../optikit-core` repo (`library/`), served by the optikit-core service as the
+registry (`/v1/library/index`). The schematic palette, the component browser,
+and the bind workbench all read it — there is no separate spreadsheet of parts
+anymore (the legacy `modules_updated.csv` was migrated into records in WP-43;
+set `localStorage['optikit-legacy-csv'] = '1'` to re-enable the old loader for
+a release).
+
+Each part is three linked records — component (the optical symbol), template
+(the mechanical footprint + STP/GLB), module (the binding). Extend the database
+by authoring in the **Components** editor (`/configurator/components`): browse
+the library tab, open any record to edit a copy, then "Save to workspace"
+(browser-local draft), "Write into ../optikit-core/library" (dev fast path), or
+"Download record pair" (a git PR). `.dsn` setups are *designs* (arrangements of
+parts), stored separately — not in the parts database. See
+`../optikit-core/DOCS/LIBRARY.md` for the full contract.

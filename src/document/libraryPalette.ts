@@ -259,19 +259,34 @@ export function templateClassOf(libraryRef: string): TemplateClass | null {
   return LIB_ENTRIES.get(libraryRef)?.templateClass ?? null;
 }
 
+/** True when a palette module id came from the record registry (WP-43): the
+ * robust "is this a library part?" test, independent of its display group. */
+export function isLibraryModule(id: string): boolean {
+  return LIB_ENTRIES.has(id);
+}
+
 export const T_CLASS_LABEL: Record<TemplateClass, 'T1' | 'T2' | 'T3'> = {
   fixed: 'T1',
   adaptive: 'T2',
   generative: 'T3',
 };
 
+/** @deprecated WP-43: registry parts now group by category, not one "Library"
+ * bucket. Kept for compatibility; use `isLibraryModule` to detect them. */
 export const LIBRARY_GROUP = 'Library';
+
+/** Palette group for a registry part (WP-43): category + namespace, so the
+ * palette's group filter reads "mirror · openuc2", "lens · thorlabs", …. */
+function paletteGroup(entry: LibraryPaletteEntry): string {
+  const namespace = entry.moduleId.split('.')[0] || 'user';
+  return `${entry.category} · ${namespace}`;
+}
 
 function toModuleDefinition(entry: LibraryPaletteEntry): ModuleDefinition {
   return {
     id: entry.moduleId,
     name: entry.name,
-    group: LIBRARY_GROUP,
+    group: paletteGroup(entry),
     color: '#1f9c7c',
     footprint: { width: entry.footprintGrid[0], height: entry.footprintGrid[1] },
     thumbnail: entry.thumbnailUrl ?? undefined,
@@ -285,15 +300,17 @@ let registeredFingerprint = '';
 
 /**
  * Merge the library entries into the palette's module list (replacing any
- * previous Library-group definitions) and refresh the lookup map. Idempotent:
- * re-registering identical entries is a no-op, so callers can invoke it from
- * effects that also observe the module list.
+ * previously-registered registry definitions) and refresh the lookup map.
+ * Idempotent: re-registering identical entries is a no-op, so callers can
+ * invoke it from effects that also observe the module list.
  */
 export function registerLibraryModules(entries: LibraryPaletteEntry[]): void {
   const defs = entries.map(toModuleDefinition);
   const fingerprint = JSON.stringify(entries);
   const store = useAppStore.getState();
-  const nonLibrary = store.modules.filter(m => m.group !== LIBRARY_GROUP);
+  // Non-registry modules = anything not previously registered here (robust to
+  // the category-based grouping, WP-43).
+  const nonLibrary = store.modules.filter(m => !LIB_ENTRIES.has(m.id));
   const alreadyThere =
     fingerprint === registeredFingerprint &&
     store.modules.length === nonLibrary.length + defs.length;

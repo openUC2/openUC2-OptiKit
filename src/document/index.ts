@@ -38,6 +38,7 @@ export { setPartParam } from './OptikitDocument';
 export {
   DEFAULT_LIB_ROT,
   LIBRARY_GROUP,
+  isLibraryModule,
   T_CLASS_LABEL,
   defaultRotationFor,
   docCategoryOfRecord,

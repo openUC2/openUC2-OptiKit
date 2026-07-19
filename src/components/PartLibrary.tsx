@@ -30,11 +30,11 @@ import {
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import {
-  LIBRARY_GROUP,
   T_CLASS_LABEL,
   categoryOf,
   entriesFromIndex,
   entriesFromWorkspace,
+  isLibraryModule,
   registerLibraryModules,
   templateClassOf,
 } from '../document';
@@ -378,7 +378,7 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
     // keep the SVG symbol.
     const glbOrient = glbThumbnails ? defaultOrientation(thumbManifest, module.id) : null;
     const imgSrc = (glbOrient ? thumbnailUrl(module.id, glbOrient) : null) || module.thumbnail;
-    const isLibrary = module.group === LIBRARY_GROUP;
+    const isLibrary = isLibraryModule(module.id);
     // T-class badge (WP-34): registry modules always have one; CSV parts get
     // a best-effort class where a library record with the same id exists.
     const tClass = templateClassOf(module.id);
@@ -595,7 +595,7 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
         <Button
           variant="outlined"
           startIcon={<AddIcon />}
-          onClick={() => setShowWizard(true)}
+          onClick={() => { window.location.assign('/configurator/components'); }}
           fullWidth
           sx={{ mb: 1 }}
         >

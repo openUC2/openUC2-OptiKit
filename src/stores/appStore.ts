@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { Octokit } from '@octokit/rest';
 import { loadModulesFromCSV } from '../utils/moduleLoader';
+import { legacyCsvEnabled } from '../model/paletteConfig';
+import { isLibraryModule } from '../document/libraryPalette';
 import type { 
   AppState, 
   ModuleDefinition, 
@@ -169,6 +171,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   // Actions
   loadModules: async () => {
+    // WP-43: the parts palette reads ONE database — the record registry. The
+    // Library group (registered from the index by PartLibrary) is the whole
+    // palette now; the CSV loader only runs behind the legacy fallback flag.
+    if (!legacyCsvEnabled()) {
+      // Keep any registry-registered modules; drop stale CSV rows.
+      set(state => ({ modules: state.modules.filter(m => isLibraryModule(m.id)) }));
+      return;
+    }
     try {
       const modules = await loadModulesFromCSV();
       set({ modules });
