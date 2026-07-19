@@ -216,6 +216,8 @@ import {
   threePoseToDatum,
   docQuatToThree,
   threeQuatToDoc,
+  quatToEulerDeg,
+  eulerDegToQuat,
 } from '../bindRecord';
 
 function placedMirror(quat: [number, number, number, number]): BindInput {
@@ -320,5 +322,32 @@ describe('gizmo pose round trip (WP-41)', () => {
     // 90° about doc z
     expect(cube[2]).toBeCloseTo(Math.sin(Math.PI / 4), 3);
     expect(cube[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3);
+  });
+});
+
+describe('placed-optic Euler editing (WP-41 follow-up)', () => {
+  it('quatToEulerDeg / eulerDegToQuat round-trip a 45° yaw', () => {
+    const half = Math.PI / 8;
+    const q: [number, number, number, number] = [0, 0, Math.sin(half), Math.cos(half)];
+    const e = quatToEulerDeg(q);
+    expect(e.z).toBeCloseTo(45, 4);
+    expect(e.x).toBeCloseTo(0, 4);
+    expect(e.y).toBeCloseTo(0, 4);
+    const back = eulerDegToQuat(e);
+    back.forEach((v, i) => expect(v).toBeCloseTo(q[i], 4));
+  });
+
+  it('editing one Euler axis leaves the others intact', () => {
+    // start at pitch 30, roll 0, yaw 0
+    const q0 = eulerDegToQuat({ x: 30, y: 0, z: 0 });
+    const e0 = quatToEulerDeg(q0);
+    expect(e0.x).toBeCloseTo(30, 4);
+    expect(e0.y).toBeCloseTo(0, 4);
+    expect(e0.z).toBeCloseTo(0, 4);
+    // set yaw to 45 → pitch stays 30
+    const q1 = eulerDegToQuat({ ...e0, z: 45 });
+    const e1 = quatToEulerDeg(q1);
+    expect(e1.x).toBeCloseTo(30, 3);
+    expect(e1.z).toBeCloseTo(45, 3);
   });
 });

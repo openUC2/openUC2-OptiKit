@@ -304,6 +304,9 @@ function PlacedOptic({
         <TransformControls
           object={groupRef as RefObject<THREE.Object3D>}
           mode={gizmoMode}
+          // Local space: the rotation rings follow the optic's own axes, so
+          // "rotate onto the face" reads intuitively (WP-41 follow-up).
+          space={gizmoMode === 'rotate' ? 'local' : 'world'}
           translationSnap={snap ? 1 : null}
           rotationSnap={snap ? THREE.MathUtils.degToRad(15) : null}
           onMouseUp={commit}

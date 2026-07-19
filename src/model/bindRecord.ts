@@ -115,6 +115,43 @@ export function datumQuatToCube(
 }
 
 const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/**
+ * A placed optic's part-frame orientation quaternion ↔ editable Euler angles,
+ * in the schema's extrinsic-ZXY degrees (the same pitch-x / roll-y / yaw-z the
+ * schematic property panel and `offset-deg` use everywhere) — so a coarse
+ * gizmo placement can be dialed in by typing exact values (WP-41 follow-up).
+ */
+export function quatToEulerDeg(
+  q: [number, number, number, number],
+): { x: number; y: number; z: number } {
+  const e = new THREE.Euler().setFromQuaternion(
+    new THREE.Quaternion(q[0], q[1], q[2], q[3]),
+    'ZXY',
+  );
+  return {
+    x: round1(THREE.MathUtils.radToDeg(e.x)),
+    y: round1(THREE.MathUtils.radToDeg(e.y)),
+    z: round1(THREE.MathUtils.radToDeg(e.z)),
+  };
+}
+
+export function eulerDegToQuat(d: {
+  x: number;
+  y: number;
+  z: number;
+}): [number, number, number, number] {
+  const q = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(
+      THREE.MathUtils.degToRad(d.x),
+      THREE.MathUtils.degToRad(d.y),
+      THREE.MathUtils.degToRad(d.z),
+      'ZXY',
+    ),
+  );
+  return [round6(q.x), round6(q.y), round6(q.z), round6(q.w)];
+}
 
 /** The optic's local optical axis (+y) in the cube frame — a placed mirror's
  * surface normal (WP-41). */

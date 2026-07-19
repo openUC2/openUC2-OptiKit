@@ -50,6 +50,8 @@ import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb, saveLibraryRecords } from '../../api/coreClient';
 import {
   bindToRecords,
+  eulerDegToQuat,
+  quatToEulerDeg,
   recordsToFiles,
   snapToAxis,
   type BindAssets,
@@ -524,6 +526,30 @@ export function MechanicsPanel({
                   inputProps={{ style: { width: 48, fontSize: 12 } }}
                 />
               </Stack>
+              {/* WP-41 follow-up: dial in the placed orientation by typing
+                  exact pitch/roll/yaw after the coarse gizmo drop. */}
+              {isPlaced && (
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Typography variant="caption" color="text.secondary" sx={{ width: 34 }}>
+                    rot°
+                  </Typography>
+                  {(['x', 'y', 'z'] as const).map(axis => {
+                    const euler = quatToEulerDeg(datum.quaternion ?? [0, 0, 0, 1]);
+                    const label = axis === 'x' ? 'pitch' : axis === 'y' ? 'roll' : 'yaw';
+                    return (
+                      <TextField
+                        key={axis} size="small" variant="standard" label={`${label} ${axis}°`}
+                        type="number" value={euler[axis]}
+                        onChange={e => {
+                          const next = { ...euler, [axis]: Number(e.target.value) || 0 };
+                          store.updateDatum(datum.id, { quaternion: eulerDegToQuat(next) });
+                        }}
+                        inputProps={{ step: 5, style: { width: 52, fontSize: 12 } }}
+                      />
+                    );
+                  })}
+                </Stack>
+              )}
               {/* WP-42: a per-mirror actuation tilt — sweeping it swings ONLY
                   this mirror's reflected arrow about its own pivot. */}
               {isPlaced && datum.kind === 'reflective' && (
