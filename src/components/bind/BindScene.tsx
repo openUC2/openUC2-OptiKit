@@ -414,7 +414,7 @@ function OrthoCell({ view, draft }: { view: OrthoView; draft?: RecordDraft }) {
   const flipOrtho = useBindStore(s => s.flipOrtho);
   const pose = ORTHO_POSES[view];
   return (
-    <Box sx={{ position: 'relative', borderLeft: '1px solid #2a3442', borderTop: '1px solid #2a3442' }}>
+    <Box sx={{ position: 'relative', borderLeft: '1px solid', borderTop: '1px solid', borderColor: 'divider' }}>
       <Viewport ortho={view} draft={draft} />
       <Tooltip title={`flip to ${flip ? pose.label : pose.flipLabel}`}>
         <IconButton
@@ -422,7 +422,8 @@ function OrthoCell({ view, draft }: { view: OrthoView; draft?: RecordDraft }) {
           onClick={() => flipOrtho(view)}
           sx={{
             position: 'absolute', top: 4, left: 4, zIndex: 5,
-            bgcolor: 'rgba(23,28,36,0.8)', fontSize: 11, borderRadius: 1, px: 0.75,
+            bgcolor: 'background.paper', boxShadow: 2, fontSize: 11, borderRadius: 1, px: 0.75,
+            border: '1px solid', borderColor: 'divider',
           }}
         >
           <FlipIcon sx={{ fontSize: 14, mr: 0.5 }} />

@@ -42,6 +42,7 @@ import {
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
   Science as SimulationIcon,
+  School as SchoolIcon,
   ThreeDRotation as View3DIcon
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
@@ -51,6 +52,7 @@ import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 import { SyncChip } from './sync/SyncChip';
+import { GuidesDialog } from './guides/GuidesDialog';
 import { BrandLogo } from './BrandLogo';
 import { useThemeMode } from '../theme/themeMode';
 
@@ -80,6 +82,7 @@ export const Toolbar: React.FC = () => {
   const [annotateMenuAnchor, setAnnotateMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [helpMenuAnchor, setHelpMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [guidesOpen, setGuidesOpen] = React.useState(false);
   const themeMode = useThemeMode(s => s.mode);
   const toggleThemeMode = useThemeMode(s => s.toggle);
   
@@ -570,11 +573,11 @@ openUC2 team via GitHub repository
             </Tooltip>
           )}
           {isEditorPage && (
-            <Tooltip title={isThreeD ? 'Switch to 2D grid view' : 'Switch to 3D view'}>
+            <Tooltip title="The 3D cube view lives in the Assembly now (WP-37)">
               <Button
                 color="inherit"
-                startIcon={isThreeD ? <EditorIcon /> : <View3DIcon />}
-                onClick={() => navigate(isThreeD ? '/configurator/grid' : '/configurator/3d')}
+                startIcon={<View3DIcon />}
+                onClick={() => navigate('/configurator/assembly')}
                 size="small"
                 sx={{
                   textTransform: 'none',
@@ -586,7 +589,7 @@ openUC2 team via GitHub repository
                 }}
               >
                 <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  {isThreeD ? 'View 2D' : 'View 3D'}
+                  Assembly (3D)
                 </Typography>
               </Button>
             </Tooltip>
@@ -770,9 +773,13 @@ openUC2 team via GitHub repository
           Help
         </Button>
         <Menu anchorEl={helpMenuAnchor} open={Boolean(helpMenuAnchor)} onClose={() => setHelpMenuAnchor(null)}>
+          <MenuItem onClick={() => { setGuidesOpen(true); setHelpMenuAnchor(null); }}>
+            <ListItemIcon><SchoolIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Guides & tutorials</ListItemText>
+          </MenuItem>
           <MenuItem onClick={() => { handleHelp(); setHelpMenuAnchor(null); }}>
             <ListItemIcon><HelpIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Help / Tutorial</ListItemText>
+            <ListItemText>Grid-builder tour</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { handleForum(); setHelpMenuAnchor(null); }}>
             <ListItemIcon><ForumIcon fontSize="small" /></ListItemIcon>
@@ -793,8 +800,11 @@ openUC2 team via GitHub repository
         </Typography>
       </MuiToolbar>
       
+      {/* Guides & tutorials (WP-27) */}
+      <GuidesDialog open={guidesOpen} onClose={() => setGuidesOpen(false)} />
+
       {/* Feedback Dialog */}
-      <FeedbackDialog 
+      <FeedbackDialog
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         trigger={feedbackTrigger}

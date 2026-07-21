@@ -39,6 +39,7 @@ import {
   defaultDraft,
   derivedPortWarnings,
   draftFromRecord,
+  recordFromYaml,
   draftToRecord,
   recordId,
   recordToYaml,
@@ -147,6 +148,25 @@ export function ComponentEditorPage({
     setOpenedFrom({ origin, id: rec.id, version: rec.version });
     void resolveMesh(rec.id);
   };
+
+  // WP-37: deep link — the assembly links an insert to `?open=<componentId>`.
+  const [deepLinked, setDeepLinked] = useState(false);
+  useEffect(() => {
+    if (deepLinked) return;
+    const id = new URLSearchParams(window.location.search).get('open');
+    if (!id || index.loading) return;
+    setDeepLinked(true);
+    void (async () => {
+      try {
+        const url = `${assetsBaseUrl(index.url)}/v1/library/assets/components/${id}/component.yml`;
+        const response = await fetch(url, { cache: 'no-cache' });
+        if (response.ok) openRecord(recordFromYaml(await response.text()), 'index');
+      } catch {
+        /* stay on the blank draft if the record can't be fetched */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index.loading, deepLinked]);
 
   // Persist the bound mesh per record id so drafts survive a reload (WP-38).
   useEffect(() => {

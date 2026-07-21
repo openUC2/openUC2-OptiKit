@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense, type ReactNode } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
 import { AppShell } from './components/AppShell'
@@ -16,10 +16,8 @@ import './styles/fonts.css'
 import './styles/brand.css'
 import './App.css'
 
-// Lazy-load the 3D route so three.js / R3F are excluded from the 2D bundle
-const Editor3DPage = lazy(() =>
-  import('./components/Editor3DPage').then(m => ({ default: m.Editor3DPage }))
-);
+// WP-37: the legacy Editor3DPage (View 3D) is retired — /configurator/3d now
+// redirects to the assembly, which renders the cubes in 3D.
 const SchematicPage = lazy(() =>
   import('./components/schematic/SchematicPage').then(m => ({ default: m.SchematicPage }))
 );
@@ -176,7 +174,9 @@ function App() {
           <Route path="/configurator/grid" element={light(<EditorPage />)} />
           <Route path="/configurator/frame" element={light(<FrameWizardPage />)} />
           <Route path="/configurator/setups" element={light(<SetupBrowser />)} />
-          <Route path="/configurator/3d" element={light(<Editor3DPage />)} />
+          {/* WP-37: View 3D retired — the assembly renders the cubes in 3D and
+              is where optical parts associate with cubes. Redirect + notice. */}
+          <Route path="/configurator/3d" element={<Navigate to="/configurator/assembly?from=3d" replace />} />
           <Route path="/configurator/schematic" element={light(<SchematicPage />)} />
           <Route path="/configurator/components" element={light(<ComponentEditorPage />)} />
           <Route path="/configurator/assembly" element={light(<AssemblyPage />)} />

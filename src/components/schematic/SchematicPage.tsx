@@ -259,7 +259,8 @@ export function SchematicPage() {
               sx={{
                 position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
                 zIndex: 10, display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5,
-                bgcolor: 'rgba(23,28,36,0.88)', backdropFilter: 'blur(8px)', borderRadius: 2,
+                bgcolor: 'background.paper', backdropFilter: 'blur(8px)', borderRadius: 2,
+                border: '1px solid', borderColor: 'divider',
               }}
             >
               <Tooltip title="Snap to 50 mm grid (S) — off by default in the schematic">

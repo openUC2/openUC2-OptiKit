@@ -40,7 +40,8 @@ export function SchematicLegend({ onClose }: { onClose: () => void }) {
       elevation={6}
       sx={{
         position: 'absolute', top: 16, left: 16, zIndex: 20, width: 340, p: 2,
-        bgcolor: 'rgba(23,28,36,0.94)', backdropFilter: 'blur(8px)', borderRadius: 2,
+        bgcolor: 'background.paper', backdropFilter: 'blur(8px)', borderRadius: 2,
+        border: '1px solid', borderColor: 'divider',
       }}
     >
       <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>

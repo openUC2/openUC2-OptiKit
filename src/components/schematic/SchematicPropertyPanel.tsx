@@ -21,10 +21,17 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  Bolt as BoltIcon,
   Delete as DeleteIcon,
   Route as RouteIcon,
 } from '@mui/icons-material';
 import type { DocPart, Vec3 } from '../../document';
+import {
+  firmwareCommand,
+  getDeviceUrl,
+  sendActuation,
+  setDeviceUrl,
+} from '../../model/actuation';
 import {
   T_CLASS_LABEL,
   captureUndo,
@@ -98,6 +105,29 @@ function PartProperties({ part }: { part: DocPart }) {
   const stateParam = typeof part.params.state === 'string' ? part.params.state : '';
   // WP-42: firmware-actuated axes drive live sliders (galvo tilt, stage focus).
   const actuatableDofs = (lib?.dofs ?? []).filter(d => d.actuatable);
+  // WP-26: send a DOF value to a device as a firmware command.
+  const [deviceUrl, setDeviceUrlState] = useState(getDeviceUrl());
+  const [actNote, setActNote] = useState<string | null>(null);
+
+  const sendDof = async (dofName: string, value: number) => {
+    const dof = actuatableDofs.find(d => d.name === dofName);
+    if (!dof) return;
+    const command = firmwareCommand(dof, value);
+    if (!command) {
+      setActNote(`${dofName}: not firmware-bound`);
+      return;
+    }
+    if (!getDeviceUrl()) {
+      setActNote(`${command.uc2rest.task} ${dofName}=${value} (no device — command only)`);
+      return;
+    }
+    try {
+      const res = await sendActuation(command);
+      setActNote(`${command.uc2rest.task} ${dofName}=${value} → ${res.status}`);
+    } catch (e) {
+      setActNote(`send failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
   const setAxis = (axis: 0 | 1 | 2) => (v: number) => {
     const next = [...pos] as Vec3;
@@ -234,11 +264,24 @@ function PartProperties({ part }: { part: DocPart }) {
                     <Chip size="small" color={d.canObject != null ? 'warning' : 'default'}
                       label={`⚡ ${d.name}`} sx={{ height: 18, fontSize: 10, fontWeight: 700 }} />
                   </Tooltip>
-                  <Typography variant="caption">
+                  <Typography variant="caption" sx={{ flex: 1 }}>
                     {value.toFixed(2)} {d.unit}
                     {d.surface != null && ` · surface ${d.surface}`}
                     {d.pivotFrame && ` · about ${d.pivotFrame}`}
                   </Typography>
+                  <Tooltip title={d.canObject != null
+                    ? 'send this value to the device (WP-26)'
+                    : 'no firmware binding — nothing to send'}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={d.canObject == null}
+                        onClick={() => sendDof(d.name, value)}
+                      >
+                        <BoltIcon fontSize="small" color="warning" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </Stack>
                 <Slider
                   size="small"
@@ -251,6 +294,21 @@ function PartProperties({ part }: { part: DocPart }) {
               </Box>
             );
           })}
+          <TextField
+            label="Device URL"
+            size="small"
+            placeholder="http://192.168.4.1"
+            value={deviceUrl}
+            onChange={e => setDeviceUrlState(e.target.value)}
+            onBlur={() => setDeviceUrl(deviceUrl.trim())}
+            helperText="UC2-REST controller — empty shows the command only"
+            FormHelperTextProps={{ sx: { fontSize: 10, mx: 0 } }}
+          />
+          {actNote && (
+            <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+              {actNote}
+            </Typography>
+          )}
         </>
       )}
       <Typography variant="caption" color="text.secondary">

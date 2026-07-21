@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Divider,
   Drawer,
+  Snackbar,
   Stack,
   TextField,
   ToggleButton,
@@ -23,16 +24,19 @@ import {
 } from '@mui/material';
 import {
   Apps as CubifyIcon,
+  Edit as EditIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   Rule as DrcIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
-// Same legacy bootstrap as SchematicPage/Editor3DPage: the module catalog and
-// the stored layout live in appStore until the .dsn document replaces it.
+// Same legacy bootstrap as SchematicPage: the module catalog and the stored
+// layout live in appStore until the .dsn document replaces it.
 import { useAppStore } from '../../stores/appStore';
 import {
   getPart,
+  libraryEntryOf,
   selectPart,
   useDocParts,
   useDocRevision,
@@ -54,6 +58,13 @@ export function AssemblyPage() {
   const parts = useDocParts();
   const selectedId = useSelectedPartId();
   const selected = parts.find(p => p.id === selectedId);
+  const navigate = useNavigate();
+  // WP-37: View 3D retired here.
+  const [showRetireNotice, setShowRetireNotice] = useState(
+    () => new URLSearchParams(window.location.search).get('from') === '3d',
+  );
+  // The optical component this cube's insert realizes (WP-37): link to the editor.
+  const selectedEntry = selected ? libraryEntryOf(selected.libraryRef) : undefined;
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
@@ -139,7 +150,8 @@ export function AssemblyPage() {
                 onChange={() => setLockView(v => !v)}
                 sx={{
                   position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-                  bgcolor: 'rgba(23,28,36,0.88)', zIndex: 10,
+                  bgcolor: 'background.paper', boxShadow: 3, zIndex: 10,
+                  border: '1px solid', borderColor: 'divider',
                 }}
               >
                 {lockView ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
@@ -242,6 +254,18 @@ export function AssemblyPage() {
                   <Typography variant="caption" sx={{ display: 'block' }}>
                     offset-deg (residual yaw): {selected.gridPose.residualYawDeg.toFixed(3)}°
                   </Typography>
+                  {/* WP-37: which optical component this cube realizes. */}
+                  {selectedEntry?.componentId && (
+                    <Button
+                      size="small" variant="outlined" startIcon={<EditIcon />}
+                      sx={{ mt: 1, textTransform: 'none' }}
+                      onClick={() =>
+                        navigate(`/configurator/components?open=${encodeURIComponent(selectedEntry.componentId!)}`)
+                      }
+                    >
+                      {selectedEntry.componentId} — open in editor
+                    </Button>
+                  )}
                   {selectedMechanics?.translationDofs.map(dof => {
                     const value = selected.dofs.find(d => d.name === dof.name)?.value ?? dof.value;
                     return (
@@ -260,6 +284,17 @@ export function AssemblyPage() {
           </Drawer>
       </Box>
       <CubifyDialog />
+      <Snackbar
+        open={showRetireNotice}
+        autoHideDuration={6000}
+        onClose={() => setShowRetireNotice(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="info" onClose={() => setShowRetireNotice(false)}>
+          “View 3D” now lives here — the assembly renders the cubes in 3D and links each
+          insert to its optical component.
+        </Alert>
+      </Snackbar>
     </>
   );
 }

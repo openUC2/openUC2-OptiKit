@@ -47,6 +47,9 @@ export interface LibraryPaletteEntry {
   /** The libraryRef a placed part carries — the registry MODULE id (or the
    * workspace component id for records without mechanics yet). */
   moduleId: string;
+  /** The optical component record this module realizes (id, no @range) —
+   * what the assembly panel links to in the component editor (WP-37). */
+  componentId: string | null;
   name: string;
   description: string;
   category: DocCategory;
@@ -198,6 +201,7 @@ export function entriesFromIndex(
     path ? (path.startsWith('http') ? path : `${origin}${path}`) : null;
   return modules.map(mod => ({
     moduleId: mod.id,
+    componentId: mod.component?.ref?.split('@')[0] ?? null,
     name: shortName(mod.id),
     description: mod.description,
     category: docCategoryOfRecord(mod.category),
@@ -230,6 +234,7 @@ export function entriesFromWorkspace(
 ): LibraryPaletteEntry[] {
   return Object.values(records).map(record => ({
     moduleId: record.id,
+    componentId: record.id,
     name: shortName(record.id),
     description: record.description ?? '',
     category: docCategoryOfRecord(record.category),
