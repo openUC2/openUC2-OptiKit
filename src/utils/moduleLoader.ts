@@ -31,6 +31,7 @@ export interface ModuleCSVRow {
   rxOffset_deg?: string; // pitch rotation offset (deg)
   ryOffset_deg?: string; // yaw rotation offset (deg)
   rzOffset_deg?: string; // in-plane rotation offset — changes mirror/BS orientation (deg)
+  optikitId?: string;    // optikit-core library component record id (EMB-C)
 }
 
 export function parseCSV(csvText: string): ModuleCSVRow[] {
@@ -131,6 +132,7 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
           parseFloat(row.glbOffsetZ || '0')
         ] as [number, number, number]
       : undefined,
+    optikitId: row.optikitId && row.optikitId.trim() ? row.optikitId.trim() : undefined,
     placementOffset: (() => {
       const dx = parseFloat(row.dx_mm || '0') || 0;
       const dy = parseFloat(row.dy_mm || '0') || 0;

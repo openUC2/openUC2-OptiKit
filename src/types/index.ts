@@ -33,6 +33,10 @@ export interface ModuleDefinition {
   docsUrl?: string;
   glbUrl?: string;
   glbOffset?: [number, number, number];
+  /** optikit-core library component record id (EMB-C, decision E4): the only
+   * slug→record link. Unmapped modules place, render, and count toward the
+   * BOM but are absent from the generated design ("not simulated"). */
+  optikitId?: string;
   /** Intra-cube placement offsets sourced from CSV (mirrors optikit_exporter conventions). */
   placementOffset?: {
     dx_mm: number;        // transverse X offset within cube (mm)
