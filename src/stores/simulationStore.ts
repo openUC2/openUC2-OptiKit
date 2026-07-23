@@ -19,7 +19,18 @@ import { getDefaultSimulationConfig, buildScene } from '../utils/sceneBuilder';
 import { getSimulationManager } from '../simulation';
 import { useAppStore } from './appStore';
 
+/**
+ * Which physics engine renders rays (integration spec, EMB-B/ADR-9):
+ * - 'legacy': the existing TS SimulationEngine (default until EMB-D)
+ * - 'kernel': the oc-wasm kernel worker (src/kernel/), wired in EMB-D
+ */
+export type SimulationEngineKind = 'legacy' | 'kernel';
+
 interface SimulationStore extends SimulationState {
+  /** Selected physics engine; 'legacy' keeps today's behavior untouched. */
+  engine: SimulationEngineKind;
+  setEngine: (engine: SimulationEngineKind) => void;
+
   // Actions
   setConfig: (config: Partial<SimulationConfig>) => void;
   toggleSimulation: () => void;
@@ -57,6 +68,11 @@ let autoRunTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useSimulationStore = create<SimulationStore>((set, get) => ({
   ...defaultState,
+  engine: 'legacy',
+
+  setEngine: (engine) => {
+    set({ engine });
+  },
 
   setConfig: (config) => {
     set(state => ({
