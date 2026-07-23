@@ -18,18 +18,74 @@ import type {
 import { getDefaultSimulationConfig, buildScene } from '../utils/sceneBuilder';
 import { getSimulationManager } from '../simulation';
 import { useAppStore } from './appStore';
+import { triggerKernelPass } from '../kernel/kernelBridge';
+import type { KernelPassResult } from '../kernel/kernelLoop';
+import type { Scene3Finding } from '../api/coreClient';
+import { CoreServiceError } from '../api/coreClient';
+import type { UnmappedPlacement } from '../document/designBuilder';
 
 /**
- * Which physics engine renders rays (integration spec, EMB-B/ADR-9):
- * - 'legacy': the existing TS SimulationEngine (default until EMB-D)
- * - 'kernel': the oc-wasm kernel worker (src/kernel/), wired in EMB-D
+ * Which physics engine renders rays (integration spec, EMB-D/ADR-9):
+ * - 'kernel': the oc-wasm kernel worker (src/kernel/) — the only user-facing
+ *   engine (decision E5); every visible ray comes from it.
+ * - 'legacy': the old TS SimulationEngine, a developer-only debug/migration
+ *   flag, default off. Opt in with localStorage['oc-debug-engine'] = 'legacy'.
  */
 export type SimulationEngineKind = 'legacy' | 'kernel';
 
+function initialEngine(): SimulationEngineKind {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('oc-debug-engine') === 'legacy') {
+      return 'legacy';
+    }
+  } catch {
+    // storage unavailable (privacy mode): kernel
+  }
+  return 'kernel';
+}
+
+/** Kernel-loop state (EMB-D): the latest settled f64 trace and diagnostics. */
+export interface KernelSimState {
+  /** World-frame segment buffer, 11 floats/segment — render-only (rule 5). */
+  segments: Float32Array | null;
+  /** Request id of the rendered trace (monotonic; stale responses dropped). */
+  requestId: number;
+  findings: Scene3Finding[];
+  warnings: string[];
+  mapped: string[];
+  unmapped: UnmappedPlacement[];
+  manifest: unknown;
+  materializeMs: number;
+  traceMs: number;
+  /** Set when the service rejected or was unreachable; the last trace stays. */
+  serviceError: string | null;
+  /** A newer request is in flight; views may restyle the trace as stale. */
+  busy: boolean;
+}
+
+const defaultKernelState: KernelSimState = {
+  segments: null,
+  requestId: 0,
+  findings: [],
+  warnings: [],
+  mapped: [],
+  unmapped: [],
+  manifest: null,
+  materializeMs: 0,
+  traceMs: 0,
+  serviceError: null,
+  busy: false,
+};
+
 interface SimulationStore extends SimulationState {
-  /** Selected physics engine; 'legacy' keeps today's behavior untouched. */
+  /** Selected physics engine; 'kernel' unless the debug flag opts into legacy. */
   engine: SimulationEngineKind;
   setEngine: (engine: SimulationEngineKind) => void;
+
+  kernel: KernelSimState;
+  setKernelResult: (result: KernelPassResult) => void;
+  setKernelError: (error: unknown, requestId: number) => void;
+  setKernelBusy: (busy: boolean) => void;
 
   // Actions
   setConfig: (config: Partial<SimulationConfig>) => void;
@@ -49,9 +105,14 @@ interface SimulationStore extends SimulationState {
   scheduleAutoRun: () => void;
 }
 
-// Default state
+// Default state. On the kernel engine the simulation is on by default: the
+// first-success scenario (spec 18.1) has rays appear on placement with no
+// further action. The legacy debug engine keeps its old off-by-default.
 const defaultState: SimulationState = {
-  config: getDefaultSimulationConfig(),
+  config: {
+    ...getDefaultSimulationConfig(),
+    ...(initialEngine() === 'kernel' ? { enabled: true, autoRun: true } : {}),
+  },
   isRunning: false,
   lastRunTime: 0,
   elements: [],
@@ -68,10 +129,46 @@ let autoRunTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useSimulationStore = create<SimulationStore>((set, get) => ({
   ...defaultState,
-  engine: 'legacy',
+  engine: initialEngine(),
+  kernel: defaultKernelState,
 
   setEngine: (engine) => {
     set({ engine });
+  },
+
+  setKernelResult: (result) => {
+    set(state => ({
+      kernel: {
+        ...state.kernel,
+        segments: result.segments,
+        requestId: result.requestId,
+        findings: result.findings,
+        warnings: result.warnings,
+        mapped: result.mapped,
+        unmapped: result.unmapped,
+        manifest: result.manifest,
+        materializeMs: result.materializeMs,
+        traceMs: result.traceMs,
+        serviceError: null,
+      },
+    }));
+  },
+
+  setKernelError: (error, requestId) => {
+    // A 422 is a design diagnostic with a stable code; anything else is the
+    // service being unreachable. Either way the last trace stays on screen
+    // (decision 6.14: diagnostics arrive beside the picture, not instead).
+    const message =
+      error instanceof CoreServiceError
+        ? error.message
+        : `simulation service unreachable: ${error instanceof Error ? error.message : String(error)}`;
+    set(state => ({
+      kernel: { ...state.kernel, requestId, serviceError: message },
+    }));
+  },
+
+  setKernelBusy: (busy) => {
+    set(state => (state.kernel.busy === busy ? state : { kernel: { ...state.kernel, busy } }));
   },
 
   setConfig: (config) => {
@@ -105,7 +202,14 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
 
   runSimulation: () => {
     const state = get();
-    
+
+    // E5: on the kernel engine every user action routes to the kernel loop —
+    // no legacy-engine code runs on any user path (ADR-9).
+    if (state.engine === 'kernel') {
+      triggerKernelPass();
+      return;
+    }
+
     if (state.isRunning) {
       console.warn('Simulation already running');
       return;
@@ -217,15 +321,16 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   },
 
   clearResults: () => {
-    set({
+    set(state => ({
       rays: [],
       raysByLayer: {},
       elementsByLayer: {},
       detectorReadings: [],
       warnings: [],
       errors: [],
-      lastRunTime: 0
-    });
+      lastRunTime: 0,
+      kernel: { ...defaultKernelState, requestId: state.kernel.requestId },
+    }));
   },
 
   setRunning: (running) => {
@@ -276,10 +381,12 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   }
 }));
 
-// Subscribe to app store changes to trigger auto-run
+// Subscribe to app store changes to trigger auto-run (legacy engine only —
+// the kernel loop owns its own subscription in kernelSim.ts)
 useAppStore.subscribe((state, prevState) => {
   const simState = useSimulationStore.getState();
-  
+  if (simState.engine !== 'legacy') return;
+
   // Check if simulation is enabled and auto-run is on
   if (!simState.config.enabled || !simState.config.autoRun) return;
   

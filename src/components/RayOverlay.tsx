@@ -9,6 +9,7 @@ import React, { useMemo } from 'react';
 import { Line, Circle, Group } from 'react-konva';
 import { useSimulationStore } from '../stores/simulationStore';
 import { getRayColor, wavelengthToColor } from '../utils/sceneBuilder';
+import { KernelRayOverlay } from './KernelRayOverlay';
 import type { SimPoint, ViewportConfig } from '../types';
 
 interface RayOverlayProps {
@@ -28,7 +29,14 @@ function simToCanvas(point: SimPoint, gridCellSize: number): { x: number; y: num
   };
 }
 
-export const RayOverlay: React.FC<RayOverlayProps> = ({ viewport, gridCellSize }) => {
+/** Every user-visible ray comes from the kernel (decision E5); the legacy
+ * overlay renders only under the developer debug flag (ADR-9). */
+export const RayOverlay: React.FC<RayOverlayProps> = (props) => {
+  const engine = useSimulationStore(s => s.engine);
+  return engine === 'kernel' ? <KernelRayOverlay {...props} /> : <LegacyRayOverlay {...props} />;
+};
+
+const LegacyRayOverlay: React.FC<RayOverlayProps> = ({ viewport, gridCellSize }) => {
   const { 
     config, 
     rays, 

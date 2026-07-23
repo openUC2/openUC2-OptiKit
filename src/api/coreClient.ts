@@ -35,6 +35,25 @@ export interface ServiceFinding {
   message: string;
 }
 
+/** A `/v1/scene3` finding (decision 6.14): diagnostic, rendered beside the
+ * scene. `context` names the component or source the finding is about. */
+export interface Scene3Finding {
+  code: string;
+  message: string;
+  severity: string;
+  context?: string;
+}
+
+export interface Scene3Response {
+  /** The materialized Scene3 (`.ocanvas` v2) document — opaque to the
+   * configurator (rule 12); it goes to the kernel worker verbatim. */
+  scene: unknown;
+  /** scene3-manifest: component → object-id map, DOF bindings (EMB-F). */
+  manifest: unknown;
+  warnings: string[];
+  findings: Scene3Finding[];
+}
+
 export interface FlatReportEntry {
   id: string;
   type: string;
@@ -97,7 +116,9 @@ export class CoreClient {
 
   constructor(options: CoreClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bind the global: a bare `fetch` reference loses its window receiver and
+    // throws "Illegal invocation" in browsers (Node tolerates it).
+    this.fetchImpl = options.fetchImpl ?? ((...args) => fetch(...args));
   }
 
   /** GET /v1/library/index. Re-fetches on every call; a changed hash drops
@@ -149,6 +170,17 @@ export class CoreClient {
     return out;
   }
 
+  /** POST /v1/scene3 — materialize the design into a kernel Scene3 (EMB-D).
+   * Intent findings (E_NO_TARGET, ...) arrive beside the scene, never instead
+   * of it (decision 6.14); only physical errors reject with a 422. */
+  async scene3(designYaml: string, traceQuality?: Record<string, unknown>): Promise<Scene3Response> {
+    return (await this.postDesign(
+      '/v1/scene3',
+      designYaml,
+      traceQuality ? { trace_quality: traceQuality } : {},
+    )) as Scene3Response;
+  }
+
   /** POST /v1/validate — the design as YAML text. */
   async validate(designYaml: string): Promise<{ ok: boolean; findings: ServiceFinding[] }> {
     return (await this.postDesign('/v1/validate', designYaml)) as {
@@ -164,11 +196,15 @@ export class CoreClient {
     };
   }
 
-  private async postDesign(path: string, designYaml: string): Promise<unknown> {
+  private async postDesign(
+    path: string,
+    designYaml: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<unknown> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ files: { 'optikit-design.yml': designYaml } }),
+      body: JSON.stringify({ files: { 'optikit-design.yml': designYaml }, ...extra }),
     });
     if (!response.ok) await throwServiceError(response);
     return response.json();

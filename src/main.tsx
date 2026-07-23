@@ -6,6 +6,9 @@ import App from './App.tsx'
 // Import direct SVG test for debugging
 import { testDirectSVGUpload } from './utils/directSVGTest'
 import { testStatisticsCollection } from './utils/testStatistics'
+import { startKernelSimulation } from './kernel/kernelSim'
+import { useAppStore } from './stores/appStore'
+import { useSimulationStore } from './stores/simulationStore'
 
 // Add debugging functions to window
 if (typeof window !== 'undefined') {
@@ -26,6 +29,17 @@ if (typeof window !== 'undefined') {
   console.log('- testDirectSVGUpload() - Tests direct SVG upload to GitHub');
   console.log('- testStatistics() - Tests user statistics collection');
   console.log('- debugModuleCreation() - Shows debugging info');
+}
+
+// EMB-D: the kernel live loop — edits re-materialize via /v1/scene3 and
+// re-trace in the oc-wasm worker. Idle until simulation is enabled and
+// something is placed.
+startKernelSimulation()
+
+if (typeof window !== 'undefined') {
+  // Store handles for the Playwright acceptance tests (drive placements and
+  // read results without fragile canvas automation).
+  (window as any).__stores = { app: useAppStore, sim: useSimulationStore };
 }
 
 // EMB-B: boot the oc-wasm kernel worker on demand (?kernel=1). Nothing renders

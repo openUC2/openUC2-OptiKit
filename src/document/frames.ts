@@ -50,3 +50,28 @@ export function optikitPointsToThree(points: ArrayLike<number>): Float32Array {
   }
   return out;
 }
+
+// --- 2D grid canvas (Konva) map ------------------------------------------------
+//
+// The 2D canvas draws a module's tile as the cell rectangle
+// [x·50, (x+1)·50] mm, so the tile centre sits at (x + 0.5)·50 mm — while the
+// module's optikit origin flattens to x·50 mm (its optical axis crosses the
+// grid intersection, matching the 3D cubes). The 2D image of an optikit world
+// point is therefore shifted by half a cell on both in-plane axes.
+
+/** Half-cell shift: canvas mm = optikit world mm + this, per in-plane axis. */
+export const CANVAS_HALF_CELL_MM = 25;
+
+/** optikit world (mm) → 2D canvas coordinates (mm; multiply by px-per-mm). */
+export function optikitToCanvasMM(w: Readonly<Vec3>): { x: number; y: number } {
+  return { x: w[0] + CANVAS_HALF_CELL_MM, y: w[1] + CANVAS_HALF_CELL_MM };
+}
+
+/** The optikit-world height of layer L's optical axis (55 mm pitch). */
+export function layerAxisZ(layer: number): number {
+  return layer * 55;
+}
+
+/** Half-thickness of a layer's slab: rays within ±27.5 mm of the layer axis
+ * belong to the layer's 2D view (spec 18.8); cross-layer rays truncate here. */
+export const LAYER_SLAB_HALF_MM = 27.5;

@@ -49,6 +49,7 @@ import {
 import { useSimulationStore } from '../stores/simulationStore';
 import { useAppStore } from '../stores/appStore';
 import { hasSimulationModel, isSourceElement, isDetectorElement } from '../utils/sceneBuilder';
+import { KernelDiagnostics } from './KernelDiagnostics';
 
 export const SimulationPanel: React.FC = () => {
   const [detailsExpanded, setDetailsExpanded] = React.useState(true);
@@ -126,6 +127,9 @@ export const SimulationPanel: React.FC = () => {
           />
         </CardContent>
       </Card>
+
+      {/* Kernel-engine diagnostics (EMB-D): wall times, findings, warnings */}
+      <KernelDiagnostics />
       
       {/* Controls - only show when enabled */}
       {config.enabled && (

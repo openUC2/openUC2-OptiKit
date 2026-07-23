@@ -16,13 +16,21 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { useAppStore } from '../stores/appStore';
 import { getRayColor } from '../utils/sceneBuilder';
 import { GRID_MM } from '../constants/grid';
+import { KernelRays3D } from './KernelRays3D';
 
 // Optical-axis height for a given layer
 function opticalAxisY(layer: number): number {
   return layer * GRID_MM.yLayer + GRID_MM.baseplate + GRID_MM.cube / 2;
 }
 
+/** Every user-visible ray comes from the kernel (decision E5); the legacy
+ * renderer survives only behind the developer debug flag (ADR-9). */
 export function Rays3D() {
+  const engine = useSimulationStore(s => s.engine);
+  return engine === 'kernel' ? <KernelRays3D /> : <LegacyRays3D />;
+}
+
+function LegacyRays3D() {
   const rays = useSimulationStore(s => s.rays);
   const raysByLayer = useSimulationStore(s => s.raysByLayer);
   const config = useSimulationStore(s => s.config);
