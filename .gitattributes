@@ -1,0 +1,4 @@
+# Golden and scene fixtures are compared byte-for-byte in tests; autocrlf
+# checkout on Windows must not rewrite their line endings.
+src/document/__tests__/fixtures/** text eol=lf
+src/kernel/__tests__/fixtures/** text eol=lf
