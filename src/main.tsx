@@ -28,6 +28,23 @@ if (typeof window !== 'undefined') {
   console.log('- debugModuleCreation() - Shows debugging info');
 }
 
+// EMB-B: boot the oc-wasm kernel worker on demand (?kernel=1). Nothing renders
+// from it yet; this proves the vendored wasm loads under the /configurator/
+// base and is the hook the Playwright smoke test drives. EMB-D wires it to the
+// edit loop.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('kernel')) {
+  import('./kernel/KernelClient').then(async ({ getKernelClient }) => {
+    const kernel = getKernelClient();
+    await kernel.ready;
+    const segments = await kernel.traceWorld(); // no scene loaded: empty buffer
+    (window as any).__ocKernelReady = segments.length === 0;
+    console.log('oc-wasm kernel ready');
+  }).catch((e) => {
+    (window as any).__ocKernelError = String(e);
+    console.error('oc-wasm kernel failed to boot:', e);
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

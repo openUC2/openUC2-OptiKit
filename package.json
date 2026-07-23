@@ -23,7 +23,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "thumbnails": "node scripts/generate-glb-thumbnails.mjs"
+    "thumbnails": "node scripts/generate-glb-thumbnails.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -41,6 +42,7 @@
     "intro.js": "^8.3.2",
     "jszip": "^3.10.1",
     "konva": "^9.3.22",
+    "oc-wasm": "file:vendor/oc-wasm-0.0.1+ff5587baa.tgz",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-konva": "^19.0.7",
@@ -53,6 +55,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
