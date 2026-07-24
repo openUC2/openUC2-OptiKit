@@ -25,6 +25,7 @@ import {
 } from '../../document';
 import { wavelengthToColor } from '../../utils/sceneBuilder';
 import { AuthoritativeRays } from './AuthoritativeRays';
+import { EscapeRays } from './EscapeRays';
 import { GLYPH_COLORS } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
 import { beamAxesOf, glyphQuatOf, portsOf, resolvePortRef } from './ports';
@@ -587,6 +588,7 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
         <RayOverlay planeZMm={settings.planeZMm} enabled />
       )}
       <AuthoritativeRays />
+      <EscapeRays />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
         <GizmoViewport

@@ -37,18 +37,37 @@ export function setCoreUrl(url: string): void {
   else localStorage.removeItem(URL_STORAGE_KEY);
 }
 
+/** A ray that left the system with nothing to catch it (WP-52). */
+export interface ChainEscape {
+  source: string;
+  from_comp: string;
+  from_port: string;
+  origin_mm: [number, number, number];
+  direction: [number, number, number];
+  reason: string;
+}
+
 /** A typed engine error (E_* / DRC_*) or transport failure. */
 export class CoreServiceError extends Error {
   readonly code: string;
   readonly context: unknown;
   readonly status: number;
+  /** Structured escape points on an E_NO_TARGET chain failure (WP-52). */
+  readonly escapes: ChainEscape[];
 
-  constructor(code: string, message: string, context: unknown, status: number) {
+  constructor(
+    code: string,
+    message: string,
+    context: unknown,
+    status: number,
+    escapes: ChainEscape[] = [],
+  ) {
     super(message);
     this.name = 'CoreServiceError';
     this.code = code;
     this.context = context;
     this.status = status;
+    this.escapes = escapes;
   }
 }
 
@@ -76,13 +95,23 @@ const validateSchema = z.object({
 });
 export type ValidateResponse = z.infer<typeof validateSchema>;
 
+const vec3 = z.tuple([anyNumber, anyNumber, anyNumber]);
+const escapeSchema = z.object({
+  source: z.string(),
+  from_comp: z.string(),
+  from_port: z.string(),
+  origin_mm: vec3,
+  direction: vec3,
+  reason: z.string(),
+});
+
 const chainInferSchema = z.object({
   paths: z.record(z.string(), z.object({ chain: z.array(z.string()) }).loose()),
   warnings: z.array(z.string()),
+  escapes: z.array(escapeSchema).default([]),
 });
 export type ChainInferResponse = z.infer<typeof chainInferSchema>;
 
-const vec3 = z.tuple([anyNumber, anyNumber, anyNumber]);
 const simulateSchema = z.object({
   path: z.string(),
   warnings: z.array(z.string()).default([]),
@@ -216,13 +245,16 @@ async function post<T>(
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = (payload as { detail?: { code?: string; message?: string; context?: unknown } })
-      ?.detail;
+    const detail = (payload as {
+      detail?: { code?: string; message?: string; context?: unknown; escapes?: unknown };
+    })?.detail;
+    const escapes = z.array(escapeSchema).safeParse(detail?.escapes);
     throw new CoreServiceError(
       detail?.code ?? `E_HTTP_${response.status}`,
       detail?.message ?? `${endpoint} failed with HTTP ${response.status}`,
       detail?.context ?? payload,
       response.status,
+      escapes.success ? escapes.data : [],
     );
   }
   const parsed = schema.safeParse(payload);

@@ -12,8 +12,10 @@ import {
   simulatePath,
   validateDesign,
 } from '../../api/coreClient';
-import type { SimulateResponse } from '../../api/coreClient';
+import type { ChainEscape, SimulateResponse } from '../../api/coreClient';
 import { getDocRevision, makePortRef, setPath, useDocRevision } from '../../document';
+import type { Vec3 } from '../../document';
+import { UC2_GRID_MM } from '../../document/types';
 import { useAppStore } from '../../stores/appStore';
 import { buildServiceDesign, serviceFiles } from '../../model/dsn/serviceExport';
 
@@ -58,18 +60,26 @@ async function inferAndAdoptChains(
   return adopted;
 }
 
-/** Surface an inference failure; ambiguity points at the manual wiring UI. */
-function notifyChainFailure(err: unknown): void {
+/** Surface an inference failure; ambiguity points at the manual wiring UI.
+ * Returns the escape markers (WP-52) so the caller can draw them. */
+function notifyChainFailure(
+  err: unknown,
+  partIdByKey: Record<string, string> = {},
+): ChainEscapeMarker[] {
   const e = toError(err);
+  const escapes =
+    err instanceof CoreServiceError ? toEscapeMarkers(err.escapes, partIdByKey) : [];
+  const hint = escapes.length > 0 ? ` The beam leaves at: ${escapes[0].hint}.` : '';
   useAppStore.getState().addNotification({
     type: 'warning',
     title: e.code === 'E_AMBIGUOUS_CHAIN' ? 'beam path is ambiguous' : 'auto-chaining failed',
     message:
       e.code === 'E_AMBIGUOUS_CHAIN'
         ? `${e.message} — chain the pins manually (click one pin, then the next)`
-        : e.message,
+        : `${e.message}${hint}`,
     duration: 8000,
   });
+  return escapes;
 }
 
 export interface ErcMarker {
@@ -101,6 +111,8 @@ interface ServiceState {
   markers: ErcMarker[];
   /** Chain proposals that are not yet declared in the document. */
   proposals: { name: string; chain: string[] }[];
+  /** Escaping rays (WP-52): a failed/partial chain, drawn dashed-red. */
+  escapes: ChainEscapeMarker[];
   checkedAt: number | null;
   simByPath: Record<string, PathSimResult>;
   /** Document revision the simulation was computed at (null = never ran). */
@@ -149,12 +161,69 @@ function resolveWhere(
   return null;
 }
 
+/** The grid cell a point falls in (document mm → integer cell). */
+function cellOf(mm: Vec3): [number, number, number] {
+  return [
+    Math.round(mm[0] / UC2_GRID_MM[0]),
+    Math.round(mm[1] / UC2_GRID_MM[1]),
+    Math.round(mm[2] / UC2_GRID_MM[2]),
+  ];
+}
+
+/** A rendered escape (WP-52): where a ray left the system, in document mm,
+ * with the empty cell it heads toward — for the dashed overlay + the hint. */
+export interface ChainEscapeMarker {
+  fromPartId: string | null;
+  fromLabel: string;
+  originMm: Vec3;
+  direction: Vec3;
+  cell: [number, number, number];
+  reason: string;
+  hint: string;
+}
+
+const AXES = ['x', 'y', 'z'] as const;
+
+/** Nearest ±axis label of a (near axis-aligned) unit vector. */
+function axisLabel(dir: Vec3): string {
+  let i = 0;
+  for (let k = 1; k < 3; k++) if (Math.abs(dir[k]) > Math.abs(dir[i])) i = k;
+  return `${dir[i] >= 0 ? '+' : '-'}${AXES[i]}`;
+}
+
+export function toEscapeMarkers(
+  escapes: ChainEscape[],
+  partIdByKey: Record<string, string>,
+): ChainEscapeMarker[] {
+  return escapes.map(e => {
+    const originMm = e.origin_mm as Vec3;
+    const direction = e.direction as Vec3;
+    // The empty cell one grid step along the ray — what the user needs to fill.
+    const cell = cellOf([
+      originMm[0] + direction[0] * UC2_GRID_MM[0],
+      originMm[1] + direction[1] * UC2_GRID_MM[1],
+      originMm[2] + direction[2] * UC2_GRID_MM[2],
+    ]);
+    const label = e.from_port ? `${e.from_comp}.${e.from_port}` : e.from_comp;
+    return {
+      fromPartId: partIdByKey[e.from_comp] ?? null,
+      fromLabel: label,
+      originMm,
+      direction,
+      cell,
+      reason: e.reason,
+      hint: `${label} → ${axisLabel(direction)} — no part at cell [${cell.join(', ')}]`,
+    };
+  });
+}
+
 export const useServiceStore = create<ServiceState>((set, get) => ({
   checkBusy: false,
   simBusy: false,
   error: null,
   markers: [],
   proposals: [],
+  escapes: [],
   checkedAt: null,
   simByPath: {},
   simRevision: null,
@@ -180,7 +249,10 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             files = serviceFiles();
           }
         } catch (err) {
-          notifyChainFailure(err);
+          notifyChainFailure(
+            err,
+            Object.fromEntries(Object.entries(keyByPartId).map(([id, key]) => [key, id])),
+          );
         }
       }
 
@@ -189,6 +261,7 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
       );
       const markers: ErcMarker[] = [];
       let proposals: { name: string; chain: string[] }[] = [];
+      let escapes: ChainEscapeMarker[] = [];
 
       const validation = await validateDesign(files);
       for (const f of validation.findings) {
@@ -223,20 +296,38 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             partId: resolveWhere(warning, partIdByKey),
           });
         }
+        // Pruned arms / dead ends that survived a partial inference (WP-52).
+        escapes = toEscapeMarkers(inferred.escapes, partIdByKey);
       } catch (err) {
         const e = toError(err);
-        markers.push({
-          id: `chain-${markers.length}`,
-          source: 'chain',
-          code: e.code,
-          severity: 'error',
-          where: '',
-          message: e.message,
-          partId: null,
-        });
+        escapes = err instanceof CoreServiceError ? toEscapeMarkers(err.escapes, partIdByKey) : [];
+        // One marker per escape point so the ERC list names each dead end.
+        if (escapes.length > 0) {
+          for (const esc of escapes) {
+            markers.push({
+              id: `chain-${markers.length}`,
+              source: 'chain',
+              code: e.code,
+              severity: 'error',
+              where: esc.fromLabel,
+              message: `${e.message.split('.')[0]} — ${esc.hint}`,
+              partId: esc.fromPartId,
+            });
+          }
+        } else {
+          markers.push({
+            id: `chain-${markers.length}`,
+            source: 'chain',
+            code: e.code,
+            severity: 'error',
+            where: '',
+            message: e.message,
+            partId: null,
+          });
+        }
       }
 
-      set({ markers, proposals, checkedAt: Date.now(), checkBusy: false });
+      set({ markers, proposals, escapes, checkedAt: Date.now(), checkBusy: false });
     } catch (err) {
       set({ error: toError(err), checkBusy: false });
     }
@@ -261,7 +352,10 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             pathNames = Object.keys(design.paths ?? {});
           }
         } catch (err) {
-          notifyChainFailure(err);
+          const partIdByKey = Object.fromEntries(
+            Object.entries(keyByPartId).map(([id, key]) => [key, id]),
+          );
+          set({ escapes: notifyChainFailure(err, partIdByKey) });
         }
       }
       if (pathNames.length === 0) {
@@ -295,7 +389,8 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
           }
         }
       }
-      set({ simByPath, simRevision: revision, simBusy: false });
+      // Rays traced → the beam has a home; clear any stale escape overlay.
+      set({ simByPath, simRevision: revision, simBusy: false, escapes: [] });
     } catch (err) {
       set({ error: toError(err), simBusy: false });
     }
