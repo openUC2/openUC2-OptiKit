@@ -60,12 +60,9 @@ export const Toolbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isThreeD = location.pathname.startsWith('/configurator/3d');
-  // /configurator now lands on the schematic; the legacy grid builder lives
-  // at /configurator/grid (feedback round 1).
-  const isSchematic =
-    location.pathname.startsWith('/configurator/schematic') ||
-    location.pathname === '/configurator' ||
-    location.pathname === '/configurator/';
+  // /configurator is the community landing (design Screen 01); the schematic
+  // editor lives at /configurator/schematic, the legacy grid at /grid.
+  const isSchematic = location.pathname.startsWith('/configurator/schematic');
   const isComponentEditor = location.pathname.startsWith('/configurator/components');
   const isAssembly = location.pathname.startsWith('/configurator/assembly');
   const isBind = location.pathname.startsWith('/configurator/bind');
@@ -444,11 +441,11 @@ openUC2 team via GitHub repository
 
         {/* Navigation Section - Always visible */}
         <Box sx={{ display: 'flex', gap: 0.5, mr: 1 }}>
-          <Tooltip title={isEditorPage ? "Switch to Setup Browser" : "Switch to Editor"}>
+          <Tooltip title={isEditorPage ? "Explore community builds" : "Switch to Editor"}>
             <Button
               color="inherit"
               startIcon={isEditorPage ? <SetupIcon /> : <EditorIcon />}
-              onClick={() => navigate(isEditorPage ? '/configurator/setups' : '/configurator')}
+              onClick={() => navigate(isEditorPage ? '/configurator/explore' : '/configurator/schematic')}
               size="small"
               sx={{ 
                 textTransform: 'none',
@@ -464,7 +461,7 @@ openUC2 team via GitHub repository
                   display: { xs: 'none', sm: 'inline' } 
                 }}
               >
-                {isEditorPage ? 'Browse Setups' : 'Editor'}
+                {isEditorPage ? 'Explore' : 'Editor'}
               </Typography>
             </Button>
           </Tooltip>
@@ -808,7 +805,13 @@ openUC2 team via GitHub repository
           variant="h6"
           sx={{ display: { xs: 'none', lg: 'block' }, fontWeight: 400, fontSize: '1rem', ml: 2, whiteSpace: 'nowrap' }}
         >
-          {isThreeD ? 'OptiKit — 3D Builder' : is2DEditor ? 'OptiKit - 2D Grid Builder' : 'Setup Browser'}
+          {isThreeD
+            ? 'OptiKit — 3D Builder'
+            : is2DEditor
+              ? 'OptiKit - 2D Grid Builder'
+              : /\/configurator\/setups/.test(location.pathname)
+                ? 'Setup Browser'
+                : 'Community'}
         </Typography>
       </MuiToolbar>
       

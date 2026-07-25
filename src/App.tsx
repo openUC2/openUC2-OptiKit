@@ -30,6 +30,16 @@ const AssemblyPage = lazy(() =>
 const BindPage = lazy(() =>
   import('./components/bind/BindPage').then(m => ({ default: m.BindPage }))
 );
+// Community surfaces (OptiKit Platform design): landing / explore / design page.
+const HomePage = lazy(() =>
+  import('./components/community/HomePage').then(m => ({ default: m.HomePage }))
+);
+const ExplorePage = lazy(() =>
+  import('./components/community/ExplorePage').then(m => ({ default: m.ExplorePage }))
+);
+const DesignDetailPage = lazy(() =>
+  import('./components/community/DesignDetailPage').then(m => ({ default: m.DesignDetailPage }))
+);
 
 function App() {
   const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
@@ -167,13 +177,19 @@ function App() {
       <CssBaseline />
       <Router basename="">
         <Routes>
-          {/* The schematic is the primary editor; the legacy 2D grid builder
-              stays reachable at /configurator/grid (feedback round 1). */}
-          <Route path="/configurator" element={light(<SchematicPage />)} />
-          <Route path="/configurator/" element={light(<SchematicPage />)} />
+          {/* The landing is the front door (design Screen 01, July 2026);
+              the schematic editor lives at /configurator/schematic and the
+              legacy 2D grid builder at /configurator/grid. */}
+          <Route path="/configurator" element={light(<HomePage />)} />
+          <Route path="/configurator/" element={light(<HomePage />)} />
           <Route path="/configurator/grid" element={light(<EditorPage />)} />
           <Route path="/configurator/frame" element={light(<FrameWizardPage />)} />
           <Route path="/configurator/setups" element={light(<SetupBrowser />)} />
+          {/* Community surfaces (OptiKit Platform design, July 2026): landing,
+              explore gallery, and the per-design repo+product page. */}
+          <Route path="/configurator/home" element={light(<HomePage />)} />
+          <Route path="/configurator/explore" element={light(<ExplorePage />)} />
+          <Route path="/configurator/design/:id" element={light(<DesignDetailPage />)} />
           {/* WP-37: View 3D retired — the assembly renders the cubes in 3D and
               is where optical parts associate with cubes. Redirect + notice. */}
           <Route path="/configurator/3d" element={<Navigate to="/configurator/assembly?from=3d" replace />} />
@@ -182,15 +198,22 @@ function App() {
           <Route path="/configurator/assembly" element={light(<AssemblyPage />)} />
           <Route path="/configurator/bind" element={light(<BindPage />)} />
           <Route path="/configurator/:collectionName" element={light(<CollectionView />)} />
-          {/* Legacy routes for backward compatibility */}
-          <Route path="/" element={light(<EditorPage />)} />
+          {/* The landing is the front door (design Screen 01); the legacy
+              grid builder stays at /configurator/grid. */}
+          <Route path="/" element={light(<HomePage />)} />
           <Route path="/setups" element={light(<SetupBrowser />)} />
           <Route path="/:collectionName" element={light(<CollectionView />)} />
         </Routes>
         
-        {/* Startup Dialog */}
-        <StartupDialog 
-          open={showStartupDialog}
+        {/* Startup Dialog — the community landing IS the "two doors" now, so
+            it only appears on editor surfaces. */}
+        <StartupDialog
+          open={
+            showStartupDialog &&
+            !/^\/(configurator\/?)?$|^\/configurator\/(home|explore|design)/.test(
+              window.location.pathname,
+            )
+          }
           onClose={handleCloseStartupDialog}
         />
         
