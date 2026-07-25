@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { useAppStore } from '../stores/appStore';
 import type { ModuleDefinition } from '../types';
 import type { ComponentRecord } from '../model/dsn/generated/library-component';
-import type { IndexModule } from '../model/libraryIndex';
+import type { IndexGroup, IndexModule } from '../model/libraryIndex';
 import type { SourcePort } from './sourceDesignStore';
 import type { AxisDir, Rot24 } from './rot24';
 import type { DocCategory } from './types';
@@ -68,6 +68,33 @@ export interface LibraryPaletteEntry {
   /** Effective focal length when meaningful — feeds the 2D ray preview. */
   eflMm: number | null;
   source: 'registry' | 'workspace';
+  /** WP-45: carriers host cubes (FRAME, baseplates, plates, puzzle pieces). */
+  carrier: boolean;
+  /** WP-45: docking bays on a carrier (cells relative to its placement). */
+  bays: Record<string, { originCell: [number, number, number]; size: [number, number, number]; axis: string }>;
+}
+
+/** WP-44: a placeable arrangement — the OPM. Members land as ordinary parts
+ * tagged with one group-instance id; the drag layer keeps them rigid. */
+export interface LibraryGroupEntry {
+  groupId: string;
+  name: string;
+  description: string;
+  envelopeGrid: [number, number, number];
+  members: {
+    key: string;
+    moduleId: string;
+    cell: [number, number, number];
+    rot90: number;
+    overhang: boolean;
+  }[];
+  structure: {
+    plates: { face: string; moduleId: string; origin: [number, number]; size: [number, number] }[];
+    jointCells: [number, number, number][];
+    jointModuleId: string;
+  };
+  interface: Record<string, { member: string; port: string }>;
+  review: boolean;
 }
 
 /** Grid rotation applied when placing a library part whose record optics run
@@ -224,6 +251,42 @@ export function entriesFromIndex(
     ports: indexPortsToSource(mod),
     eflMm: mod.component?.efl_mm ?? null,
     source: 'registry',
+    carrier: mod.template?.carrier ?? false,
+    bays: Object.fromEntries(
+      Object.entries(mod.template?.bays ?? {}).map(([name, bay]) => [
+        name,
+        { originCell: bay.origin_cell, size: bay.size, axis: bay.axis },
+      ]),
+    ),
+  }));
+}
+
+/** Registry index groups → palette group entries (WP-44). */
+export function groupEntriesFromIndex(groups: IndexGroup[]): LibraryGroupEntry[] {
+  return groups.map(g => ({
+    groupId: g.id,
+    name: shortName(g.id),
+    description: g.description,
+    envelopeGrid: g.envelope_grid,
+    members: g.members.map(m => ({
+      key: m.key,
+      moduleId: m.module,
+      cell: m.cell,
+      rot90: m.rot90,
+      overhang: m.overhang,
+    })),
+    structure: {
+      plates: Object.entries(g.structure?.plates ?? {}).map(([face, p]) => ({
+        face,
+        moduleId: p.module,
+        origin: p.origin,
+        size: p.size,
+      })),
+      jointCells: g.structure?.joint_cells ?? [],
+      jointModuleId: g.structure?.joint_module ?? '',
+    },
+    interface: g.interface ?? {},
+    review: g.review,
   }));
 }
 
@@ -247,6 +310,8 @@ export function entriesFromWorkspace(
     ports: recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
     source: 'workspace',
+    carrier: false,
+    bays: {},
   }));
 }
 
@@ -268,6 +333,22 @@ export function templateClassOf(libraryRef: string): TemplateClass | null {
  * robust "is this a library part?" test, independent of its display group. */
 export function isLibraryModule(id: string): boolean {
   return LIB_ENTRIES.has(id);
+}
+
+/** Live lookup: group id → group entry (WP-44). */
+const LIB_GROUPS = new Map<string, LibraryGroupEntry>();
+
+export function registerLibraryGroups(entries: LibraryGroupEntry[]): void {
+  LIB_GROUPS.clear();
+  for (const entry of entries) LIB_GROUPS.set(entry.groupId, entry);
+}
+
+export function groupEntryOf(groupId: string): LibraryGroupEntry | undefined {
+  return LIB_GROUPS.get(groupId);
+}
+
+export function listLibraryGroups(): LibraryGroupEntry[] {
+  return [...LIB_GROUPS.values()];
 }
 
 export const T_CLASS_LABEL: Record<TemplateClass, 'T1' | 'T2' | 'T3'> = {

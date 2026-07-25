@@ -36,6 +36,7 @@ import {
   T_CLASS_LABEL,
   captureUndo,
   commitUndo,
+  groupInstanceOf,
   libraryEntryOf,
   movePartWorld,
   removePart,
@@ -45,8 +46,10 @@ import {
   setDofValue,
   setPartParam,
   tiltPart,
+  ungroupInstance,
   useDocPart,
   useDocPaths,
+  useGroupEditStore,
   useSelectedPartId,
 } from '../../document';
 
@@ -105,6 +108,12 @@ function PartProperties({ part }: { part: DocPart }) {
   const stateParam = typeof part.params.state === 'string' ? part.params.state : '';
   // WP-42: firmware-actuated axes drive live sliders (galvo tilt, stage focus).
   const actuatableDofs = (lib?.dofs ?? []).filter(d => d.actuatable);
+  // WP-44: group membership + edit-mode toggle.
+  const groupInstance = groupInstanceOf(part.id);
+  const groupRef = typeof part.params.groupRef === 'string' ? part.params.groupRef : null;
+  const unlockedMap = useGroupEditStore(s => s.unlocked);
+  const toggleUnlocked = useGroupEditStore(s => s.toggleUnlocked);
+  const groupUnlocked = groupInstance ? !!unlockedMap[groupInstance] : false;
   // WP-26: send a DOF value to a device as a firmware command.
   const [deviceUrl, setDeviceUrlState] = useState(getDeviceUrl());
   const [actNote, setActNote] = useState<string | null>(null);
@@ -171,6 +180,27 @@ function PartProperties({ part }: { part: DocPart }) {
           </IconButton>
         </Tooltip>
       </Stack>
+
+      {/* WP-44: group membership — the instance moves as one rigid unit until
+          unlocked for member editing. */}
+      {groupInstance && (
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          <Tooltip title={`part of group instance ${groupInstance}${groupRef ? ` (${groupRef})` : ''}`}>
+            <Chip
+              size="small"
+              color="secondary"
+              label={`⬚ ${groupRef ? groupRef.split('.').pop() : 'group'}`}
+              sx={{ fontWeight: 700, height: 20 }}
+            />
+          </Tooltip>
+          <Button size="small" onClick={() => toggleUnlocked(groupInstance)}>
+            {groupUnlocked ? 'lock group (move as unit)' : 'edit members'}
+          </Button>
+          <Button size="small" color="warning" onClick={() => ungroupInstance(groupInstance)}>
+            ungroup
+          </Button>
+        </Stack>
+      )}
 
       <Typography variant="caption" color="text.secondary">
         World position (mm) — x east · y north · z up

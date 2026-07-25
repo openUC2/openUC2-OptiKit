@@ -31,10 +31,13 @@ import {
 import { useAppStore } from '../stores/appStore';
 import {
   T_CLASS_LABEL,
+  addGroup,
   categoryOf,
   entriesFromIndex,
   entriesFromWorkspace,
+  groupEntriesFromIndex,
   isLibraryModule,
+  registerLibraryGroups,
   registerLibraryModules,
   templateClassOf,
 } from '../document';
@@ -142,7 +145,33 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
     const workspace = entriesFromWorkspace(workspaceRecords, workspaceThumbs)
       .filter(e => !registryIds.has(e.moduleId));
     registerLibraryModules([...registry, ...workspace]);
-  }, [libraryIndex.modules, workspaceRecords, workspaceThumbs, modules]);
+    // WP-44: groups (the OPM arrangements) register alongside the modules.
+    registerLibraryGroups(groupEntriesFromIndex(libraryIndex.groups));
+  }, [libraryIndex.modules, libraryIndex.groups, workspaceRecords, workspaceThumbs, modules]);
+
+  const paletteGroups = groupEntriesFromIndex(libraryIndex.groups);
+
+  // WP-44: place a group as one rigid unit at the origin cell; the user
+  // drags the whole arrangement into place afterwards.
+  const placeGroup = (groupId: string) => {
+    const result = addGroup(groupId, [0, 0, 0]);
+    const notify = useAppStore.getState().addNotification;
+    if (!result) {
+      notify({ type: 'error', title: 'group not found', message: groupId, duration: 5000 });
+      return;
+    }
+    const bayNote = result.snappedToBay
+      ? ` — docked into the ${result.snappedToBay.bay} bay`
+      : '';
+    notify({
+      type: result.bayOverflow ? 'warning' : 'success',
+      title: result.bayOverflow ? 'group exceeds the bay' : 'group placed',
+      message: result.bayOverflow
+        ? `${groupId} is larger than the bay it docked into — check the fit`
+        : `${result.partIds.length} part(s) placed as one unit${bayNote} — drag any member to move the group`,
+      duration: 6000,
+    });
+  };
 
   useEffect(() => {
     loadModules();
@@ -615,6 +644,40 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
       
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        {/* WP-44: groups — placeable arrangements (the OPM) */}
+        {activeTab === 0 && paletteGroups.length > 0 && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+              Groups (optical modules)
+            </Typography>
+            {paletteGroups.map(group => (
+              <Paper
+                key={group.groupId}
+                variant="outlined"
+                sx={{ p: 1, mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                      {group.name}
+                    </Typography>
+                    <Chip size="small" label="GROUP" color="secondary"
+                      sx={{ height: 16, fontSize: 9, fontWeight: 700 }} />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" noWrap display="block">
+                    {group.envelopeGrid.join('×')} · {group.members.length} members
+                    {group.structure.jointCells.length > 0 &&
+                      ` · ${group.structure.jointCells.length} joints`}
+                  </Typography>
+                </Box>
+                <Button size="small" variant="contained"
+                  onClick={() => placeGroup(group.groupId)}>
+                  place
+                </Button>
+              </Paper>
+            ))}
+          </Box>
+        )}
         <Box
           sx={{
             display: 'grid',

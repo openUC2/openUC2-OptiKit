@@ -25,9 +25,11 @@ import {
   splitWorldPosition,
   worldPoseOf,
 } from './mapping';
-import { defaultRotationFor, libraryEntryOf } from './libraryPalette';
+import { defaultRotationFor, groupEntryOf, libraryEntryOf } from './libraryPalette';
+import { useGroupEditStore } from './groupStore';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
+import { UC2_GRID_MM } from './types';
 import type { DocCategory, DocDof, DocPart, DocPath, DocSnapshot, PortRef, Vec3 } from './types';
 
 // ── category derivation ──────────────────────────────────────────────────────
@@ -150,6 +152,113 @@ export function addPart(
   return created.id;
 }
 
+let groupCounter = 0;
+
+export interface AddGroupResult {
+  instanceId: string;
+  partIds: string[];
+  /** Set when the drop landed in a carrier bay and the group snapped to it. */
+  snappedToBay: { carrierId: string; bay: string } | null;
+  /** Set when the group's envelope exceeds the bay it docked into. */
+  bayOverflow: boolean;
+}
+
+/**
+ * Place a cube group (WP-44): every member — plus the structure's sandwich
+ * plates and puzzle joints (WP-53) — lands as an ordinary part tagged with
+ * one group-instance id, so cubify/DRC/BOM see real cubes while the editor
+ * drags the arrangement as one rigid unit.
+ *
+ * WP-45: when the drop point falls inside a placed carrier's bay (the
+ * FRAME's 3x3x2 miniFRAME slot), the group snaps to the bay origin.
+ */
+export function addGroup(groupId: string, positionMm: Vec3): AddGroupResult | null {
+  const group = groupEntryOf(groupId);
+  if (!group) return null;
+  const instanceId = `grp-${Date.now().toString(36)}-${++groupCounter}`;
+  const pitch = UC2_GRID_MM;
+
+  // Drop cell (integer grid) the group's (0,0,0) member cell lands on.
+  let origin: Vec3 = [
+    Math.round(positionMm[0] / pitch[0]),
+    Math.round(positionMm[1] / pitch[1]),
+    Math.round(positionMm[2] / pitch[2]),
+  ];
+
+  // WP-45: bay docking — if the drop cell is inside a placed carrier's bay,
+  // snap the group origin onto the bay origin.
+  let snappedToBay: AddGroupResult['snappedToBay'] = null;
+  let bayOverflow = false;
+  for (const part of listParts()) {
+    const lib = libraryEntryOf(part.libraryRef);
+    if (!lib?.carrier || Object.keys(lib.bays).length === 0) continue;
+    for (const [bayName, bay] of Object.entries(lib.bays)) {
+      const bayOrigin: Vec3 = [
+        part.gridPose.cell[0] + bay.originCell[0],
+        part.gridPose.cell[1] + bay.originCell[1],
+        part.gridPose.cell[2] + bay.originCell[2],
+      ];
+      const inside =
+        origin[0] >= bayOrigin[0] && origin[0] < bayOrigin[0] + bay.size[0] &&
+        origin[1] >= bayOrigin[1] && origin[1] < bayOrigin[1] + bay.size[1] &&
+        origin[2] >= bayOrigin[2] && origin[2] < bayOrigin[2] + bay.size[2];
+      if (!inside) continue;
+      origin = bayOrigin;
+      snappedToBay = { carrierId: part.id, bay: bayName };
+      bayOverflow =
+        group.envelopeGrid[0] > bay.size[0] ||
+        group.envelopeGrid[1] > bay.size[1] ||
+        group.envelopeGrid[2] > bay.size[2];
+      break;
+    }
+    if (snappedToBay) break;
+  }
+
+  const partIds: string[] = [];
+  const placeAt = (moduleId: string, cell: [number, number, number]): void => {
+    const world: Vec3 = [
+      (origin[0] + cell[0]) * pitch[0],
+      (origin[1] + cell[1]) * pitch[1],
+      (origin[2] + cell[2]) * pitch[2],
+    ];
+    const id = addPart(moduleId, world);
+    if (id) {
+      setPartParam(id, 'groupId', instanceId);
+      setPartParam(id, 'groupRef', groupId);
+      partIds.push(id);
+    }
+  };
+
+  for (const member of group.members) placeAt(member.moduleId, member.cell);
+  // Structure (WP-53): the bottom plate under layer 0, the top plate above
+  // the highest layer, one puzzle piece per joint cell (it lives in the 5 mm
+  // inter-layer gap above its cell's cube).
+  const layers = group.members.filter(m => !m.overhang).map(m => m.cell[2]);
+  const topLayer = layers.length > 0 ? Math.max(...layers) : 0;
+  for (const plate of group.structure.plates) {
+    const z = plate.face === 'bottom' ? -1 : topLayer + 1;
+    placeAt(plate.moduleId, [plate.origin[0], plate.origin[1], z]);
+  }
+  if (group.structure.jointModuleId) {
+    for (const cell of group.structure.jointCells) {
+      placeAt(group.structure.jointModuleId, cell);
+    }
+  }
+
+  return { instanceId, partIds, snappedToBay, bayOverflow };
+}
+
+/** Dissolve a group instance: members stay, the rigid-drag tag goes (WP-44). */
+export function ungroupInstance(instanceId: string): void {
+  for (const part of useAppStore
+    .getState()
+    .placedModules.filter(p => p.params?.groupId === instanceId)) {
+    setPartParam(part.id, 'groupId', undefined);
+    setPartParam(part.id, 'groupRef', undefined);
+  }
+  useGroupEditStore.getState().lock(instanceId);
+}
+
 /**
  * Constrain an intra-cube residual to what the part's mechanical template
  * class allows (WP-34): T1 fixed templates hold the record pose (δ = 0);
@@ -184,6 +293,32 @@ function constrainOffsetToTemplate(m: PlacedModule, offsetMm: Vec3): Vec3 {
 
 /** Move a part to an absolute document-frame position in mm (continuous). */
 export function movePartWorld(partId: string, positionMm: Vec3, opts?: { snap?: boolean }): void {
+  // WP-44: a grouped part drags its whole instance rigidly unless the group
+  // is unlocked for member editing (the delta fans out to every sibling).
+  const groupId = groupInstanceOf(partId);
+  if (groupId && !useGroupEditStore.getState().unlocked[groupId]) {
+    const current = worldPoseOf(
+      useAppStore.getState().placedModules.find(p => p.id === partId)!,
+    ).positionMm;
+    const delta: Vec3 = [
+      positionMm[0] - current[0],
+      positionMm[1] - current[1],
+      positionMm[2] - current[2],
+    ];
+    for (const sibling of partsOfGroup(groupId)) {
+      const pos = worldPoseOf(sibling).positionMm;
+      movePartWorldSingle(
+        sibling.id,
+        [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]],
+        opts,
+      );
+    }
+    return;
+  }
+  movePartWorldSingle(partId, positionMm, opts);
+}
+
+function movePartWorldSingle(partId: string, positionMm: Vec3, opts?: { snap?: boolean }): void {
   const store = useAppStore.getState();
   const m = store.placedModules.find(p => p.id === partId);
   if (!m) return;
@@ -198,6 +333,19 @@ export function movePartWorld(partId: string, positionMm: Vec3, opts?: { snap?: 
     store.moveModuleToLayer(partId, placement.layer);
   }
   setDocParams(partId, { offsetMm });
+}
+
+/** WP-44: the group-instance id a part belongs to (null = ungrouped). */
+export function groupInstanceOf(partId: string): string | null {
+  const m = useAppStore.getState().placedModules.find(p => p.id === partId);
+  const gid = m?.params?.groupId;
+  return typeof gid === 'string' && gid ? gid : null;
+}
+
+function partsOfGroup(instanceId: string) {
+  return useAppStore
+    .getState()
+    .placedModules.filter(p => p.params?.groupId === instanceId);
 }
 
 /** Move a part to an integer grid cell (clears the continuous residual). */

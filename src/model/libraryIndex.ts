@@ -52,6 +52,38 @@ export interface IndexDof {
   can_object?: number | string | null;
 }
 
+/** WP-45: a docking region on a carrier (cells relative to its placement). */
+export interface IndexBay {
+  origin_cell: [number, number, number];
+  size: [number, number, number];
+  axis: string;
+}
+
+/** WP-44: a cube group — a placeable arrangement (the OPM). */
+export interface IndexGroup {
+  id: string;
+  version: string;
+  kind: 'cube_group';
+  description: string;
+  tags: string[];
+  review: boolean;
+  envelope_grid: [number, number, number];
+  members: {
+    key: string;
+    module: string;
+    cell: [number, number, number];
+    rot90: number;
+    overhang: boolean;
+  }[];
+  structure: {
+    plates: Record<string, { module: string; origin: [number, number]; size: [number, number] }>;
+    joints: string;
+    joint_cells: [number, number, number][];
+    joint_module: string;
+  };
+  interface: Record<string, { member: string; port: string }>;
+}
+
 export interface IndexModule {
   id: string;
   version: string;
@@ -76,6 +108,9 @@ export interface IndexModule {
     actuatable: boolean;
     dof?: IndexDof[];
     states?: string[];
+    /** WP-45: carriers host cubes; bays are their docking regions. */
+    carrier?: boolean;
+    bays?: Record<string, IndexBay>;
   };
   /** Service asset URL paths (`/v1/library/assets/...`), origin-relative. */
   assets?: { thumbnail: string | null; glb: string | null; step: string | null };
@@ -88,6 +123,8 @@ export interface LibraryIndex {
   count: number;
   modules: IndexModule[];
   components?: IndexComponent[];
+  /** WP-44: placeable arrangements (absent on pre-group indexes). */
+  groups?: IndexGroup[];
 }
 
 const URL_STORAGE_KEY = 'optikit-library-index-url';
@@ -137,6 +174,7 @@ export interface IndexState {
   error: string | null;
   components: IndexComponent[];
   modules: IndexModule[];
+  groups: IndexGroup[];
 }
 
 export async function fetchLibraryIndex(url: string): Promise<LibraryIndex> {
@@ -159,6 +197,7 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
     error: null,
     components: [],
     modules: [],
+    groups: [],
   });
 
   useEffect(() => {
@@ -172,6 +211,7 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
           error: null,
           components: index.components ?? [],
           modules: index.modules ?? [],
+          groups: index.groups ?? [],
         });
       })
       .catch(async (err: unknown) => {
@@ -179,7 +219,7 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
         // working offline (WP-22). Surface where the data came from.
         if (cancelled || url === FALLBACK_INDEX_URL) {
           if (!cancelled) {
-            setState({ loading: false, error: String(err), components: [], modules: [] });
+            setState({ loading: false, error: String(err), components: [], modules: [], groups: [] });
           }
           return;
         }
@@ -191,10 +231,11 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
             error: `registry unreachable (${String(err)}) — showing the bundled offline snapshot`,
             components: fallback.components ?? [],
             modules: fallback.modules ?? [],
+            groups: fallback.groups ?? [],
           });
         } catch {
           if (!cancelled) {
-            setState({ loading: false, error: String(err), components: [], modules: [] });
+            setState({ loading: false, error: String(err), components: [], modules: [], groups: [] });
           }
         }
       });

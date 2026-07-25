@@ -35,6 +35,9 @@ export {
 } from './OptikitDocument';
 export type { PartRenderInfo, UndoToken } from './OptikitDocument';
 export { setPartParam } from './OptikitDocument';
+export { addGroup, groupInstanceOf, ungroupInstance } from './OptikitDocument';
+export type { AddGroupResult } from './OptikitDocument';
+export { useGroupEditStore, isGroupLocked } from './groupStore';
 export {
   DEFAULT_LIB_ROT,
   LIBRARY_GROUP,
@@ -46,9 +49,13 @@ export {
   entriesFromWorkspace,
   libraryEntryOf,
   registerLibraryModules,
+  registerLibraryGroups,
+  groupEntriesFromIndex,
+  groupEntryOf,
+  listLibraryGroups,
   templateClassOf,
 } from './libraryPalette';
-export type { LibraryDof, LibraryPaletteEntry, TemplateClass } from './libraryPalette';
+export type { LibraryDof, LibraryGroupEntry, LibraryPaletteEntry, TemplateClass } from './libraryPalette';
 export {
   DOC_PARAMS_KEY,
   docPosToThree,
