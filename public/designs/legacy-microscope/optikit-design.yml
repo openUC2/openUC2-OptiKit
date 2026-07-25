@@ -1,0 +1,115 @@
+optikit-version: v0.0.0-alpha.1
+design:
+  name: legacy-microscope
+  version: 0.1.0
+  description: converted from legacy layout JSON (optikit-layout.json, exported 2025-07-26T11:22:02.569Z)
+    — WP-54
+  tags:
+  - converted
+  - legacy-layout
+components:
+  mirror_00:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.mirror_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: +x
+          x: -y
+      translation:
+        offset-grid:
+          x: 6
+          y: -2
+    category: mirror
+  mirror_01:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.mirror_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: -y
+          x: -x
+      translation:
+        offset-grid:
+          x: 4
+          y: -2
+    category: mirror
+  basic_cube_02:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 5
+          y: -2
+    category: mechanics
+  z_stage_03:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.stage_z
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 3
+          y: -3
+    category: mechanics
+  sample_holder_1x1_04:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.sampleholder_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: -y
+          x: -z
+      translation:
+        offset-grid:
+          x: 4
+    category: sample
+  torch_1x1_05:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.torch_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: -x
+          x: -z
+      translation:
+        offset-grid:
+          x: 4
+          y: 1
+    category: source
+  eyepiece_10_06:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.eyepiece_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: +x
+          x: -z
+      translation:
+        offset-grid:
+          x: 6
+          y: -1
+    category: lens

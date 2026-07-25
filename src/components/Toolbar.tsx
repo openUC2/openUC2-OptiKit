@@ -86,11 +86,10 @@ export const Toolbar: React.FC = () => {
   const themeMode = useThemeMode(s => s.mode);
   const toggleThemeMode = useThemeMode(s => s.toggle);
   
-  const { 
-    exportData, 
+  const {
+    exportData,
     saveToGitHub,
     saveToGitHubOverwrite,
-    generateShareableLink,
     downloadSTLBundle,
     importData, 
     importFromUrl,
@@ -392,20 +391,33 @@ openUC2 team via GitHub repository
     }
   };
 
-  const handleGenerateShareableLink = () => {
-    const shareableUrl = generateShareableLink();
-    
-    // Copy to clipboard and show confirmation
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(shareableUrl).then(() => {
-        alert(`Shareable link copied to clipboard!\n\nURL: ${shareableUrl}\n\nAnyone with this link can open your layout in OptiKit.`);
-      }).catch(() => {
-        // Fallback if clipboard write fails
+  // WP-54: the share link carries the CURRENT .dsn document inline
+  // (?d=<deflate+base64url>) — the schematic loads it on the other end.
+  const handleGenerateShareableLink = async () => {
+    try {
+      const { serviceFiles } = await import('../model/dsn/serviceExport');
+      const { buildShareUrl } = await import('../model/shareLink');
+      const link = await buildShareUrl(serviceFiles());
+      if (link.tooLarge || !link.url) {
+        alert(
+          `This design is too large for an inline link (${link.payloadBytes} bytes). ` +
+          `Export it as .dsn (File → Export .dsn) and host the file — a ` +
+          `?design=<url> link opens it from anywhere.`,
+        );
+        return;
+      }
+      const shareableUrl = link.url;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareableUrl).then(() => {
+          alert(`Shareable link copied to clipboard!\n\nURL: ${shareableUrl}\n\nAnyone with this link opens this exact design as an editable copy.`);
+        }).catch(() => {
+          prompt('Copy this shareable link:', shareableUrl);
+        });
+      } else {
         prompt('Copy this shareable link:', shareableUrl);
-      });
-    } else {
-      // Fallback for browsers without clipboard API
-      prompt('Copy this shareable link:', shareableUrl);
+      }
+    } catch (err) {
+      alert(`Could not build the share link: ${err instanceof Error ? err.message : err}`);
     }
   };
 

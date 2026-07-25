@@ -1,0 +1,411 @@
+optikit-version: v0.0.0-alpha.1
+design:
+  name: miniframe-brightfield
+  version: 0.1.0
+  description: 'The FRAME inner cube (OPM-0003 Brightfield): 3x3x2 stack, sandwich
+    plates, puzzle joints, camera arm — expanded from openuc2.group.miniframe_brightfield
+    (WP-53)'
+  tags:
+  - opm
+  - miniframe
+  - community
+components:
+  fold_mirror:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.mirror_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: +x
+          x: -y
+      translation:
+        offset-grid:
+          x: 1
+          y: 1
+          z: 1
+    category: mirror
+  tube_lens:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.tube_lens_1x1
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: +x
+          x: -z
+      translation:
+        offset-grid:
+          x: 2
+          y: 1
+          z: 1
+    category: lens
+  pinhole:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.pinhole_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          y: 1
+          z: 1
+    category: mechanics
+  opt_00:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          z: 1
+    category: mechanics
+  opt_10:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+          z: 1
+    category: mechanics
+  opt_20:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+          z: 1
+    category: mechanics
+  opt_02:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          y: 2
+          z: 1
+    category: mechanics
+  opt_12:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+          y: 2
+          z: 1
+    category: mechanics
+  opt_22:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+          y: 2
+          z: 1
+    category: mechanics
+  ele_00:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation: {}
+    category: mechanics
+  ele_10:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+    category: mechanics
+  ele_20:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+    category: mechanics
+  ele_01:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          y: 1
+    category: mechanics
+  ele_11:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+          y: 1
+    category: mechanics
+  ele_21:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+          y: 1
+    category: mechanics
+  ele_02:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          y: 2
+    category: mechanics
+  ele_12:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+          y: 2
+    category: mechanics
+  ele_22:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+          y: 2
+    category: mechanics
+  arm_relay:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.cube_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 3
+          y: 1
+    category: mechanics
+  camera:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.camera_usb
+    pose:
+      rotation:
+        type: grid
+        grid:
+          z: +x
+          x: -z
+      translation:
+        offset-grid:
+          x: 4
+          y: 1
+    category: detector
+  plate_bottom:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.plate_3x3
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          z: -1
+    category: mechanics
+  plate_top:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.plate_3x3
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          z: 2
+    category: mechanics
+  puzzle_0:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation: {}
+    category: mechanics
+  puzzle_1:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          y: 1
+    category: mechanics
+  puzzle_2:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          y: 2
+    category: mechanics
+  puzzle_3:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+    category: mechanics
+  puzzle_4:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+          y: 1
+    category: mechanics
+  puzzle_5:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 1
+          y: 2
+    category: mechanics
+  puzzle_6:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+    category: mechanics
+  puzzle_7:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+          y: 1
+    category: mechanics
+  puzzle_8:
+    type: primitive
+    primitive:
+      type: glb
+      model: openuc2.cube.puzzle_1x1
+    pose:
+      rotation:
+        type: grid
+      translation:
+        offset-grid:
+          x: 2
+          y: 2
+    category: mechanics

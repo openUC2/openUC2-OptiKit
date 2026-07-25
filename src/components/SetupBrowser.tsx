@@ -42,6 +42,16 @@ interface SetupMetadata {
   url: string;
 }
 
+/** WP-54: a bundled/hosted `.dsn` design the new configurator opens directly. */
+interface DsnDesignMeta {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  url: string;
+  parts: number;
+}
+
 interface CollectionMetadata {
   name: string;
   description: string;
@@ -71,6 +81,8 @@ export const SetupBrowser: React.FC = () => {
   const { importFromUrl, exportData, setRemoteSourcePath } = useAppStore();
   const [setups, setSetups] = useState<SetupMetadata[]>([]);
   const [collections, setCollections] = useState<CollectionMetadata[]>([]);
+  // WP-54: .dsn designs the NEW configurator opens directly (bundled index).
+  const [dsnDesigns, setDsnDesigns] = useState<DsnDesignMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
@@ -213,6 +225,14 @@ export const SetupBrowser: React.FC = () => {
     fetchSetups();
     fetchCollections();
   }, [fetchCollections]);
+
+  // WP-54: bundled .dsn designs — the cards that open in the NEW configurator.
+  useEffect(() => {
+    fetch('/configurator/designs/index.json')
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: { designs?: DsnDesignMeta[] }) => setDsnDesigns(data.designs ?? []))
+      .catch(() => setDsnDesigns([]));
+  }, []);
 
   const getCollectionDescription = (collectionName: string): string => {
     const descriptions: Record<string, string> = {
@@ -692,6 +712,51 @@ export const SetupBrowser: React.FC = () => {
             </Button>
           </Box>
         </Box>
+
+        {/* WP-54: .dsn designs — open directly in the new configurator */}
+        {dsnDesigns.length > 0 && (
+          <Box mb={4}>
+            <Typography variant="h6" gutterBottom>
+              OptiKit designs (.dsn)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Community designs in the new format — one click opens an editable copy
+              in the schematic editor.
+            </Typography>
+            <Box display="flex" gap={2} flexWrap="wrap">
+              {dsnDesigns.map(design => (
+                <Card key={design.id} sx={{ width: 320, display: 'flex', flexDirection: 'column' }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box display="flex" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>
+                        {design.name}
+                      </Typography>
+                      <Chip size="small" label=".dsn" color="primary" />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {design.category} · {design.parts} parts
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {design.description}
+                    </Typography>
+                  </CardContent>
+                  <Box sx={{ p: 1.5, pt: 0 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      fullWidth
+                      onClick={() =>
+                        navigate(`/configurator/schematic?design=${encodeURIComponent(design.url)}`)
+                      }
+                    >
+                      Open in configurator
+                    </Button>
+                  </Box>
+                </Card>
+              ))}
+            </Box>
+          </Box>
+        )}
 
         {/* Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>

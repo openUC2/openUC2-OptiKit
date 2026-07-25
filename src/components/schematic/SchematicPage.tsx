@@ -105,6 +105,42 @@ export function SchematicPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Share links (WP-54): ?d=<inline payload> / ?design=<hosted url> load a
+  // design into the session once the palette modules are registered.
+  const shareConsumedRef = useRef(false);
+  useEffect(() => {
+    if (shareConsumedRef.current || modules.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const inline = params.get('d');
+    const hosted = params.get('design');
+    if (!inline && !hosted) return;
+    shareConsumedRef.current = true;
+    (async () => {
+      const { decodeShareParam, fetchDesignUrl } = await import('../../model/shareLink');
+      const { importDsnFiles } = await import('../../model/dsn');
+      const files = inline ? await decodeShareParam(inline) : await fetchDesignUrl(hosted!);
+      const report = importDsnFiles(files);
+      useAppStore.getState().addNotification({
+        type: 'success',
+        title: 'shared design loaded',
+        message: `${report.placed} part(s) placed as an editable copy`,
+        duration: 6000,
+      });
+      // The link did its job — keep the URL clean for further sharing.
+      params.delete('d');
+      params.delete('design');
+      const query = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
+    })().catch(err => {
+      useAppStore.getState().addNotification({
+        type: 'error',
+        title: 'could not load the shared design',
+        message: err instanceof Error ? err.message : String(err),
+        duration: 8000,
+      });
+    });
+  }, [modules.length]);
+
   // Cross-probing (WP-17): arriving from another view with a selection frames
   // the selected part here (selection itself is document-level already).
   useEffect(() => {

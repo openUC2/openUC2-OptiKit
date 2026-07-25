@@ -1,0 +1,20 @@
+{
+  "designs": [
+    {
+      "id": "miniframe-brightfield",
+      "name": "miniFRAME brightfield OPM",
+      "description": "The FRAME inner cube: 3x3x2 cube stack with sandwich plates, puzzle joints and the two-cube camera arm — expanded from the openuc2.group.miniframe_brightfield record (WP-53).",
+      "category": "FRAME",
+      "url": "/configurator/designs/miniframe-brightfield/optikit-design.yml",
+      "parts": 31
+    },
+    {
+      "id": "legacy-microscope",
+      "name": "Legacy grid microscope",
+      "description": "A classic grid-builder layout (two fold mirrors, z-stage, sample holder, torch, eyepiece) converted with `optikit-core import layout-json` (WP-54).",
+      "category": "Education",
+      "url": "/configurator/designs/legacy-microscope/optikit-design.yml",
+      "parts": 7
+    }
+  ]
+}
