@@ -37,6 +37,7 @@ import {
   entriesFromWorkspace,
   groupEntriesFromIndex,
   isLibraryModule,
+  libraryEntryOf,
   registerLibraryGroups,
   registerLibraryModules,
   templateClassOf,
@@ -110,6 +111,29 @@ const MiniPhysicalIcon: React.FC<MiniPhysicalIconProps> = ({ module, size = 58 }
         </Group>
       </Layer>
     </Stage>
+  );
+};
+
+/**
+ * WP-48: an authored symbol outranks the derived glyph — but only once it
+ * actually loads. An unreachable asset (offline registry) falls back to the
+ * derived glyph instead of a broken-image tile.
+ */
+const SymbolOrGlyphThumb: React.FC<{
+  symbolUrl: string | null;
+  category: DocCategory;
+  name: string;
+}> = ({ symbolUrl, category, name }) => {
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => setFailed(false), [symbolUrl]);
+  if (!symbolUrl || failed) return <GlyphThumb category={category} size={58} />;
+  return (
+    <img
+      src={symbolUrl}
+      alt={name}
+      onError={() => setFailed(true)}
+      style={{ width: 58, height: 58, objectFit: 'contain' }}
+    />
   );
 };
 
@@ -457,6 +481,8 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
             {opticalGlyphs ? (
               // Schematic palette (WP-23): the optical symbol, not the cube —
               // except library parts with a real thumbnail (WP-34).
+              // WP-48: an authored symbol outranks the derived glyph (but not
+              // a real photographic thumbnail).
               isLibrary && module.thumbnail ? (
                 <img
                   src={module.thumbnail}
@@ -464,7 +490,11 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
                   style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 4 }}
                 />
               ) : (
-                <GlyphThumb category={categoryOf(module.id, module)} size={58} />
+                <SymbolOrGlyphThumb
+                  symbolUrl={libraryEntryOf(module.id)?.symbolUrl ?? null}
+                  category={categoryOf(module.id, module)}
+                  name={module.name}
+                />
               )
             ) : iconMode === 'canvas' ? (
               <MiniPhysicalIcon module={module} size={58} />

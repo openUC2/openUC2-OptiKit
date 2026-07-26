@@ -25,6 +25,7 @@
 import { parse } from 'yaml';
 import {
   getSnapshot,
+  listFibers,
   parsePortRef,
   useSourceDesignStore,
 } from '../../document';
@@ -129,6 +130,25 @@ export function buildServiceDesign(
         : { chain: liveChain };
   }
   design.paths = Object.keys(paths).length > 0 ? paths : undefined;
+
+  // ── fibers (WP-46) ────────────────────────────────────────────────────────
+  // Patch cords are live document state, always re-emitted from the store so
+  // chain inference and compile see the same links the canvas draws.
+  const fibers: NonNullable<DesignDecl['fibers']> = {};
+  for (const fiber of listFibers()) {
+    const from = parsePortRef(fiber.from);
+    const to = parsePortRef(fiber.to);
+    if (!keyByPartId[from.partId] || !keyByPartId[to.partId]) continue;
+    fibers[fiber.id] = {
+      from: `${keyByPartId[from.partId]}.${from.port}`,
+      to: `${keyByPartId[to.partId]}.${to.port}`,
+      ...(fiber.coreUm != null ? { 'core-um': fiber.coreUm } : {}),
+      ...(fiber.na != null ? { na: fiber.na } : {}),
+      'length-m': fiber.lengthM,
+      type: fiber.type,
+    };
+  }
+  design.fibers = Object.keys(fibers).length > 0 ? fibers : undefined;
 
   if (source.provenance) {
     design.provenance = { ...(design.provenance ?? {}), ...source.provenance };

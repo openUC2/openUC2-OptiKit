@@ -5,6 +5,7 @@
  */
 
 import {
+  addFiber,
   addPart,
   categoryOf,
   getSnapshot,
@@ -16,6 +17,8 @@ import {
   setPath,
   listParts,
   listPaths,
+  updateFiber,
+  useFibersStore,
   useSourceDesignStore,
 } from '../../document';
 import { useAppStore } from '../../stores/appStore';
@@ -108,6 +111,27 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
       .filter(({ key }) => idByKey[key])
       .map(({ key, port }) => makePortRef(idByKey[key], port));
     if (chain.length > 0) setPath(path.name, chain);
+  }
+
+  // WP-46: restore patch cords whose BOTH endpoints landed as placed parts.
+  useFibersStore.getState().clear();
+  for (const fiber of imported.fibers) {
+    const fromId = idByKey[fiber.from.key];
+    const toId = idByKey[fiber.to.key];
+    if (!fromId || !toId) {
+      warnings.push(`fiber '${fiber.id}': endpoint part missing — dropped`);
+      continue;
+    }
+    const id = addFiber(
+      makePortRef(fromId, fiber.from.port),
+      makePortRef(toId, fiber.to.port),
+    );
+    updateFiber(id, {
+      coreUm: fiber.coreUm,
+      na: fiber.na,
+      lengthM: fiber.lengthM,
+      type: fiber.type,
+    });
   }
 
   if (imported.meta.name || imported.meta.description) {

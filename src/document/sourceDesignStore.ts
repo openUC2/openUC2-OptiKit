@@ -75,6 +75,8 @@ export interface SourcePort {
   /** Datum-frame offset in component-local mm. */
   positionMm: [number, number, number];
   afterSurface: number | null;
+  /** WP-46: 'fiber' takes a patch cord; '' (default) is a free-space port. */
+  coupling?: '' | 'fiber';
 }
 
 interface RawOptics {

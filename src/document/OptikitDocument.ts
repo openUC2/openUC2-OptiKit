@@ -29,6 +29,7 @@ import { defaultRotationFor, groupEntryOf, libraryEntryOf } from './libraryPalet
 import { useGroupEditStore } from './groupStore';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
+import { useFibersStore } from './fibersStore';
 import { UC2_GRID_MM } from './types';
 import type { DocCategory, DocDof, DocPart, DocPath, DocSnapshot, PortRef, Vec3 } from './types';
 
@@ -430,6 +431,8 @@ export function setDofValue(partId: string, dofName: string, value: number): voi
 export function removePart(partId: string): void {
   useAppStore.getState().removeModule(partId);
   usePathsStore.getState().prunePart(partId);
+  // WP-46: patch cords that terminated on this part go with it.
+  useFibersStore.getState().prunePart(partId);
 }
 
 export function renamePart(partId: string, ref: string): void {
@@ -440,6 +443,29 @@ export function renamePart(partId: string, ref: string): void {
  * e.g. the selected T1 state (WP-34). */
 export function setPartParam(partId: string, key: string, value: unknown): void {
   useAppStore.getState().updateModuleParams(partId, { [key]: value });
+}
+
+// ── source runtime state (WP-47) ──────────────────────────────────────────────
+// Whether a source is emitting, and which of its record's lines is active.
+// Round-trips through the `.dsn` as CompSpec.enabled / wavelength-um.
+
+/** Is this source emitting? (Non-sources and unset sources read as on.) */
+export function isSourceOn(part: DocPart): boolean {
+  return part.params.enabled !== false;
+}
+
+/** The active line in µm, or null when the placement has not picked one. */
+export function activeWavelengthUm(part: DocPart): number | null {
+  const w = part.params.wavelengthUm;
+  return typeof w === 'number' && w > 0 ? w : null;
+}
+
+export function setSourceOn(partId: string, on: boolean): void {
+  setPartParam(partId, 'enabled', on);
+}
+
+export function setActiveWavelengthUm(partId: string, um: number | null): void {
+  setPartParam(partId, 'wavelengthUm', um);
 }
 
 export function setPath(name: string, chain: PortRef[]): void {

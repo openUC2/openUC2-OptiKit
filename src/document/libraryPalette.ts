@@ -67,6 +67,18 @@ export interface LibraryPaletteEntry {
   ports: SourcePort[];
   /** Effective focal length when meaningful — feeds the 2D ray preview. */
   eflMm: number | null;
+  /** WP-47: the source record's emission lines in µm (empty for non-sources);
+   * a placement picks one as its active wavelength. */
+  wavelengthsUm: number[];
+  /** WP-48: authored schematic symbol URL, or null to derive the glyph. */
+  symbolUrl: string | null;
+  /** WP-47: pixel facts for slm/display parts (null for everything else). */
+  programmable: {
+    mode: 'reflective' | 'transmissive';
+    pixelPitchUm: number | null;
+    resolution: [number, number] | null;
+    fillFactor: number | null;
+  } | null;
   source: 'registry' | 'workspace';
   /** WP-45: carriers host cubes (FRAME, baseplates, plates, puzzle pieces). */
   carrier: boolean;
@@ -174,6 +186,8 @@ const CATEGORY_MAP: Record<string, DocCategory> = {
   filter: 'filter',
   detector: 'detector',
   sample: 'sample',
+  slm: 'slm',
+  display: 'display',
 };
 
 export function docCategoryOfRecord(category: string): DocCategory {
@@ -192,6 +206,7 @@ function indexPortsToSource(mod: IndexModule): SourcePort[] {
     direction: p.direction,
     positionMm: p.position_mm,
     afterSurface: p.after_surface,
+    coupling: p.coupling ?? '',
   }));
 }
 
@@ -200,7 +215,12 @@ function recordPortsToSource(record: ComponentRecord): SourcePort[] {
   const frames = (optics.frames ?? {}) as Record<string, Record<string, number>>;
   const ports = (optics.ports ?? {}) as Record<
     string,
-    { frame?: string; direction?: string; 'after-surface'?: number | null }
+    {
+      frame?: string;
+      direction?: string;
+      'after-surface'?: number | null;
+      coupling?: '' | 'fiber';
+    }
   >;
   return Object.entries(ports).map(([name, port]) => {
     const frame = frames[port.frame ?? ''] ?? {};
@@ -213,6 +233,7 @@ function recordPortsToSource(record: ComponentRecord): SourcePort[] {
         frame['z-mm'] ?? 0,
       ] as [number, number, number],
       afterSurface: port['after-surface'] ?? null,
+      coupling: port.coupling ?? '',
     };
   });
 }
@@ -250,6 +271,16 @@ export function entriesFromIndex(
     glbUrl: abs(mod.assets?.glb),
     ports: indexPortsToSource(mod),
     eflMm: mod.component?.efl_mm ?? null,
+    wavelengthsUm: mod.component?.wavelengths_um ?? [],
+    symbolUrl: abs(mod.assets?.symbol),
+    programmable: mod.component?.programmable
+      ? {
+          mode: mod.component.programmable.mode,
+          pixelPitchUm: mod.component.programmable['pixel-pitch-um'],
+          resolution: mod.component.programmable.resolution,
+          fillFactor: mod.component.programmable['fill-factor'],
+        }
+      : null,
     source: 'registry',
     carrier: mod.template?.carrier ?? false,
     bays: Object.fromEntries(
@@ -309,6 +340,11 @@ export function entriesFromWorkspace(
     glbUrl: null,
     ports: recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
+    wavelengthsUm:
+      (record as { source?: { wavelengths_um?: number[] } }).source?.wavelengths_um ?? [],
+    // Workspace drafts have no served asset yet — they derive their glyph.
+    symbolUrl: null,
+    programmable: null,
     source: 'workspace',
     carrier: false,
     bays: {},

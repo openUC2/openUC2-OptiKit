@@ -26,6 +26,8 @@ export interface SchematicPort {
   /** Unit direction in part-local document coordinates. */
   localDir: Vec3;
   kind: 'input' | 'output' | 'bidirectional';
+  /** WP-46: 'fiber' ports take a patch cord; '' is free space. */
+  coupling: '' | 'fiber';
 }
 
 /** Visual stand-off of a pin from its datum point along the beam direction. */
@@ -73,8 +75,18 @@ export function portsOf(part: DocPart): SchematicPort[] {
       ],
       localDir: dir,
       kind: INPUT_PORT_NAMES.test(p.name) ? 'input' : 'output',
+      coupling: p.coupling ?? '',
     };
   });
+}
+
+/** Does this port ref name a fiber-coupled connector (WP-46)? */
+export function isFiberPort(parts: DocPart[], ref: PortRef): boolean {
+  const dot = ref.lastIndexOf('.');
+  const part = parts.find(p => p.id === ref.slice(0, dot));
+  if (!part) return false;
+  const name = ref.slice(dot + 1);
+  return portsOf(part).find(p => p.name === name)?.coupling === 'fiber';
 }
 
 function beamDirOf(port: SourcePort): Vec3 {

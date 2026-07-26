@@ -1,6 +1,6 @@
 {
   "schema": "optikit-library-index/v0",
-  "count": 121,
+  "count": 122,
   "modules": [
     {
       "id": "openuc2.cube.12v_power_supply",
@@ -30,7 +30,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.12v_power_supply@^0.1",
@@ -46,7 +48,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -79,7 +82,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.adjustable_slit_1x1@^0.1",
@@ -95,7 +100,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.adjustable_slit_1x1/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -128,7 +134,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.aquarium_1x1@^0.1",
@@ -144,7 +152,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.aquarium_1x1/ASS_-_2052_-_CUBAQU_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -155,7 +164,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -188,7 +198,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.autofocus_3x1@^0.1",
@@ -204,7 +216,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -235,7 +248,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.baseplate_4x4@^0.1",
@@ -251,7 +266,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -282,7 +298,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.baseplate_8x4@^0.1",
@@ -298,7 +316,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -331,7 +350,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.baseplate_cubes_5x4@^0.1",
@@ -347,7 +368,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -380,7 +402,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.baseplate_cubes_6x5@^0.1",
@@ -396,7 +420,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -429,7 +454,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.beamsplitter_1x1@^0.1",
@@ -445,7 +472,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.beamsplitter_1x1/ASS_-_2011_-_CUBSPLCUB_-_V04_-_A.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -456,7 +484,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "transmitted",
@@ -466,7 +495,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -476,7 +506,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -509,7 +540,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.c_mount_adapter_1x1@^0.1",
@@ -525,7 +558,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.c_mount_adapter_1x1/ASS_-_2055_-_CUBCMOUNTMNT_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -536,7 +570,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -569,7 +604,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_allied_vision_mono@^0.1",
@@ -585,7 +622,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -596,7 +634,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -629,7 +668,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_andor_mono@^0.1",
@@ -645,7 +686,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -656,7 +698,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -687,7 +730,9 @@
           "mpn": "CS165MU",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_mount_1x1@^0.1",
@@ -703,7 +748,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.camera_mount_1x1/model.glb",
-        "step": "/v1/library/assets/templates/openuc2.tpl.camera_mount_1x1/model.step"
+        "step": "/v1/library/assets/templates/openuc2.tpl.camera_mount_1x1/model.step",
+        "symbol": null
       },
       "ports": [
         {
@@ -714,7 +760,8 @@
             0.0,
             -10.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -747,7 +794,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_daheng_mono@^0.1",
@@ -763,7 +812,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -774,7 +824,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -807,7 +858,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_daheng_rgb@^0.1",
@@ -823,7 +876,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -834,7 +888,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -867,7 +922,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_hik_mono@^0.1",
@@ -883,7 +940,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -894,7 +952,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -927,7 +986,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_hik_rgb@^0.1",
@@ -943,7 +1004,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -954,7 +1016,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -987,7 +1050,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_pco_mono@^0.1",
@@ -1003,7 +1068,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1014,7 +1080,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1047,7 +1114,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_thorcam_mono@^0.1",
@@ -1063,7 +1132,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1074,7 +1144,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1107,7 +1178,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_tucsen_mono@^0.1",
@@ -1123,7 +1196,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1134,7 +1208,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1167,7 +1242,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_usb@^0.1",
@@ -1183,7 +1260,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1194,7 +1272,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1227,7 +1306,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_usb_daheng@^0.1",
@@ -1243,7 +1324,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1254,7 +1336,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1287,7 +1370,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_virtual@^0.1",
@@ -1303,7 +1388,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1314,7 +1400,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1347,7 +1434,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.camera_webcam@^0.1",
@@ -1363,7 +1452,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1374,7 +1464,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1407,7 +1498,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.cube_1x1@^0.1",
@@ -1423,7 +1516,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.cube_1x1/ASS_-_2000_-_CUB_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -1456,7 +1550,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.cube_fiberholder_1x1@^0.1",
@@ -1472,7 +1568,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.cube_fiberholder_1x1/ASS_-_2044_-_CUBFIBHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1483,7 +1580,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -1493,7 +1591,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1526,7 +1625,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.cube_ledmatrix_1x1@^0.1",
@@ -1542,7 +1643,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.cube_ledmatrix_1x1/ASS_-_2046_-_CUBLEDMTX_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1553,7 +1655,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1586,7 +1689,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.cube_raspicam_2x1@^0.1",
@@ -1602,7 +1707,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.cube_raspicam_2x1/ASS_-_2045_-_CUBCAM_RASPBERRY_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1613,7 +1719,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1646,7 +1753,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.cylindrical_lens_1x1@^0.1",
@@ -1662,7 +1771,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.cylindrical_lens_1x1/ASS_-_2054_-_CUBLENCYL30x32F100_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -1695,7 +1805,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.dev_camera_1x1@^0.1",
@@ -1711,7 +1823,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.dev_camera_1x1/camera-box.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1722,7 +1835,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1755,7 +1869,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.dev_empty_1x1@^0.1",
@@ -1771,7 +1887,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.dev_empty_1x1/camera-box.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -1804,7 +1921,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.dev_mirror_1x1@^0.1",
@@ -1820,7 +1939,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.dev_mirror_1x1/mirror-box.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1831,7 +1951,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -1841,7 +1962,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -1874,7 +1996,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.dial_control@^0.1",
@@ -1890,7 +2014,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -1923,7 +2048,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.diffuser_1x1@^0.1",
@@ -1939,7 +2066,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.diffuser_1x1/ASS_-_2049_-_CUBREDFIL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -1950,10 +2078,117 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
+    },
+    {
+      "id": "openuc2.cube.dmd_45",
+      "version": "0.1.0",
+      "kind": "cube_module",
+      "description": "DMD structured-illumination cube (45\u00b0, pattern over CAN)",
+      "tags": [
+        "cube",
+        "cube/slm",
+        "structured-illumination"
+      ],
+      "category": "slm",
+      "thumbnail": null,
+      "footprint_grid": [
+        1,
+        1,
+        1
+      ],
+      "price": 420.0,
+      "review": false,
+      "component": {
+        "ref": "openuc2.slm.dmd_45@^0.1",
+        "resolved": "0.1.0",
+        "vendor": {
+          "name": "Texas Instruments",
+          "mpn": "DLP4710",
+          "url": ""
+        },
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": {
+          "mode": "reflective",
+          "pixel-pitch-um": 5.4,
+          "resolution": [
+            1920,
+            1080
+          ],
+          "fill-factor": 0.92
+        }
+      },
+      "template": {
+        "ref": "openuc2.tpl.dmd_45@^0.1",
+        "id": "openuc2.tpl.dmd_45",
+        "resolved": "0.1.0",
+        "class": "fixed",
+        "actuatable": true,
+        "carrier": false,
+        "bays": {},
+        "dof": [
+          {
+            "name": "pattern_index",
+            "kind": "parameter",
+            "axis": "",
+            "unit": "",
+            "range": [
+              0.0,
+              255
+            ],
+            "actuatable": true,
+            "pivot_frame": "",
+            "surface": 0,
+            "can_object": "0x6080:1"
+          }
+        ],
+        "states": []
+      },
+      "assets": {
+        "thumbnail": null,
+        "glb": null,
+        "step": null,
+        "symbol": null
+      },
+      "ports": [
+        {
+          "name": "front",
+          "direction": "-z",
+          "position_mm": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "after_surface": null,
+          "coupling": ""
+        },
+        {
+          "name": "reflected",
+          "direction": "+x",
+          "position_mm": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "after_surface": 0,
+          "coupling": ""
+        }
+      ],
+      "electronics": {
+        "pcb": "",
+        "firmware-contract": "uc2rest:dmd@1",
+        "axis-map": [
+          {
+            "dof": "pattern_index",
+            "can-object": "0x6080:1"
+          }
+        ]
+      }
     },
     {
       "id": "openuc2.cube.dmd_slm_4500_1x1",
@@ -1966,7 +2201,7 @@
         "cube/source",
         "illumination"
       ],
-      "category": "source",
+      "category": "slm",
       "thumbnail": null,
       "footprint_grid": [
         1,
@@ -1983,7 +2218,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.dmd_slm_4500_1x1@^0.1",
@@ -1999,7 +2236,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.dmd_slm_4500_1x1/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2010,7 +2248,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2043,7 +2282,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.electronics_v3@^0.1",
@@ -2059,7 +2300,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.electronics_v3/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": "/v1/library/assets/components/openuc2.electronics.electronics_v3/symbol.svg"
       },
       "ports": [],
       "electronics": null
@@ -2092,7 +2334,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": 25.0
+        "efl_mm": 25.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.eyepiece_1x1@^0.1",
@@ -2108,7 +2352,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.eyepiece_1x1/ASS_-_2025_-_CUBEYEPCE_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2119,7 +2364,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -2129,7 +2375,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2162,7 +2409,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.fiber_combiner@^0.1",
@@ -2178,7 +2427,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.fiber_combiner/ASS_-_GalvoScanner_-_beamsplitter_-_offcentered.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -2211,7 +2461,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.filter_1x1@^0.1",
@@ -2227,7 +2479,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.filter_1x1/ASS_-_2053_-_CUBREMOVAEMIFIL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2238,7 +2491,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -2248,7 +2502,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2281,7 +2536,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.filter_bandpass@^0.1",
@@ -2297,7 +2554,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.filter_bandpass/ASS_-_2047_-_CUBEXCFILWLS532_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2308,7 +2566,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -2318,7 +2577,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2351,7 +2611,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.filter_dichroic@^0.1",
@@ -2367,7 +2629,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.filter_dichroic/ASS_-_2027_-_CUBDICSPL+EMIFIL_WLS532_-_A.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2378,7 +2641,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "transmitted",
@@ -2388,7 +2652,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -2398,7 +2663,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2431,7 +2697,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.fluorescent_sample_1x1@^0.1",
@@ -2447,7 +2715,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.fluorescent_sample_1x1/ASS_-_2024_-_CUBSAMHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2458,7 +2727,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2491,7 +2761,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": 100.0
+        "efl_mm": 100.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.focus_tunable_lens_1x1@^0.1",
@@ -2507,7 +2779,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.focus_tunable_lens_1x1/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2518,7 +2791,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -2528,7 +2802,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2559,7 +2834,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame@^0.1",
@@ -2589,7 +2866,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -2622,7 +2900,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_body@^0.1",
@@ -2638,7 +2918,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -2671,7 +2952,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_illumination_arm@^0.1",
@@ -2687,7 +2970,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2698,7 +2982,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2731,7 +3016,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_image_af@^0.1",
@@ -2747,7 +3034,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -2780,7 +3068,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_laser_af@^0.1",
@@ -2796,7 +3086,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -2829,7 +3120,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_led_matrix@^0.1",
@@ -2845,7 +3138,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2856,7 +3150,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2889,7 +3184,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_ps4_joystick@^0.1",
@@ -2905,7 +3202,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -2938,7 +3236,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_single_led@^0.1",
@@ -2954,7 +3254,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -2965,7 +3266,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -2998,7 +3300,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_wellplate_insert_4slides@^0.1",
@@ -3014,7 +3318,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3025,7 +3330,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3058,7 +3364,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.frame_wellplate_insert_wellplate@^0.1",
@@ -3074,7 +3382,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3085,7 +3394,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3117,7 +3427,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.galvo_dual@^0.1",
@@ -3162,7 +3474,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3173,7 +3486,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -3183,7 +3497,8 @@
             0.0,
             6.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": {
@@ -3229,7 +3544,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.galvo_xy@^0.1",
@@ -3245,7 +3562,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.galvo_xy/ASS_-_GalvoScanner_China_Unknownbrand.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3256,7 +3574,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -3266,7 +3585,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3299,7 +3619,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.grating_adapter_kinematic_1x1@^0.1",
@@ -3315,7 +3637,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.grating_adapter_kinematic_1x1/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -3348,7 +3671,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.iris_1x1@^0.1",
@@ -3364,7 +3689,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.iris_1x1/ASS_-_2040_-_CUBDIAPGM_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -3397,7 +3723,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.kinematicmirror_1x1@^0.1",
@@ -3413,7 +3741,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.kinematicmirror_1x1/ASS_-_2013_-_CUBKINMIR4590_-_V04_-_A.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3424,7 +3753,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -3434,7 +3764,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3467,7 +3798,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.kinematicmirror_90_1x1@^0.1",
@@ -3483,7 +3816,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.kinematicmirror_90_1x1/ASS_-_2013_-_CUBKINMIR4590_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3494,7 +3828,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -3504,7 +3839,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3537,7 +3873,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.lambdahalf_1x1@^0.1",
@@ -3553,7 +3891,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.lambdahalf_1x1/ASS_-_2048_-_CUBDBLPOLFIL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -3586,7 +3925,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_405nm@^0.1",
@@ -3602,7 +3943,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.laser_405nm/ASS_-_2018_-_CUBLAS520_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3613,7 +3955,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3644,7 +3987,9 @@
           "mpn": "LASER-488-COL",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_pointer_1x1@^0.1",
@@ -3660,7 +4005,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.laser_pointer_1x1/model.glb",
-        "step": "/v1/library/assets/templates/openuc2.tpl.laser_pointer_1x1/model.step"
+        "step": "/v1/library/assets/templates/openuc2.tpl.laser_pointer_1x1/model.step",
+        "symbol": null
       },
       "ports": [
         {
@@ -3671,7 +4017,8 @@
             0.0,
             20.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3704,7 +4051,11 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [
+          0.488
+        ],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_488nm@^0.1",
@@ -3720,7 +4071,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.laser_488nm/ASS_-_2018_-_CUBLAS520_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3731,7 +4083,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3764,7 +4117,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_532nm@^0.1",
@@ -3780,7 +4135,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.laser_532nm/ASS_-_2018_-_CUBLAS520_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3791,7 +4147,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3824,7 +4181,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_635nm@^0.1",
@@ -3840,7 +4199,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.laser_635nm/ASS_-_2018_-_CUBLAS520_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3851,7 +4211,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3883,7 +4244,11 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [
+          0.85
+        ],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_850nm_ir@^0.1",
@@ -3899,7 +4264,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3910,7 +4276,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -3943,7 +4310,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.laser_fcsm_1x1@^0.1",
@@ -3959,7 +4328,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.laser_fcsm_1x1/ASS_-_4005_-_LAS+CAS.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -3970,7 +4340,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": "fiber"
         }
       ],
       "electronics": null
@@ -4003,7 +4374,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.led_470nm@^0.1",
@@ -4019,7 +4392,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.led_470nm/ASS_-_2042_-_CUBFLULEDBLUNEWENE_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4030,7 +4404,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4063,7 +4438,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.led_530nm@^0.1",
@@ -4079,7 +4456,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.led_530nm/ASS_-_2043_-_CUBFLULEDGRENEWENE_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4090,7 +4468,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4123,7 +4502,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.led_625nm@^0.1",
@@ -4139,7 +4520,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.led_625nm/ASS_-_2046_-_CUBLEDMTX_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4150,7 +4532,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4183,7 +4566,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.led_ring_koehlerillu@^0.1",
@@ -4199,7 +4584,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4210,7 +4596,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4243,7 +4630,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": 100.0
+        "efl_mm": 100.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.lens_asp_1x1@^0.1",
@@ -4259,7 +4648,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.lens_asp_1x1/ASS_-_2001_-_CUBLEND40F50_-_V03.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4270,7 +4660,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -4280,7 +4671,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4313,7 +4705,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": -100.0
+        "efl_mm": -100.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.lens_neg_1x1@^0.1",
@@ -4329,7 +4723,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.lens_neg_1x1/ASS_-_2001_-_CUBLEND40F50_-_V03.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4340,7 +4735,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -4350,7 +4746,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4383,7 +4780,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": -50.0
+        "efl_mm": -50.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.lens_negative_1x1@^0.1",
@@ -4399,7 +4798,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.lens_negative_1x1/ASS_-_2001_-_CUBLEND40F50_-_V03.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4410,7 +4810,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -4420,7 +4821,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4453,7 +4855,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": 100.0
+        "efl_mm": 100.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.lens_pos_1x1@^0.1",
@@ -4469,7 +4873,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.lens_pos_1x1/ASS_-_2001_-_CUBLEND40F50_-_V03.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4480,7 +4885,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -4490,7 +4896,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4522,7 +4929,9 @@
           "mpn": "AC254-050-A",
           "url": ""
         },
-        "efl_mm": 50.0
+        "efl_mm": 50.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.lens_insert_25mm@^1",
@@ -4553,7 +4962,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4564,7 +4974,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -4574,7 +4985,8 @@
             0.0,
             5.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": {
@@ -4616,7 +5028,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.mirror_1x1@^0.1",
@@ -4632,7 +5046,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.mirror_1x1/ASS_-_2020_-_CUBMIR45\u00b0TH2_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4643,7 +5058,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -4653,7 +5069,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4684,7 +5101,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.mirror_mount_1x1@^0.1",
@@ -4703,7 +5122,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.mirror_mount_1x1/model.glb",
-        "step": "/v1/library/assets/templates/openuc2.tpl.mirror_mount_1x1/model.step"
+        "step": "/v1/library/assets/templates/openuc2.tpl.mirror_mount_1x1/model.step",
+        "symbol": null
       },
       "ports": [
         {
@@ -4714,7 +5134,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -4724,7 +5145,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4757,7 +5179,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.motorized_objective_revolver@^0.1",
@@ -4773,7 +5197,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -4806,7 +5231,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.multi_colour_led_fiber@^0.1",
@@ -4822,7 +5249,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4833,7 +5261,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4866,7 +5295,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.ndfilter_1x1@^0.1",
@@ -4882,7 +5313,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.ndfilter_1x1/ASS_-_2049_-_CUBREDFIL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -4893,7 +5325,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -4903,7 +5336,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -4936,7 +5370,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.objective_10x_1x1@^0.1",
@@ -4952,7 +5388,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -4985,7 +5422,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.objective_20x_1x1@^0.1",
@@ -5001,7 +5440,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5034,7 +5474,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.objective_20x_nikon_0_75na_1x1@^0.1",
@@ -5050,7 +5492,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5083,7 +5526,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.objective_4x_1x1@^0.1",
@@ -5099,7 +5544,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5132,7 +5578,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.objective_holder_rms_1x1@^0.1",
@@ -5148,7 +5596,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5181,7 +5630,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.odmr_xiao_esp32s3@^0.1",
@@ -5197,7 +5648,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5230,7 +5682,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.overview_camera@^0.1",
@@ -5246,7 +5700,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -5257,7 +5712,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -5290,7 +5746,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.phone_holder_1x1@^0.1",
@@ -5306,7 +5764,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.phone_holder_1x1/ASS_-_4001_-_PHNHOL_-_A.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5339,7 +5798,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.photodiode@^0.1",
@@ -5355,7 +5816,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.photodiode/ASS_-_2019_-_CUBPHOSEN+LEND16F28_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -5366,7 +5828,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -5399,7 +5862,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.pinhole_1x1@^0.1",
@@ -5415,7 +5880,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.pinhole_1x1/ASS_-_4001_-_PHNHOL_-_A.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5447,7 +5913,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.plate_3x3@^0.1",
@@ -5463,7 +5931,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5495,7 +5964,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.plate_3x4@^0.1",
@@ -5511,7 +5982,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5543,7 +6015,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.plate_3x5@^0.1",
@@ -5559,7 +6033,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5592,7 +6067,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.polfilter_1x1@^0.1",
@@ -5608,7 +6085,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.polfilter_1x1/ASS_-_2048_-_CUBDBLPOLFIL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -5619,7 +6097,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -5629,7 +6108,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -5660,7 +6140,9 @@
           "mpn": "PRT-1004-PUZ11",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.puzzle_1x1@^0.1",
@@ -5676,7 +6158,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.puzzle_1x1/model.glb",
-        "step": "/v1/library/assets/templates/openuc2.tpl.puzzle_1x1/model.step"
+        "step": "/v1/library/assets/templates/openuc2.tpl.puzzle_1x1/model.step",
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5709,7 +6192,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.quadband_laser_block@^0.1",
@@ -5725,7 +6210,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -5736,7 +6222,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -5769,7 +6256,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.quadband_laser_dichroic@^0.1",
@@ -5785,7 +6274,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -5796,7 +6286,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "transmitted",
@@ -5806,7 +6297,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -5816,7 +6308,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -5849,7 +6342,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.quadband_led_dichroic@^0.1",
@@ -5865,7 +6360,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -5876,7 +6372,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "transmitted",
@@ -5886,7 +6383,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         },
         {
           "name": "reflected",
@@ -5896,7 +6394,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 0
+          "after_surface": 0,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -5929,7 +6428,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.raspberrypi_controller_1x1@^0.1",
@@ -5945,7 +6446,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.raspberrypi_controller_1x1/ASS_-_RASPI5_-_RAS-25-01.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -5978,7 +6480,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.rotation_stage_1x1@^0.1",
@@ -5994,7 +6498,8 @@
       "assets": {
         "thumbnail": null,
         "glb": null,
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6027,7 +6532,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.sampleholder_1x1@^0.1",
@@ -6043,7 +6550,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.sampleholder_1x1/ASS_-_2005_-_CUBSAMHOL_-_V03.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -6054,7 +6562,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -6087,7 +6596,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.screenholder_1x1@^0.1",
@@ -6103,7 +6614,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.screenholder_1x1/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6136,7 +6648,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.spectrometer_fiber_1x1@^0.1",
@@ -6152,7 +6666,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.spectrometer_fiber_1x1/ASS_-_2014_-_CUBSCRHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -6163,7 +6678,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -6196,7 +6712,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.stage_z@^0.1",
@@ -6212,7 +6730,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.stage_z/ASS_-_3004_-_CUBMANSTGR10_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6245,7 +6764,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.stage_z_motorized@^0.1",
@@ -6261,7 +6782,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.stage_z_motorized/ASS_-_2042_-_CUBFLULEDBLUNEWENE_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6294,7 +6816,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.torch_1x1@^0.1",
@@ -6310,7 +6834,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.torch_1x1/ASS_-_4004_-_TOR+BAT.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -6321,7 +6846,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -6354,7 +6880,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": 200.0
+        "efl_mm": 200.0,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.tube_lens_1x1@^0.1",
@@ -6370,7 +6898,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.tube_lens_1x1/ASS_-_2022_-_CUBLEND40F100_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [
         {
@@ -6381,7 +6910,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         },
         {
           "name": "back",
@@ -6391,7 +6921,8 @@
             0.0,
             0.0
           ],
-          "after_surface": 1
+          "after_surface": 1,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -6424,7 +6955,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.uc2_controller@^0.1",
@@ -6440,7 +6973,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.uc2_controller/ASS_-_4008_-_MAIBRD+CAS.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6473,7 +7007,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.uc2_puzzle@^0.1",
@@ -6489,7 +7025,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.uc2_puzzle/PRT_-_1004_-_PUZ11_-_V04_-_A.ipt",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6522,7 +7059,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.wildcard_1x1@^0.1",
@@ -6538,7 +7077,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.wildcard_1x1/ASS_-_2024_-_CUBSAMHOL_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6571,7 +7111,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.wildcard_2x2@^0.1",
@@ -6587,7 +7129,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.wildcard_2x2/ASS_-_2035_-_CUBMAG_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6620,7 +7163,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.wildcard_3x3@^0.1",
@@ -6636,7 +7181,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.wildcard_3x3/ASS_-_2038_-_CUBFEPTUB_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6669,7 +7215,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.xy_mount_mini_16mm_1x1@^0.1",
@@ -6685,7 +7233,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.xy_mount_mini_16mm_1x1/ASS_-_2061_--_CUBTRANSTAGE16MM_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6718,7 +7267,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.xy_stage@^0.1",
@@ -6734,7 +7285,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.xy_stage/ASS_-_3005_-_CUBMANXYST02DIA.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6767,7 +7319,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.xyz_openflexure_1x1@^0.1",
@@ -6783,7 +7337,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.xyz_openflexure_1x1/openflexure.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6816,7 +7371,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.xyz_stage_compact_1x1@^0.1",
@@ -6832,7 +7389,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.xyz_stage_compact_1x1/ASS_-_3006_-_AUTXYZSTG_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6865,7 +7423,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "openuc2.tpl.xyz_stage_compact_motorised_1x1@^0.1",
@@ -6881,7 +7441,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/openuc2.tpl.xyz_stage_compact_motorised_1x1/ASS_-_3006_-_AUTXYZSTG_-_V04.glb",
-        "step": null
+        "step": null,
+        "symbol": null
       },
       "ports": [],
       "electronics": null
@@ -6911,7 +7472,11 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [
+          0.532
+        ],
+        "programmable": null
       },
       "template": {
         "ref": "user.tpl.aa@^0.1",
@@ -6927,7 +7492,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/user.tpl.aa/spacer_endstop.glb",
-        "step": "/v1/library/assets/templates/user.tpl.aa/spacer_endstop.step"
+        "step": "/v1/library/assets/templates/user.tpl.aa/spacer_endstop.step",
+        "symbol": null
       },
       "ports": [
         {
@@ -6938,7 +7504,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -6968,7 +7535,11 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [
+          0.532
+        ],
+        "programmable": null
       },
       "template": {
         "ref": "user.tpl.karlheinz@^0.1",
@@ -6984,7 +7555,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/user.tpl.karlheinz/spacer_endstop.glb",
-        "step": "/v1/library/assets/templates/user.tpl.karlheinz/spacer_endstop.step"
+        "step": "/v1/library/assets/templates/user.tpl.karlheinz/spacer_endstop.step",
+        "symbol": null
       },
       "ports": [
         {
@@ -6995,7 +7567,8 @@
             0.0,
             0.0
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -7025,7 +7598,9 @@
           "mpn": "",
           "url": ""
         },
-        "efl_mm": null
+        "efl_mm": null,
+        "wavelengths_um": [],
+        "programmable": null
       },
       "template": {
         "ref": "user.tpl.test@^0.1",
@@ -7041,7 +7616,8 @@
       "assets": {
         "thumbnail": null,
         "glb": "/v1/library/assets/templates/user.tpl.test/spacer_endstop.glb",
-        "step": "/v1/library/assets/templates/user.tpl.test/spacer_endstop.step"
+        "step": "/v1/library/assets/templates/user.tpl.test/spacer_endstop.step",
+        "symbol": null
       },
       "ports": [
         {
@@ -7052,7 +7628,8 @@
             -4.917,
             0.374
           ],
-          "after_surface": null
+          "after_surface": null,
+          "coupling": ""
         }
       ],
       "electronics": null
@@ -8993,6 +9570,27 @@
       "review": true
     },
     {
+      "id": "openuc2.slm.dmd_45",
+      "version": "0.1.0",
+      "kind": "optical_component",
+      "category": "slm",
+      "description": "DLP digital micromirror device at 45\u00b0 (0.47\" 1920x1080, 5.4 \u00b5m pitch)",
+      "tags": [
+        "slm",
+        "dmd",
+        "structured-illumination",
+        "programmable"
+      ],
+      "vendor": {
+        "name": "Texas Instruments",
+        "mpn": "DLP4710",
+        "url": ""
+      },
+      "efl_mm": null,
+      "n_surfaces": 1,
+      "review": false
+    },
+    {
       "id": "openuc2.source.cube_ledmatrix_1x1",
       "version": "0.1.0",
       "kind": "optical_component",
@@ -9034,11 +9632,12 @@
       "id": "openuc2.source.dmd_slm_4500_1x1",
       "version": "0.1.0",
       "kind": "optical_component",
-      "category": "source",
+      "category": "slm",
       "description": "Digital micromirror device for structured illumination and maskless projection; visible\u2011range window.",
       "tags": [
         "migrated",
-        "illumination"
+        "illumination",
+        "programmable"
       ],
       "vendor": {
         "name": "",
@@ -9149,7 +9748,7 @@
       "version": "0.1.0",
       "kind": "optical_component",
       "category": "source",
-      "description": "405nm laser diode module",
+      "description": "488 nm laser diode module",
       "tags": [
         "migrated",
         "fluorescence"

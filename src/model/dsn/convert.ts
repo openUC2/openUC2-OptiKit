@@ -10,7 +10,7 @@
  */
 
 import type { AxisDir, DocCategory, DocPart, DocSnapshot, Rot24, Vec3 } from '../../document';
-import { UC2_GRID_MM, parsePortRef } from '../../document';
+import { UC2_GRID_MM, listFibers, parsePortRef } from '../../document';
 import { catalogPortsOf } from '../../document/portCatalog';
 import { libraryEntryOf } from '../../document/libraryPalette';
 import type {
@@ -140,12 +140,20 @@ export function paletteOpticsOf(part: {
 
 /** Component spec for a part with no retained source (palette placement). */
 export function bareComponentSpec(part: DocPart): CompSpec {
+  // WP-47: runtime state of a source placement — a source that is off emits
+  // nothing, and inference skips it, so the netlist matches the bench.
+  const enabled = part.params.enabled !== false;
+  const wavelengthUm = part.params.wavelengthUm;
   return {
     type: 'primitive',
     primitive: { type: 'glb', model: part.libraryRef },
     category: part.category,
     optics: paletteOpticsOf(part),
     pose: poseSpecOf(part),
+    ...(enabled ? {} : { enabled: false }),
+    ...(typeof wavelengthUm === 'number' && wavelengthUm > 0
+      ? { 'wavelength-um': wavelengthUm }
+      : {}),
   };
 }
 
@@ -181,6 +189,26 @@ export function snapshotToDesign(snap: DocSnapshot): ExportResult {
     };
   }
 
+  // WP-46: patch cords travel with the design; endpoints use the same
+  // component keys as the chains.
+  const fibers: NonNullable<DesignDecl['fibers']> = {};
+  for (const fiber of listFibers()) {
+    const end = (ref: string) => {
+      const { partId, port } = parsePortRef(ref);
+      return `${keyByPartId[partId] ?? partId}.${port}`;
+    };
+    if (!keyByPartId[parsePortRef(fiber.from).partId]) continue;
+    if (!keyByPartId[parsePortRef(fiber.to).partId]) continue;
+    fibers[fiber.id] = {
+      from: end(fiber.from),
+      to: end(fiber.to),
+      ...(fiber.coreUm != null ? { 'core-um': fiber.coreUm } : {}),
+      ...(fiber.na != null ? { na: fiber.na } : {}),
+      'length-m': fiber.lengthM,
+      type: fiber.type,
+    };
+  }
+
   const design: DesignDecl = {
     'optikit-version': OPTIKIT_VERSION,
     design: {
@@ -189,6 +217,7 @@ export function snapshotToDesign(snap: DocSnapshot): ExportResult {
     },
     components,
     ...(Object.keys(paths).length > 0 ? { paths } : {}),
+    ...(Object.keys(fibers).length > 0 ? { fibers } : {}),
     ...(Object.keys(dofValues).length > 0
       ? { instantiation: { dof_values: dofValues } }
       : {}),
@@ -268,9 +297,21 @@ export interface ImportedPart {
   dofValues: Record<string, number>;
 }
 
+export interface ImportedFiber {
+  id: string;
+  from: { key: string; port: string };
+  to: { key: string; port: string };
+  coreUm: number | null;
+  na: number | null;
+  lengthM: number;
+  type: 'SM' | 'MM';
+}
+
 export interface ImportedDesign {
   parts: ImportedPart[];
   paths: { name: string; chain: { key: string; port: string }[] }[];
+  /** Fiber links (WP-46), endpoints in design-key space. */
+  fibers: ImportedFiber[];
   meta: { name: string; description: string };
   warnings: string[];
 }
@@ -353,9 +394,28 @@ export function designToParts(decl: DesignDecl): ImportedDesign {
     }),
   }));
 
+  // WP-46: patch cords, endpoints still in design-key space (the applier maps
+  // them onto placed part ids).
+  const fibers = Object.entries(decl.fibers ?? {}).map(([id, spec]) => {
+    const split = (ref: string) => {
+      const i = (ref ?? '').lastIndexOf('.');
+      return { key: ref.slice(0, i), port: ref.slice(i + 1) };
+    };
+    return {
+      id,
+      from: split(spec.from ?? ''),
+      to: split(spec.to ?? ''),
+      coreUm: typeof spec['core-um'] === 'number' ? spec['core-um'] : null,
+      na: typeof spec.na === 'number' ? spec.na : null,
+      lengthM: typeof spec['length-m'] === 'number' ? spec['length-m'] : 1,
+      type: spec.type === 'SM' ? ('SM' as const) : ('MM' as const),
+    };
+  });
+
   return {
     parts,
     paths,
+    fibers,
     meta: {
       name: decl.design?.name || decl.design?.path || '',
       description: decl.design?.description || '',

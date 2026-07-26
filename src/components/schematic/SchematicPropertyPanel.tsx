@@ -9,6 +9,7 @@ import {
   Button,
   Chip,
   Divider,
+  FormControlLabel,
   IconButton,
   List,
   ListItem,
@@ -16,6 +17,7 @@ import {
   MenuItem,
   Slider,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -32,13 +34,19 @@ import {
   sendActuation,
   setDeviceUrl,
 } from '../../model/actuation';
+import { sourceTint } from './colors';
 import {
   T_CLASS_LABEL,
+  activeWavelengthUm,
   captureUndo,
   commitUndo,
   groupInstanceOf,
+  isSourceOn,
+  setActiveWavelengthUm,
+  setSourceOn,
   libraryEntryOf,
   movePartWorld,
+  removeFiber,
   removePart,
   removePath,
   renamePart,
@@ -47,8 +55,10 @@ import {
   setPartParam,
   tiltPart,
   ungroupInstance,
+  updateFiber,
   useDocPart,
   useDocPaths,
+  useFibersStore,
   useGroupEditStore,
   useSelectedPartId,
 } from '../../document';
@@ -108,6 +118,24 @@ function PartProperties({ part }: { part: DocPart }) {
   const stateParam = typeof part.params.state === 'string' ? part.params.state : '';
   // WP-42: firmware-actuated axes drive live sliders (galvo tilt, stage focus).
   const actuatableDofs = (lib?.dofs ?? []).filter(d => d.actuatable);
+  // WP-47: source runtime state + the record's line list.
+  const sourceOn = isSourceOn(part);
+  const activeUm = activeWavelengthUm(part);
+  const lines = lib?.wavelengthsUm ?? [];
+  const tint = sourceTint(activeUm);
+  const programmable = lib?.programmable ?? null;
+  const activeAreaMm =
+    programmable?.pixelPitchUm != null && programmable.resolution
+      ? ([
+          (programmable.resolution[0] * programmable.pixelPitchUm) / 1000,
+          (programmable.resolution[1] * programmable.pixelPitchUm) / 1000,
+        ] as [number, number])
+      : null;
+  // WP-46: patch cords terminating on this part.
+  const allFibers = useFibersStore(s => s.fibers);
+  const partFibers = allFibers.filter(
+    f => f.from.startsWith(`${part.id}.`) || f.to.startsWith(`${part.id}.`),
+  );
   // WP-44: group membership + edit-mode toggle.
   const groupInstance = groupInstanceOf(part.id);
   const groupRef = typeof part.params.groupRef === 'string' ? part.params.groupRef : null;
@@ -341,6 +369,148 @@ function PartProperties({ part }: { part: DocPart }) {
           )}
         </>
       )}
+
+      {/* WP-47: a source's runtime state — is it emitting, and on which line?
+          Off sources are skipped by auto-chaining, and the active line tints
+          the glyph and its rays. */}
+      {part.category === 'source' && (
+        <>
+          <Divider />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+              Source
+            </Typography>
+            <FormControlLabel
+              sx={{ m: 0 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={sourceOn}
+                  onChange={e => withUndoStep(() => setSourceOn(part.id, e.target.checked))}
+                />
+              }
+              label={<Typography variant="caption">{sourceOn ? 'on' : 'off'}</Typography>}
+            />
+          </Stack>
+          {lines.length > 0 ? (
+            <TextField
+              select
+              size="small"
+              label="wavelength"
+              value={activeUm ?? ''}
+              onChange={e =>
+                withUndoStep(() =>
+                  setActiveWavelengthUm(part.id, e.target.value ? Number(e.target.value) : null),
+                )
+              }
+            >
+              <MenuItem value="">
+                <em>unset</em>
+              </MenuItem>
+              {lines.map(um => (
+                <MenuItem key={um} value={um}>
+                  {(um * 1000).toFixed(0)} nm
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              the record declares no lines — add `source.wavelengths_um` to tint the beam
+            </Typography>
+          )}
+          {tint && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: tint, border: '1px solid', borderColor: 'divider' }} />
+              <Typography variant="caption" color="text.secondary">
+                {sourceOn ? 'beam tint' : 'off — rays are hidden'}
+              </Typography>
+            </Stack>
+          )}
+        </>
+      )}
+
+      {/* WP-47: pixel-addressable surface facts (the pattern is not simulated). */}
+      {programmable && (
+        <>
+          <Divider />
+          <Typography variant="caption" color="text.secondary">
+            Programmable surface
+          </Typography>
+          <Typography variant="caption">
+            {programmable.mode} · {programmable.resolution?.join(' × ') ?? '?'} px
+            {programmable.pixelPitchUm != null && ` · ${programmable.pixelPitchUm} µm pitch`}
+            {activeAreaMm && ` · ${activeAreaMm[0].toFixed(1)} × ${activeAreaMm[1].toFixed(1)} mm active`}
+          </Typography>
+        </>
+      )}
+
+      {/* WP-46: patch cords landing on this part — a fiber has no geometric
+          constraint, so its properties (not its endpoints' poses) are the
+          only thing the optics depend on. */}
+      {partFibers.length > 0 && (
+        <>
+          <Divider />
+          <Typography variant="caption" color="text.secondary">
+            Fibers
+          </Typography>
+          {partFibers.map(f => (
+            <Box
+              key={f.id}
+              sx={{ px: 1, py: 0.75, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+            >
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <Chip
+                  size="small"
+                  label={f.type}
+                  color={f.type === 'SM' ? 'info' : 'warning'}
+                  sx={{ height: 18, fontSize: 10, fontWeight: 700 }}
+                />
+                <Typography variant="caption" sx={{ flex: 1, wordBreak: 'break-all' }}>
+                  {f.from === `${part.id}.${f.from.split('.').pop()}` ? '→ ' : '← '}
+                  {f.from.startsWith(`${part.id}.`) ? f.to : f.from}
+                </Typography>
+                <Tooltip title="remove this fiber">
+                  <IconButton size="small" onClick={() => removeFiber(f.id)}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+              <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
+                <NumberField
+                  label="core µm"
+                  value={f.coreUm ?? 0}
+                  step={5}
+                  onCommit={v => updateFiber(f.id, { coreUm: v > 0 ? v : null })}
+                />
+                <NumberField
+                  label="NA"
+                  value={f.na ?? 0}
+                  step={0.01}
+                  onCommit={v => updateFiber(f.id, { na: v > 0 ? v : null })}
+                />
+                <NumberField
+                  label="length m"
+                  value={f.lengthM}
+                  step={0.1}
+                  onCommit={v => updateFiber(f.id, { lengthM: Math.max(0.001, v) })}
+                />
+              </Stack>
+              <TextField
+                select
+                size="small"
+                label="type"
+                value={f.type}
+                onChange={e => updateFiber(f.id, { type: e.target.value as 'SM' | 'MM' })}
+                sx={{ mt: 0.75, width: 120 }}
+              >
+                <MenuItem value="MM">MM (NA cone)</MenuItem>
+                <MenuItem value="SM">SM (diffraction)</MenuItem>
+              </TextField>
+            </Box>
+          ))}
+        </>
+      )}
+
       <Typography variant="caption" color="text.secondary">
         grid cell [{part.gridPose.cell.join(', ')}]
         {part.gridPose.offsetMm.some(v => Math.abs(v) > 1e-6) &&

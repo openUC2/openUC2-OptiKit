@@ -36,6 +36,8 @@ export interface IndexPort {
   direction: string;
   position_mm: [number, number, number];
   after_surface: number | null;
+  /** WP-46: 'fiber' takes a patch cord; '' (or absent) is free space. */
+  coupling?: '' | 'fiber';
 }
 
 export interface IndexDof {
@@ -99,6 +101,15 @@ export interface IndexModule {
     resolved: string | null;
     vendor: { name: string; mpn: string; url: string } | null;
     efl_mm: number | null;
+    /** WP-47: the source record's emission lines, µm (empty for non-sources). */
+    wavelengths_um?: number[];
+    /** WP-47: pixel facts for slm/display parts. */
+    programmable?: {
+      mode: 'reflective' | 'transmissive';
+      'pixel-pitch-um': number | null;
+      resolution: [number, number] | null;
+      'fill-factor': number | null;
+    } | null;
   };
   template: {
     ref: string;
@@ -113,7 +124,13 @@ export interface IndexModule {
     bays?: Record<string, IndexBay>;
   };
   /** Service asset URL paths (`/v1/library/assets/...`), origin-relative. */
-  assets?: { thumbnail: string | null; glb: string | null; step: string | null };
+  assets?: {
+    thumbnail: string | null;
+    glb: string | null;
+    step: string | null;
+    /** WP-48: authored schematic symbol (SVG), when the component ships one. */
+    symbol?: string | null;
+  };
   ports?: IndexPort[];
   electronics: unknown | null;
 }

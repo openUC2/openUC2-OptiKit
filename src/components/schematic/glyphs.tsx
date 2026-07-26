@@ -191,13 +191,19 @@ export function SchematicGlyph({
   category,
   label,
   foldDeg = null,
+  tint = null,
+  dimmed = false,
 }: {
   category: DocCategory;
   label: string;
   /** Fold angle from the record ports (beamAxesOf); null = straight-through. */
   foldDeg?: number | null;
+  /** WP-47: a source's active-line colour, overriding the category tint. */
+  tint?: string | null;
+  /** WP-47: a source that is switched off reads greyed out. */
+  dimmed?: boolean;
 }) {
-  const color = GLYPH_COLORS[category];
+  const color = dimmed ? '#6b7280' : (tint ?? GLYPH_COLORS[category]);
   // 180° (normal incidence) is the safe default when no fold is known.
   const fold = foldDeg ?? 180;
   switch (category) {
@@ -223,6 +229,11 @@ export function SchematicGlyph({
       return <FilterGlyph color={color} />;
     case 'sample':
       return <SampleGlyph color={color} />;
+    // WP-47: a programmable surface is a plate like a mirror, but drawn with
+    // its own colour so a DMD never reads as a plain fold mirror.
+    case 'slm':
+    case 'display':
+      return <MirrorGlyph color={color} foldDeg={fold} />;
     default:
       return <FallbackGlyph color={color} label={label} />;
   }

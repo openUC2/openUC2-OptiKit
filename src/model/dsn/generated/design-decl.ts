@@ -41,9 +41,12 @@ export type Surfaces = [
 export type XMm = number | string;
 export type YMm = number | string;
 export type ZMm = number | string;
+export type Rotation = number[] | null;
+export type ClearApertureMm = number | string | null;
 export type Frame = string;
-export type Direction = string;
+export type Direction = string | number[];
 export type AfterSurface = number | null;
+export type Coupling = '' | 'fiber';
 export type Passthrough = boolean;
 export type Class = 'fixed' | 'adaptive' | 'generative';
 export type XMm1 = number | string;
@@ -57,9 +60,23 @@ export type Range = [unknown, unknown] | null;
 export type Resolution = number | string | null;
 export type Unit = string;
 export type Actuatable = boolean;
+export type PivotFrame = string;
+export type Surface = number | null;
 export type Dof = DofSpec[];
+export type Enabled = boolean;
+export type WavelengthUm = number | null;
+export type Mode = 'reflective' | 'transmissive';
+export type PixelPitchUm = number | null;
+export type Resolution1 = [unknown, unknown] | null;
+export type FillFactor = number | null;
 export type Description1 = string;
 export type Chain = string[];
+export type From = string;
+export type To = string;
+export type CoreUm = number | null;
+export type Na = number | null;
+export type LengthM = number;
+export type Type3 = 'SM' | 'MM';
 export type OptimizedBy = string;
 export type Run = string;
 
@@ -77,6 +94,7 @@ export interface DesignDecl {
   components?: Components;
   variants?: Variants;
   paths?: Paths;
+  fibers?: Fibers;
   provenance?: ProvenanceSpec;
   inputs?: Inputs2;
   relations?: Relations;
@@ -122,6 +140,9 @@ export interface CompSpec {
   optics?: OpticsSpec | null;
   template?: TemplateSpec | null;
   dof?: Dof;
+  enabled?: Enabled;
+  'wavelength-um'?: WavelengthUm;
+  programmable?: ProgrammableSpec | null;
   instantiation?: Instantiation;
   computation?: Computation;
   [k: string]: unknown;
@@ -224,11 +245,20 @@ export interface Frames {
 }
 /**
  * Named datum frame: a fixed transform in the component's local coordinates.
+ *
+ * Position (``x-mm``/``y-mm``/``z-mm``) is the frame origin. ``rotation`` is an
+ * ``[x, y, z, w]`` quaternion taking the component's axes to the frame's, and is
+ * omitted (identity) for the axis-aligned majority — a port's ``direction``
+ * literal is resolved *in its frame*, so a tilted frame tilts the beam. Both
+ * are populated from a ``PLN`` datum marker (``DOCS/inventor-naming-contract.md``);
+ * ``clear-aperture-mm`` is the diameter of the marker disc that defined it.
  */
 export interface FrameSpec {
   'x-mm'?: XMm;
   'y-mm'?: YMm;
   'z-mm'?: ZMm;
+  rotation?: Rotation;
+  'clear-aperture-mm'?: ClearApertureMm;
   [k: string]: unknown;
 }
 export interface Ports {
@@ -236,11 +266,17 @@ export interface Ports {
 }
 /**
  * Optical entry/exit port: a named frame plus a beam direction.
+ *
+ * ``direction`` is an axis literal (``+x`` … ``-z``) or — WP-39, pending E2
+ * ratification (ask #8) — a continuous ``[x, y, z]`` unit vector for
+ * record-internal geometry no cube axis can express (a 30° galvo mirror, an
+ * off-axis parabola). ``checks.check()`` warns on vectors until schema v0.1.
  */
 export interface PortSpec {
   frame?: Frame;
   direction?: Direction;
   'after-surface'?: AfterSurface;
+  coupling?: Coupling;
   [k: string]: unknown;
 }
 /**
@@ -287,6 +323,23 @@ export interface DofSpec {
   resolution?: Resolution;
   unit?: Unit;
   actuatable?: Actuatable;
+  'pivot-frame'?: PivotFrame;
+  surface?: Surface;
+  [k: string]: unknown;
+}
+/**
+ * A pixel-addressable surface: DMD, LCoS, LC panel, display (WP-47).
+ *
+ * The PATTERN is not simulated — the surface traces as a plane mirror
+ * (reflective) or a flat window (transmissive), so it still folds the beam
+ * and participates in DRC. What the record carries is the hardware fact
+ * sheet: pixel pitch, resolution, fill factor.
+ */
+export interface ProgrammableSpec {
+  mode?: Mode;
+  'pixel-pitch-um'?: PixelPitchUm;
+  resolution?: Resolution1;
+  'fill-factor'?: FillFactor;
   [k: string]: unknown;
 }
 export interface Instantiation {
@@ -333,6 +386,30 @@ export interface PathSpec {
   [k: string]: unknown;
 }
 export interface Simulation {
+  [k: string]: unknown;
+}
+export interface Fibers {
+  [k: string]: FiberSpec;
+}
+/**
+ * A fiber link between two ports (WP-46).
+ *
+ * A fiber carries light from ``from_port`` to ``to_port`` WITHOUT a geometric
+ * constraint: the two components may sit anywhere, at any angle. The optical
+ * path length is the fiber's own ``length_m``, not the distance between the
+ * connectors — the compiler advances the unfolded axis by that length and
+ * resumes at the far port's frame.
+ *
+ * ``core_um``/``na`` describe the guided mode: a multimode fiber re-emits at
+ * the NA-derived cone half-angle, a single-mode one diffraction-limited.
+ */
+export interface FiberSpec {
+  from?: From;
+  to?: To;
+  'core-um'?: CoreUm;
+  na?: Na;
+  'length-m'?: LengthM;
+  type?: Type3;
   [k: string]: unknown;
 }
 /**

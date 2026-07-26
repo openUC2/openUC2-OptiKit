@@ -27,6 +27,7 @@ import {
   LockOpen as LockOpenIcon,
   Rotate90DegreesCcw as SnapYawIcon,
   Timeline as RaysIcon,
+  Cable as FiberIcon,
   KeyboardArrowDown as DownIcon,
   KeyboardArrowUp as UpIcon,
 } from '@mui/icons-material';
@@ -35,8 +36,10 @@ import { PartLibrary } from '../PartLibrary';
 import { useAppStore } from '../../stores/appStore';
 import type { PortRef } from '../../document';
 import {
+  addFiber,
   addPart,
   getPart,
+  listParts,
   removePart,
   selectPart,
   setPath,
@@ -44,6 +47,7 @@ import {
   useSelectedPartId,
   UC2_GRID_MM,
 } from '../../document';
+import { isFiberPort } from './ports';
 import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
 import { SchematicLegend, LEGEND_SEEN_KEY } from './SchematicLegend';
@@ -72,6 +76,10 @@ export function SchematicPage() {
     setLegendOpen(false);
   };
   const [chainDraft, setChainDraft] = useState<PortRef[] | null>(null);
+  // WP-46: in fiber mode a pin click starts/ends a patch cord instead of
+  // extending a beam chain.
+  const [fiberMode, setFiberMode] = useState(false);
+  const [fiberDraft, setFiberDraft] = useState<PortRef | null>(null);
   const paths = useDocPaths();
   const activePathName = `path-${paths.length + 1}`;
 
@@ -162,14 +170,39 @@ export function SchematicPage() {
     });
   }, []);
 
-  // ── chaining ────────────────────────────────────────────────────────────────
-  const onPinClick = useCallback((ref: PortRef) => {
-    setChainDraft(draft => {
-      if (draft === null) return [ref];
-      if (draft[draft.length - 1] === ref) return draft; // ignore double click on same pin
-      return [...draft, ref];
-    });
-  }, []);
+  // ── chaining / fibers ───────────────────────────────────────────────────────
+  const onPinClick = useCallback(
+    (ref: PortRef) => {
+      if (fiberMode) {
+        // First click picks the near connector, second lays the cord.
+        setFiberDraft(from => {
+          if (from === null) return ref;
+          if (from === ref) return null; // clicking the same pin cancels
+          const id = addFiber(from, ref);
+          const placed = listParts();
+          const freeSpace = [from, ref].filter(r => !isFiberPort(placed, r));
+          useAppStore.getState().addNotification({
+            type: freeSpace.length > 0 ? 'warning' : 'success',
+            title: freeSpace.length > 0 ? 'fiber on a free-space port' : 'fiber added',
+            message:
+              freeSpace.length > 0
+                ? `${freeSpace.join(', ')} ${freeSpace.length > 1 ? 'are' : 'is'} not ` +
+                  'declared `coupling: fiber` — the link is drawn, but check the record'
+                : `${from} → ${ref} (${id})`,
+            duration: 7000,
+          });
+          return null;
+        });
+        return;
+      }
+      setChainDraft(draft => {
+        if (draft === null) return [ref];
+        if (draft[draft.length - 1] === ref) return draft; // ignore double click on same pin
+        return [...draft, ref];
+      });
+    },
+    [fiberMode],
+  );
 
   const finishChain = useCallback(() => {
     setChainDraft(draft => {
@@ -185,7 +218,9 @@ export function SchematicPage() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       switch (e.key) {
         case 'Escape':
-          if (chainDraft) setChainDraft(null);
+          if (fiberDraft) setFiberDraft(null);
+          else if (fiberMode) setFiberMode(false);
+          else if (chainDraft) setChainDraft(null);
           else selectPart(null);
           break;
         case 'Enter':
@@ -202,7 +237,7 @@ export function SchematicPage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chainDraft, finishChain, selectedId]);
+  }, [chainDraft, fiberDraft, fiberMode, finishChain, selectedId]);
 
   // ── drop from the part library ─────────────────────────────────────────────
   const handleDrop = useCallback(
@@ -330,6 +365,21 @@ export function SchematicPage() {
                   <RaysIcon fontSize="small" />
                 </ToggleButton>
               </Tooltip>
+              <Tooltip title="Fiber tool (WP-46): click two port pins to lay a patch cord — no geometric constraint between them">
+                <ToggleButton
+                  value="fiber"
+                  selected={fiberMode}
+                  size="small"
+                  onChange={() => {
+                    setFiberMode(v => !v);
+                    setFiberDraft(null);
+                    setChainDraft(null);
+                  }}
+                  sx={{ '&.Mui-selected': { color: '#f2a33c' } }}
+                >
+                  <FiberIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
               <Tooltip
                 title={settings.lockView
                   ? 'View locked (SimCity mode): left button is for parts; right-drag orbits. Click to unlock free orbit.'
@@ -390,6 +440,23 @@ export function SchematicPage() {
               >
                 <Typography variant="body2">
                   Chaining “{activePathName}” — {chainDraft.length} port(s) · Enter to finish · Esc to cancel
+                </Typography>
+              </Paper>
+            )}
+
+            {/* Hint chip while laying a fiber (WP-46) */}
+            {fiberMode && (
+              <Paper
+                sx={{
+                  position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'rgba(242,163,60,0.94)', color: '#2a1c05',
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="body2">
+                  {fiberDraft
+                    ? `Fiber from ${fiberDraft} — click the far connector · Esc to cancel`
+                    : 'Fiber tool — click the first port pin · Esc to leave'}
                 </Typography>
               </Paper>
             )}

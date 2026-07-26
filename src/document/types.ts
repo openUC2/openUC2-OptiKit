@@ -28,6 +28,10 @@ export type DocCategory =
   | 'filter'
   | 'detector'
   | 'sample'
+  // WP-47: pixel-addressable surfaces — DMD/LCoS (slm) and screens/diffusers
+  // (display). They trace as a plane; the pattern is not simulated.
+  | 'slm'
+  | 'display'
   | 'other';
 
 export interface DocWorldPose {

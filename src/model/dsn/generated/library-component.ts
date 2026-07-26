@@ -27,14 +27,24 @@ export type Surfaces = [
 export type XMm = number | string;
 export type YMm = number | string;
 export type ZMm = number | string;
+export type Rotation = number[] | null;
+export type ClearApertureMm = number | string | null;
 export type Frame = string;
-export type Direction = string;
+export type Direction = string | number[];
 export type AfterSurface = number | null;
+export type Coupling = '' | 'fiber';
 export type Passthrough = boolean;
 export type Name = string;
 export type Mpn = string;
 export type Url = string;
 export type EffectiveFocalLengthMm = number | null;
+export type WavelengthsUm = number[];
+export type DivergenceDeg = number;
+export type Mode = 'reflective' | 'transmissive';
+export type PixelPitchUm = number | null;
+export type Resolution = [unknown, unknown] | null;
+export type FillFactor = number | null;
+export type Symbol = string;
 
 /**
  * Optical component — the "symbol". (optikit-core 0.1.0, schema v0)
@@ -52,6 +62,9 @@ export interface ComponentRecord {
   optics?: OpticsSpec;
   vendor?: VendorSpec;
   effective_focal_length_mm?: EffectiveFocalLengthMm;
+  source?: SourceSpec | null;
+  programmable?: ProgrammableSpec | null;
+  symbol?: Symbol;
   [k: string]: unknown;
 }
 /**
@@ -79,11 +92,20 @@ export interface Frames {
 }
 /**
  * Named datum frame: a fixed transform in the component's local coordinates.
+ *
+ * Position (``x-mm``/``y-mm``/``z-mm``) is the frame origin. ``rotation`` is an
+ * ``[x, y, z, w]`` quaternion taking the component's axes to the frame's, and is
+ * omitted (identity) for the axis-aligned majority — a port's ``direction``
+ * literal is resolved *in its frame*, so a tilted frame tilts the beam. Both
+ * are populated from a ``PLN`` datum marker (``DOCS/inventor-naming-contract.md``);
+ * ``clear-aperture-mm`` is the diameter of the marker disc that defined it.
  */
 export interface FrameSpec {
   'x-mm'?: XMm;
   'y-mm'?: YMm;
   'z-mm'?: ZMm;
+  rotation?: Rotation;
+  'clear-aperture-mm'?: ClearApertureMm;
   [k: string]: unknown;
 }
 export interface Ports {
@@ -91,11 +113,17 @@ export interface Ports {
 }
 /**
  * Optical entry/exit port: a named frame plus a beam direction.
+ *
+ * ``direction`` is an axis literal (``+x`` … ``-z``) or — WP-39, pending E2
+ * ratification (ask #8) — a continuous ``[x, y, z]`` unit vector for
+ * record-internal geometry no cube axis can express (a 30° galvo mirror, an
+ * off-axis parabola). ``checks.check()`` warns on vectors until schema v0.1.
  */
 export interface PortSpec {
   frame?: Frame;
   direction?: Direction;
   'after-surface'?: AfterSurface;
+  coupling?: Coupling;
   [k: string]: unknown;
 }
 /**
@@ -105,5 +133,33 @@ export interface VendorSpec {
   name?: Name;
   mpn?: Mpn;
   url?: Url;
+  [k: string]: unknown;
+}
+/**
+ * What a `category: source` component emits (WP-47).
+ *
+ * ``wavelengths_um`` is the source's LINE LIST — a multi-line laser declares
+ * every line it can emit; a design picks the active one per placement
+ * (``CompSpec.wavelength_um``). ``divergence_deg`` is the full-angle beam
+ * divergence of the bare emitter.
+ */
+export interface SourceSpec {
+  wavelengths_um?: WavelengthsUm;
+  divergence_deg?: DivergenceDeg;
+  [k: string]: unknown;
+}
+/**
+ * A pixel-addressable surface: DMD, LCoS, LC panel, display (WP-47).
+ *
+ * The PATTERN is not simulated — the surface traces as a plane mirror
+ * (reflective) or a flat window (transmissive), so it still folds the beam
+ * and participates in DRC. What the record carries is the hardware fact
+ * sheet: pixel pitch, resolution, fill factor.
+ */
+export interface ProgrammableSpec {
+  mode?: Mode;
+  'pixel-pitch-um'?: PixelPitchUm;
+  resolution?: Resolution;
+  'fill-factor'?: FillFactor;
   [k: string]: unknown;
 }

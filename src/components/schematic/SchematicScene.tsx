@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, Text } from '@react-three/drei';
-import type { DocPart, DocPath, PortRef, Vec3 } from '../../document';
+import type { DocFiber, DocPart, DocPath, PortRef, Vec3 } from '../../document';
 import {
   docQuatToThree,
   libraryEntryOf,
@@ -19,14 +19,19 @@ import {
   selectPart,
   templateClassOf,
   useDocParts,
+  activeWavelengthUm,
+  isSourceOn,
   useDocPaths,
+  useFibersStore,
   useSelectedPartId,
   UC2_GRID_MM,
 } from '../../document';
 import { wavelengthToColor } from '../../utils/sceneBuilder';
 import { AuthoritativeRays } from './AuthoritativeRays';
+import { AuthoredSymbol } from './AuthoredSymbol';
+import { useAuthoredSymbol } from './authoredSymbol';
 import { EscapeRays } from './EscapeRays';
-import { GLYPH_COLORS } from './colors';
+import { FIBER_COLOR, GLYPH_COLORS, sourceTint } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
 import { beamAxesOf, glyphQuatOf, portsOf, resolvePortRef } from './ports';
 import { useSceneColors } from '../../theme/sceneColors';
@@ -121,6 +126,12 @@ function SchematicPart({
   // ports — the same convention for palette and imported parts (WP-29).
   const glyphQuat = useMemo(() => glyphQuatOf(part), [part]);
   const foldDeg = useMemo(() => beamAxesOf(part).foldDeg, [part]);
+  // WP-47: a source draws in its active line's colour, greyed out when off.
+  const sourceOff = part.category === 'source' && !isSourceOn(part);
+  const glyphTint =
+    part.category === 'source' ? sourceTint(activeWavelengthUm(part)) : null;
+  // WP-48: an authored symbol, when the record ships one AND it loads.
+  const symbolSvg = useAuthoredSymbol(libraryEntryOf(part.libraryRef)?.symbolUrl ?? null);
 
   const intersectDragPlane = useCallback(
     (e: ThreeEvent<PointerEvent>, mode: 'plane' | 'height'): Vec3 | null => {
@@ -225,7 +236,21 @@ function SchematicPart({
         }}
       >
         <group quaternion={glyphQuat}>
-          <SchematicGlyph category={part.category} label={part.ref} foldDeg={foldDeg} />
+          {/* WP-48: an authored symbol replaces the derived glyph — looks
+              only, the pins above still come from optics.ports. An unreachable
+              asset falls back to the derived glyph rather than drawing
+              nothing. */}
+          {symbolSvg ? (
+            <AuthoredSymbol svg={symbolSvg} color={glyphTint ?? GLYPH_COLORS[part.category]} />
+          ) : (
+            <SchematicGlyph
+              category={part.category}
+              label={part.ref}
+              foldDeg={foldDeg}
+              tint={glyphTint}
+              dimmed={sourceOff}
+            />
+          )}
           <OpticalAxisArrow
             color={selected ? colors.labelSelected : colors.label}
             foldDeg={foldDeg}
@@ -464,6 +489,55 @@ function PathLines({ parts, paths, draft }: { parts: DocPart[]; paths: DocPath[]
   );
 }
 
+/**
+ * Fiber links (WP-46): a loose catmull-rom curve between the two connectors,
+ * deliberately unlike a beam segment — a fiber carries light with NO geometric
+ * constraint, so it must not read as a straight optical path. It sags toward
+ * the working plane and is drawn in the amber "patch cord" tint.
+ */
+function FiberLines({ parts, fibers }: { parts: DocPart[]; fibers: DocFiber[] }) {
+  const curves = useMemo(() => {
+    const out: { id: string; points: [number, number, number][] }[] = [];
+    for (const fiber of fibers) {
+      const a = resolvePortRef(parts, fiber.from);
+      const b = resolvePortRef(parts, fiber.to);
+      if (!a || !b) continue;
+      const p0 = new THREE.Vector3(...toThree(a));
+      const p1 = new THREE.Vector3(...toThree(b));
+      // Sag: a slack cord dips below the straight line, scaled by its span so
+      // short patch cords stay tidy and long ones drape.
+      const span = p0.distanceTo(p1);
+      const mid = p0.clone().add(p1).multiplyScalar(0.5);
+      mid.y -= Math.min(60, span * 0.22);
+      const curve = new THREE.CatmullRomCurve3([p0, mid, p1], false, 'catmullrom', 0.5);
+      out.push({
+        id: fiber.id,
+        points: curve.getPoints(32).map(p => [p.x, p.y, p.z] as [number, number, number]),
+      });
+    }
+    return out;
+  }, [parts, fibers]);
+
+  return (
+    <>
+      {curves.map(c => (
+        <Line
+          raycast={NO_RAYCAST}
+          key={c.id}
+          points={c.points}
+          color={FIBER_COLOR}
+          lineWidth={2}
+          dashed
+          dashSize={5}
+          gapSize={3}
+          transparent
+          opacity={0.85}
+        />
+      ))}
+    </>
+  );
+}
+
 function RayOverlay({ planeZMm, enabled }: { planeZMm: number; enabled: boolean }) {
   const { rays } = useSchematicSim(planeZMm, enabled);
   const planeY = planeZMm + 0.8;
@@ -511,6 +585,7 @@ function CameraCapture({ cameraRef }: { cameraRef: SceneProps['cameraRef'] }) {
 function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef, colors }: SceneContentProps) {
   const parts = useDocParts();
   const paths = useDocPaths();
+  const fibers = useFibersStore(s => s.fibers);
   const [orbitEnabled, setOrbitEnabled] = useState(true);
   const planeY = settings.planeZMm;
   // The approximate 2D preview yields to fresh authoritative rays and
@@ -584,6 +659,7 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
       </Suspense>
 
       <PathLines parts={parts} paths={paths} draft={chainDraft} />
+      <FiberLines parts={parts} fibers={fibers} />
       {settings.showRays && simFreshness !== 'fresh' && (
         <RayOverlay planeZMm={settings.planeZMm} enabled />
       )}

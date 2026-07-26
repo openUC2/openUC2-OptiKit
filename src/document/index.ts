@@ -35,9 +35,25 @@ export {
 } from './OptikitDocument';
 export type { PartRenderInfo, UndoToken } from './OptikitDocument';
 export { setPartParam } from './OptikitDocument';
+export {
+  activeWavelengthUm,
+  isSourceOn,
+  setActiveWavelengthUm,
+  setSourceOn,
+} from './OptikitDocument';
 export { addGroup, groupInstanceOf, ungroupInstance } from './OptikitDocument';
 export type { AddGroupResult } from './OptikitDocument';
 export { useGroupEditStore, isGroupLocked } from './groupStore';
+export {
+  addFiber,
+  defaultFiber,
+  fibersOfPart,
+  listFibers,
+  removeFiber,
+  updateFiber,
+  useFibersStore,
+} from './fibersStore';
+export type { DocFiber, FiberType } from './fibersStore';
 export {
   DEFAULT_LIB_ROT,
   LIBRARY_GROUP,
