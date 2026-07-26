@@ -25,8 +25,10 @@ import {
 import {
   Bolt as BoltIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
   Route as RouteIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import type { DocPart, Vec3 } from '../../document';
 import {
   firmwareCommand,
@@ -108,6 +110,7 @@ function withUndoStep(mutate: () => void): void {
 }
 
 function PartProperties({ part }: { part: DocPart }) {
+  const navigate = useNavigate();
   const [ref, setRef] = useState(part.ref);
   useEffect(() => setRef(part.ref), [part.ref]);
   const pos = part.worldPose.positionMm;
@@ -544,9 +547,29 @@ function PartProperties({ part }: { part: DocPart }) {
       )}
 
       <Divider />
+      {/* WP-51.1 (collapsed form): the module trio behind this part — the
+          full composition card with assets/electronics lives in the assembly
+          panel; here just the two records with their deep links. */}
       <Typography variant="caption" color="text.secondary">
         library: {part.libraryRef}
       </Typography>
+      {lib?.componentId && (
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }} noWrap>
+            ◐ {lib.componentId} · ▣ {lib.templateClass ? T_CLASS_LABEL[lib.templateClass] : 'no template'}
+          </Typography>
+          <Tooltip title="open in the component editor">
+            <IconButton
+              size="small"
+              onClick={() =>
+                navigate(`/configurator/components?open=${encodeURIComponent(lib.componentId!)}`)
+              }
+            >
+              <EditIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      )}
     </Stack>
   );
 }

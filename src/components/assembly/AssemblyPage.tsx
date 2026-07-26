@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Divider,
   Drawer,
+  IconButton,
   Snackbar,
   Stack,
   TextField,
@@ -27,6 +28,7 @@ import {
   Edit as EditIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
+  Receipt as BomIcon,
   Rule as DrcIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +37,7 @@ import * as THREE from 'three';
 // layout live in appStore until the .dsn document replaces it.
 import { useAppStore } from '../../stores/appStore';
 import {
+  T_CLASS_LABEL,
   getPart,
   libraryEntryOf,
   selectPart,
@@ -42,7 +45,9 @@ import {
   useDocRevision,
   useSelectedPartId,
 } from '../../document';
+import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
 import { listPartMechanics } from '../../model/dsn/serviceExport';
+import { BomDialog } from '../bom/BomDialog';
 import { MarkerList } from '../schematic/MarkerList';
 import { AssemblyScene } from './AssemblyScene';
 import { CubifyDialog } from './CubifyDialog';
@@ -65,6 +70,25 @@ export function AssemblyPage() {
   );
   // The optical component this cube's insert realizes (WP-37): link to the editor.
   const selectedEntry = selected ? libraryEntryOf(selected.libraryRef) : undefined;
+  // WP-51.1: the raw index module — versions, assets and electronics for the
+  // composition card ("cube + insert + part" in one place).
+  const index = useLibraryIndex();
+  const selectedIndexModule = selected
+    ? index.modules.find(m => m.id === selected.libraryRef)
+    : undefined;
+  const selectedStepUrl = selectedIndexModule?.assets?.step
+    ? `${assetsBaseUrl(index.url)}${selectedIndexModule.assets.step}`
+    : null;
+  const selectedElectronics = (selectedIndexModule?.electronics ?? null) as {
+    'firmware-contract'?: string;
+    'axis-map': { dof: string; 'can-object': number | string }[];
+  } | null;
+  // WP-51.2: the T-class comes from the INDEX, not the palette entry — the
+  // assembly does not mount PartLibrary, so palette registration is absent
+  // here and an entry-derived chip would silently never render.
+  const selectedTClass = selectedIndexModule?.template?.class ?? null;
+  // The live BOM (WP-50) — the same dialog the schematic mounts.
+  const [bomOpen, setBomOpen] = useState(false);
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
@@ -198,6 +222,12 @@ export function AssemblyPage() {
                 >
                   run DRC
                 </Button>
+                <Button
+                  size="small" variant="outlined" startIcon={<BomIcon />}
+                  onClick={() => setBomOpen(true)}
+                >
+                  BOM
+                </Button>
               </Stack>
 
               {cubifyState && (
@@ -233,18 +263,17 @@ export function AssemblyPage() {
               {selected && (
                 <Box sx={{ mt: 2 }}>
                   <Divider sx={{ mb: 1 }}>
-                    <Typography variant="overline">{selected.ref}</Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Typography variant="overline">{selected.ref}</Typography>
+                      {/* WP-51.2: the T-class badge on the placed part */}
+                      {selectedTClass && (
+                        <Chip size="small" label={T_CLASS_LABEL[selectedTClass]}
+                          sx={{ height: 16, fontSize: 10, fontWeight: 700 }} />
+                      )}
+                    </Stack>
                   </Divider>
                   <Typography variant="caption" sx={{ display: 'block' }}>
                     category: {selected.category}
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block' }}>
-                    template:{' '}
-                    {selectedMechanics?.templateClass
-                      ? { fixed: 'T1 fixed (insert locked)', adaptive: 'T2 adaptive', generative: 'T3 generative' }[
-                          selectedMechanics.templateClass
-                        ] ?? selectedMechanics.templateClass
-                      : 'none bound'}
                   </Typography>
                   <Typography variant="caption" sx={{ display: 'block' }}>
                     cell: [{selected.gridPose.cell.join(', ')}] · offset-mm: [
@@ -254,18 +283,72 @@ export function AssemblyPage() {
                   <Typography variant="caption" sx={{ display: 'block' }}>
                     offset-deg (residual yaw): {selected.gridPose.residualYawDeg.toFixed(3)}°
                   </Typography>
-                  {/* WP-37: which optical component this cube realizes. */}
-                  {selectedEntry?.componentId && (
-                    <Button
-                      size="small" variant="outlined" startIcon={<EditIcon />}
-                      sx={{ mt: 1, textTransform: 'none' }}
-                      onClick={() =>
-                        navigate(`/configurator/components?open=${encodeURIComponent(selectedEntry.componentId!)}`)
-                      }
-                    >
-                      {selectedEntry.componentId} — open in editor
-                    </Button>
-                  )}
+
+                  {/* WP-51.1: the module composition card — cube + insert +
+                      part in ONE place, each line deep-linking its editor. */}
+                  <Box sx={{ mt: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                      Module composition · {selected.libraryRef}
+                    </Typography>
+                    {/* component (the optical "symbol") */}
+                    {selectedIndexModule?.component ? (
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="caption" sx={{ flex: 1 }}>
+                          ◐ {selectedIndexModule.component.ref}
+                          {selectedIndexModule.component.resolved && ` → ${selectedIndexModule.component.resolved}`}
+                        </Typography>
+                        {selectedEntry?.componentId && (
+                          <Tooltip title="open in the component editor">
+                            <IconButton size="small" onClick={() =>
+                              navigate(`/configurator/components?open=${encodeURIComponent(selectedEntry.componentId!)}`)}>
+                              <EditIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" sx={{ display: 'block' }}>◐ no component bound</Typography>
+                    )}
+                    {/* template (the mechanical "footprint") */}
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Typography variant="caption" sx={{ flex: 1 }}>
+                        ▣ {selectedIndexModule?.template?.ref ?? 'no template bound'}
+                        {selectedIndexModule?.template?.resolved && ` → ${selectedIndexModule.template.resolved}`}
+                      </Typography>
+                      {selectedTClass && (
+                        <Chip size="small" label={T_CLASS_LABEL[selectedTClass]}
+                          sx={{ height: 14, fontSize: 9 }} />
+                      )}
+                    </Stack>
+                    {/* mechanics assets */}
+                    <Stack direction="row" spacing={1}>
+                      {selectedEntry?.glbUrl && (
+                        <Typography variant="caption" component="a" href={selectedEntry.glbUrl}
+                          target="_blank" rel="noreferrer" sx={{ color: 'primary.main' }}>
+                          GLB ↗
+                        </Typography>
+                      )}
+                      {selectedStepUrl && (
+                        <Typography variant="caption" component="a" href={selectedStepUrl}
+                          target="_blank" rel="noreferrer" sx={{ color: 'primary.main' }}>
+                          STEP ↗
+                        </Typography>
+                      )}
+                      {!selectedEntry?.glbUrl && !selectedStepUrl && (
+                        <Typography variant="caption" color="text.secondary">no mesh assets</Typography>
+                      )}
+                    </Stack>
+                    {/* electronics (the WP-42 actuation contract) */}
+                    {selectedElectronics && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                        ⚡ {selectedElectronics['firmware-contract'] || 'firmware'} ·{' '}
+                        {selectedElectronics['axis-map']
+                          .map(e => `${e.dof}→${typeof e['can-object'] === 'number'
+                            ? '0x' + e['can-object'].toString(16) : e['can-object']}`)
+                          .join(' · ')}
+                      </Typography>
+                    )}
+                  </Box>
                   {selectedMechanics?.translationDofs.map(dof => {
                     const value = selected.dofs.find(d => d.name === dof.name)?.value ?? dof.value;
                     return (
@@ -284,6 +367,7 @@ export function AssemblyPage() {
           </Drawer>
       </Box>
       <CubifyDialog />
+      <BomDialog open={bomOpen} onClose={() => setBomOpen(false)} />
       <Snackbar
         open={showRetireNotice}
         autoHideDuration={6000}

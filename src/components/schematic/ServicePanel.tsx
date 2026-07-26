@@ -19,6 +19,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useTheme,
 } from '@mui/material';
 import {
   PlayArrow as SimulateIcon,
@@ -35,6 +36,10 @@ import { useServiceStore, useSimFreshness } from './serviceStore';
 
 function SpotDiagram({ x, y, color }: { x: number[]; y: number[]; color: string }) {
   const size = 120;
+  // WP-51.4: the spot plot is panel chrome, not a 3D canvas — it follows the
+  // theme so it reads in light mode too (the dark 2D/3D drawing surfaces are
+  // the deliberate exception, not this).
+  const theme = useTheme();
   const points = useMemo(() => {
     const xs = x.filter(Number.isFinite);
     const ys = y.filter(Number.isFinite);
@@ -57,9 +62,13 @@ function SpotDiagram({ x, y, color }: { x: number[]; y: number[]; color: string 
 
   return (
     <Box sx={{ textAlign: 'center' }}>
-      <svg width={size} height={size} style={{ background: '#10151c', borderRadius: 6 }}>
-        <line x1={size / 2} y1={0} x2={size / 2} y2={size} stroke="#2a3442" />
-        <line x1={0} y1={size / 2} x2={size} y2={size / 2} stroke="#2a3442" />
+      <svg
+        width={size}
+        height={size}
+        style={{ background: theme.palette.action.hover, borderRadius: 6 }}
+      >
+        <line x1={size / 2} y1={0} x2={size / 2} y2={size} stroke={theme.palette.divider} />
+        <line x1={0} y1={size / 2} x2={size} y2={size / 2} stroke={theme.palette.divider} />
         {points.dots.map((d, i) => (
           <circle key={i} cx={d.cx} cy={d.cy} r={1.6} fill={color} opacity={0.8} />
         ))}

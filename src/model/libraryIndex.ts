@@ -95,6 +95,8 @@ export interface IndexModule {
   category: string;
   thumbnail: string | null;
   footprint_grid: [number, number, number];
+  /** Kit price in EUR from the module record (null = unpriced). */
+  price?: number | null;
   review: boolean;
   component: {
     ref: string;

@@ -21,7 +21,6 @@ import { PartLibrary } from './PartLibrary';
 import { GridCanvas } from './GridCanvas';
 import { LayerPanel } from './LayerPanel';
 import { PropertyPanel } from './PropertyPanel';
-import { BOMPanel } from './BOMPanel';
 import { AnnotationPanel } from './AnnotationPanel';
 import { ChatPanel } from './ChatPanel';
 import { SimulationPanel } from './SimulationPanel';
@@ -231,7 +230,7 @@ export const Layout: React.FC = () => {
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Tabs 
-              value={activeRightTab} 
+              value={activeRightTab === 'bom' ? 'layers' : activeRightTab} 
               onChange={(_, newValue) => setActiveRightTab(newValue)}
               variant="scrollable"
               scrollButtons="auto"
@@ -250,16 +249,17 @@ export const Layout: React.FC = () => {
               <Tab label="Properties" value="properties" data-tour="properties-tab" />
               <Tab label="Simulation" value="simulation" data-tour="simulation-tab" />
               <Tab label="Annotations" value="annotations" data-tour="annotations-tab" />
-              <Tab label="BOM/Quote" value="bom" data-tour="bom-tab" />
               <Tab label="Chat" value="chat" data-tour="chat-tab" />
             </Tabs>
-            
+
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
               {activeRightTab === 'layers' && <LayerPanel />}
               {activeRightTab === 'properties' && <PropertyPanel />}
               {activeRightTab === 'simulation' && <SimulationPanel />}
               {activeRightTab === 'annotations' && <AnnotationPanel />}
-              {activeRightTab === 'bom' && <BOMPanel />}
+              {/* WP-50: the appStore BOMPanel is retired — the live BOM (with
+                  grid locations + registry prices) opens from the schematic
+                  bottom toolbar and the assembly panel. */}
               {activeRightTab === 'chat' && <ChatPanel />}
             </Box>
           </Box>

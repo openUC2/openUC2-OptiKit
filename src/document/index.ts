@@ -41,6 +41,8 @@ export {
   setActiveWavelengthUm,
   setSourceOn,
 } from './OptikitDocument';
+export { buildDocBom, docBomCsv } from './bom';
+export type { DocBom, DocBomLine } from './bom';
 export { addGroup, groupInstanceOf, ungroupInstance } from './OptikitDocument';
 export type { AddGroupResult } from './OptikitDocument';
 export { useGroupEditStore, isGroupLocked } from './groupStore';

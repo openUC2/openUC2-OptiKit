@@ -79,6 +79,10 @@ export interface LibraryPaletteEntry {
     resolution: [number, number] | null;
     fillFactor: number | null;
   } | null;
+  /** WP-50: kit price in EUR from the module record (null = unpriced). */
+  priceEur: number | null;
+  /** WP-50: record still carries review flags (drafts marked in the BOM). */
+  review: boolean;
   source: 'registry' | 'workspace';
   /** WP-45: carriers host cubes (FRAME, baseplates, plates, puzzle pieces). */
   carrier: boolean;
@@ -281,6 +285,8 @@ export function entriesFromIndex(
           fillFactor: mod.component.programmable['fill-factor'],
         }
       : null,
+    priceEur: typeof mod.price === 'number' ? mod.price : null,
+    review: mod.review,
     source: 'registry',
     carrier: mod.template?.carrier ?? false,
     bays: Object.fromEntries(
@@ -345,6 +351,9 @@ export function entriesFromWorkspace(
     // Workspace drafts have no served asset yet — they derive their glyph.
     symbolUrl: null,
     programmable: null,
+    // Drafts are unpriced by definition and always review-marked.
+    priceEur: null,
+    review: true,
     source: 'workspace',
     carrier: false,
     bays: {},

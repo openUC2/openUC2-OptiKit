@@ -28,6 +28,7 @@ import {
   Rotate90DegreesCcw as SnapYawIcon,
   Timeline as RaysIcon,
   Cable as FiberIcon,
+  Receipt as BomIcon,
   KeyboardArrowDown as DownIcon,
   KeyboardArrowUp as UpIcon,
 } from '@mui/icons-material';
@@ -51,6 +52,7 @@ import { isFiberPort } from './ports';
 import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
 import { SchematicLegend, LEGEND_SEEN_KEY } from './SchematicLegend';
+import { BomDialog } from '../bom/BomDialog';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
 import { ServicePanel } from './ServicePanel';
 
@@ -75,6 +77,8 @@ export function SchematicPage() {
     localStorage.setItem(LEGEND_SEEN_KEY, '1');
     setLegendOpen(false);
   };
+  // The live BOM (WP-50) — shared dialog, also mounted from the assembly.
+  const [bomOpen, setBomOpen] = useState(false);
   const [chainDraft, setChainDraft] = useState<PortRef[] | null>(null);
   // WP-46: in fiber mode a pin click starts/ends a patch cord instead of
   // extending a beam chain.
@@ -323,6 +327,7 @@ export function SchematicPage() {
               controlsRef={controlsRef}
             />
             {legendOpen && <SchematicLegend onClose={closeLegend} />}
+            <BomDialog open={bomOpen} onClose={() => setBomOpen(false)} />
 
             {/* Bottom toolbar: snap / rays / working plane */}
             <Paper
@@ -360,7 +365,7 @@ export function SchematicPage() {
                   selected={settings.showRays}
                   size="small"
                   onChange={() => setSettings(s => ({ ...s, showRays: !s.showRays }))}
-                  sx={{ '&.Mui-selected': { color: '#00e5ff' } }}
+                  sx={{ '&.Mui-selected': { color: 'info.main' } }}
                 >
                   <RaysIcon fontSize="small" />
                 </ToggleButton>
@@ -375,7 +380,7 @@ export function SchematicPage() {
                     setFiberDraft(null);
                     setChainDraft(null);
                   }}
-                  sx={{ '&.Mui-selected': { color: '#f2a33c' } }}
+                  sx={{ '&.Mui-selected': { color: 'warning.main' } }}
                 >
                   <FiberIcon fontSize="small" />
                 </ToggleButton>
@@ -402,6 +407,16 @@ export function SchematicPage() {
                   onChange={() => (legendOpen ? closeLegend() : setLegendOpen(true))}
                 >
                   <HelpIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title="Bill of materials — parts, quantities, grid cells, prices (WP-50)">
+                <ToggleButton
+                  value="bom"
+                  selected={bomOpen}
+                  size="small"
+                  onChange={() => setBomOpen(v => !v)}
+                >
+                  <BomIcon fontSize="small" />
                 </ToggleButton>
               </Tooltip>
 
@@ -434,7 +449,7 @@ export function SchematicPage() {
               <Paper
                 sx={{
                   position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'rgba(46,196,165,0.92)', color: '#08221c',
+                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'success.main', color: 'success.contrastText',
                   borderRadius: 2,
                 }}
               >
@@ -449,7 +464,7 @@ export function SchematicPage() {
               <Paper
                 sx={{
                   position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'rgba(242,163,60,0.94)', color: '#2a1c05',
+                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'warning.main', color: 'warning.contrastText',
                   borderRadius: 2,
                 }}
               >

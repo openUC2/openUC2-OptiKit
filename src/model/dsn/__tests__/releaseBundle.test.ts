@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import type { DocPart, DocSnapshot } from '../../../document';
+import { buildDocBom, docBomCsv } from '../../../document';
 import { useSourceDesignStore } from '../../../document/sourceDesignStore';
 import { buildServiceDesign } from '../serviceExport';
 import {
@@ -132,6 +133,11 @@ describe('buildReleaseBundle', () => {
       },
     });
     const bundle = await buildReleaseBundle(fluoSnapshot(), { compile, glb: false });
+
+    // WP-50: one generator, two consumers — the bundle's BOM.csv is the SAME
+    // facade output the live BOM panel renders, byte for byte.
+    expect(bundle.files['BOM.csv']).toBe(docBomCsv(buildDocBom(fluoSnapshot().parts)));
+
     const names = Object.keys(bundle.files).sort();
     expect(names).toEqual([
       'BOM.csv',

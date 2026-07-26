@@ -19,7 +19,7 @@
  * the service wire format) so Python's json.loads round-trips it to ±inf.
  */
 
-import { getSnapshot } from '../../document';
+import { buildDocBom, docBomCsv, getSnapshot } from '../../document';
 import type { DocSnapshot } from '../../document';
 import { compileDesign } from '../../api/coreClient';
 import type { CompileResponse } from '../../api/coreClient';
@@ -246,7 +246,11 @@ export async function buildReleaseBundle(
     }
   }
 
-  const bom = bomCsv(buildBom(design));
+  // WP-50: BOM.csv comes from the SAME facade function the live BOM panel
+  // renders (one generator, two consumers) — the numbers on screen can never
+  // disagree with the manufacturing export. The legacy model-typed rows
+  // (BUY/PRT/SUB) survive only inside assembly-notes' "Purchased optics".
+  const bom = docBomCsv(buildDocBom(snap.parts));
   files['BOM.csv'] = bom;
   hashes['BOM.csv'] = await sha256Hex(bom);
 
