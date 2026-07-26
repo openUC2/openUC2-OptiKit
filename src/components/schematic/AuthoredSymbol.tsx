@@ -1,6 +1,8 @@
 /**
  * Renders an authored schematic symbol (WP-48) in place of the derived glyph.
- * Loading, sanitizing and the caching contract live in `authoredSymbol.ts`.
+ * Loading, sanitizing and the caching contract live in `symbolAsset.ts` —
+ * kept in a differently-named file, not a case variant, because a
+ * case-insensitive filesystem would resolve both to one module.
  */
 
 import { Html } from '@react-three/drei';

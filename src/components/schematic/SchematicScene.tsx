@@ -29,7 +29,7 @@ import {
 import { wavelengthToColor } from '../../utils/sceneBuilder';
 import { AuthoritativeRays } from './AuthoritativeRays';
 import { AuthoredSymbol } from './AuthoredSymbol';
-import { useAuthoredSymbol } from './authoredSymbol';
+import { useAuthoredSymbol } from './symbolAsset';
 import { EscapeRays } from './EscapeRays';
 import { FIBER_COLOR, GLYPH_COLORS, sourceTint } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
