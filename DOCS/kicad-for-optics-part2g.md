@@ -352,10 +352,10 @@ PROMPT (repo: openUC2-OptiKit + optikit-core)
 4. Light-scheme remnants: sweep the schematic/assembly/bind chrome for
    remaining hardcoded colors (e.g. the #00e5ff ray-toggle accent, the
    cubify chip's rgba) → theme tokens. Both themes screenshot-checked.
-5. T3 generate button: the component editor's mechanics tab gets
-   "generate holder" for records with surfaces + no bound mesh — POST a
-   new /v1/generate endpoint wrapping optikit-core generate, download/
-   attach the artifact pair, show the cavity in the 3D preview.
+5. T3 generate button — SUPERSEDED by WP-61 (Part 2i), which does this
+   properly: the /v1/generate endpoint plus a "generate a holder" action
+   on a freely PLACED part that materializes the template+module binding
+   at the placed pose. Do not build it here.
 
 Acceptance: select a placed T2 part in the assembly → composition card
 with 3 working deep links + T2 chip; /v1/library/index p50 drops below
