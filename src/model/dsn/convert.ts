@@ -87,7 +87,9 @@ export function paletteOpticsOf(part: {
           type: 'standard',
           geometry: { type: 'StandardGeometry', radius: round6(sign * r), conic: 0 },
           thickness: 2.0,
-          material_post: { type: 'ideal', name: 'N-BK7' },
+          // WP-63: optiland's registry keys on class names — a named glass
+          // is {type: Material}; the invented 'ideal' tag broke simulate.
+          material_post: { type: 'Material', name: 'N-BK7' },
           semi_aperture: round6(semi),
         },
         {
