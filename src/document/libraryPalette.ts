@@ -439,6 +439,12 @@ export function libraryEntryOf(libraryRef: string): LibraryPaletteEntry | undefi
   return LIB_ENTRIES.get(libraryRef);
 }
 
+/** WP-66: every registered palette module entry (groups live elsewhere) —
+ * the swap-candidate list for the Modules panel. */
+export function listLibraryEntries(): LibraryPaletteEntry[] {
+  return [...LIB_ENTRIES.values()];
+}
+
 /** T-class of a library ref: 'fixed' | 'adaptive' | 'generative' | null. */
 export function templateClassOf(libraryRef: string): TemplateClass | null {
   return LIB_ENTRIES.get(libraryRef)?.templateClass ?? null;

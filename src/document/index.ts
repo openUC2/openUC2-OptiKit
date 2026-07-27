@@ -8,6 +8,7 @@ export {
   addPart,
   captureUndo,
   categoryOf,
+  clearDofValue,
   commitUndo,
   getPart,
   getSnapshot,
@@ -68,6 +69,7 @@ export {
   entriesFromIndex,
   entriesFromWorkspace,
   libraryEntryOf,
+  listLibraryEntries,
   registerLibraryModules,
   registerLibraryGroups,
   groupEntriesFromIndex,
@@ -103,6 +105,8 @@ export {
   useSourceDesignStore,
 } from './sourceDesignStore';
 export type { SourcePort, SourceProvenance } from './sourceDesignStore';
+export { swapPartModule } from './swap';
+export type { SwapResult } from './swap';
 export { getDocRevision, useDocRevision } from './revision';
 export { classifyPart, layerOf, layerRangeOf } from './layers';
 export type { LayerClassification, LayerRange } from './layers';

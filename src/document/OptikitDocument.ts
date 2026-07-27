@@ -428,6 +428,16 @@ export function setDofValue(partId: string, dofName: string, value: number): voi
   setDocParams(partId, { dofValues });
 }
 
+/** WP-66: remove a stored DOF value (a module swap dropped the DOF). */
+export function clearDofValue(partId: string, dofName: string): void {
+  const m = useAppStore.getState().placedModules.find(p => p.id === partId);
+  if (!m) return;
+  const dofValues = { ...(getDocParams(m).dofValues ?? {}) };
+  if (!(dofName in dofValues)) return;
+  delete dofValues[dofName];
+  setDocParams(partId, { dofValues });
+}
+
 export function removePart(partId: string): void {
   useAppStore.getState().removeModule(partId);
   usePathsStore.getState().prunePart(partId);

@@ -12,6 +12,8 @@ import {
   IconButton,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   ToggleButton,
   Tooltip,
   Typography,
@@ -57,6 +59,7 @@ import { SchematicLegend, LEGEND_SEEN_KEY } from './SchematicLegend';
 import { BomDialog } from '../bom/BomDialog';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
 import { ServicePanel } from './ServicePanel';
+import { ModulesPanel } from './ModulesPanel';
 
 export function SchematicPage() {
   const muiTheme = useTheme();
@@ -81,6 +84,8 @@ export function SchematicPage() {
   };
   // The live BOM (WP-50) — shared dialog, also mounted from the assembly.
   const [bomOpen, setBomOpen] = useState(false);
+  // WP-66: right-drawer tab — "Design" (properties + service) | "Modules".
+  const [rightTab, setRightTab] = useState<'design' | 'modules'>('design');
   const [chainDraft, setChainDraft] = useState<PortRef[] | null>(null);
   // WP-46: in fiber mode a pin click starts/ends a patch cord instead of
   // extending a beam chain.
@@ -524,7 +529,24 @@ export function SchematicPage() {
               },
             }}
           >
-            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+            {/* WP-66: two tabs — the classic property/service stack and the
+                per-part Modules list. Both stay mounted (display toggling) so
+                the service panel's live-sim state survives tab switches. */}
+            <Tabs
+              value={rightTab}
+              onChange={(_, v) => setRightTab(v)}
+              variant="fullWidth"
+              sx={{ minHeight: 36, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab value="design" label="Design" sx={{ minHeight: 36, py: 0.5 }} />
+              <Tab value="modules" label="Modules" sx={{ minHeight: 36, py: 0.5 }} />
+            </Tabs>
+            <Box
+              sx={{
+                flex: 1, overflow: 'auto', p: 2,
+                display: rightTab === 'design' ? 'block' : 'none',
+              }}
+            >
               <SchematicPropertyPanel
                 chainDraft={chainDraft}
                 activePathName={activePathName}
@@ -532,6 +554,14 @@ export function SchematicPage() {
                 onCancelChain={() => setChainDraft(null)}
               />
               <ServicePanel onZoomToPart={zoomToPart} />
+            </Box>
+            <Box
+              sx={{
+                flex: 1, overflow: 'auto', p: 2,
+                display: rightTab === 'modules' ? 'block' : 'none',
+              }}
+            >
+              <ModulesPanel onZoomToPart={zoomToPart} />
             </Box>
           </Drawer>
     </Box>
