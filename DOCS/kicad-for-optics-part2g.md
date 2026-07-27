@@ -360,8 +360,8 @@ PROMPT (repo: openUC2-OptiKit + optikit-core)
 Acceptance: select a placed T2 part in the assembly → composition card
 with 3 working deep links + T2 chip; /v1/library/index p50 drops below
 100 ms warm; zero hardcoded canvas-chrome colors grep-able in schematic/
-assembly/bind; generate-holder on the AC254-050-A record attaches the
-two halves and previews them.
+assembly/bind. (The generate-holder acceptance moved to WP-61 with the
+button itself.)
 ```
 
 **For humans:** the "where is my cube + insert + part?" question gets a

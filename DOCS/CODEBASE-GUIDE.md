@@ -1,7 +1,7 @@
 # OptiKit — the whole codebase, file by file, flow by flow
 
-**Status:** current as of 2026-07-26 (frontend through WP-54 + the community UI;
-optikit-core through WP-53, plus WP-46 fibers in core).
+**Status:** current as of 2026-07-27 (both repos through WP-58, plus Part 2i's
+WP-60/61/62 — unbound symbols, `/v1/generate`, and prescription-derived solids).
 **Audience:** you, coming back to this after a while — or anyone new.
 
 This is the map. It answers three questions:
@@ -519,6 +519,51 @@ The **lockfile** (`optikit-lock.yml`) sha256-hashes every text file in the
 bundle so `optikit-core rebuild` can prove the artifacts were derived from that
 exact design.
 
+**STEP assembly export (WP-57):** File → "Export STEP assembly" streams
+`POST /v1/export/step` (core `export/step_assembly.py`) — one grouped STEP with
+a node per part: the template's own STEP where it exists, optics **lathed from
+the prescription** where it doesn't, and the beam path as swept cylinders.
+Deterministic across invocations (WP-18), apart from the header timestamp.
+
+---
+
+### 2.10 Flow — free-place an optic, then put it in a cube (WP-60/61/62)
+
+The Part 2i round: the **symbol** (`optical_component`) and the **cube**
+(`cube_module`) are different records, and a symbol is placeable on its own.
+
+```mermaid
+flowchart LR
+  Z[".zmx import / authored symbol"] --> C[("optical_component<br/>no mechanics at all")]
+  C -->|"entriesFromComponents()<br/>badge UNBOUND (WP-60)"| P["placed freely:<br/>continuous mm, no grid claim,<br/>invisible to DRC"]
+  P -->|"'generate a holder…'<br/>POST /v1/generate (WP-61)"| G["two printable halves,<br/>cavity carved AT the placed pose"]
+  G -->|"accept"| M[("mechanical_template (T3)<br/>+ cube_module — the part<br/>is now a real cube")]
+  C -.->|"no vendor STEP?<br/>solid_from_prescription (WP-62)"| G
+```
+
+- **WP-60** — any published component NO module binds joins the palette
+  (`entriesFromComponents`, group "<category> · unbound", UNBOUND badge). It
+  places through the same path as everything else, but with
+  `templateClass: null` the residual is unclamped (free mm movement), core
+  `drc()` skips it, and the assembly draws a distinct translucent UNBOUND
+  ghost (≠ the "no template" ghost, which means *a module whose mesh is
+  missing*).
+- **WP-61** — `POST /v1/generate` wraps the T3 harness; the assembly panel's
+  "generate a holder…" (`GenerateHolderDialog`) posts the live design so
+  `pose_params_from_component` carves the cavity where the optic actually
+  sits. Accept **materializes** `user.tpl.holder_*` + `user.cube.*_t3`
+  (`holderRecord.ts`) through the existing exits (zip / dev-write + index
+  bump) and re-points the part's `libraryRef` — one undo step; undo restores
+  the unbound placement, the artifacts stay keyed on disk.
+- **WP-62** — no vendor CAD needed: `generators/optic_solid.py` revolves the
+  record's own surface stack (reusing `sag_at`, now in `library/sag.py`) into
+  a solid whose primary job is to be **subtracted** as the holder cavity
+  (`part_prescription` as the alternative to `part_step`, schema `oneOf` —
+  a `{component: id}` reference is inlined by the harness before keying, so
+  the cache key covers the actual surfaces). Guard rail: a negative or
+  sub-0.2 mm edge thickness is a typed error (`E_EDGE_THICKNESS`), and
+  prescription-derived runs/templates carry a review flag.
+
 ---
 
 ## Part 3 — optikit-core, file by file
@@ -597,13 +642,16 @@ multi-exit components; prunes dead arms with a warning. Errors:
 
 | File | What it does |
 |---|---|
-| `library/build.py` | `load_library(root)` walks `library/**/*.yml`; `resolve(library, "id@^1.0")` does semver resolution; `check_references()` finds dangling refs; `build_index()` produces the `index.json` the palette eats (modules with resolved component/template, ports, DOFs, assets, prices, groups); `write_index()` persists it. |
+| `library/build.py` | `load_library(root)` walks `library/**/*.yml`; `resolve(library, "id@^1.0")` does semver resolution; `check_references()` finds dangling refs; `build_index()` produces the `index.json` the palette eats (modules with resolved component/template, ports, DOFs, assets, prices, groups — and since WP-60 each `components[]` entry ships its ports/wavelengths/symbol so a bare symbol is placeable straight from the index); `write_index()` persists it. Assets are advertised only when the file is actually on disk (WP-58 fixed the 64 promised-but-404 GLBs). |
+| `library/vendor.py` | WP-58 asset hygiene: `vendor_assets()` pulls remote `glb-url` meshes into the record dirs (`library vendor-assets [--dry-run]`), ending the local/remote split brain. |
+| `library/symbols.py` | WP-48: locates a component's authored SVG schematic symbol so the index/asset endpoints can serve it. |
 | `library/semver.py` | `Version`, `satisfies()` — caret/tilde/exact ranges. |
 | `library/verify.py` | `verify_t1(library, module_id)` — the T1 conformance check: does the component's optical frame land on the template's declared insert frame? Emits `E_POSE_MISMATCH`, `E_MIRROR_NO_REFLECTIVE`, state warnings. |
 | `library/derive.py` | WP-40 "surfaces are truth": `derive_port_directions(component)` computes port directions from the surface normals via the reflection law; `check_port_directions()` warns when an authored enum disagrees with the geometry. |
 | `library/actuation.py` | `check_actuation(library)` — the WP-42 contract: every `axis-map` entry names a real DOF (`E_AXIS_MAP_UNKNOWN_DOF`), surfaces are in range (`E_DOF_SURFACE_RANGE`), actuatable DOFs are bound (`W_ACTUATABLE_UNBOUND`). |
 | `library/actuate.py` | WP-26 runtime: `firmware_command(library, module, dof, value)` → a command with both a CANopen SDO view and a UC2-REST view (`/motor_act` for translation, `/galvo_act` for rotation). Validates actuatable + range + binding. |
-| `library/pocket.py` | `pocket_params(component)` — derives MAS-2000 pocket inputs (sag, depth) from the record's own surfaces. `sag_at()` is the standard conic sag. |
+| `library/sag.py` | WP-62: `sag_at()` (the standard conic sag) + surface-dict helpers, extracted stdlib-only so generator scripts can load it by file path in the `uv run --no-project` interpreter. |
+| `library/pocket.py` | `pocket_params(component)` — derives MAS-2000 pocket inputs (sag, depth) from the record's own surfaces; re-exports `sag_at` from `sag.py`. The same sag drives the profile `optic_solid.py` revolves, so the 1D pocket numbers and the 3D solid agree by construction. |
 
 ### `generate/` — the T3 CadQuery harness
 
@@ -618,8 +666,16 @@ when importable, otherwise the harness shells out via `uv run --with cadquery`.
 
 Generators live in `generators/`: `boolean_holder_1x1.py` (the auto-holder —
 insert body minus the part shape at its bound pose, split into two printable
-halves with M3 cut-offs), `round_optic_insert_1x1.py`, `plate_nxm.py` (WP-53
+halves with M3 cut-offs; since WP-62 the cut body may be `part_step` OR
+`part_prescription` — exactly one, schema `oneOf`), `optic_solid.py` (WP-62:
+`solid_from_prescription()` revolves a record's surface stack into a real
+solid — the holder's subtraction tool, and a standalone lens STEP/GLB for the
+WP-57 assembly export), `round_optic_insert_1x1.py`, `plate_nxm.py` (WP-53
 sandwich plates).
+
+Since WP-61 the harness is service-reachable: `POST /v1/generate` (same cache
+key, 501 `E_NO_CADQUERY` without the extra), with `pose_params_from_component`
+folding a design component's placed δ/ΔR into the generator params.
 
 ### `importers/` — the roads into the library
 
@@ -638,7 +694,12 @@ derived data. Typed engine errors become HTTP 422 `{code, message, context}`
 (plus `escapes` for `E_NO_TARGET`). `cli.py` exposes the same functions as
 subcommands (`validate`, `flatten`, `cubify`, `drc`, `chain`, `compile`,
 `simulate`, `optimize`, `annotate`, `library …`, `generate`, `import …`,
-`actuate`, `fx`, `rebuild`, `serve`).
+`actuate`, `fx`, `rebuild`, `serve`, `export step`).
+
+Later additions: `/v1/library/index` is mtime-cached with a `?fresh=1` escape
+hatch (WP-51, cold 673 ms → warm ~12 ms), `/v1/export/step` streams the WP-57
+STEP assembly (`export/step_assembly.py` — deterministic emission, lathed
+optics, beam cylinders), and `/v1/generate` runs the T3 harness (WP-61).
 
 `release.py` builds and verifies the manufacturing bundle: `build_bundle_bytes()`
 and `rebuild(path)` (which re-derives every artifact and compares sha256s).
@@ -670,7 +731,8 @@ Four files legitimately straddle both (catalog bootstrap / notifications only):
 | `types.ts` | The vocabulary: `Vec3`, `Quat`, `UC2_GRID_MM = [50,50,55]`, `DocCategory`, `DocPart`, `DocPath`, `PortRef`, `makePortRef`/`parsePortRef`. |
 | `mapping.ts` | **Read this before touching any coordinate code.** Three frames and the exact transforms between them (see below). |
 | `rot24.ts` | The 24 orientations as TS: `ROT24_TABLE`, `rot24Matrix`, `decomposeRot24`. |
-| `libraryPalette.ts` | Registry index → palette entries; `defaultRotationFor(ports)`; `LibraryPaletteEntry` carries everything the legacy `ModuleDefinition` can't (ports, T-class, DOFs, states, bays, prices). |
+| `libraryPalette.ts` | Registry index → palette entries; `defaultRotationFor(ports)`; `LibraryPaletteEntry` carries everything the legacy `ModuleDefinition` can't (ports, T-class, DOFs, states, bays, prices). Three builders: `entriesFromIndex` (modules), `entriesFromWorkspace` (local drafts), `entriesFromComponents` (WP-60: published symbols NO module binds — `unbound: true`, group "<category> · unbound"). |
+| `bom.ts` | WP-50: the live BOM as ONE pure generator — placed parts grouped by library id with their grid cells, joined to registry prices/T-class/review. Renders in `BomDialog` and writes the release bundle's `BOM.csv`. |
 | `portCatalog.ts` | Fallback record-style ports for non-registry modules, so pins/glyphs/routing have one code path. |
 | `pathsStore.ts` | The netlist: named `PortRef[]` chains, persisted. |
 | `fibersStore.ts` | WP-46 patch cords: port→port with no geometric constraint, persisted. |
@@ -706,7 +768,9 @@ three.js frame   y-up, z-south
 |---|---|
 | `componentRecord.ts` | The component editor's whole model as pure functions (see [2.1](#21-flow--create-a-new-part-the-symbol)). |
 | `bindRecord.ts` | The bind workbench's model: part-frame datums, `datumToCube`, `snapToAxis` (±2° → axis literal, beyond → true vector), `bindToRecords` → component+template+module, `recordsToFiles`. |
-| `libraryIndex.ts` | Typed client + hook for `/v1/library/index`, with the bundled snapshot as offline fallback and `bumpLibraryIndex()` for live refresh. |
+| `libraryIndex.ts` | Typed client + hook for `/v1/library/index`, with the bundled snapshot as offline fallback and `bumpLibraryIndex()` for live refresh. Since WP-60 `IndexComponent` also carries ports/wavelengths/symbol. |
+| `holderRecord.ts` | WP-61: the records materialized when a generated holder is accepted — a generative `mechanical_template` (generator + the run's canonical params → regenerate is a cache hit; prescription-derived → review-flagged) and the `cube_module` binding it. Pure functions + the library-PR file map. |
+| `communityRepos.ts` | WP-58: mount a community library repo from GitHub — fetches its committed `library-index.json`, merges with precedence builtin < mounted < local drafts (a fork can ADD parts but never override a curated `openuc2.*` id; clashes are reported in the palette). |
 | `workspaceLibrary.ts` | Browser-local `user.*` drafts. |
 | `bindMeshStore.ts` | IndexedDB for STP/GLB bytes, keyed by record id. |
 | `actuation.ts` | WP-26 frontend mirror of core's `actuate.py`: `firmwareCommand()` + `sendActuation()` to a configurable device URL. |
@@ -735,6 +799,8 @@ Typed, zod-validated client. Every function takes an optional `AbortSignal`.
 | `optimizeDesign` | `POST /v1/optimize` |
 | `convertStepToGlb` | `POST /v1/convert/step-to-glb` (returns raw GLB bytes) |
 | `saveLibraryRecords` | `POST /v1/library/save` (dev-only write into the repo library) |
+| `exportStepAssembly` | `POST /v1/export/step` (WP-57, streams the grouped STEP) |
+| `generateTemplate` | `POST /v1/generate` (WP-61, T3 harness; base64 artifacts) |
 
 `CoreServiceError` carries the stable `code` (never match on `message`),
 `context`, `status`, and `escapes[]`. ±Infinity is wire-encoded as `±1e999`
@@ -749,9 +815,18 @@ Full per-file detail is long; the shape is:
   convention), `glyphs.tsx`, `serviceStore.ts` (the round trip), `ServicePanel`,
   `AuthoritativeRays`, `EscapeRays`, `SchematicPropertyPanel`, `OptimizeDialog`,
   `useSchematicSim.ts` (the fast approximate preview), `MarkerList`, `colors.ts`,
-  `GlyphThumb.tsx`, `SchematicLegend`.
-- **`assembly/`** — `AssemblyPage`, `AssemblyScene` (GLB cubes, ghost boxes, DRC
-  billboards, T2 insert handles), `CubifyDialog`, `assemblyStore.ts`.
+  `GlyphThumb.tsx`, `SchematicLegend`, `AuthoredSymbol.tsx` + `symbolAsset.ts`
+  (WP-48: an authored SVG symbol outranks the derived glyph).
+- **`assembly/`** — `AssemblyPage` (incl. the WP-51 module-composition card and
+  the WP-60 unbound-part card), `AssemblyScene` (GLB cubes, ghost boxes — the
+  UNBOUND ghost is distinct from "no template" — DRC billboards, T2 insert
+  handles), `CubifyDialog`, `GenerateHolderDialog` (WP-61: generate → preview
+  the two halves → accept materializes + re-points, one undo step),
+  `assemblyStore.ts`.
+- **`bom/`** — `BomDialog` (WP-50): sortable live BOM, per-row deep links,
+  cell chips that cross-probe into the scene, CSV download. Mounted from both
+  the schematic toolbar and the assembly panel.
+- **`library/`** — `AddCommunityRepoDialog` (WP-58: "Add library from GitHub").
 - **`bind/`** — `MechanicsPanel` (the UI, mounted as the component editor's
   mechanics tab), `BindScene` (ghost cube + gizmos + 2×2 ortho views),
   `OpticsOverlay` (the optical model drawn at the datum), `bindStore.ts`.
@@ -771,7 +846,7 @@ Full per-file detail is long; the shape is:
   `BrandLogo`, `NotificationDisplay`, `StartupDialog`.
 - **LEGACY (still on appStore, react-konva 2D grid at `/configurator/grid`):**
   `EditorPage`, `Layout`, `GridCanvas`, `PropertyPanel`, `LayerPanel`,
-  `BOMPanel`, `SimulationPanel`, `AnnotationCanvas`, `AnnotationPanel`,
+  `SimulationPanel` (`BOMPanel` was deleted by WP-50), `AnnotationCanvas`, `AnnotationPanel`,
   `PhysicalModuleOverlay`, `RayOverlay`, `ModuleCreationWizard` (+ its three
   steps), `SetupBrowser`, `CollectionView`, `ChatPanel`.
 
@@ -826,6 +901,8 @@ exercising so you can set a breakpoint there.
 | DRC fires on a part that should be fine | `geometry/cubify.py:drc` | Check the template class and declared DOFs |
 | Optimizer result doesn't stick | `annotate/back_annotate.py:_classify_pose` | The delta may have no DOF to carry it |
 | Palette is empty / stale | `model/libraryIndex.ts:fetchLibraryIndex` | Registry vs bundled fallback |
+| An imported symbol isn't placeable | `libraryPalette.ts:entriesFromComponents` | It only offers components NO module binds; a module-bound one comes through its module |
+| "generate a holder" carves at the cube centre | `generate/harness.py:pose_params_from_component` | The placed δ/ΔR must reach the generator params |
 | Service says `E_UNREACHABLE` | `api/coreClient.ts:post` | Not running, CORS, or crashed mid-request — the message distinguishes them |
 
 ### Running the pair
@@ -874,7 +951,7 @@ Real things found while writing this, worth knowing before you trip over them.
 | Where | What |
 |---|---|
 | `geometry/cubify.py:_check_aperture` | **A stub returning `[]`.** `DRC_APERTURE` is named in the `DrcFinding` docstring but is never emitted — it needs port-axis geometry from the compiler that was never wired. Beam-vs-clear-aperture is currently unchecked. |
-| `library/pocket.py` | Fully implemented, exported from **nowhere** — no `__init__` re-export, no CLI subcommand, no endpoint. Reachable only as `from optikit_core.library.pocket import pocket_params`. |
+| `library/pocket.py` | `pocket_params` is still CLI/endpoint-less, but the module gained its first real consumer in WP-62: `generators/optic_solid.py` imports `sag_at` for the revolved profile. |
 | `chain/infer.py` → `compile/compiler.py` | `infer.py` imports the **private** `_port_frame` and `_angle_between` from the compiler. The shared port geometry effectively lives in `compile/`; a refactor should hoist it. |
 | `ANGLE_TOL_DEG = 20.0` | Defined **twice** independently (`compile/compiler.py`, `chain/infer.py`). They agree today but nothing links them. |
 | `cli.py` `library build` | Calls `write_index()` then `build_index()` again just to read `index["count"]` — the index is built twice per invocation. |
