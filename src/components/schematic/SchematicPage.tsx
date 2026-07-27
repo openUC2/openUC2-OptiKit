@@ -45,9 +45,11 @@ import {
   selectPart,
   setPath,
   useDocPaths,
+  useLayerStore,
   useSelectedPartId,
   UC2_GRID_MM,
 } from '../../document';
+import { LayerChips } from './LayerChips';
 import { isFiberPort } from './ports';
 import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
@@ -275,6 +277,12 @@ export function SchematicPage() {
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
   const layerIndex = Math.round(settings.planeZMm / UC2_GRID_MM[2]);
 
+  // WP-65: the layer store tracks the working-plane layer — the active layer
+  // is always rendered visible, so a drop can never land on an invisible plane.
+  useEffect(() => {
+    useLayerStore.getState().setActiveLayer(layerIndex);
+  }, [layerIndex]);
+
   // Rendered inside the AppShell (WP-24): the shell provides theme + toolbar.
   return (
     <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
@@ -447,6 +455,9 @@ export function SchematicPage() {
                   </IconButton>
                 </Stack>
               </Stack>
+
+              {/* WP-65: per-layer visibility chips (shared with the assembly). */}
+              <LayerChips />
             </Paper>
 
             {/* Hint chip while chaining */}

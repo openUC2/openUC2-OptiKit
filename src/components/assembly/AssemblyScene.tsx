@@ -6,7 +6,7 @@
  * document setDofValue). Talks ONLY to src/document + serviceExport.
  */
 
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
@@ -21,17 +21,21 @@ import {
   useGLTF,
 } from '@react-three/drei';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import type { DocPart, Vec3 } from '../../document';
+import type { DocPart, LayerAppearance, Vec3 } from '../../document';
 import {
   captureUndo,
+  classifyPart,
   commitUndo,
   docQuatToThree,
   interfaceKindOf,
+  layerAppearance,
+  layerRangeOf,
   renderInfoOf,
   rot24Matrix,
   selectPart,
   setDofValue,
   useDocParts,
+  useLayerStore,
   useSelectedPartId,
   UC2_GRID_MM,
 } from '../../document';
@@ -57,9 +61,38 @@ const AXIS_VECTORS: Record<'x' | 'y' | 'z', Vec3> = {
 
 // ── GLB / ghost geometry ─────────────────────────────────────────────────────
 
-function GLBModel({ url, offset }: { url: string; offset?: [number, number, number] }) {
+function GLBModel({
+  url,
+  offset,
+  dimmed = false,
+}: {
+  url: string;
+  offset?: [number, number, number];
+  /** WP-65: render the mesh nearly transparent (dimmed layer). */
+  dimmed?: boolean;
+}) {
   const { scene } = useGLTF(url);
-  const cloned = useMemo(() => skeletonClone(scene) as THREE.Group, [scene]);
+  const cloned = useMemo(() => {
+    const c = skeletonClone(scene) as THREE.Group;
+    if (dimmed) {
+      const dim = (mat: THREE.Material) => {
+        const m = mat.clone();
+        m.transparent = true;
+        m.opacity = 0.12;
+        m.depthWrite = false;
+        return m;
+      };
+      c.traverse(obj => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.material = Array.isArray(mesh.material)
+            ? mesh.material.map(dim)
+            : dim(mesh.material);
+        }
+      });
+    }
+    return c;
+  }, [scene, dimmed]);
   return (
     <group position={offset}>
       <primitive object={cloned} />
@@ -72,23 +105,38 @@ function GhostBox({
   label = 'no template',
   labelColor = '#ffb02e',
   opacity = 0.22,
+  dimmed = false,
 }: {
   color: string;
   label?: string;
   labelColor?: string;
   opacity?: number;
+  /** WP-65: faded rendering on a dimmed layer. */
+  dimmed?: boolean;
 }) {
   return (
     <group>
       <mesh>
         <boxGeometry args={[48, 48, 48]} />
-        <meshStandardMaterial color={color} transparent opacity={opacity} roughness={0.8} />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={dimmed ? opacity * 0.3 : opacity}
+          roughness={0.8}
+        />
       </mesh>
       <lineSegments geometry={new THREE.EdgesGeometry(new THREE.BoxGeometry(48, 48, 48))}>
-        <lineBasicMaterial color={color} />
+        <lineBasicMaterial color={color} transparent opacity={dimmed ? 0.25 : 1} />
       </lineSegments>
       <Billboard position={[0, 32, 0]}>
-        <Text fontSize={6} color={labelColor} anchorX="center" outlineWidth={0.4} outlineColor="#000000aa">
+        <Text
+          fontSize={6}
+          color={labelColor}
+          fillOpacity={dimmed ? 0.3 : 1}
+          anchorX="center"
+          outlineWidth={dimmed ? 0 : 0.4}
+          outlineColor="#000000aa"
+        >
           {label}
         </Text>
       </Billboard>
@@ -236,12 +284,15 @@ function AssemblyPart({
   mechanics,
   markers,
   unbound,
+  dimmed = false,
 }: {
   part: DocPart;
   mechanics: PartMechanics | undefined;
   markers: Marker[];
   /** WP-60: a bare optical symbol — not in a cube yet (≠ missing template). */
   unbound: boolean;
+  /** WP-65: the part's layer is dimmed — low opacity, non-interactive. */
+  dimmed?: boolean;
 }) {
   const selectedId = useSelectedPartId();
   const selected = selectedId === part.id;
@@ -276,39 +327,44 @@ function AssemblyPart({
   const partMarkers = markers.filter(m => m.partId === part.id);
   const locked = templateClass === 'fixed';
 
-  return (
-    <group position={shellPos}>
-      <group
-        quaternion={shellQuat}
-        onClick={e => {
+  // WP-65: dimmed layers are non-interactive — without handlers R3F skips
+  // raycasting these meshes entirely, so clicks fall through.
+  const handlers = dimmed
+    ? {}
+    : {
+        onClick: (e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
           selectPart(part.id);
-        }}
-        onPointerOver={e => {
+        },
+        onPointerOver: (e: ThreeEvent<PointerEvent>) => {
           e.stopPropagation();
           setHovered(true);
           document.body.style.cursor = locked ? 'not-allowed' : 'pointer';
-        }}
-        onPointerOut={() => {
+        },
+        onPointerOut: () => {
           setHovered(false);
           document.body.style.cursor = 'auto';
-        }}
-      >
+        },
+      };
+
+  return (
+    <group position={shellPos}>
+      <group quaternion={shellQuat} {...handlers}>
         {unbound ? (
           // WP-60: an optical primitive with no mechanics at all — drawn as a
           // fainter "not in a cube yet" ghost, distinct from the missing-
           // template ghost (that one is a module whose mesh is absent).
-          <GhostBox color={color} label="UNBOUND" labelColor="#7bdcff" opacity={0.08} />
+          <GhostBox color={color} label="UNBOUND" labelColor="#7bdcff" opacity={0.08} dimmed={dimmed} />
         ) : templateClass === null ? (
-          <GhostBox color={color} />
+          <GhostBox color={color} dimmed={dimmed} />
         ) : render.glbUrl ? (
-          <GLBErrorBoundary fallback={<GhostBox color={color} />}>
-            <Suspense fallback={<GhostBox color={color} />}>
-              <GLBModel url={render.glbUrl} offset={render.glbOffset} />
+          <GLBErrorBoundary fallback={<GhostBox color={color} dimmed={dimmed} />}>
+            <Suspense fallback={<GhostBox color={color} dimmed={dimmed} />}>
+              <GLBModel url={render.glbUrl} offset={render.glbOffset} dimmed={dimmed} />
             </Suspense>
           </GLBErrorBoundary>
         ) : (
-          <GhostBox color={color} />
+          <GhostBox color={color} dimmed={dimmed} />
         )}
         {(selected || hovered) && (
           <mesh>
@@ -334,6 +390,7 @@ function AssemblyPart({
               category={part.category}
               label={part.ref}
               foldDeg={insertFoldDeg}
+              dimmed={dimmed}
               interfaceKind={interfaceKindOf(part.libraryRef)}
             />
           </group>
@@ -344,6 +401,7 @@ function AssemblyPart({
         position={[0, 34, 0]}
         fontSize={7}
         color={selected ? '#ffd24d' : '#aeb6c2'}
+        fillOpacity={dimmed ? 0.35 : 1}
         anchorX="center"
         anchorY="bottom"
         outlineWidth={0.4}
@@ -406,6 +464,24 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
     [mechanics],
   );
 
+  // WP-65: shared layer visibility — hidden layers unmount, dimmed layers
+  // render faint and non-interactive (same rules as the schematic).
+  const layerVis = useLayerStore();
+  const appearances = useMemo(() => {
+    const range = layerRangeOf(parts);
+    const map = new Map<string, LayerAppearance>();
+    for (const part of parts) {
+      const c = classifyPart(part, range);
+      map.set(part.id, layerAppearance(c.layer, c.interface, layerVis));
+    }
+    return map;
+  }, [parts, layerVis]);
+  // A part hidden while selected gets deselected (WP-65 delete guard).
+  const selectedId = useSelectedPartId();
+  useEffect(() => {
+    if (selectedId && appearances.get(selectedId) === 'hidden') selectPart(null);
+  }, [selectedId, appearances]);
+
   return (
     <>
       <hemisphereLight args={['#ffffff', '#8a929c', 0.75]} />
@@ -454,19 +530,24 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
       <axesHelper args={[80]} position={[0, -UC2_GRID_MM[2] / 2 + 0.2, 0]} />
 
       <Suspense fallback={null}>
-        {parts.map(part => (
-          <AssemblyPart
-            key={part.id}
-            part={part}
-            mechanics={mechanicsById.get(part.id)}
-            markers={markers}
-            unbound={unboundIds.has(part.libraryRef)}
-          />
-        ))}
+        {parts
+          .filter(part => appearances.get(part.id) !== 'hidden')
+          .map(part => (
+            <AssemblyPart
+              key={part.id}
+              part={part}
+              mechanics={mechanicsById.get(part.id)}
+              markers={markers}
+              unbound={unboundIds.has(part.libraryRef)}
+              dimmed={appearances.get(part.id) === 'dimmed'}
+            />
+          ))}
       </Suspense>
 
-      {/* T2 insert handles (outside the part groups: they position in world space) */}
+      {/* T2 insert handles (outside the part groups: they position in world
+          space). Only fully visible parts stay draggable (WP-65). */}
       {parts.map(part => {
+        if (appearances.get(part.id) !== 'visible') return null;
         const mech = mechanicsById.get(part.id);
         if (!mech || mech.templateClass === 'fixed') return null;
         return mech.translationDofs.map(dof => (

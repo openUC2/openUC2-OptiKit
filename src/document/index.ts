@@ -104,3 +104,7 @@ export {
 } from './sourceDesignStore';
 export type { SourcePort, SourceProvenance } from './sourceDesignStore';
 export { getDocRevision, useDocRevision } from './revision';
+export { classifyPart, layerOf, layerRangeOf } from './layers';
+export type { LayerClassification, LayerRange } from './layers';
+export { layerAppearance, useLayerStore } from './layerStore';
+export type { LayerAppearance, LayerOverride } from './layerStore';

@@ -5,21 +5,26 @@
  * 2D ray overlay. Talks ONLY to src/document.
  */
 
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, Text } from '@react-three/drei';
-import type { DocFiber, DocPart, DocPath, PortRef, Vec3 } from '../../document';
+import type { DocFiber, DocPart, DocPath, LayerAppearance, PortRef, Vec3 } from '../../document';
 import {
+  classifyPart,
   docQuatToThree,
   interfaceKindOf,
+  layerAppearance,
+  layerRangeOf,
   libraryEntryOf,
   movePartWorld,
+  parsePortRef,
   rotatePart,
   selectPart,
   templateClassOf,
   useDocParts,
+  useLayerStore,
   activeWavelengthUm,
   isSourceOn,
   useDocPaths,
@@ -77,6 +82,7 @@ function SchematicPart({
   onPinClick,
   setOrbitEnabled,
   colors,
+  dimmed = false,
 }: {
   part: DocPart;
   settings: SchematicSettings;
@@ -84,6 +90,8 @@ function SchematicPart({
   onPinClick: (ref: PortRef) => void;
   setOrbitEnabled: (v: boolean) => void;
   colors: SceneColors;
+  /** WP-65: the part's layer is dimmed — low opacity, non-interactive. */
+  dimmed?: boolean;
 }) {
   const selectedId = useSelectedPartId();
   const selected = selectedId === part.id;
@@ -221,37 +229,45 @@ function SchematicPart({
 
   const color = GLYPH_COLORS[part.category];
 
-  return (
-    <group position={pos}>
-      <group
-        quaternion={quat}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerOver={e => {
+  // WP-65: a dimmed layer is non-interactive — no pointer handlers means R3F
+  // never raycasts these meshes, so clicks fall through to parts behind.
+  const handlers = dimmed
+    ? {}
+    : {
+        onPointerDown,
+        onPointerMove,
+        onPointerUp: endDrag,
+        onPointerOver: (e: ThreeEvent<PointerEvent>) => {
           e.stopPropagation();
           setHovered(true);
           document.body.style.cursor = chaining ? 'crosshair' : 'grab';
-        }}
-        onPointerOut={() => {
+        },
+        onPointerOut: () => {
           setHovered(false);
           document.body.style.cursor = 'auto';
-        }}
-      >
+        },
+      };
+
+  return (
+    <group position={pos}>
+      <group quaternion={quat} {...handlers}>
         <group quaternion={glyphQuat}>
           {/* WP-48: an authored symbol replaces the derived glyph — looks
               only, the pins above still come from optics.ports. An unreachable
               asset falls back to the derived glyph rather than drawing
               nothing. */}
           {symbolSvg ? (
-            <AuthoredSymbol svg={symbolSvg} color={glyphTint ?? GLYPH_COLORS[part.category]} />
+            <AuthoredSymbol
+              svg={symbolSvg}
+              color={dimmed ? '#6b7280' : (glyphTint ?? GLYPH_COLORS[part.category])}
+            />
           ) : (
             <SchematicGlyph
               category={part.category}
               label={part.ref}
               foldDeg={foldDeg}
               tint={glyphTint}
-              dimmed={sourceOff}
+              dimmed={sourceOff || dimmed}
               interfaceKind={ifaceKind}
             />
           )}
@@ -282,6 +298,7 @@ function SchematicPart({
         position={[0, 26, 0]}
         fontSize={7}
         color={selected ? colors.labelSelected : colors.label}
+        fillOpacity={dimmed ? 0.35 : 1}
         anchorX="center"
         anchorY="bottom"
         outlineWidth={0.4}
@@ -290,21 +307,24 @@ function SchematicPart({
         {part.ref}
       </Text>
 
-      {/* Port pins (world-anchored to the part, rotate with it). */}
-      <group quaternion={quat}>
-        {ports.map(port => (
-          <PortPin
-            key={port.name}
-            port={port}
-            partSelected={selected || hovered || chaining}
-            color={color}
-            onClick={() => onPinClick(port.ref)}
-          />
-        ))}
-      </group>
+      {/* Port pins (world-anchored to the part, rotate with it). Dimmed
+          layers are non-interactive — no pins (WP-65). */}
+      {!dimmed && (
+        <group quaternion={quat}>
+          {ports.map(port => (
+            <PortPin
+              key={port.name}
+              port={port}
+              partSelected={selected || hovered || chaining}
+              color={color}
+              onClick={() => onPinClick(port.ref)}
+            />
+          ))}
+        </group>
+      )}
 
       {/* Free-yaw ring when selected. */}
-      {selected && (
+      {selected && !dimmed && (
         <YawRing part={part} snap={settings.snapYaw} setOrbitEnabled={setOrbitEnabled} />
       )}
 
@@ -318,7 +338,7 @@ function SchematicPart({
           <lineBasicMaterial
             color={selected ? '#FFAA00' : colors.gridSection}
             transparent
-            opacity={selected ? 0.8 : 0.35}
+            opacity={selected ? 0.8 : dimmed ? 0.12 : 0.35}
           />
         </lineSegments>
       )}
@@ -458,20 +478,43 @@ function YawRing({
 
 // ── paths + rays ──────────────────────────────────────────────────────────────
 
-function PathLines({ parts, paths, draft }: { parts: DocPart[]; paths: DocPath[]; draft: PortRef[] | null }) {
+function PathLines({
+  parts,
+  paths,
+  draft,
+  visibleIds,
+}: {
+  parts: DocPart[];
+  paths: DocPath[];
+  draft: PortRef[] | null;
+  /** WP-65: path lines only run between VISIBLE parts — a chain through a
+   * hidden layer breaks into separate runs instead of bridging the gap. */
+  visibleIds: ReadonlySet<string>;
+}) {
   const lines = useMemo(() => {
     const resolved: { name: string; points: [number, number, number][]; draft: boolean }[] = [];
     const collect = (name: string, chain: PortRef[], isDraft: boolean) => {
-      const points = chain
-        .map(ref => resolvePortRef(parts, ref))
-        .filter((p): p is Vec3 => p !== null)
-        .map(toThree);
-      if (points.length >= 2) resolved.push({ name, points, draft: isDraft });
+      let run: [number, number, number][] = [];
+      let segment = 0;
+      const flush = () => {
+        if (run.length >= 2) {
+          resolved.push({ name: `${name}#${segment++}`, points: run, draft: isDraft });
+        }
+        run = [];
+      };
+      for (const ref of chain) {
+        const p = visibleIds.has(parsePortRef(ref).partId)
+          ? resolvePortRef(parts, ref)
+          : null;
+        if (p) run.push(toThree(p));
+        else flush();
+      }
+      flush();
     };
     for (const path of paths) collect(path.name, path.chain, false);
     if (draft) collect('draft', draft, true);
     return resolved;
-  }, [parts, paths, draft]);
+  }, [parts, paths, draft, visibleIds]);
 
   return (
     <>
@@ -499,10 +542,25 @@ function PathLines({ parts, paths, draft }: { parts: DocPart[]; paths: DocPath[]
  * constraint, so it must not read as a straight optical path. It sags toward
  * the working plane and is drawn in the amber "patch cord" tint.
  */
-function FiberLines({ parts, fibers }: { parts: DocPart[]; fibers: DocFiber[] }) {
+function FiberLines({
+  parts,
+  fibers,
+  visibleIds,
+}: {
+  parts: DocPart[];
+  fibers: DocFiber[];
+  /** WP-65: a cord with either connector on a hidden layer is not drawn. */
+  visibleIds: ReadonlySet<string>;
+}) {
   const curves = useMemo(() => {
     const out: { id: string; points: [number, number, number][] }[] = [];
     for (const fiber of fibers) {
+      if (
+        !visibleIds.has(parsePortRef(fiber.from).partId) ||
+        !visibleIds.has(parsePortRef(fiber.to).partId)
+      ) {
+        continue;
+      }
       const a = resolvePortRef(parts, fiber.from);
       const b = resolvePortRef(parts, fiber.to);
       if (!a || !b) continue;
@@ -520,7 +578,7 @@ function FiberLines({ parts, fibers }: { parts: DocPart[]; fibers: DocFiber[] })
       });
     }
     return out;
-  }, [parts, fibers]);
+  }, [parts, fibers, visibleIds]);
 
   return (
     <>
@@ -596,6 +654,32 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
   // reappears when the document changes under them (WP-15).
   const simFreshness = useSimFreshness();
 
+  // WP-65: per-part layer appearance. Hidden layers unmount (no raycast),
+  // dimmed layers render faint and non-interactive.
+  const layerVis = useLayerStore();
+  const appearances = useMemo(() => {
+    const range = layerRangeOf(parts);
+    const map = new Map<string, LayerAppearance>();
+    for (const part of parts) {
+      const c = classifyPart(part, range);
+      map.set(part.id, layerAppearance(c.layer, c.interface, layerVis));
+    }
+    return map;
+  }, [parts, layerVis]);
+  const visibleIds = useMemo(
+    () =>
+      new Set(
+        parts.filter(p => appearances.get(p.id) !== 'hidden').map(p => p.id),
+      ),
+    [parts, appearances],
+  );
+  // A part hidden while selected gets deselected — Del must never nuke an
+  // invisible part (WP-65 placement/delete guard).
+  const selectedId = useSelectedPartId();
+  useEffect(() => {
+    if (selectedId && appearances.get(selectedId) === 'hidden') selectPart(null);
+  }, [selectedId, appearances]);
+
   return (
     <>
       <hemisphereLight args={['#ffffff', '#8a929c', 0.7]} />
@@ -649,21 +733,24 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
       <axesHelper args={[80]} position={[0, planeY + 0.2, 0]} />
 
       <Suspense fallback={null}>
-        {parts.map(part => (
-          <SchematicPart
-            key={part.id}
-            part={part}
-            settings={settings}
-            chaining={chainDraft !== null}
-            onPinClick={onPinClick}
-            setOrbitEnabled={setOrbitEnabled}
-            colors={colors}
-          />
-        ))}
+        {parts
+          .filter(part => appearances.get(part.id) !== 'hidden')
+          .map(part => (
+            <SchematicPart
+              key={part.id}
+              part={part}
+              settings={settings}
+              chaining={chainDraft !== null}
+              onPinClick={onPinClick}
+              setOrbitEnabled={setOrbitEnabled}
+              colors={colors}
+              dimmed={appearances.get(part.id) === 'dimmed'}
+            />
+          ))}
       </Suspense>
 
-      <PathLines parts={parts} paths={paths} draft={chainDraft} />
-      <FiberLines parts={parts} fibers={fibers} />
+      <PathLines parts={parts} paths={paths} draft={chainDraft} visibleIds={visibleIds} />
+      <FiberLines parts={parts} fibers={fibers} visibleIds={visibleIds} />
       {settings.showRays && simFreshness !== 'fresh' && (
         <RayOverlay planeZMm={settings.planeZMm} enabled />
       )}

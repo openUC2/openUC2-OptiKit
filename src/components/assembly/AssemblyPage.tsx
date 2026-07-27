@@ -49,6 +49,7 @@ import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
 import { listPartMechanics } from '../../model/dsn/serviceExport';
 import { BomDialog } from '../bom/BomDialog';
 import { MarkerList } from '../schematic/MarkerList';
+import { LayerChips } from '../schematic/LayerChips';
 import { AssemblyScene } from './AssemblyScene';
 import { CubifyDialog } from './CubifyDialog';
 import { GenerateHolderDialog } from './GenerateHolderDialog';
@@ -180,23 +181,40 @@ export function AssemblyPage() {
               cameraRef={cameraRef}
               controlsRef={controlsRef}
             />
-            <Tooltip
-              title={lockView
-                ? 'View locked: left button selects/drags; right-drag orbits. Click to unlock.'
-                : 'View unlocked: left-drag orbits. Click to lock for part editing.'}
+            <Stack
+              direction="row" spacing={1} alignItems="center"
+              sx={{
+                position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 10,
+              }}
             >
-              <ToggleButton
-                value="lockView" size="small" selected={lockView}
-                onChange={() => setLockView(v => !v)}
+              {/* WP-65: the layer-visibility chips shared with the schematic. */}
+              <Box
                 sx={{
-                  position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-                  bgcolor: 'background.paper', boxShadow: 3, zIndex: 10,
+                  display: 'flex', alignItems: 'center', px: 1, py: 0.5,
+                  bgcolor: 'background.paper', boxShadow: 3, borderRadius: 2,
                   border: '1px solid', borderColor: 'divider',
                 }}
               >
-                {lockView ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
-              </ToggleButton>
-            </Tooltip>
+                <LayerChips />
+              </Box>
+              <Tooltip
+                title={lockView
+                  ? 'View locked: left button selects/drags; right-drag orbits. Click to unlock.'
+                  : 'View unlocked: left-drag orbits. Click to lock for part editing.'}
+              >
+                <ToggleButton
+                  value="lockView" size="small" selected={lockView}
+                  onChange={() => setLockView(v => !v)}
+                  sx={{
+                    bgcolor: 'background.paper', boxShadow: 3,
+                    border: '1px solid', borderColor: 'divider',
+                  }}
+                >
+                  {lockView ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
+                </ToggleButton>
+              </Tooltip>
+            </Stack>
             {parts.length === 0 && (
               <Alert
                 severity="info"
