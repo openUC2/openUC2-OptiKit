@@ -211,6 +211,20 @@ function PartProperties({ part }: { part: DocPart }) {
           </Tooltip>
         )}
         <Chip size="small" label={part.category} />
+        {/* WP-64: the same ?open= deep-link the assembly panel got in WP-37 —
+            straight from the placed part into its component record. */}
+        {lib?.componentId && (
+          <Tooltip title="open in the component editor">
+            <IconButton
+              size="small"
+              onClick={() =>
+                navigate(`/configurator/components?open=${encodeURIComponent(lib.componentId!)}`)
+              }
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip title="Delete part (Del)">
           <IconButton size="small" color="error" onClick={() => removePart(part.id)}>
             <DeleteIcon fontSize="small" />

@@ -284,8 +284,13 @@ export function SchematicPage() {
             open={leftOpen}
             onClose={() => setLeftOpen(false)}
             sx={{
-              width: sidebarWidth,
+              // WP-64: a closed persistent drawer must release its flex width —
+              // its root otherwise keeps reserving `sidebarWidth`, leaving a
+              // dead white strip beside the canvas (the R3F canvas only tracks
+              // its own container's size).
+              width: leftOpen ? sidebarWidth : 0,
               flexShrink: 0,
+              transition: muiTheme.transitions.create('width'),
               '& .MuiDrawer-paper': {
                 width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
                 height: '100%', top: 'auto', borderRight: `1px solid ${muiTheme.palette.divider}`,
@@ -297,7 +302,7 @@ export function SchematicPage() {
           </Drawer>
 
           <Box
-            sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}
+            sx={{ flexGrow: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}
             onDragOver={e => {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'copy';
@@ -498,8 +503,10 @@ export function SchematicPage() {
             open={rightOpen}
             onClose={() => setRightOpen(false)}
             sx={{
-              width: sidebarWidth,
+              // WP-64: see the left drawer — width 0 when closed.
+              width: rightOpen ? sidebarWidth : 0,
               flexShrink: 0,
+              transition: muiTheme.transitions.create('width'),
               '& .MuiDrawer-paper': {
                 width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
                 height: '100%', top: 'auto', borderLeft: `1px solid ${muiTheme.palette.divider}`,

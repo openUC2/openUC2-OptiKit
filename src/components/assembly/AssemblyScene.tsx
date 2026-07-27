@@ -26,6 +26,7 @@ import {
   captureUndo,
   commitUndo,
   docQuatToThree,
+  interfaceKindOf,
   renderInfoOf,
   rot24Matrix,
   selectPart,
@@ -327,7 +328,14 @@ function AssemblyPart({
       <group position={[insertPos[0] - shellPos[0], insertPos[1] - shellPos[1], insertPos[2] - shellPos[2]]}>
         <group quaternion={insertQuat} scale={0.55}>
           <group quaternion={insertAxisQuat}>
-            <SchematicGlyph category={part.category} label={part.ref} foldDeg={insertFoldDeg} />
+            {/* WP-64: interface parts (plates/puzzle/baseplates) share the
+                schematic's distinct flat glyphs here too. */}
+            <SchematicGlyph
+              category={part.category}
+              label={part.ref}
+              foldDeg={insertFoldDeg}
+              interfaceKind={interfaceKindOf(part.libraryRef)}
+            />
           </group>
         </group>
       </group>

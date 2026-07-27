@@ -172,7 +172,7 @@ export function AssemblyPage() {
   return (
     <>
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
+          <Box sx={{ flexGrow: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
             <AssemblyScene
               mechanics={mechanics}
               unboundIds={unboundIds}
@@ -212,8 +212,12 @@ export function AssemblyPage() {
             anchor="right"
             open={rightOpen}
             sx={{
-              width: sidebarWidth,
+              // WP-64: a closed persistent drawer must release its flex width
+              // (same fix as the schematic page) or the canvas keeps a dead
+              // white strip.
+              width: rightOpen ? sidebarWidth : 0,
               flexShrink: 0,
+              transition: muiTheme.transitions.create('width'),
               '& .MuiDrawer-paper': {
                 width: sidebarWidth, boxSizing: 'border-box', position: 'relative',
                 height: '100%', top: 'auto', borderLeft: `1px solid ${muiTheme.palette.divider}`,

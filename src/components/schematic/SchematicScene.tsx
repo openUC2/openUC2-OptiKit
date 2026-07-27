@@ -13,6 +13,7 @@ import { GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, Text } from '@re
 import type { DocFiber, DocPart, DocPath, PortRef, Vec3 } from '../../document';
 import {
   docQuatToThree,
+  interfaceKindOf,
   libraryEntryOf,
   movePartWorld,
   rotatePart,
@@ -132,6 +133,8 @@ function SchematicPart({
     part.category === 'source' ? sourceTint(activeWavelengthUm(part)) : null;
   // WP-48: an authored symbol, when the record ships one AND it loads.
   const symbolSvg = useAuthoredSymbol(libraryEntryOf(part.libraryRef)?.symbolUrl ?? null);
+  // WP-64: plates / puzzle joints / baseplates draw a distinct flat glyph.
+  const ifaceKind = useMemo(() => interfaceKindOf(part.libraryRef), [part.libraryRef]);
 
   const intersectDragPlane = useCallback(
     (e: ThreeEvent<PointerEvent>, mode: 'plane' | 'height'): Vec3 | null => {
@@ -249,6 +252,7 @@ function SchematicPart({
               foldDeg={foldDeg}
               tint={glyphTint}
               dimmed={sourceOff}
+              interfaceKind={ifaceKind}
             />
           )}
           <OpticalAxisArrow

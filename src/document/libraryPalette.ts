@@ -444,6 +444,28 @@ export function templateClassOf(libraryRef: string): TemplateClass | null {
   return LIB_ENTRIES.get(libraryRef)?.templateClass ?? null;
 }
 
+/** WP-64: structural "interface zone" part kinds — the sandwich plates,
+ * puzzle joints and baseplates living in the 5 mm layer between cube levels
+ * (placed e.g. by WP-53 groups). */
+export type InterfaceKind = 'plate' | 'puzzle' | 'baseplate';
+
+/**
+ * Derive the interface kind of a library ref (WP-64) so the scenes can draw
+ * these mechanics parts as distinct flat glyphs instead of generic blobs.
+ * Name patterns come first — 'baseplate' before 'plate', and a leading
+ * separator guard keeps `frame_wellplate_…` from reading as a plate — then
+ * the record's template `carrier` flag (FRAME bodies, baseplates) catches
+ * carriers whose ids match no pattern.
+ */
+export function interfaceKindOf(libraryRef: string): InterfaceKind | null {
+  const id = libraryRef.toLowerCase();
+  if (/(^|[._-])baseplate/.test(id)) return 'baseplate';
+  if (/puzzle/.test(id)) return 'puzzle';
+  if (/(^|[._-])plate/.test(id)) return 'plate';
+  if (LIB_ENTRIES.get(libraryRef)?.carrier) return 'baseplate';
+  return null;
+}
+
 /** True when a palette module id came from the record registry (WP-43): the
  * robust "is this a library part?" test, independent of its display group. */
 export function isLibraryModule(id: string): boolean {

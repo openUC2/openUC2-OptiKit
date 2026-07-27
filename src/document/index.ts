@@ -72,10 +72,11 @@ export {
   registerLibraryGroups,
   groupEntriesFromIndex,
   groupEntryOf,
+  interfaceKindOf,
   listLibraryGroups,
   templateClassOf,
 } from './libraryPalette';
-export type { LibraryDof, LibraryGroupEntry, LibraryPaletteEntry, TemplateClass } from './libraryPalette';
+export type { InterfaceKind, LibraryDof, LibraryGroupEntry, LibraryPaletteEntry, TemplateClass } from './libraryPalette';
 export {
   DOC_PARAMS_KEY,
   docPosToThree,

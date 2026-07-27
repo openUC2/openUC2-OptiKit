@@ -10,8 +10,9 @@
  * normal-incidence mirror draws a perpendicular one.
  */
 
+import * as THREE from 'three';
 import { Line, Text } from '@react-three/drei';
-import type { DocCategory } from '../../document';
+import type { DocCategory, InterfaceKind } from '../../document';
 import { GLYPH_COLORS } from './colors';
 
 /** Overlay lines must never intercept pointer raycasts. */
@@ -135,6 +136,116 @@ function SampleGlyph({ color }: { color: string }) {
   );
 }
 
+// ── interface-zone glyphs (WP-64) ────────────────────────────────────────────
+// Plates, puzzle joints and baseplates live in the 5 mm interface layer; the
+// generic blob made a placed miniframe group read as a cloud of identical
+// boxes. These stay deliberately subtle: flat outlines + a dim label.
+
+/** Notched square: the UC2 puzzle-piece footprint, extruded 2 mm and laid
+ * flat (shape XY → scene ground plane). */
+const PUZZLE_GEOMETRY = (() => {
+  const s = new THREE.Shape();
+  const h = 8; // half-size of the square
+  const nw = 3; // notch half-width
+  const nd = 4; // notch depth
+  s.moveTo(-h, -h);
+  s.lineTo(h, -h);
+  s.lineTo(h, h);
+  s.lineTo(nw, h);
+  s.lineTo(nw, h - nd);
+  s.lineTo(-nw, h - nd);
+  s.lineTo(-nw, h);
+  s.lineTo(-h, h);
+  s.closePath();
+  const geo = new THREE.ExtrudeGeometry(s, { depth: 2, bevelEnabled: false });
+  geo.translate(0, 0, -1);
+  return geo;
+})();
+const PUZZLE_EDGES = new THREE.EdgesGeometry(PUZZLE_GEOMETRY);
+
+const PLATE_GEOMETRY = new THREE.BoxGeometry(44, 1.6, 44);
+const PLATE_EDGES = new THREE.EdgesGeometry(PLATE_GEOMETRY);
+const BASEPLATE_GEOMETRY = new THREE.BoxGeometry(48, 1.2, 48);
+const BASEPLATE_EDGES = new THREE.EdgesGeometry(BASEPLATE_GEOMETRY);
+
+/** Part ref at reduced prominence — the interface parts must stay quiet. */
+function InterfaceLabel({ label }: { label: string }) {
+  return (
+    <Text
+      position={[0, 4, 0]}
+      fontSize={4.5}
+      color="#9aa4af"
+      fillOpacity={0.85}
+      anchorX="center"
+      anchorY="bottom"
+    >
+      {label}
+    </Text>
+  );
+}
+
+function InterfaceGlyph({
+  kind,
+  color,
+  label,
+}: {
+  kind: InterfaceKind;
+  color: string;
+  label: string;
+}) {
+  if (kind === 'puzzle') {
+    return (
+      <group>
+        <mesh geometry={PUZZLE_GEOMETRY} rotation={[-Math.PI / 2, 0, 0]}>
+          <meshStandardMaterial color={color} transparent opacity={0.35} roughness={0.7} />
+        </mesh>
+        <lineSegments geometry={PUZZLE_EDGES} rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
+          <lineBasicMaterial color={color} transparent opacity={0.9} />
+        </lineSegments>
+        <InterfaceLabel label={label} />
+      </group>
+    );
+  }
+  const plate = kind === 'plate';
+  return (
+    <group>
+      <mesh geometry={plate ? PLATE_GEOMETRY : BASEPLATE_GEOMETRY}>
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={plate ? 0.3 : 0.18}
+          roughness={0.8}
+        />
+      </mesh>
+      <lineSegments geometry={plate ? PLATE_EDGES : BASEPLATE_EDGES} raycast={NO_RAYCAST}>
+        <lineBasicMaterial color={color} transparent opacity={0.9} />
+      </lineSegments>
+      {/* Inner cross: a baseplate reads as a gridded carrier, not a lid. */}
+      {!plate && (
+        <>
+          <Line
+            raycast={NO_RAYCAST}
+            points={[[-24, 1, 0], [24, 1, 0]]}
+            color={color}
+            lineWidth={1}
+            transparent
+            opacity={0.5}
+          />
+          <Line
+            raycast={NO_RAYCAST}
+            points={[[0, 1, -24], [0, 1, 24]]}
+            color={color}
+            lineWidth={1}
+            transparent
+            opacity={0.5}
+          />
+        </>
+      )}
+      <InterfaceLabel label={label} />
+    </group>
+  );
+}
+
 function FallbackGlyph({ color, label }: { color: string; label: string }) {
   return (
     <group>
@@ -193,6 +304,7 @@ export function SchematicGlyph({
   foldDeg = null,
   tint = null,
   dimmed = false,
+  interfaceKind = null,
 }: {
   category: DocCategory;
   label: string;
@@ -202,6 +314,10 @@ export function SchematicGlyph({
   tint?: string | null;
   /** WP-47: a source that is switched off reads greyed out. */
   dimmed?: boolean;
+  /** WP-64: structural interface-zone parts (plate/puzzle/baseplate) draw a
+   * distinct flat glyph instead of the generic blob. Only consulted for
+   * categories without a dedicated glyph ('other' mechanics records). */
+  interfaceKind?: InterfaceKind | null;
 }) {
   const color = dimmed ? '#6b7280' : (tint ?? GLYPH_COLORS[category]);
   // 180° (normal incidence) is the safe default when no fold is known.
@@ -235,6 +351,7 @@ export function SchematicGlyph({
     case 'display':
       return <MirrorGlyph color={color} foldDeg={fold} />;
     default:
+      if (interfaceKind) return <InterfaceGlyph kind={interfaceKind} color={color} label={label} />;
       return <FallbackGlyph color={color} label={label} />;
   }
 }

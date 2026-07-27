@@ -43,7 +43,6 @@ import {
   LightMode as LightModeIcon,
   Science as SimulationIcon,
   School as SchoolIcon,
-  ThreeDRotation as View3DIcon,
   ViewInAr as CadIcon
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
@@ -603,28 +602,6 @@ openUC2 team via GitHub repository
               >
                 <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
                   Grid
-                </Typography>
-              </Button>
-            </Tooltip>
-          )}
-          {isEditorPage && (
-            <Tooltip title="The 3D cube view lives in the Assembly now (WP-37)">
-              <Button
-                color="inherit"
-                startIcon={<View3DIcon />}
-                onClick={() => navigate('/configurator/assembly')}
-                size="small"
-                sx={{
-                  textTransform: 'none',
-                  minWidth: { xs: '40px', sm: 'auto' },
-                  px: { xs: 1, sm: 2 },
-                  '& .MuiButton-startIcon': {
-                    mr: { xs: 0, sm: 1 }
-                  }
-                }}
-              >
-                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  Assembly (3D)
                 </Typography>
               </Button>
             </Tooltip>
