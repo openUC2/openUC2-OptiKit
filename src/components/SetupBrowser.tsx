@@ -76,6 +76,60 @@ interface SetupAnalysisData {
   [key: string]: string | number | boolean | string[] | undefined; // For component columns
 }
 
+// Pure CSV helpers (module level so the fetch callbacks have no hook deps).
+const parseCsvLine = (line: string): string[] => {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ';' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+};
+
+const parseSetupAnalysisCsv = (csvText: string): SetupAnalysisData[] => {
+  const lines = csvText.split('\n').filter(line => line.trim());
+  if (lines.length < 2) return [];
+
+  const headers = parseCsvLine(lines[0]);
+  const data: SetupAnalysisData[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCsvLine(lines[i]);
+    if (values.length >= headers.length) {
+      const row: Record<string, string | number | boolean> = {};
+      headers.forEach((header, index) => {
+        const value = values[index] || '';
+        // Convert specific fields to appropriate types
+        if (header === 'uc2_verified') {
+          row[header] = value.toLowerCase() === 'true';
+        } else if (header === 'total_components') {
+          row[header] = parseInt(value) || 0;
+        } else if (header.startsWith('component_')) {
+          row[header] = parseInt(value) || 0;
+        } else {
+          row[header] = value;
+        }
+      });
+      data.push(row as SetupAnalysisData);
+    }
+  }
+
+  return data;
+};
+
 export const SetupBrowser: React.FC = () => {
   const navigate = useNavigate();
   const { importFromUrl, exportData, setRemoteSourcePath } = useAppStore();
@@ -107,59 +161,6 @@ export const SetupBrowser: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const [sortBy, setSortBy] = useState<'name' | 'category'>('name');
-
-  const parseCsvLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ';' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    
-    result.push(current.trim());
-    return result;
-  };
-
-  const parseSetupAnalysisCsv = (csvText: string): SetupAnalysisData[] => {
-    const lines = csvText.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
-    
-    const headers = parseCsvLine(lines[0]);
-    const data: SetupAnalysisData[] = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCsvLine(lines[i]);
-      if (values.length >= headers.length) {
-        const row: Record<string, string | number | boolean> = {};
-        headers.forEach((header, index) => {
-          const value = values[index] || '';
-          // Convert specific fields to appropriate types
-          if (header === 'uc2_verified') {
-            row[header] = value.toLowerCase() === 'true';
-          } else if (header === 'total_components') {
-            row[header] = parseInt(value) || 0;
-          } else if (header.startsWith('component_')) {
-            row[header] = parseInt(value) || 0;
-          } else {
-            row[header] = value;
-          }
-        });
-        data.push(row as SetupAnalysisData);
-      }
-    }
-    
-    return data;
-  };
 
   const fetchCollections = useCallback(async () => {
     try {

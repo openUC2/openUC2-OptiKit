@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
 import { AppShell } from './components/AppShell'
-import { EditorPage } from './components/EditorPage'
 import { SetupBrowser } from './components/SetupBrowser'
 import { CollectionView } from './components/CollectionView'
 import { FrameWizardPage } from './components/FrameWizardPage'
@@ -42,12 +41,11 @@ const DesignDetailPage = lazy(() =>
 );
 
 function App() {
-  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo, setStartupDialogClosed } = useAppStore();
+  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo } = useAppStore();
   const [showStartupDialog, setShowStartupDialog] = useState(false);
 
   const handleCloseStartupDialog = () => {
     setShowStartupDialog(false);
-    setStartupDialogClosed(true);
   };
 
   useEffect(() => {
@@ -112,9 +110,6 @@ function App() {
       if (!hasVisitedBefore && isMainPage) {
         setShowStartupDialog(true);
         localStorage.setItem('optikit-visited', 'true');
-      } else {
-        // If no startup dialog is shown, mark it as closed immediately for tutorial timing
-        setStartupDialogClosed(true);
       }
       
       // Check for URL parameters to load a layout
@@ -162,7 +157,7 @@ function App() {
       clearInterval(saveInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, setStartupDialogClosed]);
+  }, [loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData]);
 
   // Every route renders inside the shared AppShell (WP-24). Feedback round 3:
   // the LIGHT brand theme (guide body colours #FAF9F9/white) is the default
@@ -178,11 +173,12 @@ function App() {
       <Router basename="">
         <Routes>
           {/* The landing is the front door (design Screen 01, July 2026);
-              the schematic editor lives at /configurator/schematic and the
-              legacy 2D grid builder at /configurator/grid. */}
+              the schematic editor lives at /configurator/schematic. */}
           <Route path="/configurator" element={light(<HomePage />)} />
           <Route path="/configurator/" element={light(<HomePage />)} />
-          <Route path="/configurator/grid" element={light(<EditorPage />)} />
+          {/* WP-69: the legacy Konva 2D grid builder is retired — the
+              schematic (2.5D) is the editor surface. Redirect + notice. */}
+          <Route path="/configurator/grid" element={<Navigate to="/configurator/schematic?from=grid" replace />} />
           <Route path="/configurator/frame" element={light(<FrameWizardPage />)} />
           <Route path="/configurator/setups" element={light(<SetupBrowser />)} />
           {/* Community surfaces (OptiKit Platform design, July 2026): landing,
@@ -198,8 +194,7 @@ function App() {
           <Route path="/configurator/assembly" element={light(<AssemblyPage />)} />
           <Route path="/configurator/bind" element={light(<BindPage />)} />
           <Route path="/configurator/:collectionName" element={light(<CollectionView />)} />
-          {/* The landing is the front door (design Screen 01); the legacy
-              grid builder stays at /configurator/grid. */}
+          {/* The landing is the front door (design Screen 01). */}
           <Route path="/" element={light(<HomePage />)} />
           <Route path="/setups" element={light(<SetupBrowser />)} />
           <Route path="/:collectionName" element={light(<CollectionView />)} />

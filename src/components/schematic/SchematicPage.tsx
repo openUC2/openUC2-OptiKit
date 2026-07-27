@@ -7,10 +7,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Box,
   Drawer,
   IconButton,
   Paper,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
@@ -84,6 +86,11 @@ export function SchematicPage() {
   };
   // The live BOM (WP-50) — shared dialog, also mounted from the assembly.
   const [bomOpen, setBomOpen] = useState(false);
+  // WP-69: the legacy Konva grid builder retired here (same pattern as the
+  // WP-37 View-3D retirement on the assembly page).
+  const [showRetireNotice, setShowRetireNotice] = useState(
+    () => new URLSearchParams(window.location.search).get('from') === 'grid',
+  );
   // WP-66: right-drawer tab — "Design" (properties + service) | "Modules".
   const [rightTab, setRightTab] = useState<'design' | 'modules'>('design');
   const [chainDraft, setChainDraft] = useState<PortRef[] | null>(null);
@@ -564,6 +571,17 @@ export function SchematicPage() {
               <ModulesPanel onZoomToPart={zoomToPart} />
             </Box>
           </Drawer>
+      <Snackbar
+        open={showRetireNotice}
+        autoHideDuration={8000}
+        onClose={() => setShowRetireNotice(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="info" onClose={() => setShowRetireNotice(false)}>
+          The 2D grid builder has retired — the schematic is the editor now.
+          Your design carried over; the assembly view renders it in 3D.
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

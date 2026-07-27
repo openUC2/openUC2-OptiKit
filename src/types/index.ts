@@ -81,17 +81,6 @@ export interface Layer {
   visible: boolean;
 }
 
-export interface GridConfig {
-  cellSize: number; // 50mm in pixels
-  gridVisible: boolean;
-  snapEnabled: boolean;
-}
-
-export interface ViewportConfig {
-  zoom: number;
-  pan: Point;
-}
-
 // Simplified state snapshot for undo/redo
 export interface StateSnapshot {
   placedModules: PlacedModule[];
@@ -147,29 +136,18 @@ export interface SelectedItem {
 export interface AppState {
   modules: ModuleDefinition[];
   placedModules: PlacedModule[];
+  /** Legacy-setup annotations — kept as round-trip data (import/export);
+   *  the annotation drawing tools retired with the grid builder (WP-69). */
   annotations: Annotation[];
   layers: Layer[];
   activeLayerId: string;
   selectedItemId: string | null;
   selectedItemType: 'module' | 'annotation' | null;
-  selectedItems: SelectedItem[]; // For multiple selection
-  selectionMode: 'single' | 'multiple';
-  grid: GridConfig;
-  viewport: ViewportConfig;
+  selectedItems: SelectedItem[];
   history: StateSnapshot[]; // Command history for undo/redo
   historyIndex: number;
-  annotationMode: 'none' | 'line' | 'arrow' | 'text' | 'optical-axis';
   setupMetadata: SetupMetadata;
-  // UI state
-  activeRightTab: 'layers' | 'properties' | 'simulation' | 'bom' | 'annotations' | 'chat';
   notifications: Notification[];
-  // Tutorial state
-  tutorialCompleted: boolean;
-  startupDialogClosed: boolean;
-  // Chat state
-  chat: ChatState;
-  // Clipboard for copy/cut/paste
-  clipboard: PlacedModule[];
   // Path of the remotely loaded setup (for overwrite-save)
   remoteSourcePath: string;
 }
@@ -211,29 +189,6 @@ export interface CompactAnnotation {
 export interface CompactExport {
   m: CompactModule[];
   a?: CompactAnnotation[];
-}
-
-// Chat-related interfaces
-export interface ChatMessage {
-  id: string;
-  chatPartner: 'user' | 'bot';
-  message: string;
-  attachment?: string; // JSON string for configuration data
-  timestamp: string;
-  sessionId: string;
-}
-
-export interface ChatSession {
-  sessionId: string;
-  messages: ChatMessage[];
-  lastPolled: string;
-}
-
-export interface ChatState {
-  currentSession: ChatSession | null;
-  isLoading: boolean;
-  isSending: boolean;
-  error: string | null;
 }
 
 // ImSwitch Configuration types

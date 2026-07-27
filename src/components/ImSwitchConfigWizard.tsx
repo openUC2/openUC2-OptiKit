@@ -204,7 +204,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
       
       // Handle incomplete JSON - add missing closing braces
       let openBraces = 0;
-      for (let char of cleanedString) {
+      for (const char of cleanedString) {
         if (char === '{') openBraces++;
         if (char === '}') openBraces--;
       }
@@ -249,7 +249,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
         
         // Handle incomplete JSON - count braces and add missing ones
         let openBraces = 0;
-        for (let char of altString) {
+        for (const char of altString) {
           if (char === '{') openBraces++;
           if (char === '}') openBraces--;
         }
@@ -274,7 +274,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
         // Last resort: try to extract key-value pairs manually
         try {
           console.log('Attempting manual extraction...');
-          const result: any = {};
+          const result: Record<string, unknown> = {};
           
           // Look for patterns like "key":{...}
           const patterns = [
@@ -290,7 +290,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
               
               // Count braces in the value to ensure proper closing
               let openBraces = 1; // We already have the opening brace
-              for (let char of value) {
+              for (const char of value) {
                 if (char === '{') openBraces++;
                 if (char === '}') openBraces--;
               }
@@ -304,7 +304,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
                 const parsedValue = JSON.parse(`{${value}}`);
                 result[key] = parsedValue;
                 console.log(`Manually extracted ${key}:`, parsedValue);
-              } catch (e) {
+              } catch {
                 console.warn(`Failed to parse manually extracted value for ${key}:`, value);
               }
             }

@@ -476,7 +476,6 @@ function applyLensRefraction(
 
   // Default: thin lens — ray bends at the physical surface
   let principalPlaneOrigin: SimPoint = intersection.point;
-  let heightAtPrincipalPlane: number;
 
   if (Math.abs(principalPlaneOffset) > EPSILON) {
     // Advance the incoming ray from the physical lens surface to the principal plane.
@@ -494,7 +493,7 @@ function applyLensRefraction(
   }
 
   // Height is measured as perpendicular offset from the element's optical axis
-  heightAtPrincipalPlane = vec2Dot(
+  const heightAtPrincipalPlane = vec2Dot(
     vec2Sub(principalPlaneOrigin, intersection.element.position),
     perpAxis
   );

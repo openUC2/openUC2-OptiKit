@@ -17,27 +17,18 @@ import {
 import {
   Undo as UndoIcon,
   Redo as RedoIcon,
-  CenterFocusStrong as CenterIcon,
-  Timeline as LineIcon,
-  ArrowForward as ArrowIcon,
-  MoreHoriz as OpticalAxisIcon,
-  TextFields as TextIcon,
   Save as SaveIcon,
   Email as EmailIcon,
   FolderOpen as ImportIcon,
   Language as UrlIcon,
-  PhotoCamera as ScreenshotIcon,
   Archive as STLIcon,
   GitHub as GitHubIcon,
-  Help as HelpIcon,
   Lock as PrivacyIcon,
   Clear as ClearIcon,
   Link as LinkIcon,
   Dashboard as SetupIcon,
   Edit as EditorIcon,
   Forum as ForumIcon,
-  SelectAll as SelectIcon,
-  Delete as DeleteIcon,
   Memory as ImSwitchIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
@@ -47,7 +38,6 @@ import {
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import { useAppStore } from '../stores/appStore';
-import { useSimulationStore } from '../stores/simulationStore';
 import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
@@ -66,17 +56,15 @@ export const Toolbar: React.FC = () => {
   const isComponentEditor = location.pathname.startsWith('/configurator/components');
   const isAssembly = location.pathname.startsWith('/configurator/assembly');
   const isBind = location.pathname.startsWith('/configurator/bind');
-  const is2DEditor = location.pathname === '/configurator/grid' || location.pathname === '/';
-  // The 2D, 3D, schematic and assembly editors share the same toolbar
-  // (edit/annotate/file/save); they differ only in the center surface.
+  // The schematic, component, assembly and bind editors share the same
+  // toolbar (edit/file/save); they differ only in the center surface.
   const isEditorPage =
-    is2DEditor || isThreeD || isSchematic || isComponentEditor || isAssembly || isBind;
+    isThreeD || isSchematic || isComponentEditor || isAssembly || isBind;
 
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
   const [imSwitchWizardOpen, setImSwitchWizardOpen] = React.useState(false);
   const [editMenuAnchor, setEditMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [annotateMenuAnchor, setAnnotateMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [helpMenuAnchor, setHelpMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [guidesOpen, setGuidesOpen] = React.useState(false);
@@ -88,19 +76,11 @@ export const Toolbar: React.FC = () => {
     saveToGitHub,
     saveToGitHubOverwrite,
     downloadSTLBundle,
-    importData, 
+    importData,
     importFromUrl,
-    undo, 
+    undo,
     redo,
-    centerView,
-    annotationMode,
-    setAnnotationMode,
-    downloadScreenshot,
     clearAll,
-    selectionMode,
-    setSelectionMode,
-    deleteSelectedItems,
-    selectedItems,
     remoteSourcePath,
     addNotification
   } = useAppStore();
@@ -300,49 +280,6 @@ Best regards`;
       downloadSTLBundle(password);
     } else if (password !== null) {
       alert('Incorrect password. Access denied.');
-    }
-  };
-
-  const handleHelp = () => {
-    // Check if tutorial restart function is available
-    if ((window as any).restartTutorial) {
-      (window as any).restartTutorial();
-    } else {
-      // Fallback to showing help text
-      const helpContent = `
-OpenUC2 OptiKit - 2D Grid Builder Help
-
-BASIC USAGE:
-• Drag components from the Part Library to the grid
-• Click components to select and view properties
-• Use the rotate button to rotate selected components
-• Use layer panel to work with different Z-levels
-
-NAVIGATION:
-• Mouse wheel: Zoom in/out
-• Drag background: Pan the view
-• Center button: Reset view to center
-
-ANNOTATIONS:
-• Line tool: Click to start, click again to finish
-• Arrow tool: Click to start, click again to finish
-• Optical Axis: Dashed line for optical paths
-• Text tool: Click to place text
-
-EXPORT/IMPORT:
-• Save: Export layout to JSON file
-• Share: Send layout via email
-• Import: Load layout from JSON file
-• Screenshot: Download PNG image of assembly
-
-SHORTCUTS:
-• Snap toggle: Enable/disable snap-to-grid
-• Undo/Redo: Navigate through changes
-
-Click this Help button again to restart the tutorial!
-`;
-      
-      alert(helpContent);
     }
   };
 
@@ -587,25 +524,6 @@ openUC2 team via GitHub repository
             </Tooltip>
           )}
           {isEditorPage && <SyncChip />}
-          {isEditorPage && (
-            <Tooltip title="Legacy 2D grid builder">
-              <Button
-                color="inherit"
-                onClick={() => navigate('/configurator/grid')}
-                size="small"
-                sx={{
-                  textTransform: 'none',
-                  minWidth: { xs: '40px', sm: 'auto' },
-                  px: { xs: 1, sm: 2 },
-                  fontWeight: is2DEditor ? 700 : 400,
-                }}
-              >
-                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  Grid
-                </Typography>
-              </Button>
-            </Tooltip>
-          )}
         </Box>
 
         <Divider 
@@ -642,57 +560,9 @@ openUC2 team via GitHub repository
                 <ListItemText>Redo</ListItemText>
               </MenuItem>
               <Divider />
-              <MenuItem onClick={() => { setSelectionMode(selectionMode === 'single' ? 'multiple' : 'single'); setEditMenuAnchor(null); }}>
-                <ListItemIcon><SelectIcon color={selectionMode === 'multiple' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>{selectionMode === 'single' ? 'Multi-Select Mode' : 'Single-Select Mode'}</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { centerView(); setEditMenuAnchor(null); }}>
-                <ListItemIcon><CenterIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Center View</ListItemText>
-              </MenuItem>
-              {selectedItems.length > 1 && (
-                <MenuItem onClick={() => { deleteSelectedItems(); setEditMenuAnchor(null); }}>
-                  <ListItemIcon><DeleteIcon color="error" fontSize="small" /></ListItemIcon>
-                  <ListItemText>Delete Selected ({selectedItems.length})</ListItemText>
-                </MenuItem>
-              )}
-              <Divider />
               <MenuItem onClick={() => { handleClear(); setEditMenuAnchor(null); }}>
                 <ListItemIcon><ClearIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Clear All</ListItemText>
-              </MenuItem>
-            </Menu>
-
-            {/* Annotate menu */}
-            <Button
-              color="inherit"
-              size="small"
-              onClick={e => setAnnotateMenuAnchor(e.currentTarget)}
-              sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
-            >
-              Annotate
-            </Button>
-            <Menu anchorEl={annotateMenuAnchor} open={Boolean(annotateMenuAnchor)} onClose={() => setAnnotateMenuAnchor(null)}>
-              <MenuItem onClick={() => { useSimulationStore.getState().toggleSimulation(); setAnnotateMenuAnchor(null); }}>
-                <ListItemIcon><SimulationIcon color={useSimulationStore.getState().config.enabled ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>{useSimulationStore.getState().config.enabled ? 'Disable Ray Simulation' : 'Enable Ray Simulation'}</ListItemText>
-              </MenuItem>
-              <Divider />
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'line' ? 'none' : 'line'); setAnnotateMenuAnchor(null); }}>
-                <ListItemIcon><LineIcon color={annotationMode === 'line' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Draw Line</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow'); setAnnotateMenuAnchor(null); }}>
-                <ListItemIcon><ArrowIcon color={annotationMode === 'arrow' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Draw Arrow</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'optical-axis' ? 'none' : 'optical-axis'); setAnnotateMenuAnchor(null); }}>
-                <ListItemIcon><OpticalAxisIcon color={annotationMode === 'optical-axis' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Optical Axis</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnnotationMode(annotationMode === 'text' ? 'none' : 'text'); setAnnotateMenuAnchor(null); }}>
-                <ListItemIcon><TextIcon color={annotationMode === 'text' ? 'secondary' : 'inherit'} fontSize="small" /></ListItemIcon>
-                <ListItemText>Add Text</ListItemText>
               </MenuItem>
             </Menu>
 
@@ -750,10 +620,6 @@ openUC2 team via GitHub repository
                 <ListItemText>Share via Email</ListItemText>
               </MenuItem>
               <Divider />
-              <MenuItem onClick={() => { downloadScreenshot(); setFileMenuAnchor(null); }}>
-                <ListItemIcon><ScreenshotIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Download Screenshot</ListItemText>
-              </MenuItem>
               <MenuItem onClick={() => { handleExportSTL(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><STLIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Download STL Bundle</ListItemText>
@@ -798,10 +664,6 @@ openUC2 team via GitHub repository
             <ListItemIcon><SchoolIcon fontSize="small" /></ListItemIcon>
             <ListItemText>Guides & tutorials</ListItemText>
           </MenuItem>
-          <MenuItem onClick={() => { handleHelp(); setHelpMenuAnchor(null); }}>
-            <ListItemIcon><HelpIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Grid-builder tour</ListItemText>
-          </MenuItem>
           <MenuItem onClick={() => { handleForum(); setHelpMenuAnchor(null); }}>
             <ListItemIcon><ForumIcon fontSize="small" /></ListItemIcon>
             <ListItemText>Forum</ListItemText>
@@ -819,11 +681,9 @@ openUC2 team via GitHub repository
         >
           {isThreeD
             ? 'OptiKit — 3D Builder'
-            : is2DEditor
-              ? 'OptiKit - 2D Grid Builder'
-              : /\/configurator\/setups/.test(location.pathname)
-                ? 'Setup Browser'
-                : 'Community'}
+            : /\/configurator\/setups/.test(location.pathname)
+              ? 'Setup Browser'
+              : 'Community'}
         </Typography>
       </MuiToolbar>
       

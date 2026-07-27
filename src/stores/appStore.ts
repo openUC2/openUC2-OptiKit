@@ -1,16 +1,12 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { Octokit } from '@octokit/rest';
-import { loadModulesFromCSV } from '../utils/moduleLoader';
-import { legacyCsvEnabled } from '../model/paletteConfig';
 import { isLibraryModule } from '../document/libraryPalette';
-import type { 
-  AppState, 
-  ModuleDefinition, 
-  PlacedModule, 
-  Annotation, 
-  Layer, 
-  Point, 
+import type {
+  AppState,
+  PlacedModule,
+  Annotation,
+  Point,
   UC2Component,
   StateSnapshot,
   CompactExport,
@@ -18,43 +14,13 @@ import type {
   CompactAnnotation,
   SetupMetadata,
   FeedbackData,
-  Notification,
-  ChatMessage,
-  ChatSession
+  Notification
 } from '../types';
-
-const GRID_CELL_SIZE = 50; // 50mm in pixels (assuming 1:1 scale)
-
-// Sample module definitions (fallback)
-const sampleModules: ModuleDefinition[] = [
-  {
-    id: 'cube-1x1',
-    name: 'Basic Cube',
-    group: 'cubes',
-    color: '#3498db',
-    footprint: { width: 1, height: 1 },
-    thumbnail: '/icons/cube-1x1.svg',
-    defaultParams: { height: 50 }
-  },
-  {
-    id: 'lens-1x1',
-    name: 'Lens',
-    group: 'lenses',
-    color: '#f39c12',
-    footprint: { width: 1, height: 1 },
-    thumbnail: '/icons/lens-1x1.svg',
-    defaultParams: { focalLength: 100 }
-  }
-];
 
 interface AppStore extends AppState {
   // Actions
   loadModules: () => Promise<void>;
-  addLayer: (name: string) => void;
-  removeLayer: (layerId: string) => void;
   setActiveLayer: (layerId: string) => void;
-  toggleLayerVisibility: (layerId: string, visible?: boolean) => void;
-  setAllLayersVisibility: (visible: boolean) => void;
   placeModule: (moduleId: string, position: Point, layer: number) => void;
   moveModule: (moduleId: string, position: Point) => void;
   moveModuleToLayer: (moduleId: string, layer: number) => void;
@@ -64,63 +30,34 @@ interface AppStore extends AppState {
   removeModule: (moduleId: string) => void;
   updateModuleCustomText: (moduleId: string, customText: string) => void;
   updateModuleParams: (moduleId: string, params: Record<string, unknown>) => void;
-  addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
-  moveAnnotation: (annotationId: string, positionOrPoints: Point | Point[]) => void;
-  removeAnnotation: (annotationId: string) => void;
   selectItem: (itemId: string | null, itemType: 'module' | 'annotation' | null) => void;
-  addToSelection: (itemId: string, itemType: 'module' | 'annotation') => void;
-  removeFromSelection: (itemId: string) => void;
-  clearSelection: () => void;
-  setSelectionMode: (mode: 'single' | 'multiple') => void;
-  deleteSelectedItems: () => void;
-  setGridConfig: (config: Partial<AppState['grid']>) => void;
-  setViewport: (config: Partial<AppState['viewport']>) => void;
-  setAnnotationMode: (mode: AppState['annotationMode']) => void;
-  checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => boolean;
   exportData: () => Promise<string>;
-  exportDataWithScreenshot: (screenshotDataUrl?: string) => Promise<string>;
   saveToGitHub: () => Promise<void>;
-  generateShareableLink: () => string;
   downloadSTLBundle: (password: string) => Promise<void>;
   importData: (data: string) => void;
   importFromUrl: (url: string) => Promise<boolean>;
   undo: () => void;
   redo: () => void;
   pushToHistory: (snapshot: StateSnapshot) => void;
-  centerView: () => void;
   saveStateToStorage: () => void;
   loadStateFromStorage: () => void;
-  downloadScreenshot: () => void;
   clearAll: () => void;
-  setActiveRightTab: (tab: 'layers' | 'properties' | 'simulation' | 'bom' | 'annotations' | 'chat') => void;
   updateSetupMetadata: (metadata: Partial<SetupMetadata>) => void;
-  // Clipboard actions
-  copyToClipboard: () => void;
-  cutToClipboard: () => void;
-  pasteFromClipboard: () => void;
-  // Multi-module move (arrow-key nudge, multi-select drag)
-  moveSelectedModules: (delta: Point) => void;
   // Remote path tracking for overwrite-save
   setRemoteSourcePath: (path: string) => void;
   saveToGitHubOverwrite: () => Promise<void>;
-  // Tutorial actions
-  setTutorialCompleted: (completed: boolean) => void;
-  setStartupDialogClosed: (closed: boolean) => void;
   // Feedback actions
   submitFeedback: (feedback: FeedbackData) => Promise<void>;
   // Notification actions
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
-  // Chat actions
-  initializeChatSession: () => void;
-  sendChatMessage: (message: string) => Promise<void>;
-  pollChatMessages: () => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
-  // Initial state
-  modules: sampleModules,
+  // Initial state — the palette is registry-driven (WP-43/68): modules are
+  // registered by PartLibrary from the library index, never loaded from CSV.
+  modules: [],
   placedModules: [],
   annotations: [],
   layers: [
@@ -130,20 +67,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   selectedItemId: null,
   selectedItemType: null,
   selectedItems: [],
-  selectionMode: 'single',
-  grid: {
-    cellSize: GRID_CELL_SIZE,
-    gridVisible: true,
-    snapEnabled: true
-  },
-  viewport: {
-    zoom: 1,
-    pan: { x: 0, y: 0 }
-  },
   history: [],
   historyIndex: -1,
-  annotationMode: 'none',
-  activeRightTab: 'properties',
   setupMetadata: {
     name: 'Untitled Setup',
     author: '',
@@ -157,83 +82,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
     collection: ['General'], // Support multiple collections as array
     notification: ''
   },
-  tutorialCompleted: false,
-  startupDialogClosed: false,
   notifications: [],
-  clipboard: [],
   remoteSourcePath: '',
-  chat: {
-    currentSession: null,
-    isLoading: false,
-    isSending: false,
-    error: null
-  },
 
   // Actions
   loadModules: async () => {
-    // WP-43: the parts palette reads ONE database — the record registry. The
-    // Library group (registered from the index by PartLibrary) is the whole
-    // palette now; the CSV loader only runs behind the legacy fallback flag.
-    if (!legacyCsvEnabled()) {
-      // Keep any registry-registered modules; drop stale CSV rows.
-      set(state => ({ modules: state.modules.filter(m => isLibraryModule(m.id)) }));
-      return;
-    }
-    try {
-      const modules = await loadModulesFromCSV();
-      set({ modules });
-    } catch (error) {
-      console.error('Failed to load modules:', error);
-      set({ modules: sampleModules });
-    }
-  },
-
-  addLayer: (name: string) => {
-    const newLayer: Layer = {
-      id: uuidv4(),
-      name,
-      index: get().layers.length,
-      visible: true
-    };
-    set(state => ({
-      layers: [...state.layers, newLayer]
-    }));
-  },
-
-  removeLayer: (layerId: string) => {
-    const state = get();
-    if (state.layers.length <= 1) return; // Don't remove the last layer
-    
-    set(state => ({
-      layers: state.layers.filter(layer => layer.id !== layerId),
-      placedModules: state.placedModules.filter(module => 
-        state.layers.find(layer => layer.id === layerId)?.index !== module.layer
-      ),
-      annotations: state.annotations.filter(annotation => 
-        state.layers.find(layer => layer.id === layerId)?.index !== annotation.layer
-      ),
-      activeLayerId: state.activeLayerId === layerId ? state.layers[0].id : state.activeLayerId
-    }));
+    // WP-43/69: the parts palette reads ONE database — the record registry
+    // (registered from the index by PartLibrary). The legacy CSV loader is
+    // retired; this only prunes any stale non-registry rows.
+    set(state => ({ modules: state.modules.filter(m => isLibraryModule(m.id)) }));
   },
 
   setActiveLayer: (layerId: string) => {
     set({ activeLayerId: layerId });
-  },
-
-  toggleLayerVisibility: (layerId: string, visible?: boolean) => {
-    set(state => ({
-      layers: state.layers.map(layer =>
-        layer.id === layerId
-          ? { ...layer, visible: visible !== undefined ? visible : !layer.visible }
-          : layer
-      )
-    }));
-  },
-
-  setAllLayersVisibility: (visible: boolean) => {
-    set(state => ({
-      layers: state.layers.map(layer => ({ ...layer, visible }))
-    }));
   },
 
   placeModule: (moduleId: string, position: Point, layer: number) => {
@@ -267,8 +128,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set(state => ({
       placedModules: [...state.placedModules, newModule],
       selectedItemId: newModule.id,
-      selectedItemType: 'module',
-      activeRightTab: 'properties'
+      selectedItemType: 'module'
     }));
 
     // Show notification if module has one
@@ -397,236 +257,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateModuleParams: (moduleId: string, params: Record<string, unknown>) => {
     set(state => ({
-      placedModules: state.placedModules.map(m => 
+      placedModules: state.placedModules.map(m =>
         m.id === moduleId ? { ...m, params: { ...m.params, ...params } } : m
       )
-    }));
-    // Trigger simulation re-run when params change so displayed rays always
-    // match the current parameter values (ray export correctness).
-    // Lazy import to avoid circular dependency between stores.
-    import('./simulationStore').then(({ useSimulationStore }) => {
-      const simState = useSimulationStore.getState();
-      if (simState.config.enabled && simState.config.autoRun) {
-        simState.scheduleAutoRun();
-      }
-    });
-  },
-
-  addAnnotation: (annotation: Omit<Annotation, 'id'>) => {
-    const state = get();
-    
-    // Save current state to history
-    state.pushToHistory({
-      placedModules: state.placedModules,
-      annotations: state.annotations,
-      layers: state.layers,
-      activeLayerId: state.activeLayerId,
-      selectedItems: state.selectedItems,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType
-    });
-
-    const newAnnotation: Annotation = {
-      ...annotation,
-      id: uuidv4()
-    };
-    set(state => ({
-      annotations: [...state.annotations, newAnnotation]
-    }));
-  },
-
-  moveAnnotation: (annotationId: string, positionOrPoints: Point | Point[]) => {
-    set(state => ({
-      annotations: state.annotations.map(annotation => {
-        if (annotation.id === annotationId && annotation.points) {
-          // If we receive multiple points, replace all points
-          if (Array.isArray(positionOrPoints)) {
-            return { ...annotation, points: positionOrPoints };
-          } else {
-            // If we receive a single point, replace only the first point (backward compatibility)
-            return { ...annotation, points: [positionOrPoints, ...annotation.points.slice(1)] };
-          }
-        }
-        return annotation;
-      })
-    }));
-    
-    // Save state after moving
-    get().saveStateToStorage();
-  },
-
-  removeAnnotation: (annotationId: string) => {
-    const state = get();
-    
-    // Save current state to history
-    state.pushToHistory({
-      placedModules: state.placedModules,
-      annotations: state.annotations,
-      layers: state.layers,
-      activeLayerId: state.activeLayerId,
-      selectedItems: state.selectedItems,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType
-    });
-
-    set(state => ({
-      annotations: state.annotations.filter(a => a.id !== annotationId),
-      selectedItemId: state.selectedItemId === annotationId ? null : state.selectedItemId
     }));
   },
 
   selectItem: (itemId: string | null, itemType: 'module' | 'annotation' | null) => {
-    const state = get();
-    if (state.selectionMode === 'multiple' && itemId && itemType) {
-      // In multiple selection mode, toggle the item
-      const isSelected = state.selectedItems.some(item => item.id === itemId);
-      if (isSelected) {
-        get().removeFromSelection(itemId);
-      } else {
-        get().addToSelection(itemId, itemType);
-      }
-    } else {
-      // Single selection mode
-      set({ 
-        selectedItemId: itemId, 
-        selectedItemType: itemType,
-        selectedItems: itemId && itemType ? [{ id: itemId, type: itemType }] : []
-      });
-    }
-  },
-
-  addToSelection: (itemId: string, itemType: 'module' | 'annotation') => {
-    set(state => {
-      const isAlreadySelected = state.selectedItems.some(item => item.id === itemId);
-      if (!isAlreadySelected) {
-        return {
-          selectedItems: [...state.selectedItems, { id: itemId, type: itemType }],
-          selectedItemId: itemId,
-          selectedItemType: itemType
-        };
-      }
-      return state;
-    });
-  },
-
-  removeFromSelection: (itemId: string) => {
-    set(state => {
-      const updatedSelection = state.selectedItems.filter(item => item.id !== itemId);
-      const lastSelected = updatedSelection[updatedSelection.length - 1];
-      return {
-        selectedItems: updatedSelection,
-        selectedItemId: lastSelected?.id || null,
-        selectedItemType: lastSelected?.type || null
-      };
-    });
-  },
-
-  clearSelection: () => {
     set({
-      selectedItems: [],
-      selectedItemId: null,
-      selectedItemType: null
+      selectedItemId: itemId,
+      selectedItemType: itemType,
+      selectedItems: itemId && itemType ? [{ id: itemId, type: itemType }] : []
     });
-  },
-
-  setSelectionMode: (mode: 'single' | 'multiple') => {
-    set(state => {
-      if (mode === 'single' && state.selectedItems.length > 1) {
-        // When switching to single mode, keep only the first selected item
-        const firstItem = state.selectedItems[0];
-        return {
-          selectionMode: mode,
-          selectedItems: firstItem ? [firstItem] : [],
-          selectedItemId: firstItem?.id || null,
-          selectedItemType: firstItem?.type || null
-        };
-      }
-      return { selectionMode: mode };
-    });
-  },
-
-  deleteSelectedItems: () => {
-    const state = get();
-    state.selectedItems.forEach(item => {
-      if (item.type === 'module') {
-        get().removeModule(item.id);
-      } else if (item.type === 'annotation') {
-        get().removeAnnotation(item.id);
-      }
-    });
-    get().clearSelection();
-  },
-
-  copyToClipboard: () => {
-    const state = get();
-    const copied = state.selectedItems
-      .filter(item => item.type === 'module')
-      .map(item => state.placedModules.find(m => m.id === item.id))
-      .filter(Boolean) as PlacedModule[];
-    set({ clipboard: copied });
-  },
-
-  cutToClipboard: () => {
-    get().copyToClipboard();
-    get().deleteSelectedItems();
-  },
-
-  pasteFromClipboard: () => {
-    const state = get();
-    if (state.clipboard.length === 0) return;
-
-    // Push current state to history before paste
-    state.pushToHistory({
-      placedModules: state.placedModules,
-      annotations: state.annotations,
-      layers: state.layers,
-      activeLayerId: state.activeLayerId,
-      selectedItems: state.selectedItems,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType
-    });
-
-    // Paste with +1,+1 grid-cell offset from original positions
-    const newModules: PlacedModule[] = state.clipboard.map(m => ({
-      ...m,
-      id: uuidv4(),
-      position: { x: m.position.x + 1, y: m.position.y + 1 },
-      topRotation: m.topRotation // preserve topRotation on clone
-    }));
-
-    set(s => ({
-      placedModules: [...s.placedModules, ...newModules],
-      selectedItems: newModules.map(m => ({ id: m.id, type: 'module' as const })),
-      selectedItemId: newModules[newModules.length - 1]?.id ?? null,
-      selectedItemType: 'module'
-    }));
-  },
-
-  moveSelectedModules: (delta: Point) => {
-    const state = get();
-    const ids = state.selectedItems
-      .filter(item => item.type === 'module')
-      .map(item => item.id);
-    if (ids.length === 0) return;
-
-    // Push to history once for the whole nudge
-    state.pushToHistory({
-      placedModules: state.placedModules,
-      annotations: state.annotations,
-      layers: state.layers,
-      activeLayerId: state.activeLayerId,
-      selectedItems: state.selectedItems,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType
-    });
-
-    set(s => ({
-      placedModules: s.placedModules.map(m =>
-        ids.includes(m.id)
-          ? { ...m, position: { x: m.position.x + delta.x, y: m.position.y + delta.y } }
-          : m
-      )
-    }));
   },
 
   setRemoteSourcePath: (path: string) => {
@@ -680,96 +322,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 
-  setGridConfig: (config: Partial<AppState['grid']>) => {
-    set(state => ({
-      grid: { ...state.grid, ...config }
-    }));
-  },
-
-  setViewport: (config: Partial<AppState['viewport']>) => {
-    set(state => ({
-      viewport: { ...state.viewport, ...config }
-    }));
-  },
-
-  setAnnotationMode: (mode: AppState['annotationMode']) => {
-    set({ annotationMode: mode });
-  },
-
-  checkCollision: (position: Point, footprint: { width: number; height: number }, layer: number, excludeId?: string) => {
-    const state = get();
-    
-    for (const module of state.placedModules) {
-      if (module.id === excludeId || module.layer !== layer) continue;
-      
-      const moduleDefinition = state.modules.find(m => m.id === module.moduleId);
-      if (!moduleDefinition) continue;
-
-      // Calculate actual footprint considering rotation
-      const isRotated90or270 = module.rotation === 90 || module.rotation === 270;
-      const actualFootprint = isRotated90or270 ? 
-        { width: moduleDefinition.footprint.height, height: moduleDefinition.footprint.width } : 
-        { width: moduleDefinition.footprint.width, height: moduleDefinition.footprint.height };
-
-      // Check if rectangles overlap
-      const rect1 = {
-        x: position.x,
-        y: position.y,
-        width: footprint.width,
-        height: footprint.height
-      };
-      
-      const rect2 = {
-        x: module.position.x,
-        y: module.position.y,
-        width: actualFootprint.width,
-        height: actualFootprint.height
-      };
-
-      if (rect1.x < rect2.x + rect2.width &&
-          rect1.x + rect1.width > rect2.x &&
-          rect1.y < rect2.y + rect2.height &&
-          rect1.y + rect1.height > rect2.y) {
-        return true; // Collision detected
-      }
-    }
-    
-    return false;
-  },
-
+  // The screenshot event dance retired with the Konva canvas (WP-69) — the
+  // export carries whatever screenshot the setup metadata already holds.
   exportData: async () => {
-    try {
-      // Try to capture screenshot, but don't block export if it fails
-      const screenshotPromise = new Promise<string>((resolve) => {
-        const handler = (event: CustomEvent) => {
-          window.removeEventListener('screenshot-captured', handler as EventListener);
-          resolve(event.detail);
-        };
-        window.addEventListener('screenshot-captured', handler as EventListener);
-        
-        // Set flag to indicate this is for export
-        (window as unknown as { isExportCapture?: boolean }).isExportCapture = true;
-        
-        // Trigger screenshot
-        const event = new CustomEvent('download-screenshot');
-        window.dispatchEvent(event);
-        
-        // Shorter timeout - don't wait too long
-        setTimeout(() => {
-          window.removeEventListener('screenshot-captured', handler as EventListener);
-          resolve(''); // Return empty string if screenshot fails
-        }, 1000);
-      });
-
-      const screenshotDataUrl = await screenshotPromise;
-      return get().exportDataWithScreenshot(screenshotDataUrl);
-    } catch (error) {
-      console.warn('Screenshot capture failed during export, proceeding without screenshot:', error);
-      return get().exportDataWithScreenshot();
-    }
-  },
-
-  exportDataWithScreenshot: async (screenshotDataUrl?: string) => {
     const state = get();
     const uc2_components: UC2Component[] = [];
     
@@ -805,18 +360,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
       annotations: state.annotations,
       layers: state.layers,
       ...state.setupMetadata,
-      screenshot: screenshotDataUrl || state.setupMetadata.screenshot || null,
+      screenshot: state.setupMetadata.screenshot || null,
       metadata: {
         version: "1.0",
         created: new Date().toISOString(),
         software: "OpenUC2 OptiKit"
       }
     }, null, 2);
-  },
-
-  exportToPyInventor: () => {
-    // This is now deprecated - use exportData instead
-    return get().exportData();
   },
 
   importData: (data: string) => {
@@ -850,8 +400,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
             })) 
           : [];
         
-        // Extract metadata for collection and notification handling  
-        const importedMetadata = (compactData as CompactExport & { meta?: any }).meta;
+        // Extract metadata for collection and notification handling
+        const importedMetadata = (compactData as CompactExport & { meta?: SetupMetadata }).meta;
         
         set({
           placedModules,
@@ -1087,8 +637,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         ...previousSnapshot,
         historyIndex: state.historyIndex - 1,
-        history: state.history, // Keep the history
-        selectionMode: state.selectionMode // Keep current selection mode
+        history: state.history // Keep the history
       });
     }
   },
@@ -1100,8 +649,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         ...nextSnapshot,
         historyIndex: state.historyIndex + 1,
-        history: state.history, // Keep the history
-        selectionMode: state.selectionMode // Keep current selection mode
+        history: state.history // Keep the history
       });
     }
   },
@@ -1121,16 +669,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ history: newHistory });
   },
 
-  centerView: () => {
-    set(state => ({
-      viewport: {
-        ...state.viewport,
-        pan: { x: 0, y: 0 },
-        zoom: 1
-      }
-    }));
-  },
-
   // State persistence functions
   saveStateToStorage: () => {
     const state = useAppStore.getState();
@@ -1141,44 +679,32 @@ export const useAppStore = create<AppStore>((set, get) => ({
       activeLayerId: state.activeLayerId,
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      grid: state.grid,
-      viewport: state.viewport,
-      annotationMode: state.annotationMode,
       setupMetadata: state.setupMetadata,
-      // Don't save modules as they are loaded from CSV
-      // Don't save command history
+      // Don't save modules (registry-registered) or command history
     };
     localStorage.setItem('openuc2-optikit-state', JSON.stringify(stateToSave));
   },
 
   loadStateFromStorage: () => {
     const saved = localStorage.getItem('openuc2-optikit-state');
-    if (saved) {
-      try {
-        const parsedState = JSON.parse(saved);
-        set(state => ({
-          ...state,
-          ...parsedState,
-          modules: state.modules, // Keep loaded modules
-          history: state.history, // Keep command history
-        }));
-      } catch (error) {
-        console.error('Failed to load state from storage:', error);
-      }
+    if (!saved) return;
+    try {
+      // Pick only the fields this store still owns — older saves also carry
+      // retired grid-builder keys (grid, viewport, annotationMode) which are
+      // ignored on load and dropped on the next save.
+      const parsedState = JSON.parse(saved) as Partial<AppState>;
+      set(state => ({
+        layers: parsedState.layers ?? state.layers,
+        placedModules: parsedState.placedModules ?? state.placedModules,
+        annotations: parsedState.annotations ?? state.annotations,
+        activeLayerId: parsedState.activeLayerId ?? state.activeLayerId,
+        selectedItemId: parsedState.selectedItemId ?? state.selectedItemId,
+        selectedItemType: parsedState.selectedItemType ?? state.selectedItemType,
+        setupMetadata: parsedState.setupMetadata ?? state.setupMetadata,
+      }));
+    } catch (error) {
+      console.error('Failed to load state from storage:', error);
     }
-    
-    // Load tutorial state separately
-    const tutorialCompleted = localStorage.getItem('optikit-tutorial-completed');
-    if (tutorialCompleted) {
-      set({ tutorialCompleted: tutorialCompleted === 'true' });
-    }
-  },
-
-  downloadScreenshot: () => {
-    // This will be handled by the GridCanvas component
-    // We'll emit a custom event for the canvas to capture
-    const event = new CustomEvent('download-screenshot');
-    window.dispatchEvent(event);
   },
 
   saveToGitHub: async () => {
@@ -1278,57 +804,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 
-  generateShareableLink: () => {
-    const state = get();
-    
-    // Create compact export for URL sharing
-    const compactExport = {
-      m: state.placedModules.map(module => ({
-        i: module.moduleId,
-        p: [module.position.x, module.position.y, module.layer],
-        r: module.rotation,
-        ...(module.customText && { t: module.customText }),
-        ...(module.topRotation && { tr: module.topRotation }),
-        ...(module.tiltRotation && { xr: module.tiltRotation })
-      })),
-      a: state.annotations.map(annotation => ({
-        t: annotation.type,
-        p: annotation.points || [],
-        ...(annotation.text && { x: annotation.text })
-      })),
-      // Include metadata in shareable links
-      meta: state.setupMetadata
-    };
-    
-    // Base64 encode the compact JSON to make it URL-safe
-    const jsonString = JSON.stringify(compactExport);
-    const base64Data = btoa(jsonString);
-    
-    // Create shareable URL - use production URL if on youseetoo.github.io
-    let baseUrl;
-    if (window.location.hostname === 'youseetoo.github.io') {
-      baseUrl = 'https://youseetoo.github.io/configurator';
-    } else {
-      baseUrl = window.location.origin + window.location.pathname;
-    }
-    const shareableUrl = `${baseUrl}?data=${base64Data}`;
-    
-    // Check URL length and fallback if needed
-    if (shareableUrl.length > 2000) {
-      // For very large layouts, create a simplified version without metadata
-      const simplifiedExport = {
-        m: state.placedModules.map(module => ({
-          i: module.moduleId,
-          p: [module.position.x, module.position.y, module.layer]
-        }))
-      };
-      const simplifiedBase64 = btoa(JSON.stringify(simplifiedExport));
-      return `${baseUrl}?data=${simplifiedBase64}`;
-    }
-    
-    return shareableUrl;
-  },
-
   downloadSTLBundle: async (password: string) => {
     if (password !== "youseetoo") {
       alert("Invalid password");
@@ -1418,27 +893,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveStateToStorage();
   },
 
-  setActiveRightTab: (tab: 'layers' | 'properties' | 'simulation' | 'bom' | 'annotations' | 'chat') => {
-    set({ activeRightTab: tab });
-  },
-
   updateSetupMetadata: (metadata: Partial<SetupMetadata>) => {
     set((state) => ({
       setupMetadata: { ...state.setupMetadata, ...metadata }
     }));
     // Save state after updating metadata
     get().saveStateToStorage();
-  },
-
-  // Tutorial actions
-  setTutorialCompleted: (completed: boolean) => {
-    set({ tutorialCompleted: completed });
-    // Save tutorial state to localStorage
-    localStorage.setItem('optikit-tutorial-completed', completed.toString());
-  },
-
-  setStartupDialogClosed: (closed: boolean) => {
-    set({ startupDialogClosed: closed });
   },
 
   // Feedback actions
@@ -1519,438 +979,4 @@ ${feedback.email ? `Email: ${feedback.email}` : 'No contact provided'}
   clearNotifications: () => {
     set({ notifications: [] });
   },
-
-  // Chat methods
-  initializeChatSession: () => {
-    const state = get();
-    
-    // Check if we already have a session
-    if (state.chat.currentSession) {
-      return;
-    }
-
-    // Generate unique session ID using pattern user-XXYYBB
-    const generateSessionId = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      const randomChars = Array.from({ length: 6 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
-      return `user-${randomChars}`;
-    };
-
-    // Check if we have a stored session ID
-    let sessionId = localStorage.getItem('uc2-chat-session-id');
-    if (!sessionId) {
-      sessionId = generateSessionId();
-      localStorage.setItem('uc2-chat-session-id', sessionId);
-    }
-
-    const newSession: ChatSession = {
-      sessionId,
-      messages: [],
-      lastPolled: new Date().toISOString()
-    };
-
-    set((state) => ({
-      chat: {
-        ...state.chat,
-        currentSession: newSession,
-        error: null
-      }
-    }));
-
-    // Load existing messages for this session
-    get().pollChatMessages();
-  },
-
-  sendChatMessage: async (message: string) => {
-    const state = get();
-    
-    if (!state.chat.currentSession) {
-      throw new Error('No active chat session');
-    }
-
-    set((state) => ({
-      chat: {
-        ...state.chat,
-        isSending: true,
-        error: null
-      }
-    }));
-
-    try {
-      // Create message object
-      const chatMessage: ChatMessage = {
-        id: uuidv4(),
-        chatPartner: 'user',
-        message,
-        timestamp: new Date().toISOString(),
-        sessionId: state.chat.currentSession.sessionId
-      };
-
-      // Get current configuration data as attachment for user messages (exclude screenshot)
-      const exportData = await state.exportDataWithScreenshot();
-      const parsedData = JSON.parse(exportData);
-      // Remove screenshot to reduce attachment size
-      delete parsedData.screenshot;
-      chatMessage.attachment = JSON.stringify(parsedData, null, 2);
-
-      // Save message to GitHub
-      await saveChatMessageToGitHub(chatMessage);
-
-      // Add message to local state
-      set((state) => ({
-        chat: {
-          ...state.chat,
-          currentSession: state.chat.currentSession ? {
-            ...state.chat.currentSession,
-            messages: [...state.chat.currentSession.messages, chatMessage]
-          } : null,
-          isSending: false
-        }
-      }));
-
-      // Poll for bot response after a short delay
-      setTimeout(() => {
-        get().pollChatMessages();
-      }, 2000);
-
-    } catch (error) {
-      console.error('Failed to send chat message:', error);
-      set((state) => ({
-        chat: {
-          ...state.chat,
-          isSending: false,
-          error: 'Failed to send message'
-        }
-      }));
-      throw error;
-    }
-  },
-
-  pollChatMessages: async () => {
-    const state = get();
-    
-    if (!state.chat.currentSession || state.chat.isLoading) {
-      return;
-    }
-
-    console.log('🔍 Polling for messages, sessionId:', state.chat.currentSession.sessionId);
-
-    set((state) => ({
-      chat: {
-        ...state.chat,
-        isLoading: true,
-        error: null
-      }
-    }));
-
-    try {
-      const messages = await loadChatMessagesFromGitHub(state.chat.currentSession.sessionId);
-      
-      console.log('🔍 Loaded messages from GitHub:', messages.length, messages);
-      
-      set((state) => ({
-        chat: {
-          ...state.chat,
-          currentSession: state.chat.currentSession ? {
-            ...state.chat.currentSession,
-            messages,
-            lastPolled: new Date().toISOString()
-          } : null,
-          isLoading: false
-        }
-      }));
-
-    } catch (error) {
-      console.error('Failed to poll chat messages:', error);
-      set((state) => ({
-        chat: {
-          ...state.chat,
-          isLoading: false,
-          error: 'Failed to load messages'
-        }
-      }));
-    }
-  },
-
-  // Add a function to start a new session
-  startNewChatSession: () => {
-    const newSessionId = uuidv4();
-    set((state) => ({
-      chat: {
-        ...state.chat,
-        currentSession: {
-          sessionId: newSessionId,
-          messages: [],
-          lastPolled: new Date().toISOString()
-        }
-      }
-    }));
-    console.log('🔄 Started new chat session:', newSessionId);
-    // Start polling for the new session
-    get().pollChatMessages();
-  }
 }));
-
-// Helper functions for GitHub chat integration
-async function saveChatMessageToGitHub(message: ChatMessage): Promise<void> {
-  // Get the GitHub token from environment or use the existing pattern
-  const tokenPrefix = 'github_pat_11ABBE5OA0xugcH1RMlAfO_8Gr1EuOvgqJcF12IShT1QeQB3qg5';
-  const tokenSuffix = 'zYbA7QOwnfGrPVAI2U2C7TDn4Lp9jeH';
-  const token = tokenPrefix + tokenSuffix;
-
-  const octokit = new Octokit({
-    auth: token.trim()
-  });
-
-  const owner = 'beniroquai';
-  const repo = 'openUC2-OptiKit-Store';
-  const path = `chat/${message.sessionId}.csv`;
-
-  try {
-    // Try to get existing file content
-    let existingContent = '';
-    let existingSha: string | undefined;
-    try {
-      const response = await octokit.rest.repos.getContent({
-        owner,
-        repo,
-        path
-      });
-      
-      if ('content' in response.data) {
-        existingContent = atob(response.data.content);
-        existingSha = response.data.sha;
-      }
-    } catch (error) {
-      // File doesn't exist yet, that's okay
-      existingContent = 'message_id,chat_partner,chat_message,attachment,timestamp\n';
-    }
-
-    // Create CSV row for the new message - properly escape all CSV special characters
-    const escapeCSVField = (field: string): string => {
-      if (!field) return '""';
-      // Replace quotes with double quotes and wrap in quotes
-      // Also replace newlines and other special characters
-      const escaped = field
-        .replace(/"/g, '""')     // Escape quotes
-        .replace(/\r\n/g, '\\n') // Replace Windows line breaks
-        .replace(/\n/g, '\\n')   // Replace Unix line breaks
-        .replace(/\r/g, '\\n');  // Replace Mac line breaks
-      return `"${escaped}"`;
-    };
-
-    const csvRow = [
-      escapeCSVField(message.id),
-      escapeCSVField(message.chatPartner),
-      escapeCSVField(message.message),
-      escapeCSVField(message.attachment || ''),
-      escapeCSVField(message.timestamp)
-    ].join(',');
-
-    console.log('🔍 Generated CSV row:', csvRow);
-
-    const newContent = existingContent + csvRow + '\n';
-    
-    // Encode content as base64
-    const content = btoa(unescape(encodeURIComponent(newContent)));
-
-    // Prepare the request payload
-    const requestPayload: any = {
-      owner,
-      repo,
-      path,
-      message: `Add chat message from ${message.chatPartner}: ${message.id}`,
-      content
-    };
-
-    // Only include SHA if we have an existing file
-    if (existingSha) {
-      requestPayload.sha = existingSha;
-    }
-
-    // Save to GitHub
-    await octokit.request("PUT /repos/{owner}/{repo}/contents/{path}", requestPayload);
-
-  } catch (error) {
-    console.error('Failed to save chat message to GitHub:', error);
-    throw error;
-  }
-}
-
-async function loadChatMessagesFromGitHub(sessionId: string): Promise<ChatMessage[]> {
-  const owner = 'beniroquai';
-  const repo = 'openUC2-OptiKit-Store';
-  const path = `chat/${sessionId}.csv`;
-
-  console.log('🔍 Loading messages from GitHub API for path:', path);
-
-  try {
-    // Use GitHub API instead of raw URL to avoid CORS issues
-    const tokenPrefix = 'github_pat_11ABBE5OA0xugcH1RMlAfO_8Gr1EuOvgqJcF12IShT1QeQB3qg5';
-    const tokenSuffix = 'zYbA7QOwnfGrPVAI2U2C7TDn4Lp9jeH';
-    const token = tokenPrefix + tokenSuffix;
-
-    const octokit = new Octokit({
-      auth: token.trim()
-    });
-
-    const response = await octokit.rest.repos.getContent({
-      owner,
-      repo,
-      path,
-      ref: 'main'
-    });
-
-    console.log('🔍 GitHub API response:', response.status);
-
-    if ('content' in response.data) {
-      // Decode base64 content
-      const csvText = atob(response.data.content);
-      console.log('🔍 Decoded CSV content:', csvText);
-      
-      const lines = csvText.split('\n').filter(line => line.trim());
-      
-      console.log('🔍 CSV lines after filtering:', lines.length, lines);
-      
-      if (lines.length <= 1) {
-        console.log('🔍 Only header or empty file');
-        return []; // Only header or empty file
-      }
-
-      const messages: ChatMessage[] = [];
-      
-      // Skip header row and process data rows
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line.trim()) continue;
-
-        console.log('🔍 Processing line:', i, line);
-
-        // Parse CSV line (handle quoted fields)
-        const fields = parseCsvLine(line);
-        
-        console.log('🔍 Parsed fields:', fields);
-        
-        // Validate that this looks like a proper message row
-        // A proper message row should have exactly 5 fields and the first field should be a UUID-like string
-        const isValidMessageRow = fields.length === 5 && 
-                                 fields[0].length > 10 && 
-                                 (fields[1] === 'user' || fields[1] === 'bot') &&
-                                 fields[4] && (fields[4].includes('T') || fields[4].includes('Z')); // timestamp format check
-        
-        console.log('🔍 Validation check:', {
-          fieldCount: fields.length,
-          firstFieldLength: fields[0]?.length,
-          chatPartner: fields[1],
-          hasTimestamp: fields[4]?.includes('T') || fields[4]?.includes('Z'),
-          isValid: isValidMessageRow
-        });
-        
-        if (isValidMessageRow) {
-          console.log('🔍 ✅ Valid message row found');
-          
-          // Unescape the fields when creating the message
-          const unescapeCSVField = (field: string): string => {
-            return field
-              .replace(/\\n/g, '\n')  // Restore newlines
-              .replace(/""/g, '"');   // Restore quotes
-          };
-
-          const message = {
-            id: unescapeCSVField(fields[0]),
-            chatPartner: unescapeCSVField(fields[1]) as 'user' | 'bot',
-            message: unescapeCSVField(fields[2]),
-            attachment: fields[3] ? unescapeCSVField(fields[3]) : undefined,
-            timestamp: unescapeCSVField(fields[4]),
-            sessionId
-          };
-          
-          console.log('🔍 Created message:', message);
-          messages.push(message);
-        } else {
-          console.log('🔍 ❌ Skipping malformed row - not a valid message:', {
-            fieldCount: fields.length,
-            firstField: fields[0]?.substring(0, 20),
-            secondField: fields[1],
-            hasValidTimestamp: fields[4]?.includes('T')
-          });
-        }
-      }
-
-      console.log('🔍 Final messages before sorting:', messages);
-      
-      const sortedMessages = messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      
-      console.log('🔍 Returning sorted messages:', sortedMessages);
-      
-      return sortedMessages;
-    } else {
-      throw new Error('Unexpected response format from GitHub API');
-    }
-
-  } catch (error) {
-    console.error('Failed to load chat messages from GitHub:', error);
-    
-    // If it's a 404 error, return empty array (file doesn't exist yet)
-    if (error && typeof error === 'object' && 'status' in error && (error as any).status === 404) {
-      console.log('🔍 Chat file not found via API, returning empty array');
-      return [];
-    }
-    
-    throw error;
-  }
-}
-
-// Helper function to parse CSV line with quoted fields - improved to handle complex JSON
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  let quoteCount = 0;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    
-    if (char === '"') {
-      quoteCount++;
-      if (inQuotes && line[i + 1] === '"') {
-        // Escaped quote within quoted field
-        current += '"';
-        i++; // Skip next quote
-      } else {
-        // Toggle quote state
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ',' && !inQuotes) {
-      // Only treat comma as field separator when not inside quotes
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  
-  // Add the last field
-  result.push(current);
-  
-  // Post-process to ensure we have exactly 5 fields for a valid message
-  // If we have more than 5 fields, it means the JSON attachment was split incorrectly
-  if (result.length > 5) {
-    console.log('🔍 CSV line has too many fields, attempting to reconstruct JSON attachment');
-    // Keep the first 3 fields (id, chat_partner, message) and last field (timestamp)
-    // Combine everything in between as the attachment field
-    if (result.length >= 5) {
-      const reconstructed = [
-        result[0], // message_id
-        result[1], // chat_partner  
-        result[2], // message
-        result.slice(3, -1).join(','), // attachment (reconstructed)
-        result[result.length - 1] // timestamp
-      ];
-      console.log('🔍 Reconstructed to 5 fields:', reconstructed.length);
-      return reconstructed;
-    }
-  }
-  
-  return result;
-}

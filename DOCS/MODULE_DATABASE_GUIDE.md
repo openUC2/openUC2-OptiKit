@@ -1,5 +1,11 @@
 # OptiKit Module Database & Repository Structure Guide
 
+> **HISTORICAL (WP-69, July 2026).** This guide documents the retired CSV
+> module database (`modules_updated.csv` / `parts.csv`) that fed the legacy
+> Konva 2D grid builder. The palette is registry-driven now: parts come from
+> the optikit-core library index (see `DOCS/kicad-for-optics-execution.md`,
+> WP-43/68). Kept for reference when reading old setups only.
+
 **Version:** 1.0  
 **Date:** January 2026  
 **Purpose:** Developer reference for creating unified module repositories

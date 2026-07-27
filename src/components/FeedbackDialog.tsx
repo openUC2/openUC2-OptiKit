@@ -146,7 +146,7 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
             <Select
               value={feedbackType}
               label="Feedback Type"
-              onChange={(e) => setFeedbackType(e.target.value as any)}
+              onChange={(e) => setFeedbackType(e.target.value as 'bug' | 'feature' | 'improvement' | 'other')}
               disabled={isSubmitting}
             >
               <MenuItem value="improvement">{getFeedbackTypeLabel('improvement')}</MenuItem>
