@@ -57,7 +57,7 @@ components:
     type: primitive
     primitive:
       type: glb
-      model: openuc2.cube.stage_z
+      model: openuc2.cube.z_motor
     pose:
       rotation:
         type: grid
@@ -85,7 +85,7 @@ components:
     type: primitive
     primitive:
       type: glb
-      model: openuc2.cube.torch_1x1
+      model: openuc2.cube.led_basic
     pose:
       rotation:
         type: grid
@@ -101,7 +101,7 @@ components:
     type: primitive
     primitive:
       type: glb
-      model: openuc2.cube.eyepiece_1x1
+      model: openuc2.cube.starter_50mm
     pose:
       rotation:
         type: grid
