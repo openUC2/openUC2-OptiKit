@@ -22,7 +22,12 @@ import * as THREE from 'three';
 import { useAppStore } from '../stores/appStore';
 import type { ModuleDefinition } from '../types';
 import type { ComponentRecord } from '../model/dsn/generated/library-component';
-import type { IndexGroup, IndexModule } from '../model/libraryIndex';
+import type {
+  IndexComponent,
+  IndexGroup,
+  IndexModule,
+  IndexPort,
+} from '../model/libraryIndex';
 import type { SourcePort } from './sourceDesignStore';
 import type { AxisDir, Rot24 } from './rot24';
 import type { DocCategory } from './types';
@@ -84,6 +89,14 @@ export interface LibraryPaletteEntry {
   /** WP-50: record still carries review flags (drafts marked in the BOM). */
   review: boolean;
   source: 'registry' | 'workspace';
+  /** WP-60: a published symbol NO module binds — an optical primitive with no
+   * mechanics yet. Places freely (no cube, no grid claim) until a holder is
+   * generated around it (WP-61). */
+  unbound: boolean;
+  /** WP-60: the record's own surface stack. When non-empty, a placement
+   * exports THIS as its fragment (the real prescription) instead of the
+   * thin-lens approximation. Empty for module-backed entries. */
+  fragmentSurfaces: Record<string, unknown>[];
   /** WP-45: carriers host cubes (FRAME, baseplates, plates, puzzle pieces). */
   carrier: boolean;
   /** WP-45: docking bays on a carrier (cells relative to its placement). */
@@ -204,8 +217,8 @@ function shortName(id: string): string {
   return id.split('.').pop()?.replace(/[_-]/g, ' ') ?? id;
 }
 
-function indexPortsToSource(mod: IndexModule): SourcePort[] {
-  return (mod.ports ?? []).map(p => ({
+function indexPortsToSource(ports: IndexPort[] | undefined): SourcePort[] {
+  return (ports ?? []).map(p => ({
     name: p.name,
     direction: p.direction,
     positionMm: p.position_mm,
@@ -273,7 +286,7 @@ export function entriesFromIndex(
     footprintGrid: mod.footprint_grid ?? [1, 1, 1],
     thumbnailUrl: abs(mod.assets?.thumbnail),
     glbUrl: abs(mod.assets?.glb),
-    ports: indexPortsToSource(mod),
+    ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
     symbolUrl: abs(mod.assets?.symbol),
@@ -288,6 +301,8 @@ export function entriesFromIndex(
     priceEur: typeof mod.price === 'number' ? mod.price : null,
     review: mod.review,
     source: 'registry',
+    unbound: false,
+    fragmentSurfaces: [],
     carrier: mod.template?.carrier ?? false,
     bays: Object.fromEntries(
       Object.entries(mod.template?.bays ?? {}).map(([name, bay]) => [
@@ -355,9 +370,64 @@ export function entriesFromWorkspace(
     priceEur: null,
     review: true,
     source: 'workspace',
+    unbound: false,
+    // A draft's authored surfaces ARE its prescription (WP-60 convention).
+    fragmentSurfaces:
+      ((record.optics as { fragment?: { surfaces?: Record<string, unknown>[] } } | undefined)
+        ?.fragment?.surfaces) ?? [],
     carrier: false,
     bays: {},
   }));
+}
+
+/**
+ * WP-60: published optical components NO module binds → placeable palette
+ * entries. The symbol IS the part: `templateClass: null`, no GLB, no DOFs —
+ * the exact template-less shape workspace drafts already place through, so
+ * placement, free mm movement and DRC invisibility come for free. A
+ * module-bound component keeps coming through its module: this never offers
+ * the same optic twice.
+ */
+export function entriesFromComponents(
+  components: IndexComponent[],
+  modules: IndexModule[],
+  coreUrl: string,
+): LibraryPaletteEntry[] {
+  const origin = coreUrl.replace(/\/$/, '');
+  const abs = (path: string | null | undefined) =>
+    path ? (path.startsWith('http') ? path : `${origin}${path}`) : null;
+  const bound = new Set(
+    modules
+      .map(mod => mod.component?.ref?.split('@')[0])
+      .filter((id): id is string => Boolean(id)),
+  );
+  return components
+    .filter(component => !bound.has(component.id))
+    .map(component => ({
+      moduleId: component.id,
+      componentId: component.id,
+      name: shortName(component.id),
+      description: component.description,
+      category: docCategoryOfRecord(component.category),
+      templateClass: null,
+      states: [],
+      dofs: [],
+      footprintGrid: [1, 1, 1] as [number, number, number],
+      thumbnailUrl: null,
+      glbUrl: null,
+      ports: indexPortsToSource(component.ports),
+      eflMm: component.efl_mm ?? null,
+      wavelengthsUm: component.wavelengths_um ?? [],
+      symbolUrl: abs(component.symbol),
+      programmable: null,
+      priceEur: null,
+      review: component.review,
+      source: 'registry' as const,
+      unbound: true,
+      fragmentSurfaces: component.fragment_surfaces ?? [],
+      carrier: false,
+      bays: {},
+    }));
 }
 
 // ── registration ─────────────────────────────────────────────────────────────
@@ -409,6 +479,8 @@ export const LIBRARY_GROUP = 'Library';
 /** Palette group for a registry part (WP-43): category + namespace, so the
  * palette's group filter reads "mirror · openuc2", "lens · thorlabs", …. */
 function paletteGroup(entry: LibraryPaletteEntry): string {
+  // WP-60: bare symbols group apart from their cube-module siblings.
+  if (entry.unbound) return `${entry.category} · unbound`;
   const namespace = entry.moduleId.split('.')[0] || 'user';
   return `${entry.category} · ${namespace}`;
 }

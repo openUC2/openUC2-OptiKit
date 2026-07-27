@@ -28,6 +28,17 @@ export interface IndexComponent {
   efl_mm: number | null;
   n_surfaces: number;
   review: boolean;
+  /** WP-60: record ports resolved to local mm — enough to PLACE a bare
+   * symbol straight from the index, no per-record request. */
+  ports?: IndexPort[];
+  /** WP-60: source emission lines in µm (empty for non-sources). */
+  wavelengths_um?: number[];
+  /** WP-60: authored schematic symbol URL path, when the record ships one. */
+  symbol?: string | null;
+  /** WP-60: the record's own optiland surface stack, verbatim — a placed
+   * bare symbol exports (and simulates) the REAL prescription. ±Infinity
+   * radii cross the wire as ±1e999. */
+  fragment_surfaces?: Record<string, unknown>[];
 }
 
 /** A record port with its frame offset resolved to local mm (WP-34). */

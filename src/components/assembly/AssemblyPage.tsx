@@ -51,6 +51,7 @@ import { BomDialog } from '../bom/BomDialog';
 import { MarkerList } from '../schematic/MarkerList';
 import { AssemblyScene } from './AssemblyScene';
 import { CubifyDialog } from './CubifyDialog';
+import { GenerateHolderDialog } from './GenerateHolderDialog';
 import { useAssemblyStore } from './assemblyStore';
 
 export function AssemblyPage() {
@@ -87,8 +88,22 @@ export function AssemblyPage() {
   // assembly does not mount PartLibrary, so palette registration is absent
   // here and an entry-derived chip would silently never render.
   const selectedTClass = selectedIndexModule?.template?.class ?? null;
+  // WP-60: bare component ids no module binds — sourced from the INDEX for
+  // the same reason as the T-class above.
+  const unboundIds = useMemo(() => {
+    const moduleIds = new Set(index.modules.map(m => m.id));
+    return new Set(
+      index.components.map(c => c.id).filter(id => !moduleIds.has(id)),
+    );
+  }, [index.modules, index.components]);
+  const selectedUnbound = Boolean(selected && unboundIds.has(selected.libraryRef));
+  const selectedIndexComponent = selectedUnbound
+    ? index.components.find(c => c.id === selected!.libraryRef)
+    : undefined;
   // The live BOM (WP-50) — the same dialog the schematic mounts.
   const [bomOpen, setBomOpen] = useState(false);
+  // WP-61: "generate a holder…" on a placed unbound part.
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
@@ -160,6 +175,7 @@ export function AssemblyPage() {
           <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
             <AssemblyScene
               mechanics={mechanics}
+              unboundIds={unboundIds}
               lockView={lockView}
               cameraRef={cameraRef}
               controlsRef={controlsRef}
@@ -270,6 +286,13 @@ export function AssemblyPage() {
                         <Chip size="small" label={T_CLASS_LABEL[selectedTClass]}
                           sx={{ height: 16, fontSize: 10, fontWeight: 700 }} />
                       )}
+                      {/* WP-60: a bare symbol — no mechanics at all */}
+                      {selectedUnbound && (
+                        <Tooltip title="an optical primitive with no mechanics yet — place it, then generate a holder (WP-61)">
+                          <Chip size="small" label="UNBOUND" color="info" variant="outlined"
+                            sx={{ height: 16, fontSize: 10, fontWeight: 700 }} />
+                        </Tooltip>
+                      )}
                     </Stack>
                   </Divider>
                   <Typography variant="caption" sx={{ display: 'block' }}>
@@ -286,6 +309,50 @@ export function AssemblyPage() {
 
                   {/* WP-51.1: the module composition card — cube + insert +
                       part in ONE place, each line deep-linking its editor. */}
+                  {/* WP-60: an unbound part is the symbol alone — no module,
+                      no template. Show the record facts and the one verb that
+                      matters: put it in a cube (WP-61). */}
+                  {selectedUnbound ? (
+                    <Box sx={{ mt: 1.5, p: 1.5, border: '1px dashed', borderColor: 'info.main', borderRadius: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                        Optical primitive · {selected.libraryRef}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="caption" sx={{ flex: 1 }}>
+                          ◐ {selected.libraryRef}
+                          {selectedIndexComponent && ` @ ${selectedIndexComponent.version}`}
+                        </Typography>
+                        <Tooltip title="open in the component editor">
+                          <IconButton size="small" onClick={() =>
+                            navigate(`/configurator/components?open=${encodeURIComponent(selected.libraryRef)}`)}>
+                            <EditIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        ▣ no mechanics bound — floats freely, claims no grid cell
+                      </Typography>
+                      {selectedIndexComponent?.vendor?.name && (
+                        <Typography variant="caption" sx={{ display: 'block' }}>
+                          vendor: {selectedIndexComponent.vendor.name}
+                          {selectedIndexComponent.vendor.mpn && ` · ${selectedIndexComponent.vendor.mpn}`}
+                        </Typography>
+                      )}
+                      {selectedIndexComponent?.efl_mm != null && (
+                        <Typography variant="caption" sx={{ display: 'block' }}>
+                          EFL: {selectedIndexComponent.efl_mm.toFixed(2)} mm
+                        </Typography>
+                      )}
+                      <Tooltip title="print a cube holder around the placed optic (WP-61)">
+                        <Button
+                          size="small" variant="contained" sx={{ mt: 1 }}
+                          onClick={() => setGenerateOpen(true)}
+                        >
+                          generate a holder…
+                        </Button>
+                      </Tooltip>
+                    </Box>
+                  ) : (
                   <Box sx={{ mt: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                       Module composition · {selected.libraryRef}
@@ -349,6 +416,7 @@ export function AssemblyPage() {
                       </Typography>
                     )}
                   </Box>
+                  )}
                   {selectedMechanics?.translationDofs.map(dof => {
                     const value = selected.dofs.find(d => d.name === dof.name)?.value ?? dof.value;
                     return (
@@ -368,6 +436,13 @@ export function AssemblyPage() {
       </Box>
       <CubifyDialog />
       <BomDialog open={bomOpen} onClose={() => setBomOpen(false)} />
+      {selected && selectedUnbound && (
+        <GenerateHolderDialog
+          part={selected}
+          open={generateOpen}
+          onClose={() => setGenerateOpen(false)}
+        />
+      )}
       <Snackbar
         open={showRetireNotice}
         autoHideDuration={6000}

@@ -366,6 +366,65 @@ export function saveLibraryRecords(
   );
 }
 
+// ── T3 generation (WP-61) ─────────────────────────────────────────────────────
+
+const generateSchema = z.object({
+  template_id: z.string(),
+  generator: z.string(),
+  key: z.string(),
+  out_dir: z.string(),
+  regenerated: z.boolean(),
+  meta: z.record(z.string(), z.unknown()),
+  /** filename → base64 bytes (model[.part].{step,stl,glb}). */
+  artifacts: z.record(z.string(), z.string()),
+});
+export type GenerateResponse = z.infer<typeof generateSchema>;
+
+export interface GenerateRequest {
+  /** An existing generative template record id … */
+  templateId?: string;
+  /** … OR a bare optical component id: the service synthesizes a
+   * boolean-holder run whose cut body is the component's own STEP or, absent
+   * that, its prescription (WP-62). Exactly one of the two. */
+  componentId?: string;
+  /** Generator param overrides (clearance_mm, split_plane, …). */
+  params?: Record<string, unknown>;
+  /** Design files + component key: the service folds the PLACED intra-cube
+   * δ/ΔR into the generator params (pose_params_from_component). */
+  files?: DsnFiles;
+  component?: string;
+}
+
+/**
+ * Run a T3 generator on the service (WP-61). Identical params hit the
+ * sha256-keyed cache (`regenerated: false`). 501 E_NO_CADQUERY without the
+ * generate extra, mirroring /v1/convert/step-to-glb.
+ */
+export function generateTemplate(
+  req: GenerateRequest,
+  signal?: AbortSignal,
+): Promise<GenerateResponse> {
+  return post(
+    '/v1/generate',
+    {
+      ...(req.templateId ? { template_id: req.templateId } : {}),
+      ...(req.componentId ? { component_id: req.componentId } : {}),
+      ...(req.params ? { params: req.params } : {}),
+      ...(req.files ? { files: req.files } : {}),
+      ...(req.component ? { component: req.component } : {}),
+    },
+    generateSchema,
+    signal,
+  );
+}
+
+export function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 export function runDrc(files: DsnFiles, signal?: AbortSignal): Promise<DrcResponse> {
   return post('/v1/drc', { files }, drcSchema, signal);
 }

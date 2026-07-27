@@ -34,6 +34,7 @@ import {
   T_CLASS_LABEL,
   addGroup,
   categoryOf,
+  entriesFromComponents,
   entriesFromIndex,
   entriesFromWorkspace,
   groupEntriesFromIndex,
@@ -182,10 +183,18 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
     const registryIds = new Set(registry.map(e => e.moduleId));
     const workspace = entriesFromWorkspace(workspaceRecords, workspaceThumbs)
       .filter(e => !registryIds.has(e.moduleId));
-    registerLibraryModules([...registry, ...workspace]);
+    const workspaceIds = new Set(workspace.map(e => e.moduleId));
+    // WP-60: published symbols NO module binds place directly — grouped
+    // "<category> · unbound". Local drafts with the same id keep precedence.
+    const unbound = entriesFromComponents(
+      libraryIndex.components,
+      merged.modules,
+      getCoreUrl(),
+    ).filter(e => !registryIds.has(e.moduleId) && !workspaceIds.has(e.moduleId));
+    registerLibraryModules([...registry, ...workspace, ...unbound]);
     // WP-44: groups (the OPM arrangements) register alongside the modules.
     registerLibraryGroups(groupEntriesFromIndex(merged.groups));
-  }, [merged, workspaceRecords, workspaceThumbs, modules]);
+  }, [merged, libraryIndex.components, workspaceRecords, workspaceThumbs, modules]);
 
   const paletteGroups = groupEntriesFromIndex(merged.groups);
 
@@ -568,6 +577,17 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
               {module.name}
             </Typography>
             
+            {libraryEntryOf(module.id)?.unbound && (
+              <Tooltip title="an optical primitive with no mechanics yet — place it, then generate a holder (WP-61)">
+                <Chip
+                  label="UNBOUND"
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  sx={{ height: 18, fontSize: '0.55rem', flexShrink: 0, fontWeight: 700 }}
+                />
+              </Tooltip>
+            )}
             {tClass && (
               <Tooltip
                 title={

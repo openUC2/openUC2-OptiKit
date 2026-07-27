@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   defaultRotationFor,
+  entriesFromComponents,
   entriesFromIndex,
   registerLibraryModules,
   templateClassOf,
@@ -15,8 +16,9 @@ import {
 } from '../libraryPalette';
 import { rot24Matrix } from '../rot24';
 import { addPart, getPart, movePartWorld } from '../OptikitDocument';
+import { buildServiceDesign, listPartMechanics } from '../../model/dsn/serviceExport';
 import { useAppStore } from '../../stores/appStore';
-import type { IndexModule } from '../../model/libraryIndex';
+import type { IndexComponent, IndexModule } from '../../model/libraryIndex';
 import type { SourcePort } from '../sourceDesignStore';
 
 const P = (
@@ -116,6 +118,127 @@ describe('entriesFromIndex', () => {
     ]);
     expect(lens.eflMm).toBe(50);
     expect(lens.ports[1].positionMm).toEqual([0, 0, 5]);
+  });
+});
+
+// WP-60: the zmx-imported achromat — a published symbol NO module binds.
+const AC254: IndexComponent = {
+  id: 'thorlabs.lens.ac254-050-a',
+  version: '0.1.0',
+  kind: 'optical_component',
+  category: 'lens',
+  description: 'AC254-050-A positive achromat',
+  tags: ['imported', 'zmx'],
+  vendor: { name: 'Thorlabs', mpn: 'AC254-050-A', url: '' },
+  efl_mm: 50.169,
+  n_surfaces: 3,
+  review: true,
+  ports: [
+    { name: 'front', direction: '-z', position_mm: [0, 0, 0], after_surface: null },
+    { name: 'back', direction: '+z', position_mm: [0, 0, 11.5], after_surface: 2 },
+  ],
+  wavelengths_um: [],
+  symbol: null,
+  // The real 3-surface prescription (doublet) — what the placement exports.
+  fragment_surfaces: [
+    {
+      type: 'standard',
+      geometry: { type: 'StandardGeometry', radius: 33.34, conic: 0 },
+      material_post: { type: 'Material', name: 'N-BAF10' },
+      thickness: 9,
+      semi_aperture: 12.7,
+      is_stop: true,
+    },
+    {
+      type: 'standard',
+      geometry: { type: 'StandardGeometry', radius: -22.28, conic: 0 },
+      material_post: { type: 'Material', name: 'N-SF10' },
+      thickness: 2.5,
+      semi_aperture: 12.7,
+    },
+    {
+      type: 'standard',
+      geometry: { type: 'StandardGeometry', radius: -291.07, conic: 0 },
+      semi_aperture: 12.7,
+    },
+  ],
+};
+
+// Bound by MIRROR_MODULE (component.ref openuc2.mirror.flat_45@^1) — must
+// keep coming through its module, never twice.
+const BOUND_COMPONENT: IndexComponent = {
+  ...AC254,
+  id: 'openuc2.mirror.flat_45',
+  category: 'mirror',
+  ports: [],
+};
+
+describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () => {
+  it('offers only components no module binds, as template-less entries', () => {
+    const entries = entriesFromComponents(
+      [BOUND_COMPONENT, AC254],
+      [MIRROR_MODULE],
+      'http://localhost:8010',
+    );
+    expect(entries.map(e => e.moduleId)).toEqual(['thorlabs.lens.ac254-050-a']);
+    const lens = entries[0];
+    expect(lens.unbound).toBe(true);
+    expect(lens.templateClass).toBeNull();
+    expect(lens.glbUrl).toBeNull();
+    expect(lens.dofs).toEqual([]);
+    expect(lens.componentId).toBe('thorlabs.lens.ac254-050-a');
+    expect(lens.ports.map(p => p.direction)).toEqual(['-z', '+z']);
+    expect(lens.ports[1].positionMm).toEqual([0, 0, 11.5]);
+    expect(lens.eflMm).toBeCloseTo(50.169, 3);
+  });
+
+  it('groups them apart as "<category> · unbound"', () => {
+    useAppStore.setState({ placedModules: [], modules: [] });
+    registerLibraryModules(entriesFromComponents([AC254], [], 'http://x'));
+    const def = useAppStore.getState().modules.find(m => m.id === AC254.id);
+    expect(def?.group).toBe('lens · unbound');
+  });
+});
+
+describe('unbound placement (WP-60 pin: continuous mm, no cell claim)', () => {
+  beforeEach(() => {
+    useAppStore.setState({ placedModules: [], modules: [] });
+    registerLibraryModules(
+      entriesFromComponents([AC254], [], 'http://localhost:8010'),
+    );
+  });
+
+  it('moves in continuous mm — the template-less residual is unclamped', () => {
+    const id = addPart(AC254.id, [0, 0, 0])!;
+    movePartWorld(id, [130.4, 20.2, 3.3]);
+    const part = getPart(id)!;
+    expect(part.worldPose.positionMm[0]).toBeCloseTo(130.4, 5);
+    expect(part.worldPose.positionMm[1]).toBeCloseTo(20.2, 5);
+    expect(part.worldPose.positionMm[2]).toBeCloseTo(3.3, 5);
+  });
+
+  it('exports with NO template block — the state cubify/DRC skips', () => {
+    const id = addPart(AC254.id, [0, 0, 0])!;
+    const mech = listPartMechanics().find(m => m.partId === id);
+    expect(mech).toBeDefined();
+    expect(mech!.templateClass).toBeNull();
+    expect(mech!.translationDofs).toEqual([]);
+  });
+
+  it('exports the REAL prescription, not the thin-lens approximation', () => {
+    const id = addPart(AC254.id, [0, 0, 0])!;
+    const { design, keyByPartId } = buildServiceDesign();
+    const comp = design.components?.[keyByPartId[id]] as {
+      optics?: { fragment?: { surfaces: Record<string, unknown>[] } };
+    };
+    const surfaces = comp.optics?.fragment?.surfaces ?? [];
+    expect(surfaces).toHaveLength(3);
+    expect((surfaces[0].geometry as { radius: number }).radius).toBeCloseTo(33.34);
+    expect((surfaces[0].material_post as { name: string }).name).toBe('N-BAF10');
+    // The exit port keeps the record's own after-surface.
+    const ports = (comp.optics as { ports?: Record<string, { 'after-surface'?: number }> })
+      ?.ports;
+    expect(ports?.back['after-surface']).toBe(2);
   });
 });
 

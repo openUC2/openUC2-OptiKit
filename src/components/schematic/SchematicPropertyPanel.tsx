@@ -186,6 +186,12 @@ function PartProperties({ part }: { part: DocPart }) {
           onBlur={() => ref !== part.ref && renamePart(part.id, ref)}
           sx={{ flex: 1 }}
         />
+        {/* WP-60: a bare symbol — no mechanics bound at all. */}
+        {lib?.unbound && (
+          <Tooltip title="no mechanics bound — an optical primitive that floats freely until you generate a holder (WP-61)">
+            <Chip size="small" label="UNBOUND" color="info" variant="outlined" sx={{ fontWeight: 700 }} />
+          </Tooltip>
+        )}
         {tClass && (
           <Tooltip
             title={

@@ -61,11 +61,18 @@ export function paletteOpticsOf(part: {
   const aperture = typeof part.params.aperture === 'number' ? part.params.aperture : 25;
   const semi = aperture / 2;
 
+  // WP-60: an entry carrying the record's own surface stack (unbound symbols,
+  // workspace drafts) exports the REAL prescription verbatim — the thin-lens
+  // catalog approximation below is only for parts without one.
+  const realSurfaces = lib?.fragmentSurfaces ?? [];
+
   // Minimal fragment per category. Surfaces use the record conventions
   // (WP-14): standard surfaces, ±Infinity radii serialize as .inf.
   let surfaces: Record<string, unknown>[] | null = null;
   let passthrough = false;
-  switch (part.category) {
+  if (realSurfaces.length > 0) {
+    surfaces = realSurfaces.map(s => ({ ...s }));
+  } else switch (part.category) {
     case 'lens': {
       // Thin biconvex approximation: 1/f ≈ (n−1)(1/R1 − 1/R2) ⇒ R = 2f(n−1).
       const f =
@@ -125,7 +132,13 @@ export function paletteOpticsOf(part: {
     const spec: Record<string, unknown> = { frame: frameName, direction: p.direction };
     if (!isEntry && lastSurface !== null) {
       // Exit ports leave after the fold surface (0) or the last lens surface.
-      spec['after-surface'] = p.name === 'reflected' ? 0 : lastSurface;
+      // A real prescription keeps the record port's own after-surface.
+      spec['after-surface'] =
+        realSurfaces.length > 0 && p.afterSurface != null
+          ? p.afterSurface
+          : p.name === 'reflected'
+            ? 0
+            : lastSurface;
     }
     portSpecs[p.name] = spec;
   }

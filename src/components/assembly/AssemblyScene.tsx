@@ -66,19 +66,29 @@ function GLBModel({ url, offset }: { url: string; offset?: [number, number, numb
   );
 }
 
-function GhostBox({ color }: { color: string }) {
+function GhostBox({
+  color,
+  label = 'no template',
+  labelColor = '#ffb02e',
+  opacity = 0.22,
+}: {
+  color: string;
+  label?: string;
+  labelColor?: string;
+  opacity?: number;
+}) {
   return (
     <group>
       <mesh>
         <boxGeometry args={[48, 48, 48]} />
-        <meshStandardMaterial color={color} transparent opacity={0.22} roughness={0.8} />
+        <meshStandardMaterial color={color} transparent opacity={opacity} roughness={0.8} />
       </mesh>
       <lineSegments geometry={new THREE.EdgesGeometry(new THREE.BoxGeometry(48, 48, 48))}>
         <lineBasicMaterial color={color} />
       </lineSegments>
       <Billboard position={[0, 32, 0]}>
-        <Text fontSize={6} color="#ffb02e" anchorX="center" outlineWidth={0.4} outlineColor="#000000aa">
-          no template
+        <Text fontSize={6} color={labelColor} anchorX="center" outlineWidth={0.4} outlineColor="#000000aa">
+          {label}
         </Text>
       </Billboard>
     </group>
@@ -224,10 +234,13 @@ function AssemblyPart({
   part,
   mechanics,
   markers,
+  unbound,
 }: {
   part: DocPart;
   mechanics: PartMechanics | undefined;
   markers: Marker[];
+  /** WP-60: a bare optical symbol — not in a cube yet (≠ missing template). */
+  unbound: boolean;
 }) {
   const selectedId = useSelectedPartId();
   const selected = selectedId === part.id;
@@ -280,7 +293,12 @@ function AssemblyPart({
           document.body.style.cursor = 'auto';
         }}
       >
-        {templateClass === null ? (
+        {unbound ? (
+          // WP-60: an optical primitive with no mechanics at all — drawn as a
+          // fainter "not in a cube yet" ghost, distinct from the missing-
+          // template ghost (that one is a module whose mesh is absent).
+          <GhostBox color={color} label="UNBOUND" labelColor="#7bdcff" opacity={0.08} />
+        ) : templateClass === null ? (
           <GhostBox color={color} />
         ) : render.glbUrl ? (
           <GLBErrorBoundary fallback={<GhostBox color={color} />}>
@@ -350,6 +368,8 @@ function AssemblyPart({
 
 interface AssemblySceneProps {
   mechanics: PartMechanics[];
+  /** WP-60: library refs that are bare component ids (no module binds them). */
+  unboundIds: ReadonlySet<string>;
   /** Locked 2.5D camera (WP-23): LMB is for parts; orbit on RMB only. */
   lockView: boolean;
   cameraRef: React.MutableRefObject<THREE.PerspectiveCamera | null>;
@@ -370,7 +390,7 @@ function CameraCapture({ cameraRef }: { cameraRef: AssemblySceneProps['cameraRef
   return null;
 }
 
-function SceneContent({ mechanics, lockView, cameraRef, controlsRef, colors }: AssemblySceneProps & { colors: ReturnType<typeof useSceneColors> }) {
+function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef, colors }: AssemblySceneProps & { colors: ReturnType<typeof useSceneColors> }) {
   const parts = useDocParts();
   const markers = useAssemblyStore(s => s.markers);
   const mechanicsById = useMemo(
@@ -432,6 +452,7 @@ function SceneContent({ mechanics, lockView, cameraRef, controlsRef, colors }: A
             part={part}
             mechanics={mechanicsById.get(part.id)}
             markers={markers}
+            unbound={unboundIds.has(part.libraryRef)}
           />
         ))}
       </Suspense>

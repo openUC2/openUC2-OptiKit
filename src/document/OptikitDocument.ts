@@ -439,6 +439,20 @@ export function renamePart(partId: string, ref: string): void {
   useAppStore.getState().updateModuleCustomText(partId, ref);
 }
 
+/**
+ * WP-61: re-point a placed part at a different library record — the
+ * materialize step ("put it in a cube") swaps a bare symbol's ref for the
+ * freshly written cube_module without touching pose, params or paths.
+ * The revision bumps via the placedModules subscription.
+ */
+export function repointPartLibraryRef(partId: string, libraryRef: string): void {
+  useAppStore.setState(s => ({
+    placedModules: s.placedModules.map(m =>
+      m.id === partId ? { ...m, moduleId: libraryRef } : m,
+    ),
+  }));
+}
+
 /** Set a user-level part parameter (round-trips through `.dsn` params) —
  * e.g. the selected T1 state (WP-34). */
 export function setPartParam(partId: string, key: string, value: unknown): void {
