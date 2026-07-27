@@ -384,3 +384,46 @@ export function optimizeDesign(
     signal,
   );
 }
+
+/**
+ * WP-57: the design as one grouped STEP assembly. Unlike every other endpoint
+ * this returns BINARY, so it bypasses `post()`'s JSON parsing — but it keeps
+ * the same typed-error contract (a 422 still carries {code, message}).
+ */
+export async function exportStepAssembly(
+  files: DsnFiles,
+  opts: { beam?: 'solid' | 'wires' | 'off'; beamRadiusMm?: number } = {},
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; filename: string }> {
+  let response: Response;
+  try {
+    response = await fetch(`${getCoreUrl()}/v1/export/step`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        files,
+        beam: opts.beam ?? 'solid',
+        'beam-radius-mm': opts.beamRadiusMm ?? 0.5,
+      }),
+      signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err;
+    throw new CoreServiceError('E_UNREACHABLE', String(err), null, 0);
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const detail = (payload as { detail?: { code?: string; message?: string } })?.detail;
+    throw new CoreServiceError(
+      detail?.code ?? `E_HTTP_${response.status}`,
+      detail?.message ?? `STEP export failed with HTTP ${response.status}`,
+      payload,
+      response.status,
+    );
+  }
+  // The service names the file in Content-Disposition; fall back if a proxy
+  // strips the header rather than downloading something called "undefined".
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const named = /filename="([^"]+)"/.exec(disposition)?.[1];
+  return { blob: await response.blob(), filename: named || 'assembly.step' };
+}

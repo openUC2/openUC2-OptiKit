@@ -43,7 +43,8 @@ import {
   LightMode as LightModeIcon,
   Science as SimulationIcon,
   School as SchoolIcon,
-  ThreeDRotation as View3DIcon
+  ThreeDRotation as View3DIcon,
+  ViewInAr as CadIcon
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import { useAppStore } from '../stores/appStore';
@@ -115,6 +116,31 @@ export const Toolbar: React.FC = () => {
         title: '.dsn export failed',
         message: e instanceof Error ? e.message : String(e),
         duration: 6000,
+      });
+    }
+  };
+
+  /** WP-57: the design as one grouped STEP assembly, built by the service. */
+  const handleExportStep = async (beam: 'solid' | 'off') => {
+    try {
+      const { exportStepAssembly } = await import('../api/coreClient');
+      const { serviceFiles } = await import('../model/dsn/serviceExport');
+      const { blob, filename } = await exportStepAssembly(serviceFiles(), { beam });
+      saveAs(blob, filename);
+      addNotification({
+        type: 'success',
+        title: 'STEP assembly exported',
+        message:
+          `${filename} — named groups per module and optic` +
+          (beam === 'solid' ? ', beam path as solids' : ''),
+        duration: 6000,
+      });
+    } catch (e) {
+      addNotification({
+        type: 'error',
+        title: 'STEP export failed',
+        message: e instanceof Error ? e.message : String(e),
+        duration: 9000,
       });
     }
   };
@@ -727,6 +753,15 @@ openUC2 team via GitHub repository
               <MenuItem onClick={() => { handleExportReleaseBundle(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><STLIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Export Release Bundle (zip)</ListItemText>
+              </MenuItem>
+              {/* WP-57: the whole setup as one grouped CAD assembly. */}
+              <MenuItem onClick={() => { handleExportStep('solid'); setFileMenuAnchor(null); }}>
+                <ListItemIcon><CadIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Export STEP assembly (with beam)</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleExportStep('off'); setFileMenuAnchor(null); }}>
+                <ListItemIcon><CadIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Export STEP assembly (parts only)</ListItemText>
               </MenuItem>
               <Divider />
               <MenuItem onClick={() => { handleGenerateShareableLink(); setFileMenuAnchor(null); }}>
