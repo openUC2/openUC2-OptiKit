@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Box, Button, Chip, Container, Stack, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { C, FONT, kickerSx } from './communityTheme';
+import { useCommunityRepos } from '../../model/communityRepos';
 import { fetchGallery, type GalleryDesign } from './designData';
 import { useLibraryIndex } from '../../model/libraryIndex';
 
@@ -37,9 +38,11 @@ export function HomePage() {
   const navigate = useNavigate();
   const index = useLibraryIndex();
   const [designs, setDesigns] = useState<GalleryDesign[]>([]);
+  // WP-58: mounted community repos contribute their designs to the gallery.
+  const repos = useCommunityRepos(s => s.repos);
   useEffect(() => {
-    fetchGallery().then(setDesigns).catch(() => setDesigns([]));
-  }, []);
+    fetchGallery(repos).then(setDesigns).catch(() => setDesigns([]));
+  }, [repos]);
 
   const moduleCount = index.modules.length;
   const groupCount = index.groups.length;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Stage, Layer, Group, Rect } from 'react-konva';
 import { ElementShape } from './PhysicalModuleOverlay';
 import {
@@ -26,7 +26,8 @@ import {
   DragIndicator as DragIcon,
   Add as AddIcon,
   Image as ImageIcon,
-  Biotech as PhysicsIcon
+  Biotech as PhysicsIcon,
+  GitHub as GitHubIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import {
@@ -43,6 +44,8 @@ import {
   templateClassOf,
 } from '../document';
 import { useLibraryIndex } from '../model/libraryIndex';
+import { mergeRepoIndexes, useMountedRepos } from '../model/communityRepos';
+import { AddCommunityRepoDialog } from './library/AddCommunityRepoDialog';
 import { useWorkspaceLibrary } from '../model/workspaceLibrary';
 import { getCoreUrl } from '../api/coreClient';
 import { GlyphThumb } from './schematic/GlyphThumb';
@@ -148,6 +151,8 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
   const [activeTab, setActiveTab] = useState(0); // 0 for all modules, 1 for user created
   const [iconMode, setIconMode] = useState<'svg' | 'canvas'>('svg'); // icon display mode
   const [thumbManifest, setThumbManifest] = useState<ThumbnailManifest>({});
+  // WP-58: the "Add library from GitHub" dialog.
+  const [repoDialogOpen, setRepoDialogOpen] = useState(false);
   const longPressTimeout = useRef<number | null>(null);
   const isDragging = useRef(false);
 
@@ -163,17 +168,26 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
   const libraryIndex = useLibraryIndex();
   const workspaceRecords = useWorkspaceLibrary(s => s.records);
   const workspaceThumbs = useWorkspaceLibrary(s => s.thumbnails);
+  // WP-58: libraries mounted from community GitHub repos. Precedence is
+  // builtin < mounted < local drafts, so a fork can ADD parts but never
+  // silently override a curated openuc2.* id (clashes are surfaced below).
+  const mountedRepos = useMountedRepos();
+  const merged = useMemo(
+    () => mergeRepoIndexes(libraryIndex.modules, libraryIndex.groups, mountedRepos),
+    [libraryIndex.modules, libraryIndex.groups, mountedRepos],
+  );
+
   useEffect(() => {
-    const registry = entriesFromIndex(libraryIndex.modules, getCoreUrl());
+    const registry = entriesFromIndex(merged.modules, getCoreUrl());
     const registryIds = new Set(registry.map(e => e.moduleId));
     const workspace = entriesFromWorkspace(workspaceRecords, workspaceThumbs)
       .filter(e => !registryIds.has(e.moduleId));
     registerLibraryModules([...registry, ...workspace]);
     // WP-44: groups (the OPM arrangements) register alongside the modules.
-    registerLibraryGroups(groupEntriesFromIndex(libraryIndex.groups));
-  }, [libraryIndex.modules, libraryIndex.groups, workspaceRecords, workspaceThumbs, modules]);
+    registerLibraryGroups(groupEntriesFromIndex(merged.groups));
+  }, [merged, workspaceRecords, workspaceThumbs, modules]);
 
-  const paletteGroups = groupEntriesFromIndex(libraryIndex.groups);
+  const paletteGroups = groupEntriesFromIndex(merged.groups);
 
   // WP-44: place a group as one rigid unit at the origin cell; the user
   // drags the whole arrangement into place afterwards.
@@ -670,7 +684,33 @@ export const PartLibrary: React.FC<{ glbThumbnails?: boolean; opticalGlyphs?: bo
             Load STP / GLB… (part binding)
           </Button>
         )}
+        {/* WP-58: mount a community fork's parts into this palette. */}
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<GitHubIcon />}
+          onClick={() => setRepoDialogOpen(true)}
+          fullWidth
+        >
+          Add library from GitHub
+          {mountedRepos.length > 0 && ` (${mountedRepos.length})`}
+        </Button>
+        {/* A community repo trying to claim a curated id is surfaced, never
+            silently applied — the curated record keeps winning. */}
+        {merged.shadowed.length > 0 && (
+          <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1 }}>
+            {merged.shadowed.length} community part(s) ignored — those ids already exist:{' '}
+            {merged.shadowed.slice(0, 3).map(s => `${s.id} (${s.slug})`).join(', ')}
+            {merged.shadowed.length > 3 && ' …'}
+          </Typography>
+        )}
+        {mountedRepos.filter(r => r.error).map(r => (
+          <Typography key={r.url} variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
+            {r.error}
+          </Typography>
+        ))}
       </Paper>
+      <AddCommunityRepoDialog open={repoDialogOpen} onClose={() => setRepoDialogOpen(false)} />
       
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>

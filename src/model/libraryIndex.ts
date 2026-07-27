@@ -69,6 +69,8 @@ export interface IndexGroup {
   description: string;
   tags: string[];
   review: boolean;
+  /** WP-58: `<owner>/<repo>` when this came from a mounted community repo. */
+  repo?: string;
   envelope_grid: [number, number, number];
   members: {
     key: string;
@@ -97,6 +99,8 @@ export interface IndexModule {
   footprint_grid: [number, number, number];
   /** Kit price in EUR from the module record (null = unpriced). */
   price?: number | null;
+  /** WP-58: `<owner>/<repo>` when this came from a mounted community repo. */
+  repo?: string;
   review: boolean;
   component: {
     ref: string;

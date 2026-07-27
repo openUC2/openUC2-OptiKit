@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Box, Button, Chip, Container, Stack, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { C, FONT, kickerSx } from './communityTheme';
+import { useCommunityRepos } from '../../model/communityRepos';
 import { fetchGallery, type GalleryDesign } from './designData';
 
 type SortKey = 'name' | 'parts';
@@ -17,12 +18,14 @@ type SortKey = 'name' | 'parts';
 export function ExplorePage() {
   const navigate = useNavigate();
   const [designs, setDesigns] = useState<GalleryDesign[]>([]);
+  // WP-58: mounted community repos contribute their designs to the gallery.
+  const repos = useCommunityRepos(s => s.repos);
   const [category, setCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>('name');
 
   useEffect(() => {
-    fetchGallery().then(setDesigns).catch(() => setDesigns([]));
-  }, []);
+    fetchGallery(repos).then(setDesigns).catch(() => setDesigns([]));
+  }, [repos]);
 
   const categories = useMemo(
     () => [...new Set(designs.map(d => d.category))].sort(),

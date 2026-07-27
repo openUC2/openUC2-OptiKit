@@ -8,6 +8,8 @@
 import { designFromFiles, designToParts } from '../../model/dsn';
 import type { DesignDecl } from '../../model/dsn';
 import type { IndexModule } from '../../model/libraryIndex';
+import { rawUrl } from '../../model/communityRepos';
+import type { CommunityRepo } from '../../model/communityRepos';
 
 export interface GalleryDesign {
   id: string;
@@ -16,13 +18,49 @@ export interface GalleryDesign {
   category: string;
   url: string;
   parts: number;
+  /** WP-58: `<owner>/<repo>` when this design came from a mounted repo. */
+  repo?: string;
 }
 
-export async function fetchGallery(): Promise<GalleryDesign[]> {
+async function fetchBuiltinGallery(): Promise<GalleryDesign[]> {
   const response = await fetch(`${import.meta.env.BASE_URL}designs/index.json`);
   if (!response.ok) return [];
   const data = (await response.json()) as { designs?: GalleryDesign[] };
   return data.designs ?? [];
+}
+
+/**
+ * WP-58: designs published by a mounted community repo.
+ *
+ * A fork lists them in the same `designs/index.json` shape; relative `url`s
+ * resolve against the repo's raw content so a fork only has to name its own
+ * files. A repo that publishes no gallery is not an error — plenty of forks
+ * are parts-only.
+ */
+async function fetchRepoGallery(repo: CommunityRepo): Promise<GalleryDesign[]> {
+  try {
+    const response = await fetch(rawUrl(repo, 'designs/index.json'), { cache: 'no-cache' });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { designs?: GalleryDesign[] };
+    return (data.designs ?? []).map(design => ({
+      ...design,
+      id: `${repo.slug}/${design.id}`,
+      repo: repo.slug,
+      url: /^https?:\/\//.test(design.url) ? design.url : rawUrl(repo, design.url),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchGallery(
+  repos: CommunityRepo[] = [],
+): Promise<GalleryDesign[]> {
+  const [builtin, ...community] = await Promise.all([
+    fetchBuiltinGallery(),
+    ...repos.map(fetchRepoGallery),
+  ]);
+  return [...builtin, ...community.flat()];
 }
 
 export async function fetchDesign(url: string): Promise<DesignDecl> {
