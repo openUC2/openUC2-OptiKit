@@ -113,8 +113,17 @@ optikit-core/library/
   templates/openuc2.tpl.mirror_mount_1x1/{template.yml, model.step, model.glb}
   modules/openuc2.cube.mirror_1x1/module.yml
   groups/openuc2.group.miniframe_brightfield/group.yml
+  archive/…                ← WP-68: retired records; the loader skips it.
+                             `library restore <id>` brings a trio back.
   dist/index.json          ← built by `optikit-core library build`
 ```
+
+Since WP-68 the live library is a **starter set** (~30 modules): six
+hand-authored seeds (`starter_50mm`, `z_motor`, `laser_basic`, `led_basic`,
+`camera_basic` + `mirror_45`) at zero-review-flag quality, the reference
+exemplars (galvos, the thorlabs zmx import), and the carrier/plate/puzzle/
+group records. The 288 WP-43-migrated lookalikes live under `archive/`; a
+reference to one fails with `E_ARCHIVED` naming the restore command.
 
 The palette in the editor is *exactly* this library, served by
 `GET /v1/library/index` (with `public/optikit-library/index.json` as the offline
@@ -615,7 +624,14 @@ get wrong:
    negates radii, and shifts `material_post`/`thickness` one surface back.
 2. **Residuals become `cs`** — a transverse offset is `cs` decenter, a residual
    tilt is `cs` rx/ry. Errors: `E_BAD_PATH`, `E_BAD_PORT`, `E_NO_OPTICS`,
-   `E_GEOMETRY`, `E_UNSUPPORTED`.
+   `E_GEOMETRY`, `E_UNSUPPORTED`, `E_MATERIAL`.
+
+Since WP-63 the compiler is also the **material safety net**: every emitted
+`material_post` is normalized onto optiland's class-name registry
+(`{type: ideal, name}` → `Material`, `{type: ideal, index}` →
+`IdealMaterial`); an unrecognizable shape is `E_MATERIAL` naming the
+component + surface, and the service turns an optic optiland still rejects
+into a 422 `E_OPTIC_INVALID` — never a 500.
 
 `advance_to()` enforces facing/kink/transverse tolerances between ports;
 **`fiber_advance()` (WP-46) deliberately skips all of them** and advances by the
@@ -693,7 +709,8 @@ The service is a **thin wrapper**: every endpoint takes
 derived data. Typed engine errors become HTTP 422 `{code, message, context}`
 (plus `escapes` for `E_NO_TARGET`). `cli.py` exposes the same functions as
 subcommands (`validate`, `flatten`, `cubify`, `drc`, `chain`, `compile`,
-`simulate`, `optimize`, `annotate`, `library …`, `generate`, `import …`,
+`simulate`, `optimize`, `annotate`, `library …` — incl. `migrate-materials`
+(WP-63, one-shot) and `restore` (WP-68) — `generate`, `import …`,
 `actuate`, `fx`, `rebuild`, `serve`, `export step`).
 
 Later additions: `/v1/library/index` is mtime-cached with a `?fresh=1` escape
@@ -737,6 +754,8 @@ Four files legitimately straddle both (catalog bootstrap / notifications only):
 | `pathsStore.ts` | The netlist: named `PortRef[]` chains, persisted. |
 | `fibersStore.ts` | WP-46 patch cords: port→port with no geometric constraint, persisted. |
 | `groupStore.ts` | Which group instances are unlocked for member editing. |
+| `layers.ts` + `layerStore.ts` | WP-65: `layerOf(part)`, interface classification ({layer, interface: true} — plates/joints belong to the interface above their layer), and the persisted visibility store (visible/dimmed per layer, solo, "plates & joints" sub-toggle). One precedence rule both editors share; the active working-plane layer is always visible (the placement guard). |
+| `swap.ts` | WP-66: `swapPartModule(partId, newModuleId)` — the whole in-place module-swap semantic (pose kept, chains dropped only on port-name mismatch, DOFs re-clamped/removed, one undo step). |
 | `sourceDesignStore.ts` | Parks the last imported `.dsn` YAML verbatim + the partId↔key map, so blocks the store can't represent (optics, templates, locations) survive a round trip. |
 | `revision.ts` | Monotonic counter bumped only on real edits (selection isn't an edit) — the freshness signal. |
 
@@ -812,11 +831,16 @@ Full per-file detail is long; the shape is:
 
 - **`schematic/`** — the primary editor. `SchematicPage` (shell, drag-drop,
   chain draft), `SchematicScene` (R3F canvas), `ports.ts` (the one port
-  convention), `glyphs.tsx`, `serviceStore.ts` (the round trip), `ServicePanel`,
+  convention), `glyphs.tsx` (incl. WP-64's `InterfaceGlyph`: plates, puzzle
+  joints and baseplates draw as distinct flat symbols via `interfaceKindOf`),
+  `serviceStore.ts` (the round trip), `ServicePanel`,
   `AuthoritativeRays`, `EscapeRays`, `SchematicPropertyPanel`, `OptimizeDialog`,
   `useSchematicSim.ts` (the fast approximate preview), `MarkerList`, `colors.ts`,
   `GlyphThumb.tsx`, `SchematicLegend`, `AuthoredSymbol.tsx` + `symbolAsset.ts`
-  (WP-48: an authored SVG symbol outranks the derived glyph).
+  (WP-48: an authored SVG symbol outranks the derived glyph),
+  `LayerChips.tsx` (WP-65: the shared layer-visibility chip row),
+  `ModulesPanel.tsx` (WP-66: per-part list + swap + the WP-50 aggregate,
+  behind Design | Modules drawer tabs).
 - **`assembly/`** — `AssemblyPage` (incl. the WP-51 module-composition card and
   the WP-60 unbound-part card), `AssemblyScene` (GLB cubes, ghost boxes — the
   UNBOUND ghost is distinct from "no template" — DRC billboards, T2 insert
@@ -844,11 +868,13 @@ Full per-file detail is long; the shape is:
 - **`frameWizard/`** — the FRAME product configurator (separate surface, own store).
 - **Shell:** `AppShell` (the one ThemeProvider + Toolbar), `Toolbar`,
   `BrandLogo`, `NotificationDisplay`, `StartupDialog`.
-- **LEGACY (still on appStore, react-konva 2D grid at `/configurator/grid`):**
-  `EditorPage`, `Layout`, `GridCanvas`, `PropertyPanel`, `LayerPanel`,
-  `SimulationPanel` (`BOMPanel` was deleted by WP-50), `AnnotationCanvas`, `AnnotationPanel`,
-  `PhysicalModuleOverlay`, `RayOverlay`, `ModuleCreationWizard` (+ its three
-  steps), `SetupBrowser`, `CollectionView`, `ChatPanel`.
+- **LEGACY — mostly GONE (WP-69):** the Konva 2D grid builder, its panels,
+  overlays, the module wizard, the intro.js tour, the dead `three/` view and
+  the CSV plumbing were deleted in one sweep (47 files, 10.6 kLOC; konva /
+  react-konva / intro.js uninstalled; `/configurator/grid` redirects to the
+  schematic). What remains of the era: `SetupBrowser` + `CollectionView`
+  (the legacy JSON setup corpus — its CSV is setup metadata, not modules)
+  and the trimmed `appStore` (983 lines) behind the document facade.
 
 ### Routes (`src/App.tsx`)
 
@@ -861,7 +887,7 @@ Full per-file detail is long; the shape is:
 | `/configurator/components` | `ComponentEditorPage` |
 | `/configurator/bind` | `BindPage` → component editor, mechanics tab |
 | `/configurator/assembly` | `AssemblyPage` |
-| `/configurator/grid` | `EditorPage` (legacy 2D builder) |
+| `/configurator/grid` | → redirects to `/configurator/schematic` (WP-69, one-time retire notice) |
 | `/configurator/frame` | `FrameWizardPage` |
 | `/configurator/setups`, `/setups` | `SetupBrowser` (legacy JSON corpus) |
 | `/configurator/3d` | → redirects to `/configurator/assembly?from=3d` (WP-37) |
@@ -920,6 +946,9 @@ Gates before committing:
 cd optikit-core     && uv run pytest -q && uv run ruff check src/ tests/
 cd openUC2-OptiKit  && npx tsc --noEmit && npx vitest run && npm run lint
 ```
+
+Since WP-69, `npm run lint` is at **zero findings** — any new warning is a
+real one, and CI can enforce it.
 
 ---
 
