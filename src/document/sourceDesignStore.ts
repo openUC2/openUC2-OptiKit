@@ -77,6 +77,11 @@ export interface SourcePort {
   afterSurface: number | null;
   /** WP-46: 'fiber' takes a patch cord; '' (default) is a free-space port. */
   coupling?: '' | 'fiber';
+  /** WP-79: the datum frame's [x,y,z,w] quaternion (a tilted frame tilts the
+   * beam) — preserved through placement so the fold survives simulation. */
+  rotation?: [number, number, number, number];
+  /** WP-79: the frame's measured clear aperture, mm. */
+  clearApertureMm?: number;
 }
 
 interface RawOptics {

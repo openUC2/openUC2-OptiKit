@@ -49,6 +49,11 @@ export interface IndexPort {
   after_surface: number | null;
   /** WP-46: 'fiber' takes a patch cord; '' (or absent) is free space. */
   coupling?: '' | 'fiber';
+  /** WP-79: the datum frame's [x,y,z,w] quaternion — a tilted frame tilts the
+   * beam, so a gizmo-placed 45° mirror simulates folded, not axis-aligned. */
+  rotation?: [number, number, number, number];
+  /** WP-79: the frame's measured clear aperture (mm), for DRC_APERTURE. */
+  clear_aperture_mm?: number;
 }
 
 export interface IndexDof {

@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { DocPart, DocSnapshot } from '../../../document';
+import { entriesFromIndex, registerLibraryModules } from '../../../document';
 import { designToParts, snapshotToDesign } from '../convert';
 import { parseDesign, serializeDesign } from '../io';
 
@@ -155,6 +156,28 @@ describe('palette optics enrichment (WP-32)', () => {
     expect(surfaces[0].interaction_model.is_reflective).toBe(true);
     const ports = optics.ports as Record<string, { direction: string; 'after-surface'?: number }>;
     expect(ports.reflected).toEqual({ frame: 'optical', direction: '-y', 'after-surface': 0 });
+  });
+
+  it('WP-79: a bound tilted mirror exports its frame rotation (folds the beam)', () => {
+    // A registry mirror whose datum frame carries a 45° quaternion + aperture.
+    registerLibraryModules(entriesFromIndex([{
+      id: 'bound.mirror.km05', version: '0.1.0', kind: 'cube_module', description: '',
+      tags: [], category: 'mirror', thumbnail: null, footprint_grid: [1, 1, 1], review: false,
+      component: { ref: 'bound.mirror.km05@^0.1', resolved: '0.1.0', vendor: null, efl_mm: null },
+      template: { ref: 't@^0.1', resolved: '0.1.0', class: 'fixed', actuatable: false, dof: [] },
+      assets: { thumbnail: null, glb: null, step: null },
+      ports: [{
+        name: 'front', direction: '-z', position_mm: [0, 0, 0], after_surface: 0,
+        rotation: [0, 0, 0.3827, 0.9239], clear_aperture_mm: 12.7,
+      }],
+      electronics: null,
+    }], 'http://x'));
+    const comp = componentOf(
+      part({ id: 'm', ref: 'M', category: 'mirror', libraryRef: 'bound.mirror.km05' }),
+    );
+    const frames = comp.optics!.frames as Record<string, { rotation?: number[]; 'clear-aperture-mm'?: number }>;
+    expect(frames.front.rotation).toEqual([0, 0, 0.3827, 0.9239]);
+    expect(frames.front['clear-aperture-mm']).toBe(12.7);
   });
 
   it('filters export as passthrough; sources export their emit port', () => {

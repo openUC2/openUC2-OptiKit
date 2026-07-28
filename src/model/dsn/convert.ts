@@ -121,15 +121,24 @@ export function paletteOpticsOf(part: {
   const portSpecs: Record<string, unknown> = {};
   for (const p of ports) {
     const isEntry = /^(front|sensor|in|plane)$/.test(p.name);
-    // Ports with a real datum offset (library records) get their own frame.
+    // Ports with a real datum offset, a frame rotation, or a clear aperture
+    // (library records) get their own named frame. WP-79: a tilted frame must
+    // travel — a bound 45° mirror folds the beam only if its quaternion is
+    // exported, not dropped.
     let frameName = 'optical';
-    if (p.positionMm.some(v => v !== 0)) {
+    const hasOffset = p.positionMm.some(v => v !== 0);
+    if (hasOffset || p.rotation || typeof p.clearApertureMm === 'number') {
       frameName = p.name;
-      frames[frameName] = {
+      const frame: Record<string, unknown> = {
         'x-mm': round6(p.positionMm[0]),
         'y-mm': round6(p.positionMm[1]),
         'z-mm': round6(p.positionMm[2]),
       };
+      if (p.rotation) frame.rotation = p.rotation.map(round6);
+      if (typeof p.clearApertureMm === 'number') {
+        frame['clear-aperture-mm'] = round6(p.clearApertureMm);
+      }
+      frames[frameName] = frame;
     }
     const spec: Record<string, unknown> = { frame: frameName, direction: p.direction };
     if (!isEntry && lastSurface !== null) {

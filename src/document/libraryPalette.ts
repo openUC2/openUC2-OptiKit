@@ -224,12 +224,15 @@ function indexPortsToSource(ports: IndexPort[] | undefined): SourcePort[] {
     positionMm: p.position_mm,
     afterSurface: p.after_surface,
     coupling: p.coupling ?? '',
+    // WP-79: carry the frame quaternion + clear aperture through placement.
+    ...(p.rotation ? { rotation: p.rotation } : {}),
+    ...(typeof p.clear_aperture_mm === 'number' ? { clearApertureMm: p.clear_aperture_mm } : {}),
   }));
 }
 
 function recordPortsToSource(record: ComponentRecord): SourcePort[] {
   const optics = record.optics ?? {};
-  const frames = (optics.frames ?? {}) as Record<string, Record<string, number>>;
+  const frames = (optics.frames ?? {}) as Record<string, Record<string, unknown>>;
   const ports = (optics.ports ?? {}) as Record<
     string,
     {
@@ -241,16 +244,23 @@ function recordPortsToSource(record: ComponentRecord): SourcePort[] {
   >;
   return Object.entries(ports).map(([name, port]) => {
     const frame = frames[port.frame ?? ''] ?? {};
+    const rotation = frame.rotation;
+    const aperture = frame['clear-aperture-mm'];
     return {
       name,
       direction: port.direction ?? '+z',
       positionMm: [
-        frame['x-mm'] ?? 0,
-        frame['y-mm'] ?? 0,
-        frame['z-mm'] ?? 0,
+        (frame['x-mm'] as number) ?? 0,
+        (frame['y-mm'] as number) ?? 0,
+        (frame['z-mm'] as number) ?? 0,
       ] as [number, number, number],
       afterSurface: port['after-surface'] ?? null,
       coupling: port.coupling ?? '',
+      // WP-79: a draft's authored frame rotation + aperture travel too.
+      ...(Array.isArray(rotation) && rotation.length === 4
+        ? { rotation: rotation as [number, number, number, number] }
+        : {}),
+      ...(typeof aperture === 'number' ? { clearApertureMm: aperture } : {}),
     };
   });
 }
