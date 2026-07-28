@@ -439,7 +439,8 @@ export function AssemblyPage() {
                     )}
                   </Box>
                   )}
-                  {selectedMechanics?.translationDofs.map(dof => {
+                  {[...(selectedMechanics?.translationDofs ?? []),
+                    ...(selectedMechanics?.rotationDofs ?? [])].map(dof => {
                     const value = selected.dofs.find(d => d.name === dof.name)?.value ?? dof.value;
                     return (
                       <TextField

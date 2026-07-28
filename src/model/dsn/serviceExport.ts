@@ -240,11 +240,14 @@ export interface PartMechanics {
   templateClass: string | null;
   /** Ranged translation DOFs — the draggable insert axes (T2). */
   translationDofs: TranslationDof[];
+  /** WP-80: ranged rotation DOFs (tip/tilt) — now reach the compiled geometry,
+   * so they drive the trace and back-annotate like translations. */
+  rotationDofs: TranslationDof[];
 }
 
 /**
  * Mechanical bindings per placed part, from the merged design: the template
- * class and the draggable (ranged translation) DOFs with current values.
+ * class and the ranged DOFs (translation + rotation) with current values.
  */
 export function listPartMechanics(snap?: DocSnapshot): PartMechanics[] {
   const { design, keyByPartId } = buildServiceDesign(snap);
@@ -254,8 +257,10 @@ export function listPartMechanics(snap?: DocSnapshot): PartMechanics[] {
     const comp = design.components?.[key];
     if (!comp) continue;
     const translationDofs: TranslationDof[] = [];
+    const rotationDofs: TranslationDof[] = [];
     for (const dof of comp.dof ?? []) {
-      if ((dof.kind ?? 'translation') !== 'translation') continue;
+      const kind = dof.kind ?? 'translation';
+      if (kind !== 'translation' && kind !== 'rotation') continue;
       const axis = dof.axis;
       if (axis !== 'x' && axis !== 'y' && axis !== 'z') continue;
       const range = dof.range;
@@ -264,21 +269,23 @@ export function listPartMechanics(snap?: DocSnapshot): PartMechanics[] {
       if (typeof lo !== 'number' || typeof hi !== 'number') continue;
       const dotted = `${key}.${dof.name}`;
       const value = dofValues[dotted];
-      translationDofs.push({
+      const entry: TranslationDof = {
         key: dotted,
         name: dof.name,
         axis,
         range: [lo, hi],
-        unit: dof.unit ?? 'mm',
+        unit: dof.unit ?? (kind === 'rotation' ? 'deg' : 'mm'),
         value: typeof value === 'number' ? value : 0,
         actuatable: Boolean(dof.actuatable),
-      });
+      };
+      (kind === 'rotation' ? rotationDofs : translationDofs).push(entry);
     }
     out.push({
       partId,
       componentKey: key,
       templateClass: comp.template?.class ?? null,
       translationDofs,
+      rotationDofs,
     });
   }
   return out;
