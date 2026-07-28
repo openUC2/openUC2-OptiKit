@@ -174,14 +174,21 @@ const BOUND_COMPONENT: IndexComponent = {
 };
 
 describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () => {
-  it('offers only components no module binds, as template-less entries', () => {
+  it('offers only components no module binds; bound ones register hidden (WP-76)', () => {
     const entries = entriesFromComponents(
       [BOUND_COMPONENT, AC254],
       [MIRROR_MODULE],
       'http://localhost:8010',
     );
-    expect(entries.map(e => e.moduleId)).toEqual(['thorlabs.lens.ac254-050-a']);
-    const lens = entries[0];
+    // Both register (the WP-76 unbind verb needs the bound one resolvable),
+    // but only the module-less component is offered in the palette.
+    expect(entries.map(e => e.moduleId)).toEqual([
+      'openuc2.mirror.flat_45',
+      'thorlabs.lens.ac254-050-a',
+    ]);
+    expect(entries[0].paletteHidden).toBe(true);
+    const lens = entries[1];
+    expect(lens.paletteHidden).toBe(false);
     expect(lens.unbound).toBe(true);
     expect(lens.templateClass).toBeNull();
     expect(lens.glbUrl).toBeNull();

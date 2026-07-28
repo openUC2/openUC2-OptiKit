@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Chip,
+  Divider,
   IconButton,
   List,
   ListItem,
@@ -35,6 +36,8 @@ import { SwapHoriz as SwapIcon } from '@mui/icons-material';
 // Notifications only — the design model itself flows through src/document
 // (the same exception PartLibrary uses).
 import { useAppStore } from '../../stores/appStore';
+import { GenerateHolderDialog } from '../assembly/GenerateHolderDialog';
+import { runUnbind } from './unbindAction';
 import type { DocPart, LibraryPaletteEntry, TemplateClass } from '../../document';
 import {
   T_CLASS_LABEL,
@@ -79,6 +82,9 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
   const unlockedMap = useGroupEditStore(s => s.unlocked);
   const [aggregate, setAggregate] = useState(false);
   const [menu, setMenu] = useState<SwapMenuState | null>(null);
+  // WP-76: "put in a cube…" from the row menu — the WP-61 holder dialog.
+  const [holderPartId, setHolderPartId] = useState<string | null>(null);
+  const holderPart = holderPartId ? parts.find(p => p.id === holderPartId) : undefined;
 
   // Cross-probe canvas → list: keep the selected row in view.
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
@@ -93,10 +99,15 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
   const candidates = useMemo<LibraryPaletteEntry[]>(
     () =>
       menuPart
-        ? listLibraryEntries().filter(e => e.moduleId !== menuPart.libraryRef)
+        ? listLibraryEntries().filter(
+            // WP-76: lookup-only entries (bound components) are not offered —
+            // "take out of cube" is the verb for reaching them.
+            e => e.moduleId !== menuPart.libraryRef && !e.paletteHidden,
+          )
         : [],
     [menuPart],
   );
+  const menuLib = menuPart ? libraryEntryOf(menuPart.libraryRef) : undefined;
   const sameCategory = candidates.filter(e => e.category === menuPart?.category);
   const others = candidates.filter(e => e.category !== menuPart?.category);
   const othersByCategory = useMemo(() => {
@@ -227,7 +238,9 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
                 }}
                 secondaryAction={
                   <Tooltip
-                    title={locked ? 'unlock the group to swap members' : 'swap module in place'}
+                    title={locked
+                      ? 'unlock the group to edit members'
+                      : 'module actions: swap · take out of cube · put in a cube…'}
                   >
                     <span>
                       <IconButton
@@ -302,6 +315,37 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
         slotProps={{ paper: { sx: { maxHeight: 420, width: 300 } } }}
       >
         {menuPart && [
+          // WP-76: the two inverse verbs live alongside swap. A cube module
+          // offers "take out of cube"; an unbound primitive "put in a cube…".
+          ...(menuLib?.unbound
+            ? [
+                <MenuItem
+                  key="put-in-cube"
+                  dense
+                  onClick={() => {
+                    setMenu(null);
+                    setHolderPartId(menuPart.id);
+                  }}
+                >
+                  <Typography variant="body2">put in a cube… (generate a holder)</Typography>
+                </MenuItem>,
+                <Divider key="verb-divider" />,
+              ]
+            : menuLib?.componentId
+              ? [
+                  <MenuItem
+                    key="take-out"
+                    dense
+                    onClick={() => {
+                      setMenu(null);
+                      runUnbind(menuPart.id);
+                    }}
+                  >
+                    <Typography variant="body2">take out of cube</Typography>
+                  </MenuItem>,
+                  <Divider key="verb-divider" />,
+                ]
+              : []),
           <ListSubheader key="same-cat" sx={{ lineHeight: '28px' }}>
             {menuPart.category}
           </ListSubheader>,
@@ -335,6 +379,15 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
             : []),
         ]}
       </Menu>
+
+      {/* WP-76: the WP-61 holder dialog, reachable from the row menu. */}
+      {holderPart && (
+        <GenerateHolderDialog
+          part={holderPart}
+          open={holderPartId !== null}
+          onClose={() => setHolderPartId(null)}
+        />
+      )}
     </Box>
   );
 }

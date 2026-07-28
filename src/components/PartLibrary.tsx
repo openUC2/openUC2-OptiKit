@@ -137,13 +137,17 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
     loadModules();
   }, [loadModules]);
 
-  const filteredModules = modules.filter(module => {
+  // WP-76: entries registered for unbind-target lookup only stay out of the
+  // shelf — the optic is already offered through its cube module.
+  const visibleModules = modules.filter(m => !libraryEntryOf(m.id)?.paletteHidden);
+
+  const filteredModules = visibleModules.filter(module => {
     const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGroup = selectedGroup === 'all' || module.group === selectedGroup;
     return matchesSearch && matchesGroup;
   });
 
-  const groups = ['all', ...new Set(modules.map(m => m.group))];
+  const groups = ['all', ...new Set(visibleModules.map(m => m.group))];
 
   const activeLayer = layers.find(layer => layer.id === activeLayerId);
   const currentLayerIndex = activeLayer?.index ?? 0;

@@ -29,6 +29,8 @@ import {
   Route as RouteIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { GenerateHolderDialog } from '../assembly/GenerateHolderDialog';
+import { runUnbind } from './unbindAction';
 import type { DocPart, Vec3 } from '../../document';
 import {
   firmwareCommand,
@@ -148,6 +150,9 @@ function PartProperties({ part }: { part: DocPart }) {
   // WP-26: send a DOF value to a device as a firmware command.
   const [deviceUrl, setDeviceUrlState] = useState(getDeviceUrl());
   const [actNote, setActNote] = useState<string | null>(null);
+  // WP-76: "generate a holder…" for an unbound primitive, right where the
+  // ray diagram told the user where the optic belongs (was Assembly-only).
+  const [holderOpen, setHolderOpen] = useState(false);
 
   const sendDof = async (dofName: string, value: number) => {
     const dof = actuatableDofs.find(d => d.name === dofName);
@@ -567,6 +572,29 @@ function PartProperties({ part }: { part: DocPart }) {
       )}
 
       <Divider />
+      {/* WP-76: the two inverse verbs, in the schematic where the user is
+          standing. Unbound primitive → "generate a holder…" (the same WP-61
+          dialog the assembly mounts); cube module → "take out of cube". */}
+      {lib?.unbound ? (
+        <Tooltip title="print a cube holder carved around this optic at its placed pose (WP-61)">
+          <Button size="small" variant="contained" onClick={() => setHolderOpen(true)}>
+            generate a holder…
+          </Button>
+        </Tooltip>
+      ) : lib?.componentId ? (
+        <Tooltip title="drop the cube and keep the optical component at the same pose — it becomes a free UNBOUND primitive (one undo)">
+          <Button size="small" variant="outlined" onClick={() => runUnbind(part.id)}>
+            take out of cube
+          </Button>
+        </Tooltip>
+      ) : null}
+      {lib?.unbound && (
+        <GenerateHolderDialog
+          part={part}
+          open={holderOpen}
+          onClose={() => setHolderOpen(false)}
+        />
+      )}
       {/* WP-51.1 (collapsed form): the module trio behind this part — the
           full composition card with assets/electronics lives in the assembly
           panel; here just the two records with their deep links. */}

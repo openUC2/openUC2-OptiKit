@@ -93,6 +93,11 @@ export interface LibraryPaletteEntry {
    * mechanics yet. Places freely (no cube, no grid claim) until a holder is
    * generated around it (WP-61). */
   unbound: boolean;
+  /** WP-76: registered for lookup only — the entry resolves (so unbinding a
+   * cube can re-point its part at the component) but the palette and the
+   * swap menu do not offer it, because the same optic already reaches the
+   * user through its cube module. */
+  paletteHidden?: boolean;
   /** WP-60: the record's own surface stack. When non-empty, a placement
    * exports THIS as its fragment (the real prescription) instead of the
    * thin-lens approximation. Empty for module-backed entries. */
@@ -396,7 +401,8 @@ export function entriesFromWorkspace(
  * the exact template-less shape workspace drafts already place through, so
  * placement, free mm movement and DRC invisibility come for free. A
  * module-bound component keeps coming through its module: this never offers
- * the same optic twice.
+ * the same optic twice — but its entry still registers with `paletteHidden`
+ * so the WP-76 unbind verb has a resolvable target to re-point at.
  */
 export function entriesFromComponents(
   components: IndexComponent[],
@@ -412,7 +418,6 @@ export function entriesFromComponents(
       .filter((id): id is string => Boolean(id)),
   );
   return components
-    .filter(component => !bound.has(component.id))
     .map(component => ({
       moduleId: component.id,
       componentId: component.id,
@@ -434,6 +439,7 @@ export function entriesFromComponents(
       review: component.review,
       source: 'registry' as const,
       unbound: true,
+      paletteHidden: bound.has(component.id),
       fragmentSurfaces: component.fragment_surfaces ?? [],
       carrier: false,
       bays: {},
