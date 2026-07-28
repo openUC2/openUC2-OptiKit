@@ -241,6 +241,9 @@ export interface BoundRecords {
   template: Record<string, unknown>;
   module: Record<string, unknown>;
   warnings: string[];
+  /** WP-77: reasons the pair MUST NOT be saved (a dead record would result).
+   * The records are still built for preview; the UI blocks both exits. */
+  errors: string[];
 }
 
 const AXES: [string, Vec3][] = [
@@ -293,6 +296,28 @@ function dirToPort(v: Vec3): string | [number, number, number] {
 
 export function bindToRecords(input: BindInput): BoundRecords {
   const warnings: string[] = [];
+  const errors: string[] = [];
+  // WP-77: the workbench authors NO generator block and NO DOFs, so two of
+  // the three classes would emit dead records. Refuse them instead:
+  // - `generative` with no generator can never generate anything — the T3
+  //   road is "generate a holder…", which writes the generator + the exact
+  //   params of a real run;
+  // - `adaptive` with zero DOFs silently degrades to free movement and
+  //   exports nothing through fx.
+  if (input.templateClass === 'generative') {
+    errors.push(
+      'class T3 · generative would emit a template with NO generator block — a dead ' +
+        'record that can never generate anything. Use “generate a holder…” instead: ' +
+        'it writes the generator and the exact params of a real run.',
+    );
+  }
+  if (input.templateClass === 'adaptive') {
+    errors.push(
+      'class T2 · adaptive with zero declared DOFs silently degrades to free movement ' +
+        'and exports nothing through fx. The workbench cannot author DOFs yet — ' +
+        'use T1 · fixed, or author the dof block in the record directly.',
+    );
+  }
   const componentId = input.existingComponent
     ? input.existingComponent.id
     : `${input.namespace}.${input.category}.${input.name}`;
@@ -452,7 +477,7 @@ export function bindToRecords(input: BindInput): BoundRecords {
     footprint_grid: [1, 1, 1],
   };
 
-  return { component, template, module, warnings };
+  return { component, template, module, warnings, errors };
 }
 
 /** ±Infinity → .inf survives the yaml stringifier via a replacer pass. */

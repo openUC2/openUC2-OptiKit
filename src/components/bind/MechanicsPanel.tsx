@@ -58,11 +58,12 @@ import {
   type DatumKind,
 } from '../../model/bindRecord';
 import type { Vec3 } from '../../document';
-import { recordToYaml, type RecordDraft } from '../../model/componentRecord';
+import { paraxialEflMm, recordToYaml, type RecordDraft } from '../../model/componentRecord';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
 import { bumpLibraryIndex, useLibraryIndex } from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import { zipDsn } from '../../model/dsn/io';
+import { GenerateDraftHolderDialog } from '../component-editor/GenerateDraftHolderDialog';
 import { BindScene } from './BindScene';
 import { useBindStore } from './bindStore';
 
@@ -136,8 +137,16 @@ export function MechanicsPanel({
   const index = useLibraryIndex();
   const fileInput = useRef<HTMLInputElement>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  // WP-77: the record-pair chooser presents as ONE line (the answer is the
+  // draft you are editing) until the user asks for a different component.
+  const [showComponentPicker, setShowComponentPicker] = useState(false);
+  // WP-77: the T3 verb from the editor — the draft-driven holder dialog.
+  const [holderOpen, setHolderOpen] = useState(false);
 
   const allowedKinds = KINDS_BY_CATEGORY[draft.category] ?? KINDS_BY_CATEGORY.other;
+  // WP-77: the live lensmaker number, without switching to the optics tab.
+  // null (reflective stack / afocal / no surfaces) renders as "—".
+  const eflMm = paraxialEflMm(draft.surfaces);
 
   // Existing-component options: published index + local workspace drafts.
   const componentOptions = useMemo(() => {
@@ -437,6 +446,10 @@ export function MechanicsPanel({
       <Typography variant="caption" color="text.secondary">
         placement: [{store.transform.positionMm.map(v => v.toFixed(1)).join(', ')}] mm ·
         rot [{store.transform.rotationDeg.map(v => v.toFixed(1)).join(', ')}]°
+        {' · '}
+        <Tooltip title="paraxial EFL of the draft's optics tab (2×2 ABCD walk) — '—' for a reflective stack, where it is undefined">
+          <span>EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}</span>
+        </Tooltip>
       </Typography>
 
       {/* ── datums ─────────────────────────────────────────────────────── */}
@@ -581,41 +594,85 @@ export function MechanicsPanel({
       <Divider>
         <Typography variant="overline">record pair</Typography>
       </Divider>
-      <TextField
-        select size="small" fullWidth
-        label="optical component" value={store.existingComponentId}
-        onChange={e => store.setExistingComponentId(e.target.value)}
-        helperText={store.existingComponentId
-          ? 'the module references this existing component'
-          : record
-            ? `the module references THIS draft: ${record.id}@${record.version}`
-            : 'draft incomplete — a datum-derived stub component will be generated'}
-      >
-        <MenuItem value="">— this draft (the optics tab) —</MenuItem>
-        {componentOptions.map(([id, version]) => (
-          <MenuItem key={id} value={id}>{id}@{version}</MenuItem>
-        ))}
-      </TextField>
+      {/* WP-77: when the mechanics tab is open on the draft you are editing,
+          the "which component?" question has an obvious answer — show it as
+          ONE line, with the dropdown behind an explicit link. */}
+      {!showComponentPicker && !store.existingComponentId ? (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          <Typography variant="body2">
+            mechanics for{' '}
+            <b>{record ? `${record.id}@${record.version}` : `${draft.namespace}.${draft.category}.${draft.name || '…'}`}</b>
+            {' '}(this draft)
+          </Typography>
+          <Button size="small" onClick={() => setShowComponentPicker(true)}>
+            bind to a different published component…
+          </Button>
+        </Stack>
+      ) : (
+        <TextField
+          select size="small" fullWidth
+          label="optical component" value={store.existingComponentId}
+          onChange={e => store.setExistingComponentId(e.target.value)}
+          helperText={store.existingComponentId
+            ? 'the module references this existing component'
+            : record
+              ? `the module references THIS draft: ${record.id}@${record.version}`
+              : 'draft incomplete — a datum-derived stub component will be generated'}
+        >
+          <MenuItem value="">— this draft (the optics tab) —</MenuItem>
+          {componentOptions.map(([id, version]) => (
+            <MenuItem key={id} value={id}>{id}@{version}</MenuItem>
+          ))}
+        </TextField>
+      )}
 
+      {bound?.errors.map((e, i) => (
+        <Alert key={i} severity="error"><Typography variant="caption">{e}</Typography></Alert>
+      ))}
       {bound?.warnings.map((w, i) => (
         <Alert key={i} severity="warning"><Typography variant="caption">{w}</Typography></Alert>
       ))}
       {flash && <Alert severity="success">{flash}</Alert>}
 
-      <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
-        <Button variant="contained" startIcon={<DownloadIcon />} disabled={!bound}
+      <Stack direction="row" spacing={1.5} sx={{ mb: 3, flexWrap: 'wrap', rowGap: 1 }}>
+        <Button variant="contained" startIcon={<DownloadIcon />}
+          disabled={!bound || bound.errors.length > 0}
           onClick={() => void download()}>
           Download record pair (PR zip)
         </Button>
         <Tooltip title="dev fast path — on by default when the service runs from a checkout">
           <span>
             <Button variant="outlined" color="warning" startIcon={<DevWriteIcon />}
-              disabled={!bound || store.busy} onClick={() => void devWrite()}>
+              disabled={!bound || bound.errors.length > 0 || store.busy}
+              onClick={() => void devWrite()}>
               Write into ../optikit-core/library
             </Button>
           </span>
         </Tooltip>
+        {/* WP-77: the ACTUAL T3 road — a generated holder around the draft's
+            own prescription (no STEP, no datums, no placement needed). */}
+        <Tooltip
+          title={record && draft.surfaces.length > 0
+            ? 'generate a printable two-half holder from the draft prescription — accepting writes component + template (WITH generator) + module'
+            : 'complete the optics tab first — the holder is carved from the draft prescription'}
+        >
+          <span>
+            <Button variant="outlined" color="secondary"
+              disabled={!record || draft.surfaces.length === 0}
+              onClick={() => setHolderOpen(true)}>
+              generate a holder… (T3)
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
+      {record && (
+        <GenerateDraftHolderDialog
+          draft={draft}
+          record={record}
+          open={holderOpen}
+          onClose={() => setHolderOpen(false)}
+        />
+      )}
     </Stack>
   );
 }

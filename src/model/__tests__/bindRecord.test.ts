@@ -50,6 +50,24 @@ describe('snapToAxis', () => {
   });
 });
 
+describe('dead-record guard (WP-77)', () => {
+  it('refuses class generative — no generator block can ever be emitted here', () => {
+    const bound = bindToRecords({ ...laserInput(), templateClass: 'generative' });
+    expect(bound.errors).toHaveLength(1);
+    expect(bound.errors[0]).toMatch(/generate a holder/);
+  });
+
+  it('refuses class adaptive — zero DOFs degrade to free movement', () => {
+    const bound = bindToRecords({ ...laserInput(), templateClass: 'adaptive' });
+    expect(bound.errors).toHaveLength(1);
+    expect(bound.errors[0]).toMatch(/DOF/);
+  });
+
+  it('T1 fixed stays error-free', () => {
+    expect(bindToRecords(laserInput()).errors).toEqual([]);
+  });
+});
+
 describe('datum frame math (WP-31: datums follow the part)', () => {
   it('rotating the part 90° about z carries an x-offset datum to +y', () => {
     const t = { positionMm: [0, 0, 0] as [number, number, number], rotationDeg: [0, 0, 90] as [number, number, number] };
