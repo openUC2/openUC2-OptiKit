@@ -83,17 +83,17 @@ a typed 422. Both fixed in WP-63, which goes **first**.
 ## Decisions I've assumed (veto anytime)
 
 1. **Rename**: "Components" + "Bind" → one **"Parts"** nav entry (tabs:
-   optics / mechanics). Alternative on the table: calling it "Library".
+   optics / mechanics). Alternative on the table: calling it "Library". => sounds good 
 2. **Archive location** (WP-68): records move to `library/archive/**` in the
    same repo — history preserved, loader skips it like `dist/`. Alternative:
-   a separate archive repo.
+   a separate archive repo. => same repo is good for now, we will organize oursevles later anyway
 3. **Seed set** (WP-68): exactly your five — lens, mirror, electronic
    z-stage, laser, LED — **plus a camera/detector** (no beam path can
    terminate without one) and the existing hand-authored reference records
    (flat_45, galvo, thorlabs.ac254-050-a) which are the T1/T2/vendor
-   exemplars other parts derive from.
+   exemplars other parts derive from. => good 
 4. **Frontend CSV code is deleted** (WP-69); the core `import csv` command
-   stays as the documented historical migration tool.
+   stays as the documented historical migration tool. => ok
 
 ---
 
@@ -230,55 +230,6 @@ with its grid position, click-to-find in both directions, and a dropdown to
 swap one module for another without touching its position or rewiring the
 beam.
 
-### WP-67 — The part-first library: "Parts" editor, housing without a cube
-
-```
-PROMPT (repo: optikit-core + openUC2-OptiKit)
-
-The philosophy, stated in round 9: import a STEP, associate the function +
-origin + direction to it; the symbol derives from part + glyph; a cube is
-OPTIONAL and may come later (T3). The association flow exists (bind
-workbench); this WP removes the "everything becomes a cube" assumption and
-the "bind" naming.
-
-1. Schema: `mechanical_template.footprint_grid` becomes OPTIONAL
-   (None = "not cube-mounted": a bare housing — a Thorlabs laser body, a
-   breadboard-mount part). Validation: a cube_module may only reference a
-   template WITH a footprint; a housing-only part is component + template,
-   no module. Index: housing templates ship under a `housings` section
-   (or `template.footprint: null` on the component entry) so the frontend
-   can tell the three states apart: bare symbol / symbol+housing / cube
-   module.
-2. Parts editor rename: one nav entry "Parts" replaces "Components" and
-   "Bind"; tabs "optics (symbol)" / "mechanics (housing)"; /configurator/
-   bind and /components keep redirecting. The word "bind" leaves the UI
-   (the mechanics tab's save actions say "attach housing" / "package as
-   cube module").
-3. Mechanics tab, third mode alongside insert-binding and whole-module:
-   **housing only** — load the STEP, place datums (function + origin +
-   direction, the existing flow), save component + housing template, NO
-   cube module. The WP-60 unbound-palette path then places it freely; the
-   schematic/assembly render the housing GLB at the part pose (real
-   silhouette instead of the ghost).
-4. Symbol derivation: an unbound part's palette thumbnail composes glyph +
-   housing outline (top-down bbox silhouette from the GLB) so a Thorlabs
-   laser looks like a Thorlabs laser, not a generic red box. The WP-48
-   authored-SVG slot stays the override.
-5. Road to a cube stays open: "package as cube module…" on a housing part
-   pre-fills the WP-61 generate flow (the housing STEP becomes part_step
-   for the boolean holder).
-
-Acceptance: import a laser housing STEP, mark its emission datum, save —
-component + housing template, no module; it appears in the palette with
-the composed symbol, places freely, chains and simulates; "package as
-cube module" hands it to the T3 flow; `library validate` rejects a
-cube_module referencing the housing template.
-```
-
-**For humans:** the library stops pretending everything is a cube. A part is
-its optics plus (optionally) its own housing; the editor is called "Parts"
-and speaks that language; and turning a housed part into a cube becomes a
-deliberate later step — generated, not assumed.
 
 ### WP-68 — The starter library: archive the 100+, seed six
 
@@ -354,6 +305,60 @@ before/after from vite build); schematic/assembly/parts flows unaffected
 Konva code, CSV plumbing and wizards behind it — leaves the codebase. The
 payoff besides clarity: the lint baseline finally reaches zero, so from then
 on any new warning is a real one.
+
+
+
+----------
+### WP-67 — The part-first library: "Parts" editor, housing without a cube
+
+```
+PROMPT (repo: optikit-core + openUC2-OptiKit)
+
+The philosophy, stated in round 9: import a STEP, associate the function +
+origin + direction to it; the symbol derives from part + glyph; a cube is
+OPTIONAL and may come later (T3). The association flow exists (bind
+workbench); this WP removes the "everything becomes a cube" assumption and
+the "bind" naming.
+
+1. Schema: `mechanical_template.footprint_grid` becomes OPTIONAL
+   (None = "not cube-mounted": a bare housing — a Thorlabs laser body, a
+   breadboard-mount part). Validation: a cube_module may only reference a
+   template WITH a footprint; a housing-only part is component + template,
+   no module. Index: housing templates ship under a `housings` section
+   (or `template.footprint: null` on the component entry) so the frontend
+   can tell the three states apart: bare symbol / symbol+housing / cube
+   module.
+2. Parts editor rename: one nav entry "Parts" replaces "Components" and
+   "Bind"; tabs "optics (symbol)" / "mechanics (housing)"; /configurator/
+   bind and /components keep redirecting. The word "bind" leaves the UI
+   (the mechanics tab's save actions say "attach housing" / "package as
+   cube module").
+3. Mechanics tab, third mode alongside insert-binding and whole-module:
+   **housing only** — load the STEP, place datums (function + origin +
+   direction, the existing flow), save component + housing template, NO
+   cube module. The WP-60 unbound-palette path then places it freely; the
+   schematic/assembly render the housing GLB at the part pose (real
+   silhouette instead of the ghost).
+4. Symbol derivation: an unbound part's palette thumbnail composes glyph +
+   housing outline (top-down bbox silhouette from the GLB) so a Thorlabs
+   laser looks like a Thorlabs laser, not a generic red box. The WP-48
+   authored-SVG slot stays the override.
+5. Road to a cube stays open: "package as cube module…" on a housing part
+   pre-fills the WP-61 generate flow (the housing STEP becomes part_step
+   for the boolean holder).
+
+Acceptance: import a laser housing STEP, mark its emission datum, save —
+component + housing template, no module; it appears in the palette with
+the composed symbol, places freely, chains and simulates; "package as
+cube module" hands it to the T3 flow; `library validate` rejects a
+cube_module referencing the housing template.
+```
+
+**For humans:** the library stops pretending everything is a cube. A part is
+its optics plus (optionally) its own housing; the editor is called "Parts"
+and speaks that language; and turning a housed part into a cube becomes a
+deliberate later step — generated, not assumed.
+
 
 ### WP-70 — The publish loop: save to GitHub, see it in Explore
 
@@ -498,6 +503,102 @@ implemented; no regression in any editor flow (full smoke pass).
 clearly different places (like OSHWLab → EasyEDA), and the editor finally
 gets the design-deck look — done at the end, on purpose, so polish lands on
 a working machine.
+
+
+### WP-59 — OSHWLab for optics: the gap analysis, and the phased path
+
+**What OSHWLab actually has** (and what it maps to here):
+
+| OSHWLab | Ours today | Gap |
+|---|---|---|
+| Project gallery w/ thumbnails, views/likes | Browse Setups (legacy JSON, CSV index) | WP-54 gives working cards; likes/views need a backend (Phase C) |
+| "Open in editor" (EasyEDA) | .dsn import exists; no link from a design page | WP-54 share links close it |
+| Fork/clone a design | — | cheap once designs live in git repos (WP-58): fork = fork |
+| User profiles, follows | — | Phase C — do NOT build first; GitHub identities carry Phase A/B |
+| Design page: schematic preview, BOM, description | — | WP-56 embed (preview) + WP-50 BOM + WP-55 docs = the page content exists; needs a page to host it |
+| One-click order (JLCPCB) | — | **the real differentiator — Phase B below** |
+| BOM → parts cart (LCSC) | WP-50 BOM has records w/ prices + vendor links | shop integration missing |
+
+```
+PROMPT (Phase A — repo: openUC2-OptiKit; no backend)
+
+GitHub IS the community backend for now. 1. A design page: /share/<enc>
+renders a public read-only page for any shared design — WP-56 viewer on
+top, WP-50 BOM table + WP-55 docs below, "Open in configurator" and
+"Download .dsn" buttons. 2. The gallery aggregates: Store repo + any
+WP-58 community repos the deployment lists (a curated repos.json), each
+card linking its design page. 3. Every page has share/embed snippets
+(the WP-56 iframe). Acceptance: a design shared from the configurator
+has a URL that renders viewer+BOM+docs publicly and opens back into the
+editor.
+```
+
+```
+PROMPT (Phase B — repo: openUC2-OptiKit + shop; the ordering loop)
+
+BOM → cart. 1. Record schema already carries vendor/pricing (WP-43
+preserved the CSV prices); add `shop:` per module record — the openUC2
+shop SKU/product URL. 2. "Order this setup" on the BOM panel + design
+page: split the BOM into (a) openUC2-shop items → a prefilled cart link
+(shop's cart-URL API — confirm format with the shop, likely WooCommerce
+add-to-cart?sku=… chaining), (b) third-party items (Thorlabs …) →
+vendor links, (c) T3 generated parts → the WP-21/53 artifacts zipped
+with a print-service note. 3. Availability: a nightly action checks
+SKUs against the shop API and review-flags records whose SKU 404s.
+Acceptance: the miniFRAME-DPC design's "order" button yields an openUC2
+cart containing every shop-available cube at the right quantities plus
+a download of the printable parts.
+```
+
+**Phase C (later, needs a real backend):** accounts, likes/comments,
+hosted design storage with versioning, moderation. Decision point on
+purpose-built backend vs. leaning harder on GitHub (discussions, stars)
+once Phase A/B prove the loop. **Not before the editor pain points are
+gone — a community product with a rough editor converts nobody.**
+
+**For humans:** the OSHWLab feeling is three things — *see* someone's
+design (viewer page), *open* it yourself (share link into the editor),
+*order* it (BOM → openUC2 cart). Phases A and B build exactly those three
+on top of GitHub with no new backend; the social layer (profiles, likes)
+comes only after the loop demonstrably works.
+
+
+
+### WP-56 — Embedded viewer v2: `.dsn` in any static page
+
+```
+PROMPT (repo: openUC2-OptiKit)
+
+public/viewer/ already ships an iframe-embeddable viewer for LEGACY
+layout JSON (?json= parameter, embed-example.html documents it).
+Migrate it to the real document model.
+
+1. The viewer accepts ?dsn=<url> (a .dsn file or the WP-54 ?d= inline
+   form). Parse with the same src/document import path as the app
+   (share the code — the viewer is a second entry point, not a fork).
+2. Render read-only: the 2.5D schematic scene (glyphs, beam path from
+   the design's declared/inferred chains) AND the assembly 3D (cube
+   meshes from the registry with the bundled-snapshot fallback, since
+   static sites must work without the service). A view toggle
+   (schematic ↔ 3D), orbit controls, no editing.
+3. Educational affordances: URL flags — &view=beam|modules|3d,
+   &highlight=<partRef> (pulse one module), &autoplay (slow orbit).
+   "Open in configurator" button deep-links the full app via the WP-54
+   share link. Keep the iframe API of embed-example.html working
+   (postMessage part-click events) and update the examples page.
+4. Legacy ?json= keeps working through the WP-54 converter (client-side
+   conversion, one code path after it).
+
+Acceptance: embed-example.html shows a converted Store setup rendering
+beam path + modules from a plain static file host (no service running);
+&highlight pulses the named cube; the old ?json= demo still renders.
+```
+
+**For humans:** any docs page, course website or forum post can embed a
+live, orbitable view of a setup — beam path and all — from a single static
+file, with a button that jumps into the real editor.
+
+
 
 ---
 

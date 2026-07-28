@@ -188,40 +188,6 @@ crash.
 live in your GitHub repos appear inside the design itself — and get frozen
 into the export bundle, so a downloaded setup carries its own manual.
 
-### WP-56 — Embedded viewer v2: `.dsn` in any static page
-
-```
-PROMPT (repo: openUC2-OptiKit)
-
-public/viewer/ already ships an iframe-embeddable viewer for LEGACY
-layout JSON (?json= parameter, embed-example.html documents it).
-Migrate it to the real document model.
-
-1. The viewer accepts ?dsn=<url> (a .dsn file or the WP-54 ?d= inline
-   form). Parse with the same src/document import path as the app
-   (share the code — the viewer is a second entry point, not a fork).
-2. Render read-only: the 2.5D schematic scene (glyphs, beam path from
-   the design's declared/inferred chains) AND the assembly 3D (cube
-   meshes from the registry with the bundled-snapshot fallback, since
-   static sites must work without the service). A view toggle
-   (schematic ↔ 3D), orbit controls, no editing.
-3. Educational affordances: URL flags — &view=beam|modules|3d,
-   &highlight=<partRef> (pulse one module), &autoplay (slow orbit).
-   "Open in configurator" button deep-links the full app via the WP-54
-   share link. Keep the iframe API of embed-example.html working
-   (postMessage part-click events) and update the examples page.
-4. Legacy ?json= keeps working through the WP-54 converter (client-side
-   conversion, one code path after it).
-
-Acceptance: embed-example.html shows a converted Store setup rendering
-beam path + modules from a plain static file host (no service running);
-&highlight pulses the named cube; the old ?json= demo still renders.
-```
-
-**For humans:** any docs page, course website or forum post can embed a
-live, orbitable view of a setup — beam path and all — from a single static
-file, with a button that jumps into the real editor.
-
 ### WP-57 — STEP assembly export: the optics and the beam as CAD parts
 
 ```
@@ -301,62 +267,6 @@ following the worked example, get automatic validation on every push — and
 then paste their repo URL into the configurator to see their own palette
 section and share their designs through the same gallery everyone uses.
 
-### WP-59 — OSHWLab for optics: the gap analysis, and the phased path
-
-**What OSHWLab actually has** (and what it maps to here):
-
-| OSHWLab | Ours today | Gap |
-|---|---|---|
-| Project gallery w/ thumbnails, views/likes | Browse Setups (legacy JSON, CSV index) | WP-54 gives working cards; likes/views need a backend (Phase C) |
-| "Open in editor" (EasyEDA) | .dsn import exists; no link from a design page | WP-54 share links close it |
-| Fork/clone a design | — | cheap once designs live in git repos (WP-58): fork = fork |
-| User profiles, follows | — | Phase C — do NOT build first; GitHub identities carry Phase A/B |
-| Design page: schematic preview, BOM, description | — | WP-56 embed (preview) + WP-50 BOM + WP-55 docs = the page content exists; needs a page to host it |
-| One-click order (JLCPCB) | — | **the real differentiator — Phase B below** |
-| BOM → parts cart (LCSC) | WP-50 BOM has records w/ prices + vendor links | shop integration missing |
-
-```
-PROMPT (Phase A — repo: openUC2-OptiKit; no backend)
-
-GitHub IS the community backend for now. 1. A design page: /share/<enc>
-renders a public read-only page for any shared design — WP-56 viewer on
-top, WP-50 BOM table + WP-55 docs below, "Open in configurator" and
-"Download .dsn" buttons. 2. The gallery aggregates: Store repo + any
-WP-58 community repos the deployment lists (a curated repos.json), each
-card linking its design page. 3. Every page has share/embed snippets
-(the WP-56 iframe). Acceptance: a design shared from the configurator
-has a URL that renders viewer+BOM+docs publicly and opens back into the
-editor.
-```
-
-```
-PROMPT (Phase B — repo: openUC2-OptiKit + shop; the ordering loop)
-
-BOM → cart. 1. Record schema already carries vendor/pricing (WP-43
-preserved the CSV prices); add `shop:` per module record — the openUC2
-shop SKU/product URL. 2. "Order this setup" on the BOM panel + design
-page: split the BOM into (a) openUC2-shop items → a prefilled cart link
-(shop's cart-URL API — confirm format with the shop, likely WooCommerce
-add-to-cart?sku=… chaining), (b) third-party items (Thorlabs …) →
-vendor links, (c) T3 generated parts → the WP-21/53 artifacts zipped
-with a print-service note. 3. Availability: a nightly action checks
-SKUs against the shop API and review-flags records whose SKU 404s.
-Acceptance: the miniFRAME-DPC design's "order" button yields an openUC2
-cart containing every shop-available cube at the right quantities plus
-a download of the printable parts.
-```
-
-**Phase C (later, needs a real backend):** accounts, likes/comments,
-hosted design storage with versioning, moderation. Decision point on
-purpose-built backend vs. leaning harder on GitHub (discussions, stars)
-once Phase A/B prove the loop. **Not before the editor pain points are
-gone — a community product with a rough editor converts nobody.**
-
-**For humans:** the OSHWLab feeling is three things — *see* someone's
-design (viewer page), *open* it yourself (share link into the editor),
-*order* it (BOM → openUC2 cart). Phases A and B build exactly those three
-on top of GitHub with no new backend; the social layer (profiles, likes)
-comes only after the loop demonstrably works.
 
 ---
 

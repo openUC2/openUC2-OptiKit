@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "core-service",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "--project", "/Users/bene/Downloads/OPTIKIT/optikit-core", "optikit-core", "serve", "--port", "8010"],
+      "port": 8010
+    },
+    {
       "name": "coherent-webapp",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "/Users/bene/Downloads/Glen_CC./webapp", "run", "dev"],
