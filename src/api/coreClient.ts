@@ -120,6 +120,25 @@ const simulateSchema = z.object({
   // Afocal paths (e.g. a fold mirror only) report NaN paraxial values, which
   // the service encodes as null (WP-32: palette designs hit this).
   paraxial: z.record(z.string(), numberOrNull).optional(),
+  // WP-74: how much of the source power reaches the sensor along this path.
+  photon_budget: z
+    .object({
+      wavelength_um: numberOrNull,
+      source_power_mw: numberOrNull,
+      transmitted_fraction: z.number(),
+      power_mw: numberOrNull,
+      per_element: z
+        .array(
+          z.object({
+            element: z.string(),
+            exit: z.string(),
+            kind: z.string().nullable(),
+            fraction: z.number(),
+          }),
+        )
+        .default([]),
+    })
+    .optional(),
 });
 export type SimulateResponse = z.infer<typeof simulateSchema>;
 

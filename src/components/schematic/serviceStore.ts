@@ -98,6 +98,8 @@ export interface PathSimResult {
   spot: { x: number[]; y: number[] } | null;
   /** null entries = NaN from the service (afocal paths, WP-32). */
   paraxial: Record<string, number | null> | null;
+  /** WP-74: fraction (and mW) of the source reaching the sensor on this path. */
+  photonBudget: SimulateResponse['photon_budget'] | null;
   warnings: string[];
   /** Compile/trace failure for this path (other paths may still succeed). */
   error: { code: string; message: string } | null;
@@ -376,13 +378,15 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             raysWorld: (result.rays_world ?? []) as [number, number, number][][],
             spot: cleanSpot(result.spot),
             paraxial: result.paraxial ?? null,
+            photonBudget: result.photon_budget ?? null,
             warnings: result.warnings,
             error: null,
           };
         } catch (err) {
           if (err instanceof CoreServiceError && err.status !== 0) {
             simByPath[name] = {
-              raysWorld: [], spot: null, paraxial: null, warnings: [], error: toError(err),
+              raysWorld: [], spot: null, paraxial: null, photonBudget: null,
+              warnings: [], error: toError(err),
             };
           } else {
             throw err; // unreachable service: abort the whole run

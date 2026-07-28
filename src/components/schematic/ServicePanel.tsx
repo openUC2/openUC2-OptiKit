@@ -210,6 +210,19 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
                           {k === 'f2' || k === 'EPD' ? ' mm' : ''}
                         </Typography>
                       ))}
+                    {/* WP-74: how much light reaches the sensor. */}
+                    {result.photonBudget && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                        light to sensor:{' '}
+                        <b>
+                          {result.photonBudget.power_mw != null
+                            ? `${result.photonBudget.power_mw.toFixed(1)} mW`
+                            : `${(result.photonBudget.transmitted_fraction * 100).toFixed(0)}%`}
+                        </b>
+                        {result.photonBudget.wavelength_um != null &&
+                          ` @ ${(result.photonBudget.wavelength_um * 1000).toFixed(0)} nm`}
+                      </Typography>
+                    )}
                     {result.warnings.map((w, k) => (
                       <Typography key={k} variant="caption" color="warning.main" sx={{ display: 'block' }}>
                         ⚠ {w}
