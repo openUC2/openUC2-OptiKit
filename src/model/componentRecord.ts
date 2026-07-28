@@ -62,6 +62,35 @@ export interface SurfaceDraft {
   conic: number;
   isStop: boolean;
   reflective: boolean;
+  /**
+   * WP-75: an "ideal / paraxial element" row — the honest model of a catalog
+   * objective with no known prescription. When set, the surface serializes
+   * with optiland's ThinLensInteractionModel at this focal length (geometry
+   * stays plano, no glass). null/absent = an ordinary refractive surface.
+   */
+  paraxialFocalMm?: number | null;
+}
+
+/** One glass element of the stack (WP-75): surfaces [start..end] form a
+ * contiguous glass group; the element boundary is a surface with no
+ * material (air follows). Mirrors optikit-core's `glass_groups`. */
+export interface GlassElement {
+  start: number;
+  end: number;
+}
+
+export function glassElements(surfaces: SurfaceDraft[]): GlassElement[] {
+  const elements: GlassElement[] = [];
+  let start: number | null = null;
+  surfaces.forEach((s, i) => {
+    if (start === null) start = i;
+    const glassAfter = Boolean(s.material) && (s.paraxialFocalMm ?? null) === null;
+    if (!glassAfter || i === surfaces.length - 1) {
+      elements.push({ start, end: i });
+      start = null;
+    }
+  });
+  return elements;
 }
 
 export interface FrameDraft {
@@ -217,8 +246,15 @@ export function paraxialEflMm(surfaces: SurfaceDraft[]): number | null {
   for (let i = 0; i < surfaces.length; i++) {
     const s = surfaces[i];
     if (s.reflective) return null; // fold mirrors have no transmission EFL
-    const nAfter = s.material ? indexHint(s.material) : 1.0;
-    const power = s.radiusMm ? (nAfter - n) / s.radiusMm : 0; // P = (n2−n1)/R
+    const paraxial = s.paraxialFocalMm ?? null;
+    const nAfter = paraxial !== null ? n : s.material ? indexHint(s.material) : 1.0;
+    // WP-75: an ideal element contributes P = 1/f, no index change.
+    const power =
+      paraxial !== null
+        ? (paraxial !== 0 ? 1 / paraxial : 0)
+        : s.radiusMm
+          ? (nAfter - n) / s.radiusMm
+          : 0; // P = (n2−n1)/R
     // refraction: [[1, 0], [−P, 1]]
     const C2 = C - power * A;
     const D2 = D - power * B;
@@ -365,6 +401,11 @@ export function validateDraft(draft: RecordDraft): string[] {
     if (s.thicknessMm !== null && s.thicknessMm < 0) errors.push(`surface ${i}: thickness must be ≥ 0`);
     if (s.semiApertureMm !== null && s.semiApertureMm <= 0) errors.push(`surface ${i}: semi-aperture must be > 0`);
     if (s.radiusMm === 0) errors.push(`surface ${i}: radius 0 is not a surface — use flat (∞) instead`);
+    // WP-75: an ideal element is a thin lens — power from f, no reflection.
+    if ((s.paraxialFocalMm ?? null) !== null) {
+      if (s.paraxialFocalMm === 0) errors.push(`surface ${i}: a paraxial element needs a non-zero focal length`);
+      if (s.reflective) errors.push(`surface ${i}: a paraxial element cannot also be reflective`);
+    }
   });
   if (draft.surfaces.length > 0 && draft.surfaces[draft.surfaces.length - 1].thicknessMm !== null) {
     errors.push('the last surface must not carry a thickness (gaps to the next component are air gaps)');
@@ -396,16 +437,23 @@ export function validateDraft(draft: RecordDraft): string[] {
 type Json = Record<string, unknown>;
 
 function surfaceToFragment(s: SurfaceDraft, isLast: boolean): Json {
+  const paraxial = s.paraxialFocalMm ?? null;
   const geometry: Json = {
     type: 'StandardGeometry',
-    radius: s.radiusMm === null ? Infinity : s.radiusMm,
+    // WP-75: an ideal element is geometrically plano — the power lives in
+    // its interaction model, not in a radius.
+    radius: paraxial !== null || s.radiusMm === null ? Infinity : s.radiusMm,
     conic: s.conic,
   };
   const out: Json = { type: 'standard', geometry };
-  if (s.material) out.material_post = { type: 'Material', name: s.material };
+  if (s.material && paraxial === null) {
+    out.material_post = { type: 'Material', name: s.material };
+  }
   if (!isLast && s.thicknessMm !== null) out.thickness = s.thicknessMm;
   if (s.isStop) out.is_stop = true;
-  if (s.reflective) {
+  if (paraxial !== null) {
+    out.interaction_model = { type: 'thin_lens', focal_length: paraxial };
+  } else if (s.reflective) {
     out.interaction_model = { type: 'refractive_reflective', is_reflective: true };
   }
   if (s.semiApertureMm !== null) out.semi_aperture = s.semiApertureMm;
@@ -476,9 +524,12 @@ interface FragmentSurfaceJson {
   material_post?: { name?: string };
   thickness?: number;
   is_stop?: boolean;
-  interaction_model?: { is_reflective?: boolean };
+  interaction_model?: { type?: string; is_reflective?: boolean; focal_length?: number };
   semi_aperture?: number;
 }
+
+/** WP-75: both authoring spellings of the paraxial model reopen. */
+const THIN_LENS_TYPES = /^(thin_lens|thinlensinteractionmodel)$/i;
 
 export function draftFromRecord(record: ComponentRecord): RecordDraft {
   const rec = record as unknown as Json;
@@ -506,6 +557,7 @@ export function draftFromRecord(record: ComponentRecord): RecordDraft {
     const flat = radius === undefined || radius === null ||
       (typeof radius === 'number' && !Number.isFinite(radius)) ||
       (typeof radius === 'string' && /inf/i.test(radius));
+    const thinLens = THIN_LENS_TYPES.test(s.interaction_model?.type ?? '');
     return {
       radiusMm: flat ? null : Number(radius),
       thicknessMm: i === surfaces.length - 1 ? null : (s.thickness ?? null),
@@ -514,6 +566,9 @@ export function draftFromRecord(record: ComponentRecord): RecordDraft {
       conic: s.geometry?.conic ?? 0,
       isStop: Boolean(s.is_stop),
       reflective: Boolean(s.interaction_model?.is_reflective),
+      // Only present for thin-lens rows, so ordinary stacks round-trip
+      // byte-identically through draftFromRecord.
+      ...(thinLens ? { paraxialFocalMm: s.interaction_model?.focal_length ?? null } : {}),
     };
   });
   const frames = (optics.frames ?? {}) as Record<string, { 'z-mm'?: number | string }>;

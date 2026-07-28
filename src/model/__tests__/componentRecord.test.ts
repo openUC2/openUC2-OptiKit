@@ -17,6 +17,7 @@ import {
   defaultDraft,
   draftFromRecord,
   draftToRecord,
+  glassElements,
   paraxialEflMm,
   recordId,
   recordToYaml,
@@ -55,6 +56,61 @@ describe('validateDraft', () => {
     const source = defaultDraft('source');
     source.name = 'laser-488';
     expect(validateDraft(source)).toEqual([]);
+  });
+});
+
+describe('optics groups (WP-75)', () => {
+  it('groups a cemented doublet as ONE element and splits on air gaps', () => {
+    const draft = ac254Draft();
+    expect(glassElements(draft.surfaces)).toEqual([{ start: 0, end: 2 }]);
+
+    // Doublet + air gap + singlet → two elements.
+    const spaced = [
+      { ...draft.surfaces[0] },
+      { ...draft.surfaces[1], material: '', thicknessMm: 5 },
+      { ...draft.surfaces[0], radiusMm: 51.06 },
+      { ...draft.surfaces[2], radiusMm: -51.06 },
+    ];
+    expect(glassElements(spaced)).toEqual([
+      { start: 0, end: 1 },
+      { start: 2, end: 3 },
+    ]);
+  });
+
+  it('serializes an ideal element as a thin-lens surface and reopens it', () => {
+    const draft = defaultDraft('lens');
+    draft.name = 'paraxial-20x';
+    draft.surfaces = [{
+      radiusMm: null, thicknessMm: null, material: '', semiApertureMm: 5.65,
+      conic: 0, isStop: true, reflective: false, paraxialFocalMm: 9,
+    }];
+    draft.ports = [
+      { name: 'front', frame: 'optical', direction: '-z', afterSurface: null },
+      { name: 'back', frame: 'optical', direction: '+z', afterSurface: 0 },
+    ];
+    expect(validateDraft(draft)).toEqual([]);
+    const record = draftToRecord(draft);
+    const surf = (record.optics as { fragment: { surfaces: Record<string, unknown>[] } })
+      .fragment.surfaces[0];
+    expect(surf.interaction_model).toEqual({ type: 'thin_lens', focal_length: 9 });
+    expect(surf.material_post).toBeUndefined();
+    // The paraxial sketch sees P = 1/f.
+    expect(paraxialEflMm(draft.surfaces)).toBeCloseTo(9, 6);
+    // Reopening restores the row kind (both type spellings).
+    const reopened = draftFromRecord(record);
+    expect(reopened.surfaces[0].paraxialFocalMm).toBe(9);
+  });
+
+  it('rejects a reflective or zero-f paraxial element', () => {
+    const draft = defaultDraft('lens');
+    draft.name = 'bad';
+    draft.surfaces = [{
+      radiusMm: null, thicknessMm: null, material: '', semiApertureMm: 5,
+      conic: 0, isStop: false, reflective: true, paraxialFocalMm: 0,
+    }];
+    const errors = validateDraft(draft).join('\n');
+    expect(errors).toMatch(/non-zero focal length/);
+    expect(errors).toMatch(/cannot also be reflective/);
   });
 });
 
