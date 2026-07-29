@@ -25,12 +25,14 @@ import {
   Image as LayoutIcon,
   PlayArrow as SimulateIcon,
   Rule as CheckIcon,
+  Straighten as CalibrateIcon,
   TrackChanges as OptimizeIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { DEFAULT_CORE_URL, getCoreUrl, setCoreUrl } from '../../api/coreClient';
 import { selectPart, useDocPaths, useDocRevision } from '../../document';
 import { pathColor } from './colors';
+import { CalibrateDialog } from './CalibrateDialog';
 import { LayoutDialog } from './LayoutDialog';
 import { MarkerList } from './MarkerList';
 import { OptimizeDialog } from './OptimizeDialog';
@@ -94,6 +96,8 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
   const [optimizeOpen, setOptimizeOpen] = useState(false);
   // WP-82: the 2D layout viewer (optiland's own drawing, via /v1/draw).
   const [layoutOpen, setLayoutOpen] = useState(false);
+  // WP-86: the hardware return leg — measured axes → dof values.
+  const [calibrateOpen, setCalibrateOpen] = useState(false);
   const [urlDraft, setUrlDraft] = useState<string | null>(null);
 
   // Debounced live simulate: 500 ms after the last document change.
@@ -165,6 +169,15 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
               layout (2D)
             </Button>
           </span>
+        </Tooltip>
+        {/* WP-86: the OTHER return leg — where the axes actually are. */}
+        <Tooltip title="read the running instrument's axis positions and write them back into the design (WP-86)">
+          <Button
+            size="small" variant="outlined" startIcon={<CalibrateIcon />}
+            onClick={() => setCalibrateOpen(true)}
+          >
+            calibrate…
+          </Button>
         </Tooltip>
       </Stack>
 
@@ -316,6 +329,7 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
         onClose={() => setLayoutOpen(false)}
         pathNames={docPaths.map(p => p.name)}
       />
+      <CalibrateDialog open={calibrateOpen} onClose={() => setCalibrateOpen(false)} />
     </Box>
   );
 }

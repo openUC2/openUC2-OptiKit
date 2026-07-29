@@ -19,10 +19,22 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { parse } from 'yaml';
 
+/**
+ * Where this design's instance data came from. Two legs write it (WP-27's
+ * optimizer and WP-86's instrument), and the keys say which: `optimized_by`
+ * + `merit` for a simulation result, `source: 'instrument'` + `instrument`
+ * for a measured one. Whatever is set is spread into `design.provenance`.
+ */
 export interface SourceProvenance {
-  optimized_by: string;
   run: string;
-  merit: Record<string, unknown>;
+  /** Optimizer leg (WP-27). */
+  optimized_by?: string;
+  merit?: Record<string, unknown>;
+  /** Hardware leg (WP-86): 'instrument'. */
+  source?: string;
+  /** The device the axes were read from (URL / instrument id). */
+  instrument?: string;
+  note?: string;
 }
 
 interface SourceDesignState {

@@ -228,6 +228,41 @@ const optimizeSchema = z.object({
 });
 export type OptimizeResponse = z.infer<typeof optimizeSchema>;
 
+/** WP-86: measured instrument axes → classified dof_value updates. */
+const calibrateSchema = z.object({
+  deltas: z.array(deltaSchema),
+  findings: z.array(drcFindingSchema),
+  dof_updates: z.record(z.string(), anyNumber),
+  updated_design: z.string().nullable(),
+});
+export type CalibrateResponse = z.infer<typeof calibrateSchema>;
+
+/**
+ * WP-86: hand the service what the instrument measured. `apply` returns the
+ * updated design YAML with `provenance.source: instrument`; without it this
+ * is a dry run that classifies and writes nothing — the same review-then-
+ * apply shape the optimizer leg uses.
+ */
+export function calibrateDesign(
+  files: DsnFiles,
+  measurements: Record<string, number>,
+  opts: { apply?: boolean; instrument?: string; note?: string } = {},
+  signal?: AbortSignal,
+): Promise<CalibrateResponse> {
+  return post(
+    '/v1/calibrate',
+    {
+      files,
+      measurements,
+      apply: opts.apply ?? false,
+      instrument: opts.instrument ?? '',
+      note: opts.note ?? '',
+    },
+    calibrateSchema,
+    signal,
+  );
+}
+
 // ── transport ─────────────────────────────────────────────────────────────────
 
 async function post<T>(
