@@ -50,6 +50,38 @@ describe('snapToAxis', () => {
   });
 });
 
+describe('housing only (WP-67)', () => {
+  it('emits component + housing template (footprint null, component ref), NO module', () => {
+    const bound = bindToRecords({ ...laserInput(), housingOnly: true });
+    expect(bound.errors).toEqual([]);
+    expect(bound.module).toBeNull();
+    expect(bound.template.footprint_grid).toBeNull();
+    expect(bound.template.component).toBe('user.source.laser-pointer@^0.1');
+    expect(bound.component).not.toBeNull();
+
+    const files = recordsToFiles(bound, 'laser-housing.step');
+    const paths = Object.keys(files);
+    expect(paths.some(p => p.startsWith('components/'))).toBe(true);
+    expect(paths.some(p => p.startsWith('templates/'))).toBe(true);
+    expect(paths.some(p => p.startsWith('modules/'))).toBe(false);
+    // The YAML spells the housing state explicitly for the Python loader.
+    expect(files['templates/user.tpl.laser-pointer/template.yml']).toMatch(
+      /footprint_grid: null/,
+    );
+  });
+
+  it('an existing component keeps its ref on the housing template', () => {
+    const bound = bindToRecords({
+      ...laserInput(),
+      housingOnly: true,
+      existingComponent: { id: 'openuc2.source.laser_488', version: '1.1.0' },
+    });
+    expect(bound.component).toBeNull();
+    expect(bound.template.component).toBe('openuc2.source.laser_488@^1.1');
+    expect(bound.module).toBeNull();
+  });
+});
+
 describe('dead-record guard (WP-77)', () => {
   it('refuses class generative — no generator block can ever be emitted here', () => {
     const bound = bindToRecords({ ...laserInput(), templateClass: 'generative' });

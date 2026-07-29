@@ -20,12 +20,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  FormControlLabel,
   IconButton,
   MenuItem,
   Slider,
   Stack,
-  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -176,9 +174,10 @@ export function MechanicsPanel({
       datums: store.datums,
       existingComponent: existing,
       wholeModule: store.wholeModule,
+      housingOnly: store.housingOnly,
     });
   }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
-      store.meshFile, store.transform, store.datums, store.wholeModule]);
+      store.meshFile, store.transform, store.datums, store.wholeModule, store.housingOnly]);
 
   const pairFiles = () => {
     if (!bound) return null;
@@ -274,17 +273,25 @@ export function MechanicsPanel({
         </Button>
         {store.meshFile && <Chip size="small" label={store.meshFile} sx={{ maxWidth: 200 }} />}
         <Box sx={{ flex: 1 }} />
-        {/* WP-41: the loaded STEP is the whole cube module — place the optic
-            against it rather than treating the mesh as an insert body. */}
-        <Tooltip title="the loaded STEP is the WHOLE cube module (cube + insert + optic + screws)">
-          <FormControlLabel
-            control={
-              <Switch size="small" checked={store.wholeModule} onChange={() => store.toggleWholeModule()} />
-            }
-            label={<Typography variant="caption">whole module</Typography>}
-            sx={{ mr: 0 }}
-          />
-        </Tooltip>
+        {/* WP-67: HOW the mesh mounts. Three modes: an insert body inside a
+            cube (the default), the WHOLE cube module (WP-41), or a bare
+            HOUSING with no cube at all — a Thorlabs laser body, a kinematic
+            mount. A housing saves component + template only. */}
+        <TextField
+          select size="small" label="mount" sx={{ width: 190 }}
+          value={store.housingOnly ? 'housing' : store.wholeModule ? 'whole' : 'insert'}
+          onChange={e => {
+            const mode = e.target.value;
+            // toggleWholeModule clears housingOnly, so order matters: settle
+            // wholeModule first, then the housing flag.
+            if ((mode === 'whole') !== store.wholeModule) store.toggleWholeModule();
+            store.setHousingOnly(mode === 'housing');
+          }}
+        >
+          <MenuItem value="insert">insert in a cube</MenuItem>
+          <MenuItem value="whole">whole cube module</MenuItem>
+          <MenuItem value="housing">housing only (no cube)</MenuItem>
+        </TextField>
         <TextField
           select size="small" label="template class" value={store.templateClass}
           onChange={e => store.setTemplateClass(e.target.value as 'fixed' | 'adaptive' | 'generative')}
@@ -634,33 +641,53 @@ export function MechanicsPanel({
       ))}
       {flash && <Alert severity="success">{flash}</Alert>}
 
+      {/* WP-67: a housing saves component + template only (footprint_grid:
+          null, no module) — the part places freely with its mesh travelling,
+          and "package as cube module…" stays the deliberate later step. */}
+      {store.housingOnly && (
+        <Alert severity="info">
+          <Typography variant="caption">
+            housing only: saves the symbol + its housing (no cube module). The part places
+            freely on the schematic with its mesh; “package as cube module…” generates a
+            T3 holder around the housing whenever you want it on the grid.
+          </Typography>
+        </Alert>
+      )}
+
       <Stack direction="row" spacing={1.5} sx={{ mb: 3, flexWrap: 'wrap', rowGap: 1 }}>
         <Button variant="contained" startIcon={<DownloadIcon />}
           disabled={!bound || bound.errors.length > 0}
           onClick={() => void download()}>
-          Download record pair (PR zip)
+          {store.housingOnly ? 'Download part records (zip)' : 'Download record pair (PR zip)'}
         </Button>
         <Tooltip title="dev fast path — on by default when the service runs from a checkout">
           <span>
             <Button variant="outlined" color="warning" startIcon={<DevWriteIcon />}
               disabled={!bound || bound.errors.length > 0 || store.busy}
               onClick={() => void devWrite()}>
-              Write into ../optikit-core/library
+              {store.housingOnly
+                ? 'Attach housing · write into library'
+                : 'Package · write into ../optikit-core/library'}
             </Button>
           </span>
         </Tooltip>
         {/* WP-77: the ACTUAL T3 road — a generated holder around the draft's
-            own prescription (no STEP, no datums, no placement needed). */}
+            own prescription; WP-67: on a housing, the holder is carved around
+            the housing STEP instead ("package as cube module…"). */}
         <Tooltip
-          title={record && draft.surfaces.length > 0
-            ? 'generate a printable two-half holder from the draft prescription — accepting writes component + template (WITH generator) + module'
-            : 'complete the optics tab first — the holder is carved from the draft prescription'}
+          title={store.housingOnly
+            ? (bound
+              ? 'generate a T3 holder around the housing STEP — write the housing into the library first, then accept writes template + module'
+              : 'load a housing mesh and name the draft first')
+            : record && draft.surfaces.length > 0
+              ? 'generate a printable two-half holder from the draft prescription — accepting writes component + template (WITH generator) + module'
+              : 'complete the optics tab first — the holder is carved from the draft prescription'}
         >
           <span>
             <Button variant="outlined" color="secondary"
-              disabled={!record || draft.surfaces.length === 0}
+              disabled={store.housingOnly ? !bound || !record : !record || draft.surfaces.length === 0}
               onClick={() => setHolderOpen(true)}>
-              generate a holder… (T3)
+              {store.housingOnly ? 'package as cube module… (T3)' : 'generate a holder… (T3)'}
             </Button>
           </span>
         </Tooltip>
@@ -671,6 +698,11 @@ export function MechanicsPanel({
           record={record}
           open={holderOpen}
           onClose={() => setHolderOpen(false)}
+          partStepPath={
+            store.housingOnly && bound
+              ? `library/templates/${bound.template.id as string}/${(store.meshFile || 'part.step').replace(/\.(glb|gltf)$/i, '.step')}`
+              : undefined
+          }
         />
       )}
     </Stack>

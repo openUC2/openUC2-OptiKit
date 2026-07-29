@@ -103,11 +103,12 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
       libraryIndex.components,
       merged.modules,
       getCoreUrl(),
+      libraryIndex.housings,
     ).filter(e => !registryIds.has(e.moduleId) && !workspaceIds.has(e.moduleId));
     registerLibraryModules([...registry, ...workspace, ...unbound]);
     // WP-44: groups (the OPM arrangements) register alongside the modules.
     registerLibraryGroups(groupEntriesFromIndex(merged.groups));
-  }, [merged, libraryIndex.components, workspaceRecords, workspaceThumbs, modules]);
+  }, [merged, libraryIndex.components, libraryIndex.housings, workspaceRecords, workspaceThumbs, modules]);
 
   const paletteGroups = groupEntriesFromIndex(merged.groups);
 

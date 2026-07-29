@@ -43,6 +43,9 @@ interface BindState {
   opticTilt: Record<string, number>;
   /** WP-41: the loaded mesh is the WHOLE cube module (not just an insert). */
   wholeModule: boolean;
+  /** WP-67: the mesh is a bare HOUSING — not cube-mounted at all. Emits
+   * component + housing template (footprint_grid: null), no module. */
+  housingOnly: boolean;
   /** Bbox center of the loaded mesh in doc mm (reported by the scene), for
    * the "fit to cube" snap. */
   meshBboxCenter: Vec3 | null;
@@ -65,6 +68,7 @@ interface BindState {
   setGalvoTiltDeg: (deg: number) => void;
   setOpticTilt: (id: string, deg: number) => void;
   toggleWholeModule: () => void;
+  setHousingOnly: (on: boolean) => void;
   reportMeshBbox: (centerMm: Vec3) => void;
   /** Center the mesh in the 50 mm cube (WP-41 bbox-fit). */
   fitToCube: () => void;
@@ -114,6 +118,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   galvoTiltDeg: 0,
   opticTilt: {},
   wholeModule: false,
+  housingOnly: false,
   meshBboxCenter: null,
   selectedOpticId: null,
   opticsGizmoMode: 'translate',
@@ -139,7 +144,13 @@ export const useBindStore = create<BindState>((set, get) => ({
   toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
   setGalvoTiltDeg: galvoTiltDeg => set({ galvoTiltDeg }),
   setOpticTilt: (id, deg) => set(s => ({ opticTilt: { ...s.opticTilt, [id]: deg } })),
-  toggleWholeModule: () => set(s => ({ wholeModule: !s.wholeModule })),
+  toggleWholeModule: () => set(s => ({ wholeModule: !s.wholeModule, housingOnly: false })),
+  // The two special modes are exclusive: a housing is by definition not a
+  // whole cube module.
+  setHousingOnly: housingOnly => set(s => ({
+    housingOnly,
+    wholeModule: housingOnly ? false : s.wholeModule,
+  })),
   reportMeshBbox: meshBboxCenter => set({ meshBboxCenter }),
   fitToCube: () => {
     const c = get().meshBboxCenter;
@@ -200,5 +211,6 @@ export const useBindStore = create<BindState>((set, get) => ({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null, selectedOpticId: null, error: null,
+      wholeModule: false, housingOnly: false,
     }),
 }));

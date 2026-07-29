@@ -233,13 +233,23 @@ export interface BindInput {
    * component record is emitted.
    */
   existingComponent?: { id: string; version: string } | null;
+  /**
+   * WP-67: the mesh is a bare HOUSING, not cube-mounted at all (a Thorlabs
+   * laser body, a kinematic mount). Emits component + template with
+   * `footprint_grid: null` and the component ref ON the template — and NO
+   * cube_module. The part then places freely with its mesh travelling; a
+   * cube can be generated around it later (T3) or exported for Inventor.
+   */
+  housingOnly?: boolean;
 }
 
 export interface BoundRecords {
   /** null when binding to an existing component (nothing to emit). */
   component: Record<string, unknown> | null;
   template: Record<string, unknown>;
-  module: Record<string, unknown>;
+  /** null for a housing (WP-67) — a housing is not cube-mounted, so no
+   * cube_module exists to bind the pair. */
+  module: Record<string, unknown> | null;
   warnings: string[];
   /** WP-77: reasons the pair MUST NOT be saved (a dead record would result).
    * The records are still built for preview; the UI blocks both exits. */
@@ -466,6 +476,16 @@ export function bindToRecords(input: BindInput): BoundRecords {
     ? `${componentId}@^${input.existingComponent.version.split('.').slice(0, 2).join('.')}`
     : `${componentId}@^0.1`;
 
+  // WP-67: a bare housing is component + template, NO module. The template
+  // says so itself (footprint_grid: null) and carries the component ref,
+  // because no module exists to carry the pair.
+  if (input.housingOnly) {
+    template.footprint_grid = null;
+    template.component = componentRef;
+    template.description = `housing for ${componentId} (attached from ${input.meshFile})`;
+    return { component, template, module: null, warnings, errors };
+  }
+
   const module: Record<string, unknown> = {
     kind: 'cube_module',
     id: moduleId,
@@ -506,14 +526,16 @@ export function recordsToFiles(
   assets: BindAssets = {},
 ): Record<string, string | Uint8Array> {
   const templateId = records.template.id as string;
-  const moduleId = records.module.id as string;
   const files: Record<string, string | Uint8Array> = {};
   if (records.component) {
     files[`components/${records.component.id as string}/component.yml`] =
       yamlText(records.component);
   }
   files[`templates/${templateId}/template.yml`] = yamlText(records.template);
-  files[`modules/${moduleId}/module.yml`] = yamlText(records.module);
+  // WP-67: a housing emits no module — the part is deliberately cube-less.
+  if (records.module) {
+    files[`modules/${records.module.id as string}/module.yml`] = yamlText(records.module);
+  }
   const stepName = meshFile.replace(/\.(glb|gltf)$/i, '.step');
   if (assets.step) files[`templates/${templateId}/${stepName}`] = assets.step;
   if (assets.glb) {

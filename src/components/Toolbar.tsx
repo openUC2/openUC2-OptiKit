@@ -466,8 +466,12 @@ openUC2 team via GitHub repository
               </Button>
             </Tooltip>
           )}
+          {/* WP-67: ONE "Parts" entry replaces "Components" + "Bind" — a
+              part is its optics (symbol) plus optionally its own mechanics
+              (housing), authored together in the Parts editor. The old
+              /configurator/bind route keeps deep-linking the mechanics tab. */}
           {isEditorPage && (
-            <Tooltip title="Component editor: author optical component records (the symbol editor)">
+            <Tooltip title="Parts editor: a part's optics (symbol) and mechanics (housing), authored together">
               <Button
                 color="inherit"
                 onClick={() => navigate('/configurator/components')}
@@ -476,30 +480,11 @@ openUC2 team via GitHub repository
                   textTransform: 'none',
                   minWidth: { xs: '40px', sm: 'auto' },
                   px: { xs: 1, sm: 2 },
-                  fontWeight: isComponentEditor ? 700 : 400,
+                  fontWeight: isComponentEditor || isBind ? 700 : 400,
                 }}
               >
                 <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  Components
-                </Typography>
-              </Button>
-            </Tooltip>
-          )}
-          {isEditorPage && (
-            <Tooltip title="Part binding: register an STP/GLB against the cube and author its optical datums">
-              <Button
-                color="inherit"
-                onClick={() => navigate('/configurator/bind')}
-                size="small"
-                sx={{
-                  textTransform: 'none',
-                  minWidth: { xs: '40px', sm: 'auto' },
-                  px: { xs: 1, sm: 2 },
-                  fontWeight: isBind ? 700 : 400,
-                }}
-              >
-                <Typography sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  Bind
+                  Parts
                 </Typography>
               </Button>
             </Tooltip>

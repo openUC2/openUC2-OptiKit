@@ -25,6 +25,7 @@ import type { ComponentRecord } from '../model/dsn/generated/library-component';
 import type {
   IndexComponent,
   IndexGroup,
+  IndexHousing,
   IndexModule,
   IndexPort,
 } from '../model/libraryIndex';
@@ -403,11 +404,16 @@ export function entriesFromWorkspace(
  * module-bound component keeps coming through its module: this never offers
  * the same optic twice — but its entry still registers with `paletteHidden`
  * so the WP-76 unbind verb has a resolvable target to re-point at.
+ *
+ * WP-67: a component whose id a HOUSING template names gets the housing's
+ * mesh and DOFs joined on — the part is still cube-less (free placement, no
+ * grid claim), but its silhouette travels with it instead of a ghost.
  */
 export function entriesFromComponents(
   components: IndexComponent[],
   modules: IndexModule[],
   coreUrl: string,
+  housings: IndexHousing[] = [],
 ): LibraryPaletteEntry[] {
   const origin = coreUrl.replace(/\/$/, '');
   const abs = (path: string | null | undefined) =>
@@ -417,8 +423,14 @@ export function entriesFromComponents(
       .map(mod => mod.component?.ref?.split('@')[0])
       .filter((id): id is string => Boolean(id)),
   );
-  return components
-    .map(component => ({
+  const housingOf = new Map(
+    housings
+      .filter(h => h.component.id)
+      .map(h => [h.component.id as string, h]),
+  );
+  return components.map(component => {
+    const housing = housingOf.get(component.id);
+    return {
       moduleId: component.id,
       componentId: component.id,
       name: shortName(component.id),
@@ -426,24 +438,39 @@ export function entriesFromComponents(
       category: docCategoryOfRecord(component.category),
       templateClass: null,
       states: [],
-      dofs: [],
+      // WP-67: a housing's DOFs (a kinematic mount's tip/tilt) ride along so
+      // the property panel offers them even without a cube.
+      dofs: (housing?.dof ?? []).map(d => ({
+        name: d.name,
+        kind: d.kind,
+        axis: d.axis,
+        unit: d.unit,
+        range: d.range,
+        actuatable: d.actuatable,
+        pivotFrame: d.pivot_frame,
+        surface: d.surface,
+        canObject: null,
+      })),
       footprintGrid: [1, 1, 1] as [number, number, number],
-      thumbnailUrl: null,
-      glbUrl: null,
+      thumbnailUrl: abs(housing?.assets.thumbnail),
+      // WP-67: the housing mesh TRAVELS with the unbound part (this used to
+      // hardcode null — a housed device rendered as a ghost).
+      glbUrl: abs(housing?.assets.glb),
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],
       symbolUrl: abs(component.symbol),
       programmable: null,
       priceEur: null,
-      review: component.review,
+      review: component.review || Boolean(housing?.review),
       source: 'registry' as const,
       unbound: true,
       paletteHidden: bound.has(component.id),
       fragmentSurfaces: component.fragment_surfaces ?? [],
       carrier: false,
       bays: {},
-    }));
+    };
+  });
 }
 
 // ── registration ─────────────────────────────────────────────────────────────

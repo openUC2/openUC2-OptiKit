@@ -157,6 +157,21 @@ export interface IndexModule {
   electronics: unknown | null;
 }
 
+/** WP-67: a bare housing — mechanics with no cube (footprint_grid: null).
+ * The template carries the component ref itself; the frontend joins these
+ * onto the unbound component entries so a housed part's mesh travels. */
+export interface IndexHousing {
+  id: string;
+  version: string;
+  kind: 'mechanical_template';
+  class: 'fixed' | 'adaptive' | 'generative';
+  description: string;
+  review: boolean;
+  component: { ref: string | null; resolved: string | null; id: string | null };
+  dof: IndexDof[];
+  assets: { thumbnail: string | null; glb: string | null; step: string | null };
+}
+
 export interface LibraryIndex {
   schema: string;
   count: number;
@@ -164,6 +179,8 @@ export interface LibraryIndex {
   components?: IndexComponent[];
   /** WP-44: placeable arrangements (absent on pre-group indexes). */
   groups?: IndexGroup[];
+  /** WP-67: bare housings (absent on pre-housing indexes). */
+  housings?: IndexHousing[];
 }
 
 const URL_STORAGE_KEY = 'optikit-library-index-url';
@@ -214,6 +231,7 @@ export interface IndexState {
   components: IndexComponent[];
   modules: IndexModule[];
   groups: IndexGroup[];
+  housings: IndexHousing[];
 }
 
 export async function fetchLibraryIndex(url: string): Promise<LibraryIndex> {
@@ -237,6 +255,7 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
     components: [],
     modules: [],
     groups: [],
+    housings: [],
   });
 
   useEffect(() => {
@@ -251,6 +270,7 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
           components: index.components ?? [],
           modules: index.modules ?? [],
           groups: index.groups ?? [],
+          housings: index.housings ?? [],
         });
       })
       .catch(async (err: unknown) => {
@@ -258,7 +278,7 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
         // working offline (WP-22). Surface where the data came from.
         if (cancelled || url === FALLBACK_INDEX_URL) {
           if (!cancelled) {
-            setState({ loading: false, error: String(err), components: [], modules: [], groups: [] });
+            setState({ loading: false, error: String(err), components: [], modules: [], groups: [], housings: [] });
           }
           return;
         }
@@ -271,10 +291,11 @@ export function useLibraryIndex(): IndexState & { setUrl: (url: string) => void 
             components: fallback.components ?? [],
             modules: fallback.modules ?? [],
             groups: fallback.groups ?? [],
+            housings: fallback.housings ?? [],
           });
         } catch {
           if (!cancelled) {
-            setState({ loading: false, error: String(err), components: [], modules: [], groups: [] });
+            setState({ loading: false, error: String(err), components: [], modules: [], groups: [], housings: [] });
           }
         }
       });

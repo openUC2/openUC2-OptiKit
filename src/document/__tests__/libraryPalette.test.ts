@@ -205,6 +205,41 @@ describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () =
     const def = useAppStore.getState().modules.find(m => m.id === AC254.id);
     expect(def?.group).toBe('lens · unbound');
   });
+
+  it('joins a HOUSING onto its component: the mesh and DOFs travel (WP-67)', () => {
+    const entries = entriesFromComponents(
+      [AC254],
+      [],
+      'http://localhost:8010',
+      [{
+        id: 'thorlabs.tpl.km05_housing',
+        version: '0.1.0',
+        kind: 'mechanical_template',
+        class: 'adaptive',
+        description: 'kinematic mount housing',
+        review: false,
+        component: { ref: 'thorlabs.lens.ac254-050-a@^0.1', resolved: '0.1.0',
+                     id: 'thorlabs.lens.ac254-050-a' },
+        dof: [{ name: 'tip', kind: 'rotation', axis: 'x', unit: 'deg',
+                range: [-4, 4], actuatable: false }],
+        assets: {
+          thumbnail: null,
+          glb: '/v1/library/assets/templates/thorlabs.tpl.km05_housing/mount.glb',
+          step: null,
+        },
+      }],
+    );
+    const lens = entries[0];
+    // Still cube-less (free placement, no grid claim) — but the housing's
+    // mesh and DOFs ride along instead of the hardcoded nulls.
+    expect(lens.unbound).toBe(true);
+    expect(lens.templateClass).toBeNull();
+    expect(lens.glbUrl).toBe(
+      'http://localhost:8010/v1/library/assets/templates/thorlabs.tpl.km05_housing/mount.glb',
+    );
+    expect(lens.dofs.map(d => d.name)).toEqual(['tip']);
+    expect(lens.dofs[0].range).toEqual([-4, 4]);
+  });
 });
 
 describe('unbound placement (WP-60 pin: continuous mm, no cell claim)', () => {

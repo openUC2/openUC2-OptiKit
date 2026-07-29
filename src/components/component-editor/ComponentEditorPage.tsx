@@ -200,7 +200,7 @@ export function ComponentEditorPage({
           <Box sx={{ flex: 1, overflow: 'auto', p: 2.5 }}>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ flex: 1 }}>
-                Component editor
+                Parts editor
                 <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1.5, fontFamily: 'monospace' }}>
                   {recordId(draft)}@{draft.version}
                 </Typography>
@@ -227,9 +227,10 @@ export function ComponentEditorPage({
               </Alert>
             )}
 
+            {/* WP-67: the two halves of a PART — symbol and housing. */}
             <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, minHeight: 36 }}>
-              <Tab value="optics" label="optics — the symbol" sx={{ minHeight: 36 }} />
-              <Tab value="mechanics" label="mechanics — the footprint (STP + datums)" sx={{ minHeight: 36 }} />
+              <Tab value="optics" label="optics (symbol)" sx={{ minHeight: 36 }} />
+              <Tab value="mechanics" label="mechanics (housing)" sx={{ minHeight: 36 }} />
             </Tabs>
 
             {tab === 'optics' && (

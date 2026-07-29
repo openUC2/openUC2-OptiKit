@@ -62,12 +62,17 @@ export function GenerateDraftHolderDialog({
   record,
   open,
   onClose,
+  partStepPath,
 }: {
   draft: RecordDraft;
   /** The validated draft record (the dialog is unreachable while null). */
   record: ComponentRecord;
   open: boolean;
   onClose: () => void;
+  /** WP-67 "package as cube module…": carve the cavity from this housing
+   * STEP (a library-root-relative path) instead of the draft prescription.
+   * The housing must be written into the library first. */
+  partStepPath?: string;
 }) {
   const [clearanceMm, setClearanceMm] = useState(0.15);
   const [splitPlane, setSplitPlane] = useState<'xz' | 'yz'>('xz');
@@ -102,7 +107,8 @@ export function GenerateDraftHolderDialog({
       // The draft's own surface stack, inline (JSON turns ∞ radii into null,
       // which the service reads as plano — the record spelling). The service
       // then never needs the record in its library: only the id travels, for
-      // the synthesized template's slug.
+      // the synthesized template's slug. WP-67: a housing part cuts around
+      // its housing STEP instead — exactly one of the two travels.
       const fragment = (record.optics as {
         fragment?: { surfaces?: Record<string, unknown>[] };
       } | undefined)?.fragment;
@@ -112,7 +118,9 @@ export function GenerateDraftHolderDialog({
           params: {
             clearance_mm: clearanceMm,
             split_plane: splitPlane,
-            part_prescription: { surfaces: fragment?.surfaces ?? [] },
+            ...(partStepPath
+              ? { part_step: partStepPath }
+              : { part_prescription: { surfaces: fragment?.surfaces ?? [] } }),
           },
         }),
       );
@@ -132,7 +140,7 @@ export function GenerateDraftHolderDialog({
       ports: draft.ports.map(p => ({ name: p.name, direction: p.direction })),
       generator: result.generator,
       params: meta.params ?? {},
-      derivedFromPrescription: true,
+      derivedFromPrescription: !partStepPath,
       assets: {
         step: 'model.step' in result.artifacts,
         glb: 'model.glb' in result.artifacts,
@@ -194,9 +202,13 @@ export function GenerateDraftHolderDialog({
       <DialogTitle>generate a holder · {record.id}</DialogTitle>
       <DialogContent>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-          Prints a two-half 1×1 cube insert whose cavity is boolean-carved from this draft's
-          own prescription ({draft.surfaces.length} surface(s)) at the record frame — no
-          placement needed. Accept writes component + template + module.
+          {partStepPath
+            ? `Prints a two-half 1×1 cube insert whose cavity is boolean-carved around the
+               housing STEP (${partStepPath.split('/').pop()}) — the WP-67 "package as cube
+               module" road. Accept writes template + module.`
+            : `Prints a two-half 1×1 cube insert whose cavity is boolean-carved from this
+               draft's own prescription (${draft.surfaces.length} surface(s)) at the record
+               frame — no placement needed. Accept writes component + template + module.`}
         </Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: 1.5 }}>
           <TextField
@@ -245,10 +257,12 @@ export function GenerateDraftHolderDialog({
                 label={meta.fits_envelope ? 'fits the 50 mm envelope' : 'EXCEEDS the envelope'}
                 color={meta.fits_envelope ? 'success' : 'error'}
               />
-              <Chip
-                size="small" color="warning" variant="outlined"
-                label="cavity derived from the prescription — verify before printing"
-              />
+              {!partStepPath && (
+                <Chip
+                  size="small" color="warning" variant="outlined"
+                  label="cavity derived from the prescription — verify before printing"
+                />
+              )}
             </Stack>
             <div style={{ height: 220, borderRadius: 4, overflow: 'hidden' }}>
               <Canvas camera={{ position: [70, 55, 70], fov: 40 }}>
