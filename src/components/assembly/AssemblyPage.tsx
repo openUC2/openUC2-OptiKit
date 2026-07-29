@@ -46,7 +46,13 @@ import {
   useSelectedPartId,
 } from '../../document';
 import { saveAs } from 'file-saver';
-import { CoreServiceError, exportStepPart } from '../../api/coreClient';
+import {
+  CoreServiceError,
+  base64ToBytes,
+  exportStepPart,
+  generateTemplate,
+} from '../../api/coreClient';
+import { zipDsn } from '../../model/dsn/io';
 import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
 import { buildServiceDesign, listPartMechanics, serviceFiles } from '../../model/dsn/serviceExport';
 import { BomDialog } from '../bom/BomDialog';
@@ -116,6 +122,49 @@ export function AssemblyPage() {
     (selected
       ? index.housings.find(h => h.component.id === selected.libraryRef)?.id ?? null
       : null);
+  // WP-85: the T2 road — parameterize the real Inventor master insert via
+  // the bridge; without one, the fx-changeset download is the fallback.
+  const [t2Busy, setT2Busy] = useState(false);
+  const regenerateT2 = async () => {
+    if (!selected || !selectedIndexModule?.template?.id) return;
+    setT2Busy(true);
+    const notify = useAppStore.getState().addNotification;
+    try {
+      const { keyByPartId } = buildServiceDesign();
+      const result = await generateTemplate({
+        templateId: selectedIndexModule.template.id,
+        files: serviceFiles(),
+        component: keyByPartId[selected.id],
+      });
+      const files: Record<string, Uint8Array> = {};
+      for (const [name, b64] of Object.entries(result.artifacts)) {
+        files[name] = base64ToBytes(b64);
+      }
+      const blob = await zipDsn(files, `${result.template_id}-${result.key}`);
+      saveAs(blob, `${result.template_id}-${result.key}.zip`);
+      notify({
+        type: 'success',
+        title: result.regenerated ? 'insert regenerated via Inventor' : 'insert cache hit',
+        message: `${result.template_id} @ ${result.key} — ${Object.keys(result.artifacts).join(', ')} downloaded`,
+        duration: 8000,
+      });
+    } catch (err) {
+      const bridgeless =
+        err instanceof CoreServiceError &&
+        (err.code === 'E_NO_BRIDGE' || err.code === 'E_BRIDGE_UNREACHABLE');
+      notify({
+        type: bridgeless ? 'warning' : 'error',
+        title: bridgeless ? 'no Inventor bridge — use the fx changeset' : 'T2 regenerate failed',
+        message: bridgeless
+          ? `${err.message} · Fallback: Optimize… → “download optikit-fx.json”, then run apply_fx_params.py on the Inventor machine.`
+          : err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err),
+        duration: 10000,
+      });
+    } finally {
+      setT2Busy(false);
+    }
+  };
+
   const [exportBusy, setExportBusy] = useState(false);
   const exportForInventor = async () => {
     if (!selected) return;
@@ -500,6 +549,20 @@ export function AssemblyPage() {
                         </Button>
                       </span>
                     </Tooltip>
+                    {/* WP-85: the T2 loop — the master insert parameterized
+                        from THIS part's prescription + dz via the bridge. */}
+                    {selectedTClass === 'adaptive' && (
+                      <Tooltip title="set the Inventor master insert's fx parameters from this part's prescription + dof values and re-export the STP/GLB (needs the WP-85 bridge; falls back to the fx-changeset download)">
+                        <span>
+                          <Button size="small" variant="outlined" color="secondary"
+                            disabled={t2Busy}
+                            startIcon={t2Busy ? <CircularProgress size={12} /> : undefined}
+                            onClick={() => void regenerateT2()}>
+                            regenerate insert (Inventor)…
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    )}
                   </Stack>
                   {[...(selectedMechanics?.translationDofs ?? []),
                     ...(selectedMechanics?.rotationDofs ?? [])].map(dof => {
