@@ -159,13 +159,28 @@ These three are prerequisites for everything and are mostly mechanical.
   poses), S4/S5 (Inventor frames), and honours the "don't lose Optiland detail"
   principle directly.
 
-- **WP-80 — Rotation DOFs reach geometry.** A rotation DOF is declarable,
-  validated, firmware-bindable, sliderable, sendable, and *back-annotation can
-  write one* — but the compiler drops it (*"only translation DOFs move poses
-  yet"*). Add the rotation branch honouring `pivot_frame` + `surface`; the
-  cubify, constraint, and assembly-handle counterparts follow. *Full prompt:
-  2k WP-80.* **Unblocks:** S5 (a galvo/kinematic mirror that actually tilts in
-  the trace).
+- **WP-80 — Rotation DOFs reach geometry.** ✅ *done (`6265e9b` + `5e5aba7`).*
+  A rotation DOF is declarable, validated, firmware-bindable, sliderable,
+  sendable, and *back-annotation can write one* — but the compiler dropped it
+  (*"only translation DOFs move poses yet"*). The rotation branch, the cubify
+  residual-tilt projection, `value-deg` in fx, and the panel counterparts
+  landed. *Full prompt: 2k WP-80.* **Unblocks:** S5 (a galvo/kinematic mirror
+  that actually tilts in the trace).
+
+- **WP-82a — Reflection from normals: a tilted mirror deviates by 2θ.**
+  *(carved out of WP-80 during implementation — the remaining Phase-1 item.)*
+  WP-80 delivers a **rigid θ rotation**, which is correct for a refractive
+  tilt, a tip/tilt platform and a rigid kinematic mount — but wrong by a factor
+  of two for a **reflective** surface, and it leaves `DofSpec.surface` (which
+  mirror of a dual-axis galvo a DOF drives) still inert. The reflection law
+  already exists in the repo as a *validator* (`library/derive.py`, WP-40);
+  this promotes it to the geometry source whenever a reflective element is off
+  its nominal pose, and gives DOF-named surfaces their own tilt. Sharpest
+  motivation: the browser's fast 2D preview **already applies 2θ**, so the
+  approximation and the "authoritative" trace disagree today — and the
+  approximation is the correct one. *Full prompt: 2k, amendment section.*
+  **Unblocks:** S5 properly (independent galvo axes), and restores
+  preview↔trace agreement.
 
 ### Phase 2 — The core verbs, in the UI where the user stands *(S1, S2, S3)*
 
@@ -367,9 +382,10 @@ flowchart LR
   classDef p5 fill:#f3e5f5,stroke:#7b1fa2
   classDef p6 fill:#eceff1,stroke:#455a64
 
-  WP74["WP-74 spectral"]:::p1
-  WP79["WP-79 lossy channel"]:::p1
-  WP80["WP-80 rotation DOFs"]:::p1
+  WP74["WP-74 spectral ✅"]:::p1
+  WP79["WP-79 lossy channel ✅"]:::p1
+  WP80["WP-80 rotation DOFs ✅"]:::p1
+  WP82a["WP-82a reflection from normals"]:::p1
 
   WP76["WP-76 unbind"]:::p2
   WP77["WP-77 editor T3"]:::p2
@@ -387,6 +403,8 @@ flowchart LR
   WP71["WP-71 grouping"]:::p6
   WP86["WP-86 hardware write-back"]:::p6
 
+  WP80 --> WP82a
+  WP40["WP-40 derive_port_directions (done)"] --> WP82a
   WP79 --> WP81
   WP79 --> WP75
   WP74 --> WP83
@@ -462,11 +480,13 @@ ask) for Ethan when he re-engages.
 
 ## 6. Suggested build order (one line)
 
-**WP-74 → WP-79 → WP-80** *(physics correct & lossless)* → **WP-76 → WP-77 →
-WP-81 → WP-75** *(the verbs, in the UI)* → **WP-67 → WP-83 → WP-84** *(part-first
-+ test bed + round-trip)* → **WP-82 → WP-78** *(CLI→UI + ergonomics)* → **WP-85**
-*(the human-tested T2 Inventor loop)* → **WP-71 → WP-86** *(grouping + hardware
-closure)* → **WP-70/55/56/59/72/73** *(community, accounts, UX — last)*.
+~~**WP-74 → WP-79 → WP-80**~~ ✅ *(physics correct & lossless — done)* →
+**WP-82a** *(the 2θ reflection fix carved out of WP-80)* → ~~**WP-76 → WP-77**~~ ✅
+→ **WP-81 → WP-75** *(the verbs, in the UI)* → **WP-67 → WP-83 → WP-84**
+*(part-first + test bed + round-trip)* → **WP-82 → WP-78** *(CLI→UI +
+ergonomics)* → **WP-85** *(the human-tested T2 Inventor loop)* → **WP-71 →
+WP-86** *(grouping + hardware closure)* → **WP-70/55/56/59/72/73** *(community,
+accounts, UX — last)*.
 
 At the end of Phase 6, all five scenarios are drivable through the editor and the
 North Star holds: design the optical circuit, simulate it, optimise it, cubify

@@ -549,3 +549,88 @@ Ethan.
 E2 asks this round: **one new.** WP-74's `response:` block is a fragment-surface
 extension that the Go side will round-trip through `extra="allow"` but should
 know about, since it changes which chains are legal.
+
+---
+
+## Amendment (2026-07-29) — carved out of WP-80 while implementing it
+
+### WP-82a — Reflection from normals: a tilted mirror deviates the beam by 2θ
+
+> **Numbering note:** the `a` suffix marks this as an amendment to **WP-80**,
+> not a sub-package of WP-82 (CLI↔frontend parity) — it was carved out after
+> the WP-74…81 block was already numbered.
+
+```
+PROMPT (repo: optikit-core, then openUC2-OptiKit)
+
+WP-80 made rotation DOFs move the compiled geometry, but as a RIGID θ
+rotation of the whole component. For a REFLECTIVE surface that is wrong by
+a factor of two: tilt a mirror by θ and the beam must deviate by 2θ. Today
+the exit port is rigidly attached to the component, so it rotates by θ and
+the reflected beam leaves θ short. The same gap makes `DofSpec.surface`
+(which mirror of a dual-axis galvo a DOF drives) inert — it is validated by
+check_actuation, shipped in the index, and read by no geometry code.
+
+The embarrassing symptom, and the reason this is worth its own package: the
+BROWSER'S FAST 2D PREVIEW ALREADY GETS THIS RIGHT. `ports.ts::beamAxesOf`
+sums every rotation DOF and swings the exit arm by 2θ about the fold-plane
+normal (and sums both galvo axes). So the approximate preview and the
+"authoritative" Optiland trace now DISAGREE for any tilted mirror, and the
+approximation is the more correct one. That inversion has to go.
+
+The math already exists in the repo. WP-40 built `library/derive.py::
+derive_port_directions` — `normal = rot @ entry_dir; derived = beam − 2(beam·
+normal)normal` (derive.py:83-84) — but only as a VALIDATOR: `check_port_
+directions` warns when an authored port enum disagrees with the geometry by
+more than 2°. This WP promotes that derivation from a checker to the source
+of truth whenever a reflective element is off its nominal pose.
+
+1. Compile: the outgoing direction of a reflective traversal comes from the
+   reflection law, not the authored exit port. `compiler.py:513`
+   (`prev_dir = prev_exit.direction.copy()`) is the line: for a traversal
+   whose surface `is_reflective`, compute the surface normal in WORLD space
+   (component rotation ∘ frame rotation ∘ the WP-80 DOF tilt) and reflect the
+   incoming axis through it. Reuse derive.py's function — extract the shared
+   kernel rather than writing the reflection twice.
+2. Compatibility, self-checking: at the NOMINAL pose (no DOF value, no
+   residual tilt) the derived direction must equal the authored one — that is
+   exactly the WP-40 invariant. Assert it at compile time within the existing
+   2° tolerance and raise a typed `E_PORT_NORMAL` naming the component, port
+   and deviation when a record's authored enum contradicts its own geometry.
+   Away from nominal, derived wins. This makes the change a no-op for every
+   correctly-authored existing design (pin that: the golden designs must
+   compile bit-identically).
+3. Per-surface poses, so `dof.surface` finally means something. Today every
+   surface of a fragment shares ONE coordinate system computed from the entry
+   port (`compiler.py:585` overwrites `geometry["cs"]`) and advances only by
+   `local_z += thickness`. Give a surface named by a rotation DOF's `surface`
+   index its own rx/ry on top of the traversal's, so a dual-axis galvo's
+   tilt_x moves mirror 0 and tilt_y moves mirror 1 independently. Keep the
+   change narrow: everything not named by a DOF keeps today's shared cs.
+4. Chain inference follows the same rule — `chain/infer.py`'s walk leaves a
+   tilted mirror along the deviated ray, so the proposed netlist matches what
+   the trace will do (today they diverge once a DOF is nonzero).
+5. Back-annotation closes: an optimizer TILT_UPDATE on a rotation DOF must
+   round-trip — compile → optimize → back_annotate → re-compile lands the same
+   geometry. WP-80 made the value survive; this makes the ANGLE correct.
+6. Out of scope, still: CURVED reflective surfaces (`E_UNSUPPORTED`, "curved
+   reflective surfaces cannot be unfolded onto a straight axis yet"). An
+   off-axis parabola needs a different unfolding strategy; do not smuggle it
+   in here.
+
+Acceptance: `openuc2.cube.galvo` with tilt_x = 5° deviates its reflected arm
+by 10° (not 5°) and leaves mirror 1 untouched; tilt_y = 5° moves mirror 1 and
+not mirror 0; the golden designs compile byte-identically at nominal pose;
+a record whose authored port direction contradicts its surface normal by more
+than 2° raises E_PORT_NORMAL naming the port; the schematic's 2D preview and
+the Optiland trace agree on a tilted fold (they disagree today); the
+optimizer→back-annotate→re-compile round trip is stable.
+```
+
+**For humans:** tilt a mirror by five degrees and the beam should turn by ten —
+the reflection law every optics textbook opens with. The engine currently turns
+it by five, because it moves the mirror's "exit arrow" rigidly with the mirror
+instead of bouncing the ray off the surface. Funnily enough the quick preview in
+the browser already does this correctly, so the fast approximation is currently
+more trustworthy than the real trace. This fixes the real one — and in doing so
+finally makes a dual-axis galvo's two mirrors steer independently.
