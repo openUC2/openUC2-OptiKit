@@ -36,23 +36,43 @@ import {
   KeyboardArrowDown as DownIcon,
   KeyboardArrowUp as UpIcon,
 } from '@mui/icons-material';
+import {
+  Divider,
+  ListItemText,
+  ListSubheader,
+  Menu,
+  MenuItem,
+} from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 import { PartLibrary } from '../PartLibrary';
 import { useAppStore } from '../../stores/appStore';
-import type { PortRef } from '../../document';
+import type { PartClipboard, PortRef, Vec3 } from '../../document';
 import {
   addFiber,
   addPart,
+  copyPart,
+  duplicatePart,
   getPart,
+  libraryEntryOf,
+  listLibraryEntries,
   listParts,
+  parsePortRef,
+  pastePart,
   removePart,
+  removePartUndoable,
   selectPart,
   setPath,
+  swapPartModule,
   useDocPaths,
   useLayerStore,
   useSelectedPartId,
   UC2_GRID_MM,
 } from '../../document';
+import { runUnbind } from './unbindAction';
+import { GenerateHolderDialog } from '../assembly/GenerateHolderDialog';
+import { buildServiceDesign } from '../../model/dsn/serviceExport';
+import { useServiceStore } from './serviceStore';
 import { LayerChips } from './LayerChips';
 import { isFiberPort } from './ports';
 import { SchematicScene } from './SchematicScene';
@@ -107,6 +127,52 @@ export function SchematicPage() {
   const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
+  const navigate = useNavigate();
+
+  // ── WP-78: clipboard + context menu ────────────────────────────────────────
+  // The copied part plus its source position (keyboard paste lands one cell
+  // over; each further paste steps one more so copies never stack).
+  const clipboardRef = useRef<{ clip: PartClipboard; sourceMm: Vec3; pastes: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    at: { left: number; top: number };
+    partId: string | null; // null = empty canvas
+    planeHit: Vec3;
+    swapMode: boolean;
+  } | null>(null);
+  // "put in a cube…" from the context menu (the WP-61 dialog).
+  const [holderPartId, setHolderPartId] = useState<string | null>(null);
+  const holderPart = listParts().find(p => p.id === holderPartId);
+
+  const copyToClipboard = useCallback((partId: string) => {
+    const clip = copyPart(partId);
+    const part = getPart(partId);
+    if (!clip || !part) return;
+    clipboardRef.current = { clip, sourceMm: [...part.worldPose.positionMm], pastes: 0 };
+    useAppStore.getState().addNotification({
+      type: 'info',
+      title: 'part copied',
+      message: `${clip.ref} — paste with Ctrl/Cmd+V or right-click → paste`,
+      duration: 3000,
+    });
+  }, []);
+
+  const pasteClipboard = useCallback((at?: Vec3) => {
+    const held = clipboardRef.current;
+    if (!held) return;
+    let target: Vec3;
+    if (at) {
+      target = at;
+    } else {
+      held.pastes += 1;
+      target = [
+        held.sourceMm[0] + held.pastes * UC2_GRID_MM[0],
+        held.sourceMm[1],
+        held.sourceMm[2],
+      ];
+    }
+    const id = pastePart(held.clip, target);
+    if (id) selectPart(id);
+  }, []);
 
   /** ERC marker click: frame the part without changing the view direction. */
   const zoomToPart = useCallback((partId: string) => {
@@ -213,8 +279,31 @@ export function SchematicPage() {
         });
         return;
       }
+      // WP-78: starting a manual chain on a pin inference already routes
+      // through OFFERS the proposal first (non-modally — the draft still
+      // starts, and manual wiring stays the ambiguous-case fallback).
       setChainDraft(draft => {
-        if (draft === null) return [ref];
+        if (draft === null) {
+          const { partId, port } = parsePortRef(ref);
+          const { keyByPartId } = buildServiceDesign();
+          const key = keyByPartId[partId];
+          const hit = useServiceStore.getState().proposals.find(p =>
+            p.chain.some(entry => {
+              const dot = entry.lastIndexOf('.');
+              return entry.slice(0, dot) === key &&
+                entry.slice(dot + 1).split('>').includes(port);
+            }),
+          );
+          if (hit) {
+            useAppStore.getState().addNotification({
+              type: 'info',
+              title: `inference already proposes “${hit.name}” through this pin`,
+              message: 'one-click Adopt in the service panel — or keep clicking pins to wire it manually',
+              duration: 6000,
+            });
+          }
+          return [ref];
+        }
         if (draft[draft.length - 1] === ref) return draft; // ignore double click on same pin
         return [...draft, ref];
       });
@@ -234,6 +323,26 @@ export function SchematicPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // WP-78: copy / paste / duplicate with keyboard parity.
+      if (e.metaKey || e.ctrlKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'c' && selectedId) {
+          copyToClipboard(selectedId);
+          return;
+        }
+        if (key === 'v' && clipboardRef.current) {
+          e.preventDefault();
+          pasteClipboard(); // one cell over per paste
+          return;
+        }
+        if (key === 'd' && selectedId) {
+          e.preventDefault(); // the browser bookmark shortcut
+          const id = duplicatePart(selectedId, [UC2_GRID_MM[0], 0, 0]);
+          if (id) selectPart(id);
+          return;
+        }
+        return;
+      }
       switch (e.key) {
         case 'Escape':
           if (fiberDraft) setFiberDraft(null);
@@ -255,35 +364,77 @@ export function SchematicPage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chainDraft, fiberDraft, fiberMode, finishChain, selectedId]);
+  }, [chainDraft, copyToClipboard, fiberDraft, fiberMode, finishChain, pasteClipboard, selectedId]);
+
+  // ── pointer → active working plane (shared by drop / context menu) ─────────
+  const planeHitAt = useCallback(
+    (clientX: number, clientY: number, container: HTMLElement): Vec3 | null => {
+      const cam = cameraRef.current;
+      const canvas = container.querySelector('canvas');
+      if (!cam || !canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, cam);
+      const hit = new THREE.Vector3();
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -settings.planeZMm);
+      if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+      return [hit.x, -hit.z, settings.planeZMm];
+    },
+    [settings.planeZMm],
+  );
 
   // ── drop from the part library ─────────────────────────────────────────────
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       const moduleId = e.dataTransfer.getData('moduleId');
-      const cam = cameraRef.current;
-      const canvas = (e.currentTarget as HTMLElement).querySelector('canvas');
-      if (!moduleId || !cam || !canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const ndc = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1,
-      );
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(ndc, cam);
-      const hit = new THREE.Vector3();
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -settings.planeZMm);
-      if (!raycaster.ray.intersectPlane(plane, hit)) return;
-      let x = hit.x;
-      let y = -hit.z;
+      const hit = moduleId ? planeHitAt(e.clientX, e.clientY, e.currentTarget as HTMLElement) : null;
+      if (!hit) return;
+      let [x, y] = hit;
       if (settings.snapGrid) {
         x = Math.round(x / UC2_GRID_MM[0]) * UC2_GRID_MM[0];
         y = Math.round(y / UC2_GRID_MM[1]) * UC2_GRID_MM[1];
       }
       addPart(moduleId, [x, y, settings.planeZMm]);
     },
-    [settings.planeZMm, settings.snapGrid],
+    [planeHitAt, settings.planeZMm, settings.snapGrid],
+  );
+
+  // ── WP-78: right-click menu on a part (or the empty canvas) ────────────────
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      let hit = planeHitAt(e.clientX, e.clientY, e.currentTarget as HTMLElement);
+      if (!hit) {
+        // No raycast (scene still mounting / no WebGL): the menu still works
+        // for the SELECTED part, anchored at its own position.
+        const selected = selectedId ? getPart(selectedId) : undefined;
+        if (!selected) return;
+        hit = [...selected.worldPose.positionMm];
+      }
+      // The nearest part (in-plane) within one cell counts as the target —
+      // the scene has no per-glyph contextmenu hook, so proximity decides.
+      let best: { id: string; d: number } | null = null;
+      for (const part of listParts()) {
+        const p = part.worldPose.positionMm;
+        const d = Math.hypot(p[0] - hit[0], p[1] - hit[1]);
+        if (d < UC2_GRID_MM[0] / 2 && (best === null || d < best.d)) {
+          best = { id: part.id, d };
+        }
+      }
+      if (best) selectPart(best.id);
+      setMenu({
+        at: { left: e.clientX, top: e.clientY },
+        partId: best?.id ?? null,
+        planeHit: hit,
+        swapMode: false,
+      });
+    },
+    [planeHitAt, selectedId],
   );
 
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 380;
@@ -328,6 +479,7 @@ export function SchematicPage() {
               e.dataTransfer.dropEffect = 'copy';
             }}
             onDrop={handleDrop}
+            onContextMenu={handleContextMenu}
           >
             <Tooltip title={leftOpen ? 'Collapse parts library' : 'Expand parts library'} placement="right">
               <IconButton
@@ -485,6 +637,115 @@ export function SchematicPage() {
                   Chaining “{activePathName}” — {chainDraft.length} port(s) · Enter to finish · Esc to cancel
                 </Typography>
               </Paper>
+            )}
+
+            {/* WP-78: the right-click menu — the eight verbs on a part, paste
+                on the empty canvas. */}
+            <Menu
+              open={menu !== null}
+              onClose={() => setMenu(null)}
+              anchorReference="anchorPosition"
+              anchorPosition={menu?.at}
+              slotProps={{ paper: { sx: { minWidth: 240, maxHeight: 420 } } }}
+            >
+              {menu !== null && (() => {
+                const close = () => setMenu(null);
+                const part = menu.partId ? listParts().find(p => p.id === menu.partId) : undefined;
+                if (!part) {
+                  return [
+                    <MenuItem key="paste-here" dense disabled={!clipboardRef.current}
+                      onClick={() => { close(); pasteClipboard(menu.planeHit); }}>
+                      paste here
+                    </MenuItem>,
+                    <MenuItem key="paste" dense disabled={!clipboardRef.current}
+                      onClick={() => { close(); pasteClipboard(); }}>
+                      paste (one cell over)
+                    </MenuItem>,
+                  ];
+                }
+                const lib = libraryEntryOf(part.libraryRef);
+                if (menu.swapMode) {
+                  const candidates = listLibraryEntries().filter(e =>
+                    e.category === part.category &&
+                    e.moduleId !== part.libraryRef &&
+                    !e.paletteHidden,
+                  );
+                  return [
+                    <ListSubheader key="head" sx={{ lineHeight: '28px' }}>
+                      swap {part.ref} → {part.category}
+                    </ListSubheader>,
+                    ...(candidates.length > 0
+                      ? candidates.map(entry => (
+                          <MenuItem key={entry.moduleId} dense
+                            onClick={() => { close(); swapPartModule(part.id, entry.moduleId); }}>
+                            <ListItemText primary={entry.name} secondary={entry.moduleId}
+                              slotProps={{ primary: { variant: 'body2' },
+                                           secondary: { variant: 'caption', noWrap: true } }} />
+                          </MenuItem>
+                        ))
+                      : [
+                          <MenuItem key="none" dense disabled>
+                            no other {part.category} modules — see the Modules panel
+                          </MenuItem>,
+                        ]),
+                  ];
+                }
+                return [
+                  <ListSubheader key="head" sx={{ lineHeight: '28px' }}>{part.ref}</ListSubheader>,
+                  <MenuItem key="copy" dense
+                    onClick={() => { close(); copyToClipboard(part.id); }}>
+                    copy
+                  </MenuItem>,
+                  <MenuItem key="paste" dense disabled={!clipboardRef.current}
+                    onClick={() => { close(); pasteClipboard(menu.planeHit); }}>
+                    paste here
+                  </MenuItem>,
+                  <MenuItem key="duplicate" dense
+                    onClick={() => {
+                      close();
+                      const id = duplicatePart(part.id, [UC2_GRID_MM[0], 0, 0]);
+                      if (id) selectPart(id);
+                    }}>
+                    duplicate
+                  </MenuItem>,
+                  <MenuItem key="delete" dense
+                    onClick={() => { close(); removePartUndoable(part.id); }}>
+                    delete
+                  </MenuItem>,
+                  <Divider key="d1" />,
+                  <MenuItem key="open" dense disabled={!lib?.componentId}
+                    onClick={() => {
+                      close();
+                      navigate(`/configurator/components?open=${encodeURIComponent(lib!.componentId!)}`);
+                    }}>
+                    open in library
+                  </MenuItem>,
+                  ...(lib?.unbound
+                    ? [
+                        <MenuItem key="cubify" dense
+                          onClick={() => { close(); setHolderPartId(part.id); }}>
+                          put in a cube…
+                        </MenuItem>,
+                      ]
+                    : [
+                        <MenuItem key="unbind" dense disabled={!lib?.componentId}
+                          onClick={() => { close(); runUnbind(part.id); }}>
+                          take out of cube
+                        </MenuItem>,
+                      ]),
+                  <MenuItem key="swap" dense
+                    onClick={() => setMenu(m => (m ? { ...m, swapMode: true } : m))}>
+                    swap module…
+                  </MenuItem>,
+                ];
+              })()}
+            </Menu>
+            {holderPart && (
+              <GenerateHolderDialog
+                part={holderPart}
+                open={holderPartId !== null}
+                onClose={() => setHolderPartId(null)}
+              />
             )}
 
             {/* Hint chip while laying a fiber (WP-46) */}

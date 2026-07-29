@@ -109,6 +109,8 @@ export { swapPartModule } from './swap';
 export type { SwapResult } from './swap';
 export { unbindPart } from './unbind';
 export type { UnbindOutcome } from './unbind';
+export { copyPart, duplicatePart, pastePart, removePartUndoable, uniquifiedRef } from './clipboard';
+export type { PartClipboard } from './clipboard';
 export { getDocRevision, useDocRevision } from './revision';
 export { classifyPart, layerOf, layerRangeOf } from './layers';
 export type { LayerClassification, LayerRange } from './layers';

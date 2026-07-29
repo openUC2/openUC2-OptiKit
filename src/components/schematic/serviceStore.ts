@@ -124,6 +124,11 @@ interface ServiceState {
   runSimulate: (numRays?: number) => Promise<void>;
   setLive: (live: boolean) => void;
   clearError: () => void;
+  /** WP-78: silent inference dry run → `proposals` only (debounced by the
+   * caller on document change; never toasts, never touches markers). */
+  refreshProposals: () => Promise<void>;
+  /** WP-78: declare one proposed path (the one-click "Adopt" chip). */
+  adoptProposal: (name: string) => boolean;
 }
 
 function toError(err: unknown): { code: string; message: string } {
@@ -233,6 +238,55 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
 
   clearError: () => set({ error: null }),
   setLive: live => set({ live }),
+
+  refreshProposals: async () => {
+    try {
+      const { design } = buildServiceDesign();
+      if (Object.keys(design.components ?? {}).length === 0) {
+        set({ proposals: [] });
+        return;
+      }
+      const inferred = await inferChains(serviceFiles());
+      const declared = new Set(
+        Object.values(design.paths ?? {}).map(p => JSON.stringify(p.chain ?? [])),
+      );
+      set({
+        proposals: Object.entries(inferred.paths)
+          .filter(([, spec]) => !declared.has(JSON.stringify(spec.chain)))
+          .map(([name, spec]) => ({ name, chain: spec.chain })),
+      });
+    } catch {
+      // A background dry run must never toast; ambiguity/dead ends surface
+      // through the explicit check (and its escape markers) instead.
+      set({ proposals: [] });
+    }
+  },
+
+  adoptProposal: name => {
+    const proposal = get().proposals.find(p => p.name === name);
+    if (!proposal) return false;
+    const { keyByPartId } = buildServiceDesign();
+    const partIdByKey = Object.fromEntries(
+      Object.entries(keyByPartId).map(([id, key]) => [key, id]),
+    );
+    const chain = proposal.chain
+      .map(entry => {
+        const dot = entry.lastIndexOf('.');
+        return { key: entry.slice(0, dot), port: entry.slice(dot + 1) };
+      })
+      .filter(({ key }) => partIdByKey[key])
+      .map(({ key, port }) => makePortRef(partIdByKey[key], port));
+    if (chain.length < 2) return false;
+    setPath(name, chain);
+    set({ proposals: get().proposals.filter(p => p.name !== name) });
+    useAppStore.getState().addNotification({
+      type: 'success',
+      title: 'path adopted',
+      message: `${name}: ${proposal.chain.join(' → ')}`,
+      duration: 5000,
+    });
+    return true;
+  },
 
   runCheck: async () => {
     if (get().checkBusy) return;

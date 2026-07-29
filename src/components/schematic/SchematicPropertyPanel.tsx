@@ -657,9 +657,12 @@ export function SchematicPropertyPanel({
 
       {chainDraft && (
         <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+          {/* WP-78: the draft names its own escape hatch — manual chaining is
+              the ambiguous-case fallback, not the default experience. */}
           <Typography variant="caption">
             Chaining “{activePathName}”: {chainDraft.length} port(s) — click further pins,
-            then finish.
+            then finish. Esc to cancel · or let inference propose it (the Adopt chips
+            in the service panel).
           </Typography>
           <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
             <Button size="small" variant="contained" onClick={onFinishChain} disabled={chainDraft.length < 2}>

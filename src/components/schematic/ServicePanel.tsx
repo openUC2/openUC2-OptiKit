@@ -107,6 +107,18 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revision, store.live, store.simBusy, freshness]);
 
+  // WP-78: inference re-runs on document change (debounced, silent) so a
+  // freshly placed part surfaces its proposal as an Adopt chip — chaining
+  // proposes instead of demanding.
+  const proposalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    proposalTimer.current = setTimeout(() => void store.refreshProposals(), 800);
+    return () => {
+      if (proposalTimer.current) clearTimeout(proposalTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision]);
+
   const jump = (partId: string) => {
     selectPart(partId);
     onZoomToPart(partId);
@@ -182,12 +194,30 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
               : `check: ${errorCount} error(s), ${store.markers.length - errorCount} note(s)`}
           </Typography>
           <MarkerList markers={store.markers} onJump={jump} />
-          {store.proposals.length > 0 && (
-            <Alert severity="info" sx={{ mt: 0.5 }}>
-              chain inference proposes {store.proposals.length} additional path(s):{' '}
-              {store.proposals.map(p => p.name).join(', ')}
-            </Alert>
-          )}
+        </Box>
+      )}
+
+      {/* WP-78: proposals as one-click Adopt chips (they refresh on every
+          document change) — manual pin-to-pin chaining stays the fallback
+          for the ambiguous cases inference refuses to guess. */}
+      {store.proposals.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            chain inference proposes {store.proposals.length} path(s):
+          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', rowGap: 0.5 }}>
+            {store.proposals.map(p => (
+              <Tooltip key={p.name} title={p.chain.join(' → ')}>
+                <Chip
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  label={`Adopt ${p.name} (${p.chain.length})`}
+                  onClick={() => store.adoptProposal(p.name)}
+                />
+              </Tooltip>
+            ))}
+          </Stack>
         </Box>
       )}
 
