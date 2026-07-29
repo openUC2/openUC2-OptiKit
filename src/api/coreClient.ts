@@ -505,3 +505,40 @@ export async function exportStepAssembly(
   const named = /filename="([^"]+)"/.exec(disposition)?.[1];
   return { blob: await response.blob(), filename: named || 'assembly.step' };
 }
+
+/**
+ * WP-84: ONE design component as a STEP posed w.r.t. its CUBE frame — the
+ * "export for Inventor" outbound leg, so an ME can design the cube module
+ * around the part exactly where it must sit.
+ */
+export async function exportStepPart(
+  files: DsnFiles,
+  component: string,
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; filename: string }> {
+  let response: Response;
+  try {
+    response = await fetch(`${getCoreUrl()}/v1/export/step/part`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ files, component }),
+      signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err;
+    throw new CoreServiceError('E_UNREACHABLE', String(err), null, 0);
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const detail = (payload as { detail?: { code?: string; message?: string } })?.detail;
+    throw new CoreServiceError(
+      detail?.code ?? `E_HTTP_${response.status}`,
+      detail?.message ?? `part STEP export failed with HTTP ${response.status}`,
+      payload,
+      response.status,
+    );
+  }
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const named = /filename="([^"]+)"/.exec(disposition)?.[1];
+  return { blob: await response.blob(), filename: named || `${component}-in-cube.step` };
+}

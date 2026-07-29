@@ -45,12 +45,15 @@ import {
   useDocRevision,
   useSelectedPartId,
 } from '../../document';
+import { saveAs } from 'file-saver';
+import { CoreServiceError, exportStepPart } from '../../api/coreClient';
 import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
-import { listPartMechanics } from '../../model/dsn/serviceExport';
+import { buildServiceDesign, listPartMechanics, serviceFiles } from '../../model/dsn/serviceExport';
 import { BomDialog } from '../bom/BomDialog';
 import { MarkerList } from '../schematic/MarkerList';
 import { LayerChips } from '../schematic/LayerChips';
 import { AssemblyScene } from './AssemblyScene';
+import { AttachInventorDialog } from './AttachInventorDialog';
 import { CubifyDialog } from './CubifyDialog';
 import { GenerateHolderDialog } from './GenerateHolderDialog';
 import { useAssemblyStore } from './assemblyStore';
@@ -105,6 +108,41 @@ export function AssemblyPage() {
   const [bomOpen, setBomOpen] = useState(false);
   // WP-61: "generate a holder…" on a placed unbound part.
   const [generateOpen, setGenerateOpen] = useState(false);
+  // WP-84: the Inventor round-trip. The template the return leg attaches
+  // onto: the bound module's template, or the housing named by the index.
+  const [attachOpen, setAttachOpen] = useState(false);
+  const selectedTemplateId =
+    selectedIndexModule?.template?.id ??
+    (selected
+      ? index.housings.find(h => h.component.id === selected.libraryRef)?.id ?? null
+      : null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const exportForInventor = async () => {
+    if (!selected) return;
+    setExportBusy(true);
+    const notify = useAppStore.getState().addNotification;
+    try {
+      const { keyByPartId } = buildServiceDesign();
+      const key = keyByPartId[selected.id];
+      const { blob, filename } = await exportStepPart(serviceFiles(), key);
+      saveAs(blob, filename);
+      notify({
+        type: 'success',
+        title: 'exported for Inventor',
+        message: `${filename} — the part posed w.r.t. its cube frame; design the module around it, then “attach Inventor files…”`,
+        duration: 8000,
+      });
+    } catch (err) {
+      notify({
+        type: 'error',
+        title: 'export for Inventor failed',
+        message: err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err),
+        duration: 8000,
+      });
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
@@ -439,6 +477,30 @@ export function AssemblyPage() {
                     )}
                   </Box>
                   )}
+                  {/* WP-84: the Inventor round-trip, both legs. Export the
+                      part posed w.r.t. its cube frame; attach the resulting
+                      STP/GLB back onto the SAME template record. */}
+                  <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 1 }}>
+                    <Tooltip title="download this part as a STEP posed w.r.t. its cube frame — design the cube module around it in Inventor (WP-84)">
+                      <span>
+                        <Button size="small" variant="outlined" disabled={exportBusy}
+                          startIcon={exportBusy ? <CircularProgress size={12} /> : undefined}
+                          onClick={() => void exportForInventor()}>
+                          export for Inventor
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={selectedTemplateId
+                      ? `attach the Inventor STEP/GLB back onto ${selectedTemplateId} — same record, no new id`
+                      : 'no template record to attach onto — generate a holder or attach a housing first'}>
+                      <span>
+                        <Button size="small" variant="outlined" disabled={!selectedTemplateId}
+                          onClick={() => setAttachOpen(true)}>
+                          attach Inventor files…
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Stack>
                   {[...(selectedMechanics?.translationDofs ?? []),
                     ...(selectedMechanics?.rotationDofs ?? [])].map(dof => {
                     const value = selected.dofs.find(d => d.name === dof.name)?.value ?? dof.value;
@@ -464,6 +526,13 @@ export function AssemblyPage() {
           part={selected}
           open={generateOpen}
           onClose={() => setGenerateOpen(false)}
+        />
+      )}
+      {selectedTemplateId && (
+        <AttachInventorDialog
+          templateId={selectedTemplateId}
+          open={attachOpen}
+          onClose={() => setAttachOpen(false)}
         />
       )}
       <Snackbar
