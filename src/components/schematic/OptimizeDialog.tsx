@@ -7,6 +7,9 @@
 import { useMemo, useState } from 'react';
 import { saveAs } from 'file-saver';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -19,6 +22,7 @@ import {
   DialogTitle,
   FormControlLabel,
   MenuItem,
+  Paper,
   Stack,
   Table,
   TableBody,
@@ -29,6 +33,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import {
   CoreServiceError,
   optimizeDesign,
@@ -274,6 +279,27 @@ export function OptimizeDialog({
               applied {applied} DOF value(s) to the document — provenance will be
               stamped on export
             </Alert>
+          )}
+
+          {/* WP-82: the changeset is VIEWABLE, not download-only — the
+              "anything the CLI can produce, the editor can at least view"
+              principle applied to optikit-fx.json. */}
+          {result?.fx && result.fx.changes.length > 0 && (
+            <Accordion disableGutters sx={{ bgcolor: 'transparent' }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="caption">
+                  view optikit-fx.json ({result.fx.changes.length} change(s) for the Inventor machine)
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                <Paper variant="outlined" sx={{ p: 1, maxHeight: 200, overflow: 'auto' }}>
+                  <Typography component="pre" variant="caption"
+                    sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', m: 0 }}>
+                    {JSON.stringify(result.fx, null, 2)}
+                  </Typography>
+                </Paper>
+              </AccordionDetails>
+            </Accordion>
           )}
         </Stack>
       </DialogContent>

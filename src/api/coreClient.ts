@@ -364,6 +364,97 @@ export async function convertStepToGlb(
   return new Uint8Array(await response.arrayBuffer());
 }
 
+// ── vendor importers for review (WP-82) ──────────────────────────────────────
+// The CLI importers become service-reachable: the endpoints run the same code
+// but return the PROPOSED records for review — nothing is written until the
+// user accepts through the ordinary dev-write / zip exits.
+
+const importZmxSchema = z.object({
+  component: z.record(z.string(), z.unknown()),
+  review: z.array(z.string()),
+  efl_mm: z.number().nullable(),
+  mpn: z.string(),
+  records: z.record(z.string(), z.string()),
+});
+export type ImportZmxResponse = z.infer<typeof importZmxSchema>;
+
+export function importZmx(
+  filename: string,
+  bytes: Uint8Array,
+  opts: { mpn?: string; namespace?: string } = {},
+  signal?: AbortSignal,
+): Promise<ImportZmxResponse> {
+  return post(
+    '/v1/import/zmx',
+    {
+      filename,
+      data_b64: bytesToBase64(bytes),
+      ...(opts.mpn ? { mpn: opts.mpn } : {}),
+      ...(opts.namespace ? { namespace: opts.namespace } : {}),
+    },
+    importZmxSchema,
+    signal,
+  );
+}
+
+const importGlbSchema = z.object({
+  component: z.record(z.string(), z.unknown()),
+  template: z.record(z.string(), z.unknown()),
+  module: z.record(z.string(), z.unknown()),
+  review: z.array(z.string()),
+  envelope_mm: z.array(z.number()),
+  glb_asset_path: z.string(),
+  records: z.record(z.string(), z.string()),
+});
+export type ImportGlbResponse = z.infer<typeof importGlbSchema>;
+
+export function importGlb(
+  filename: string,
+  bytes: Uint8Array,
+  opts: { namespace?: string } = {},
+  signal?: AbortSignal,
+): Promise<ImportGlbResponse> {
+  return post(
+    '/v1/import/glb',
+    {
+      filename,
+      data_b64: bytesToBase64(bytes),
+      ...(opts.namespace ? { namespace: opts.namespace } : {}),
+    },
+    importGlbSchema,
+    signal,
+  );
+}
+
+/** WP-82: the compiled path drawn by optiland's own 2D viewer, as a PNG blob. */
+export async function drawLayout(
+  files: DsnFiles,
+  path: string,
+  numRays = 8,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await fetch(`${getCoreUrl()}/v1/draw`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files, path, num_rays: numRays }),
+    signal,
+  }).catch(err => {
+    throw new CoreServiceError('E_UNREACHABLE', String(err), null, 0);
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { code?: string; message?: string; context?: unknown };
+    } | null;
+    throw new CoreServiceError(
+      payload?.detail?.code ?? `E_HTTP_${response.status}`,
+      payload?.detail?.message ?? `draw failed with HTTP ${response.status}`,
+      payload?.detail?.context ?? null,
+      response.status,
+    );
+  }
+  return response.blob();
+}
+
 const librarySaveSchema = z.object({ written: z.array(z.string()) });
 
 /** Developer fast path: write records into the repo library (env-gated). */

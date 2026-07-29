@@ -31,6 +31,7 @@ import {
 import {
   Download as DownloadIcon,
   ExpandMore as ExpandMoreIcon,
+  FileUpload as ImportIcon,
   NoteAdd as NewIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
@@ -56,6 +57,7 @@ import { GlyphPreview } from './GlyphPreview';
 import { RaySketch } from './RaySketch';
 import { MechanicsPanel, type MeshStatus } from '../bind/MechanicsPanel';
 import { useBindStore } from '../bind/bindStore';
+import { ImportVendorDialog } from './ImportVendorDialog';
 
 export function ComponentEditorPage({
   initialTab = 'optics',
@@ -151,6 +153,8 @@ export function ComponentEditorPage({
 
   // WP-37: deep link — the assembly links an insert to `?open=<componentId>`.
   const [deepLinked, setDeepLinked] = useState(false);
+  // WP-82: the vendor-import drop-zone (.zmx / marker-stamped .glb).
+  const [importOpen, setImportOpen] = useState(false);
   useEffect(() => {
     if (deepLinked) return;
     const id = new URLSearchParams(window.location.search).get('open');
@@ -216,7 +220,15 @@ export function ComponentEditorPage({
               >
                 new
               </Button>
+              {/* WP-82: the CLI importers with a review step. */}
+              <Button
+                size="small" startIcon={<ImportIcon />}
+                onClick={() => setImportOpen(true)}
+              >
+                import…
+              </Button>
             </Stack>
+            <ImportVendorDialog open={importOpen} onClose={() => setImportOpen(false)} />
 
             {/* WP-38: published records open as editable copies. */}
             {openedFrom?.origin === 'index' && (

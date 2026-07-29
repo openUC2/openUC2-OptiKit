@@ -22,6 +22,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {
+  Image as LayoutIcon,
   PlayArrow as SimulateIcon,
   Rule as CheckIcon,
   TrackChanges as OptimizeIcon,
@@ -30,6 +31,7 @@ import {
 import { DEFAULT_CORE_URL, getCoreUrl, setCoreUrl } from '../../api/coreClient';
 import { selectPart, useDocPaths, useDocRevision } from '../../document';
 import { pathColor } from './colors';
+import { LayoutDialog } from './LayoutDialog';
 import { MarkerList } from './MarkerList';
 import { OptimizeDialog } from './OptimizeDialog';
 import { useServiceStore, useSimFreshness } from './serviceStore';
@@ -90,6 +92,8 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
   const revision = useDocRevision();
   const docPaths = useDocPaths();
   const [optimizeOpen, setOptimizeOpen] = useState(false);
+  // WP-82: the 2D layout viewer (optiland's own drawing, via /v1/draw).
+  const [layoutOpen, setLayoutOpen] = useState(false);
   const [urlDraft, setUrlDraft] = useState<string | null>(null);
 
   // Debounced live simulate: 500 ms after the last document change.
@@ -139,6 +143,17 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
         <Button size="small" variant="outlined" startIcon={<OptimizeIcon />} onClick={() => setOptimizeOpen(true)}>
           optimize…
         </Button>
+        <Tooltip title="the compiled optic drawn by optiland's 2D viewer (WP-82)">
+          <span>
+            <Button
+              size="small" variant="outlined" startIcon={<LayoutIcon />}
+              disabled={docPaths.length === 0}
+              onClick={() => setLayoutOpen(true)}
+            >
+              layout (2D)
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
 
       {freshness !== 'none' && (
@@ -264,6 +279,11 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
       <OptimizeDialog
         open={optimizeOpen}
         onClose={() => setOptimizeOpen(false)}
+        pathNames={docPaths.map(p => p.name)}
+      />
+      <LayoutDialog
+        open={layoutOpen}
+        onClose={() => setLayoutOpen(false)}
         pathNames={docPaths.map(p => p.name)}
       />
     </Box>
