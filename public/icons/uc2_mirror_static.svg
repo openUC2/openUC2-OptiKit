@@ -49,9 +49,14 @@
      stroke="#111111"
      stroke-width="4"
      id="rect6446" />
+  <!-- Kernel fold convention (designBuilder.ts mount x:90): at rotation 0 the
+       mirror folds a beam travelling grid east to grid south, so the surface
+       reads "\" with the reflective face toward the beams (south-west) and
+       the hatched back side north-east. GridCanvas rotates this glyph by the
+       placement rotation (clockwise), matching the kernel yaw. -->
   <g
      id="g1633"
-     transform="rotate(-90,50,50)">
+     transform="rotate(180,50,50)">
     <line
        x1="22"
        y1="22"

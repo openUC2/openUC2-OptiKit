@@ -124,10 +124,11 @@ function MirrorShape({ el, gridCellSize, cellPx: _cellPx }: ElementShapeProps) {
   const cx = simToCanvas(el.position, gridCellSize);
   const aperture = (el.params.aperture || 25) * gridCellSize / 50;
   const halfA = aperture / 2;
-  // The surface angle in world space — mirrors use angle=-45 convention
-  // (positive x-axis rotated by (rotation - mirrorAngle) so a '/' surface at default).
-  // Keep canvas icon consistent with simulation: surface direction = rotation - angle.
-  const surfaceAngle = el.rotation - (el.params.angle ?? -45);
+  // Group rotation for the LOCAL VERTICAL surface line below. With the CSV's
+  // angle=45 this is rotation−45: at rotation 0 the surface renders "\" with
+  // the normal arrow (local −x) pointing south-west — the kernel's east→south
+  // fold (designBuilder.ts mount x:90), same reading as uc2_mirror_static.svg.
+  const surfaceAngle = el.rotation - (el.params.angle ?? 45);
 
   return (
     <Group x={cx.x} y={cx.y} rotation={surfaceAngle}>
