@@ -37,6 +37,11 @@ export interface ModuleDefinition {
    * slug→record link. Unmapped modules place, render, and count toward the
    * BOM but are absent from the generated design ("not simulated"). */
   optikitId?: string;
+  /** How the optikit record is mounted inside the cube: quarter-turn steps
+   * about the optikit world axes at zero placement rotations, e.g. "x:90"
+   * (mirror-1x1: fold lands in-plane, then yaw steers it). Kernel-only;
+   * see designBuilder.ts for the composition. */
+  optikitMount?: string;
   /** Intra-cube placement offsets sourced from CSV (mirrors optikit_exporter conventions). */
   placementOffset?: {
     dx_mm: number;        // transverse X offset within cube (mm)

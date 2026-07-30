@@ -23,6 +23,18 @@
  * down — the same convention the golden fluo-scope design authors for its
  * laser. All factors are exact 90° rotations, so R_w always lands on one of
  * the 24 grid rotations and the (z, x) axis literals are read off its columns.
+ *
+ * Mount rotations (`optikitMount` CSV column): R0 alone strands fold records —
+ * a mirror record authors `reflected: +x`, which R0 sends straight DOWN, and
+ * yaw (a rotation about the vertical) can never bring it into the grid plane,
+ * so a placed mirror kills the beam at every 2D rotation. A module may
+ * therefore declare how its record is mounted inside the cube: a sequence of
+ * quarter-turn rotations about the optikit world axes at zero placement
+ * rotations, composed between the placement rotations and R0:
+ *   R_w = Rz_w(rotation) · Rx_w(−tilt) · Ry_w(−top) · M · R0
+ * `mirror-1x1` mounts `x:90`, turning the fold from −Z (down) onto +Y (grid
+ * south) — the legacy 2D engine's east→south fold at rotation 0 — after which
+ * yaw steers it through all four in-plane directions.
  */
 
 import { stringify } from 'yaml';
@@ -44,6 +56,10 @@ export interface UnmappedPlacement {
   /** Set when the CSV names an optikitId but no record was supplied for it. */
   optikitId?: string;
 }
+
+/** The curated slug→record link. A bare string is the record id; the object
+ * form adds the module's `optikitMount` (how the record sits in the cube). */
+export type OptikitRef = string | { id: string; mount?: string };
 
 export interface DesignBuildResult {
   /** optikit-design.yml text; byte-identical for identical inputs (rule 10). */
@@ -107,15 +123,38 @@ function axisLiteral(v: readonly number[], what: string): AxisDir {
   throw new Error(`${what} is not axis-aligned: [${v.join(', ')}]`);
 }
 
+const IDENTITY: Mat3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+const MOUNT_ROT: Record<string, (q: number) => Mat3> = { x: rotX, y: rotY, z: rotZ };
+
+/** Parse an `optikitMount` value (`"x:90"`, `"z:90,x:180"`) into its matrix.
+ * Steps rotate about the optikit world axes at zero placement rotations and
+ * apply in listed order; angles must be multiples of 90°. */
+export function mountRotation(mount: string | undefined): Mat3 {
+  if (!mount || !mount.trim()) return IDENTITY;
+  let m = IDENTITY;
+  for (const step of mount.split(',')) {
+    const [axis, deg] = step.split(':').map((s) => s.trim());
+    const rot = MOUNT_ROT[axis];
+    if (!rot || deg === undefined || deg === '' || Number.isNaN(Number(deg))) {
+      throw new Error(`optikitMount step '${step.trim()}' is not '<x|y|z>:<degrees>'`);
+    }
+    m = mul(rot(quarterTurns(Number(deg), `optikitMount ${axis}`)), m);
+  }
+  return m;
+}
+
 /** The placement's optikit `rotation.grid` naming (z, x axis literals). */
-export function gridRotation(m: Pick<PlacedModule, 'rotation' | 'topRotation' | 'tiltRotation'>): {
+export function gridRotation(
+  m: Pick<PlacedModule, 'rotation' | 'topRotation' | 'tiltRotation'>,
+  mount?: string,
+): {
   z: AxisDir;
   x: AxisDir;
 } {
   const yaw = quarterTurns(m.rotation, 'rotation');
   const tilt = quarterTurns(-(m.tiltRotation ?? 0), 'tiltRotation');
   const top = quarterTurns(-(m.topRotation ?? 0), 'topRotation');
-  const r = mul(mul(mul(rotZ(yaw), rotX(tilt)), rotY(top)), R0);
+  const r = mul(mul(mul(mul(rotZ(yaw), rotX(tilt)), rotY(top)), mountRotation(mount)), R0);
   return {
     z: axisLiteral([r[0][2], r[1][2], r[2][2]], 'local z image'),
     x: axisLiteral([r[0][0], r[1][0], r[2][0]], 'local x image'),
@@ -131,15 +170,17 @@ export interface BuildDesignOptions {
 
 export function buildDesign(
   placements: readonly PlacedModule[],
-  optikitIdFor: (moduleId: string) => string | undefined,
+  optikitRefFor: (moduleId: string) => OptikitRef | undefined,
   records: ReadonlyMap<string, OptikitRecord>,
   options: BuildDesignOptions = {},
 ): DesignBuildResult {
   const unmapped: UnmappedPlacement[] = [];
-  const entries: [string, PlacedModule, OptikitRecord][] = [];
+  const entries: [string, PlacedModule, OptikitRecord, string | undefined][] = [];
 
   for (const placement of placements) {
-    const optikitId = optikitIdFor(placement.moduleId);
+    const ref = optikitRefFor(placement.moduleId);
+    const optikitId = typeof ref === 'string' ? ref : ref?.id;
+    const mount = typeof ref === 'string' ? undefined : ref?.mount;
     const record = optikitId ? records.get(optikitId) : undefined;
     if (!optikitId || !record) {
       unmapped.push({
@@ -151,7 +192,7 @@ export function buildDesign(
     }
     // Placement uuid prefixed with the slug: stable across regenerations of
     // an unchanged scene (spec §18.5).
-    entries.push([`${placement.moduleId}-${placement.id}`, placement, record]);
+    entries.push([`${placement.moduleId}-${placement.id}`, placement, record, mount]);
   }
   entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
@@ -161,7 +202,7 @@ export function buildDesign(
   // the configurator's exactly.
   const anchorEntry = entries[0];
   const components: Record<string, unknown> = {};
-  for (const [compId, placement, record] of entries) {
+  for (const [compId, placement, record, mount] of entries) {
     const isAnchor = compId === anchorEntry[0];
     const [ax, ay, az] = [
       anchorEntry[1].position.x,
@@ -181,7 +222,7 @@ export function buildDesign(
       primitive: { type: 'step', model: record.id },
       optics: record.optics,
       pose: {
-        rotation: { type: 'grid', grid: gridRotation(placement) },
+        rotation: { type: 'grid', grid: gridRotation(placement, mount) },
         translation: {
           ...(isAnchor ? {} : { anchor: anchorEntry[0] }),
           'offset-grid': grid,

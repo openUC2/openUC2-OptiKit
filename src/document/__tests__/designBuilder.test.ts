@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-import { buildDesign, gridRotation } from '../designBuilder';
-import { optikitIdFor, placed, RECORDS, threeModuleRow } from './helpers';
+import { buildDesign, gridRotation, mountRotation } from '../designBuilder';
+import { optikitIdFor, optikitRefFor, placed, RECORDS, threeModuleRow } from './helpers';
 
 import goldenYml from './fixtures/golden-three-module-row.yml?raw';
 
@@ -30,6 +30,51 @@ describe('gridRotation — the pinned yaw/roll/pitch → 24-rotation mapping tab
 
   it('rejects non-90° angles', () => {
     expect(() => gridRotation({ rotation: 45 })).toThrow(/multiple of 90/);
+  });
+});
+
+describe('mount rotations — the mirror fold lands in-plane and yaw steers it', () => {
+  // Without a mount, the flat_45 record's fold (record-local +x) images to
+  // world −Z at EVERY yaw — the beam dives into the table and dies at the
+  // mirror in the 2D view. The x:90 mount turns it onto +Y (grid south), the
+  // legacy 2D engine's east→south fold at rotation 0.
+  it('x:90 maps each yaw step to an in-plane fold', () => {
+    expect(gridRotation({ rotation: 0 }, 'x:90')).toEqual({ z: '+x', x: '+y' });
+    expect(gridRotation({ rotation: 90 }, 'x:90')).toEqual({ z: '+y', x: '-x' });
+    expect(gridRotation({ rotation: 180 }, 'x:90')).toEqual({ z: '-x', x: '-y' });
+    expect(gridRotation({ rotation: 270 }, 'x:90')).toEqual({ z: '-y', x: '+x' });
+  });
+
+  it('without a mount the fold points down at every yaw (the pinned defect)', () => {
+    for (const rotation of [0, 90, 180, 270]) {
+      expect(gridRotation({ rotation }).x).toBe('-z');
+    }
+  });
+
+  it('the x:90 mount equals a 270° tiltRotation at zero yaw (same slot in the chain)', () => {
+    expect(gridRotation({ rotation: 0 }, 'x:90')).toEqual(
+      gridRotation({ rotation: 0, tiltRotation: 270 }),
+    );
+  });
+
+  it('composes multi-step mounts left to right', () => {
+    // x:180 lifts the fold to +Z (a periscope's lower mirror).
+    expect(gridRotation({ rotation: 0 }, 'x:180')).toEqual({ z: '+x', x: '+z' });
+    // Two quarter turns about x equal one half turn.
+    expect(gridRotation({ rotation: 0 }, 'x:90,x:90')).toEqual(
+      gridRotation({ rotation: 0 }, 'x:180'),
+    );
+  });
+
+  it('rejects malformed and non-90° mounts', () => {
+    expect(() => mountRotation('w:90')).toThrow(/optikitMount step/);
+    expect(() => mountRotation('x')).toThrow(/optikitMount step/);
+    expect(() => mountRotation('x:45')).toThrow(/multiple of 90/);
+  });
+
+  it('empty or absent mounts are the identity', () => {
+    expect(gridRotation({ rotation: 0 }, '')).toEqual(gridRotation({ rotation: 0 }));
+    expect(gridRotation({ rotation: 0 }, undefined)).toEqual(gridRotation({ rotation: 0 }));
   });
 });
 
@@ -100,6 +145,28 @@ describe('buildDesign', () => {
     const { unmapped } = buildDesign(threeModuleRow(), optikitIdFor, new Map());
     expect(unmapped).toHaveLength(3);
     expect(unmapped[0].optikitId).toBeDefined();
+  });
+
+  it('applies the module mount to a mirror placement and yaw steers the fold', () => {
+    const placements = [
+      placed('laser-488nm', 'a1', 0, 0),
+      placed('mirror-1x1', 'b2', 2, 0),
+      placed('mirror-1x1', 'c3', 2, 2, { rotation: 90 }),
+    ];
+    const { yaml } = buildDesign(placements, optikitRefFor, RECORDS);
+    const doc = parse(yaml) as {
+      components: Record<string, { pose: { rotation: { grid: { z: string; x: string } } } }>;
+    };
+    expect(doc.components['mirror-1x1-b2'].pose.rotation.grid).toEqual({ z: '+x', x: '+y' });
+    expect(doc.components['mirror-1x1-c3'].pose.rotation.grid).toEqual({ z: '+y', x: '-x' });
+    // The unmounted laser is untouched by the mount mechanism.
+    expect(doc.components['laser-488nm-a1'].pose.rotation.grid).toEqual({ z: '+x', x: '-z' });
+  });
+
+  it('bare-string refs (no mount) build identically to the pre-mount output', () => {
+    const viaStrings = buildDesign(threeModuleRow(), optikitIdFor, RECORDS);
+    const viaRefs = buildDesign(threeModuleRow(), optikitRefFor, RECORDS);
+    expect(viaRefs.yaml).toBe(viaStrings.yaml);
   });
 
   it('encodes layers as offset-grid z (the 55 mm axis)', () => {

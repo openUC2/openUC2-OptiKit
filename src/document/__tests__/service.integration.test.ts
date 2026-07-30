@@ -13,7 +13,7 @@ import { optikitToThree } from '../frames';
 import { GRID_MM } from '../../constants/grid';
 import { moduleWorldPosition } from '../../three/coords';
 import { buildDesign } from '../designBuilder';
-import { optikitIdFor, RECORDS, threeModuleRow } from './helpers';
+import { optikitIdFor, optikitRefFor, placed, RECORDS, threeModuleRow } from './helpers';
 
 const BASE_URL = process.env.OPTIKIT_SERVICE_URL ?? 'http://127.0.0.1:8000';
 
@@ -120,6 +120,67 @@ describe.skipIf(!available)('optikit-core service integration', () => {
     for (let i = 0; i < 3; i++) {
       expect(Math.abs(dir[i] - beamW[i]), `axis ${i}`).toBeLessThan(1e-9);
     }
+  });
+
+  // The mirror-mount fix, proven through all three repos: the x:90 mount puts
+  // the flat_45 fold in-plane, so a laser row folds south at the mirror and
+  // lands on a camera one column down — traced by the real oc-wasm kernel.
+  // Without the mount every yaw sent the fold to world −Z (into the table).
+  it('laser → mirror → camera: the kernel traces the in-plane fold', async () => {
+    const placements = [
+      placed('laser-488nm', 'a1', 0, 0),
+      placed('mirror-1x1', 'b2', 2, 0),
+      placed('camera-usb-daheng', 'c3', 2, 2, { rotation: 90 }),
+    ];
+    const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
+    expect(unmapped).toEqual([]);
+    const response = await fetch(`${BASE_URL}/v1/scene3`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ files: { 'optikit-design.yml': yaml } }),
+    });
+    expect(response.status).toBe(200);
+    const data = (await response.json()) as {
+      scene: unknown;
+      findings: { code: string }[];
+    };
+    // The fold reaches the camera, so path inference finds a target.
+    expect(data.findings.map((f) => f.code)).not.toContain('E_NO_TARGET');
+
+    const { readFileSync } = await import('node:fs');
+    const { default: init, Canvas } = await import('oc-wasm');
+    const { KernelCore } = await import('../../kernel/kernelCore');
+    const { SEGMENT_FLOATS } = await import('../../kernel/messages');
+    const wasm = new URL('../../../node_modules/oc-wasm/oc_wasm_bg.wasm', import.meta.url);
+    await init({ module_or_path: readFileSync(wasm) });
+    const core = new KernelCore(new Canvas());
+    const loaded = core.handle({ id: 1, type: 'loadScene', sceneJson: JSON.stringify(data.scene) });
+    expect(loaded.type).toBe('sceneLoaded');
+    const traced = core.handle({ id: 2, type: 'traceWorld' });
+    expect(traced.type).toBe('segments');
+    if (traced.type !== 'segments') return;
+
+    // Mirror cube at grid (2,0) = world (100, 0); camera at (2,2) = (100, 100).
+    // At least one segment must leave the mirror travelling +Y (grid south),
+    // and the folded beam must reach the camera's cell.
+    let foldedReachY = -Infinity;
+    let folded = false;
+    for (let i = 0; i + SEGMENT_FLOATS <= traced.buffer.length; i += SEGMENT_FLOATS) {
+      const [ax, ay, , bx, by, bz] = traced.buffer.subarray(i, i + SEGMENT_FLOATS);
+      const [dx, dy] = [bx - ax, by - ay];
+      const south = dy > 0.99 * Math.hypot(dx, dy, bz - traced.buffer[i + 2]);
+      if (south && Math.abs(ax - 100) < 5) {
+        folded = true;
+        foldedReachY = Math.max(foldedReachY, by);
+      }
+      // The pinned defect sent the fold to world −Z (down): no segment may
+      // dive below the table.
+      expect(bz).toBeGreaterThan(-27.5);
+    }
+    expect(folded, 'a segment leaves the mirror travelling grid south').toBe(true);
+    // The camera record recesses its sensor 10 mm behind the part center, so
+    // the folded beam terminates on the detector plane at y = 100 − 10 = 90.
+    expect(foldedReachY, 'the folded beam ends on the camera sensor plane').toBeCloseTo(90, 6);
   });
 });
 

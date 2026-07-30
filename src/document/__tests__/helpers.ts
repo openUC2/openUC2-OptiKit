@@ -27,7 +27,20 @@ const OPTIKIT_IDS: Record<string, string> = {
   'mirror-1x1': 'openuc2.mirror.flat_45',
 };
 
+/** The curated `optikitMount` values (CSV column), keyed by module slug. */
+const OPTIKIT_MOUNTS: Record<string, string> = {
+  'mirror-1x1': 'x:90',
+};
+
 export const optikitIdFor = (moduleId: string) => OPTIKIT_IDS[moduleId];
+
+/** The object-form ref kernelSim passes: record id plus the cube mount. */
+export const optikitRefFor = (moduleId: string) => {
+  const id = OPTIKIT_IDS[moduleId];
+  if (!id) return undefined;
+  const mount = OPTIKIT_MOUNTS[moduleId];
+  return mount ? { id, mount } : id;
+};
 
 export function placed(
   moduleId: string,

@@ -32,6 +32,7 @@ export interface ModuleCSVRow {
   ryOffset_deg?: string; // yaw rotation offset (deg)
   rzOffset_deg?: string; // in-plane rotation offset — changes mirror/BS orientation (deg)
   optikitId?: string;    // optikit-core library component record id (EMB-C)
+  optikitMount?: string; // record mount inside the cube, e.g. "x:90" (designBuilder.ts)
 }
 
 /**
@@ -184,6 +185,7 @@ export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
         ] as [number, number, number]
       : undefined,
     optikitId: row.optikitId && row.optikitId.trim() ? row.optikitId.trim() : undefined,
+    optikitMount: row.optikitMount && row.optikitMount.trim() ? row.optikitMount.trim() : undefined,
     placementOffset: (() => {
       const dx = parseFloat(row.dx_mm || '0') || 0;
       const dy = parseFloat(row.dy_mm || '0') || 0;

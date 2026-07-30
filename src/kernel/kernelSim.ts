@@ -30,13 +30,16 @@ export function startKernelSimulation(): () => void {
     build: async () => {
       const { placedModules, modules } = useAppStore.getState();
       if (placedModules.length === 0) return null;
-      const optikitIdFor = (moduleId: string) =>
-        modules.find(m => m.id === moduleId)?.optikitId;
+      const optikitRefFor = (moduleId: string) => {
+        const def = modules.find(m => m.id === moduleId);
+        if (!def?.optikitId) return undefined;
+        return { id: def.optikitId, mount: def.optikitMount };
+      };
       const ids = placedModules
-        .map(p => optikitIdFor(p.moduleId))
+        .map(p => optikitRefFor(p.moduleId)?.id)
         .filter((id): id is string => Boolean(id));
       const records = ids.length ? await client.componentRecords(ids) : new Map();
-      return buildDesign(placedModules, optikitIdFor, records);
+      return buildDesign(placedModules, optikitRefFor, records);
     },
     scene3: yaml => client.scene3(yaml),
     loadScene: json => getKernelClient().loadScene(json),
