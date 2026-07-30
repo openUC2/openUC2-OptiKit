@@ -31,17 +31,17 @@ async function serviceAvailable(): Promise<boolean> {
 const available = await serviceAvailable();
 const client = new CoreClient({ baseUrl: BASE_URL });
 
-/** True when the service's dialect accepts the dichroic record (WP-74
- * `response` blocks + the importer's quoted `'.inf'` radii). Probed with the
- * record itself so the dichroic tests skip against a stale process — one
- * running pre-merge code or an older branch commit — instead of failing. */
+/** True when the service's dialect accepts the dichroic + fluorescent-sample
+ * records (WP-74 `response` blocks, quoted `'.inf'` radii, cone emission).
+ * Probed with the records themselves so these tests skip against a stale
+ * process — pre-merge code or an older branch commit — instead of failing. */
 async function serviceHasCurrentDialect(): Promise<boolean> {
   if (!available) return false;
   try {
     const { buildDesign } = await import('../designBuilder');
     const { optikitRefFor, placed, RECORDS } = await import('./helpers');
     const { yaml } = buildDesign(
-      [placed('filter-dichroic', 'probe', 0, 0)],
+      [placed('filter-dichroic', 'probe', 0, 0), placed('sampleholder-1x1', 'probe2', 1, 0)],
       optikitRefFor,
       RECORDS,
     );
@@ -212,10 +212,13 @@ describe.skipIf(!available)('optikit-core service integration', () => {
   });
 });
 
-// The dichroic/beamsplitter records author WP-74 response blocks and quoted
-// '.inf' radii, which only the post-merge service dialect accepts.
+// The dichroic/beamsplitter records author WP-74 response blocks, quoted
+// '.inf' radii, and cone emission, which only the current service accepts.
 describe.skipIf(!merged)('optikit-core service integration (merged service)', () => {
-  it('laser → dichroic → camera: both arms trace, the fold lands on the sensor', async () => {
+  // The dichroic split is wavelength-TRUE (Tabulated R/T sampled per ray):
+  // 488 sits inside the reflect band, so the fold carries FULL flux and the
+  // transmitted arm does not exist at all.
+  it('laser → dichroic → camera: 488 folds fully, nothing bleeds through', async () => {
     const placements = [
       placed('laser-488nm', 'a1', 0, 0),
       placed('filter-dichroic', 'b2', 2, 0),
@@ -235,8 +238,8 @@ describe.skipIf(!merged)('optikit-core service integration (merged service)', ()
       warnings: string[];
     };
     expect(data.findings.map((f) => f.code)).not.toContain('E_NO_TARGET');
-    // The kernel is wavelength-blind: the dichroic is an explicit 50/50 split.
-    expect(data.warnings.join('\n')).toContain('W_DICHROIC_SPLIT');
+    // Spectral split from the record's response block: no blind-split warning.
+    expect(data.warnings.join('\n')).not.toContain('W_DICHROIC_SPLIT');
 
     const { readFileSync } = await import('node:fs');
     const { default: init, Canvas } = await import('oc-wasm');
@@ -260,13 +263,94 @@ describe.skipIf(!merged)('optikit-core service integration (merged service)', ()
       if (by - ay > 0.99 * len && Math.abs(ax - 100) < 5) {
         foldedReachY = Math.max(foldedReachY, by);
       }
-      if (bx - ax > 0.99 * len && ax > 99) {
+      if (bx - ax > 0.99 * len && ax > 100.5) {
         transmittedReachX = Math.max(transmittedReachX, bx);
       }
       expect(bz).toBeGreaterThan(-27.5);
     }
     expect(foldedReachY, 'the reflected arm ends on the camera sensor plane').toBeCloseTo(90, 6);
-    expect(transmittedReachX, 'the transmitted arm continues east').toBeGreaterThan(110);
+    expect(transmittedReachX, 'no transmitted arm exists at 488').toBe(-Infinity);
+  });
+
+  // The full epi-fluorescence microscope, wavelength-true end to end: the 488
+  // excitation folds at the spectral dichroic (full flux, zero bleed-through)
+  // down to the fluorescent sample; the sample's 520 emission cone comes back
+  // through the objective, TRANSMITS at the dichroic, and lands on the camera
+  // through the tube lens. Every hit on the camera is therefore emission
+  // light — the fluorescence image, not excitation bleed.
+  it('epi-fluorescence: excitation folds to the sample, emission images on the camera', async () => {
+    const placements = [
+      placed('laser-488nm', 'a1', 0, 2),
+      placed('filter-bandpass', 'b2', 1, 2),
+      placed('filter-dichroic', 'c3', 2, 2),
+      // Rotation 270: the objective's front (and its protruding 41 mm nose)
+      // faces SOUTH toward the sample, putting the sample plane at the front
+      // focus; epi excitation enters through the back port.
+      placed('objective-20x-Nikon-0.75NA-1x1', 'd4', 2, 3, { rotation: 270 }),
+      placed('sampleholder-1x1', 'e5', 2, 4, { rotation: 270 }),
+      placed('lens-pos-1x1', 'f6', 2, 1, { rotation: 270 }),
+      placed('camera-usb-daheng', 'g7', 2, 0, { rotation: 270 }),
+    ];
+    const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
+    expect(unmapped).toEqual([]);
+    const response = await fetch(`${BASE_URL}/v1/scene3`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ files: { 'optikit-design.yml': yaml } }),
+    });
+    expect(response.status, await response.clone().text()).toBe(200);
+    const data = (await response.json()) as {
+      scene: { sources: unknown[] };
+      findings: { code: string }[];
+    };
+    // Two physical sources: the laser and the fluorophore.
+    expect(data.scene.sources).toHaveLength(2);
+    expect(data.findings.map((f) => f.code)).not.toContain('E_NO_TARGET');
+
+    const { readFileSync } = await import('node:fs');
+    const { default: init, Canvas } = await import('oc-wasm');
+    const { KernelCore } = await import('../../kernel/kernelCore');
+    const { SEGMENT_FLOATS } = await import('../../kernel/messages');
+    const { decodeHits, parseDetectorResult } = await import('../../kernel/detector');
+    const wasm = new URL('../../../node_modules/oc-wasm/oc_wasm_bg.wasm', import.meta.url);
+    await init({ module_or_path: readFileSync(wasm) });
+    const core = new KernelCore(new Canvas());
+    expect(core.handle({ id: 1, type: 'loadScene', sceneJson: JSON.stringify(data.scene) }).type)
+      .toBe('sceneLoaded');
+    const traced = core.handle({ id: 2, type: 'traceWorld' });
+    expect(traced.type).toBe('segments');
+    if (traced.type !== 'segments') return;
+
+    // Dichroic column x = 100; sample at y = 200; camera sensor at y = 10.
+    let excitationReachY = -Infinity;
+    let eastBleedFlux = 0;
+    for (let i = 0; i + SEGMENT_FLOATS <= traced.buffer.length; i += SEGMENT_FLOATS) {
+      const seg = traced.buffer.subarray(i, i + SEGMENT_FLOATS);
+      const [ax, ay, az, bx, by, bz] = seg;
+      const flux = seg[9];
+      const len = Math.hypot(bx - ax, by - ay, bz - az);
+      if (by - ay > 0.99 * len && Math.abs(ax - 100) < 5) {
+        excitationReachY = Math.max(excitationReachY, by);
+      }
+      if (bx - ax > 0.99 * len && ax > 100.5) eastBleedFlux += flux;
+    }
+    // Excitation reaches (or passes) the sample plane at y = 200.
+    expect(excitationReachY).toBeGreaterThan(195);
+    // The spectral dichroic reflects 488 completely: zero eastward bleed.
+    expect(eastBleedFlux).toBe(0);
+
+    // The camera's readout is the fluorescence image: hits exist, and every
+    // spot record is 520 nm emission light (green channel above blue — 488
+    // excitation renders blue-dominant, 520 green-dominant).
+    const detector = traced.detector;
+    expect(detector).toBeTruthy();
+    const result = parseDetectorResult(detector!.resultJson)!;
+    expect(result.hits).toBeGreaterThan(0);
+    const hits = decodeHits(detector!.hits)!;
+    for (let i = 0; i < hits.count; i++) {
+      const hit = hits.at(i);
+      expect(hit.g, `hit ${i} must be emission-colored`).toBeGreaterThan(hit.b);
+    }
   });
 });
 

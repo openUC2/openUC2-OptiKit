@@ -4,8 +4,10 @@
 vendored here as an npm tarball because the source repository (`optiland-canvas`)
 is private, so public CI cannot build it from source (integration spec rule 13).
 
-- **Current pin:** `oc-wasm-0.0.1+ff5587baa.tgz` — the `+<sha>` build metadata is
-  the `optiland-canvas` commit the tarball was packed from.
+- **Current pin:** `oc-wasm-0.0.1+83bcea9fa.tgz` — the `+<sha>` build metadata is
+  the `optiland-canvas` commit the tarball was packed from. This build adds the
+  exact pointwise R+T validation for tabulated response pairs (spectral
+  dichroics: complementary step curves validate).
 - **Consumed as** a `file:` dependency in `package.json`; Vite excludes it from
   dependency pre-bundling (`optimizeDeps.exclude`) and the worker passes the wasm
   URL explicitly (the `/configurator/` base breaks implicit paths).

@@ -13,6 +13,8 @@ import dichroicYml from './fixtures/openuc2.dichroic.filter_dichroic.component.y
 import filterYml from './fixtures/openuc2.filter.emission_525.component.yml?raw';
 import laserYml from './fixtures/openuc2.source.laser_488.component.yml?raw';
 import mirrorYml from './fixtures/openuc2.mirror.flat_45.component.yml?raw';
+import objectiveYml from './fixtures/openuc2.objective.refractive_20x.component.yml?raw';
+import sampleYml from './fixtures/openuc2.sample.fluoro_slide.component.yml?raw';
 
 function record(text: string): OptikitRecord {
   const doc = parse(text) as { id: string; category: string; optics: unknown };
@@ -20,7 +22,8 @@ function record(text: string): OptikitRecord {
 }
 
 export const RECORDS = new Map<string, OptikitRecord>(
-  [laserYml, cameraYml, achromatYml, mirrorYml, dichroicYml, filterYml, beamsplitterYml]
+  [laserYml, cameraYml, achromatYml, mirrorYml, dichroicYml, filterYml, beamsplitterYml,
+   objectiveYml, sampleYml]
     .map(record)
     .map((r) => [r.id, r]),
 );
@@ -33,6 +36,8 @@ const OPTIKIT_IDS: Record<string, string> = {
   'filter-dichroic': 'openuc2.dichroic.filter_dichroic',
   'filter-bandpass': 'openuc2.filter.emission_525',
   'beamsplitter-1x1': 'openuc2.beamsplitter.cube_5050',
+  'objective-20x-Nikon-0.75NA-1x1': 'openuc2.objective.refractive_20x',
+  'sampleholder-1x1': 'openuc2.sample.fluoro_slide',
 };
 
 /** The curated `optikitMount` values (CSV column), keyed by module slug.

@@ -72,6 +72,8 @@ describe('the shipped catalogue (public/modules_updated.csv)', () => {
       'filter-dichroic': ['openuc2.dichroic.filter_dichroic', 'x:90'],
       'filter-bandpass': ['openuc2.filter.emission_525', undefined],
       'beamsplitter-1x1': ['openuc2.beamsplitter.cube_5050', 'x:90'],
+      'objective-20x-Nikon-0.75NA-1x1': ['openuc2.objective.refractive_20x', undefined],
+      'sampleholder-1x1': ['openuc2.sample.fluoro_slide', undefined],
     };
     for (const [slug, [id, mount]] of Object.entries(expected)) {
       const def = byId.get(slug);
