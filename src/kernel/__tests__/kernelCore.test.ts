@@ -14,6 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import init, { Canvas } from 'oc-wasm';
+import { decodeHits, parseDetectorResult } from '../detector';
 import { KernelCore } from '../kernelCore';
 import { SEGMENT_FLOATS } from '../messages';
 
@@ -63,5 +64,39 @@ describe('kernel round-trip (EMB-B)', () => {
   it('reports errors without throwing', () => {
     const res = core.handle({ id: 4, type: 'loadScene', sceneJson: 'not json' });
     expect(res.type).toBe('error');
+  });
+
+  // --- EMB-E: the detector readout rides the settled f64 trace ---------------
+
+  it('settled trace carries the f64 detector readout', () => {
+    const res = core.handle({ id: 5, type: 'traceWorld' });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    const detector = res.detector;
+    expect(detector).toBeTruthy();
+    const result = parseDetectorResult(detector!.resultJson)!;
+    // All 16 probe rays land on the detector.
+    expect(result.hits).toBe(16);
+    expect(result.totalSignal).toBeGreaterThan(0);
+    expect(result.bins[0] * result.bins[1]).toBe(result.incident.length);
+    // The probe is axially symmetric, so the f64 centroid sits on axis — the
+    // EMB-E embedding criterion (same kernel, same scene, honest numbers).
+    expect(Math.abs(result.centroid[0])).toBeLessThan(1e-9);
+    expect(Math.abs(result.centroid[1])).toBeLessThan(1e-9);
+    // Hit records: [halfW, halfH, n, 6 floats per record].
+    const hits = decodeHits(detector!.hits)!;
+    expect(hits.count).toBe(16);
+    expect(detector!.hits.length).toBe(3 + 16 * 6);
+    expect(hits.halfW).toBeGreaterThan(0);
+    // Binned flux sums to the f64 total signal (both from the same readout).
+    const binned = result.incident.reduce((a, b) => a + b, 0);
+    expect(binned).toBeCloseTo(result.totalSignal, 9);
+  });
+
+  it('fast f32 preview never carries a readout (rule 5)', () => {
+    const res = core.handle({ id: 6, type: 'traceWorldFast' });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    expect(res.detector).toBeUndefined();
   });
 });

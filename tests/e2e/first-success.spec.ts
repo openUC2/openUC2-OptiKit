@@ -69,6 +69,31 @@ test('first success: place, trace, drag, delete (spec 18.1)', async ({ page }) =
   expect(kernelState.engine).toBe('kernel');
   expect(kernelState.serviceError).toBeNull();
 
+  // EMB-E: the camera's readout arrives with the settled trace — the panel
+  // renders (in the simulation right-tab), and its numbers come from the
+  // parsed f64 result (rule 5).
+  await page.evaluate(() => {
+    (window as any).__stores.app.getState().setActiveRightTab('simulation');
+  });
+  await page.waitForSelector('[data-testid="kernel-detector"]', { timeout: 10_000 });
+  const readout = await page.evaluate(() => {
+    const detector = (window as any).__stores.sim.getState().kernel.detector;
+    if (!detector) return null;
+    return {
+      hits: detector.result.hits,
+      totalSignal: detector.result.totalSignal,
+      hitRecords: detector.hits.length,
+      panel: !!document.querySelector('[data-testid="kernel-detector"]'),
+      readoutText: document.querySelector('[data-testid="kernel-detector-readout"]')?.textContent ?? '',
+    };
+  });
+  expect(readout).not.toBeNull();
+  expect(readout!.hits).toBeGreaterThan(0);
+  expect(readout!.totalSignal).toBeGreaterThan(0);
+  expect(readout!.hitRecords).toBeGreaterThanOrEqual(3);
+  expect(readout!.panel).toBe(true);
+  expect(readout!.readoutText).toContain(`${readout!.hits} hits`);
+
   // The rays must actually be DRAWN, not merely present in the store: count
   // the Konva line nodes on the 2D ray layer. Asserting only store state let a
   // "traced but invisible" regression through once already.
@@ -112,9 +137,14 @@ test('first success: place, trace, drag, delete (spec 18.1)', async ({ page }) =
       segments: (sim.kernel.segments ?? []).length / 11,
       findingCodes: sim.kernel.findings.map((f: any) => f.code),
       detectorReadings: sim.detectorReadings.length,
+      detector: sim.kernel.detector,
+      panelGone: !document.querySelector('[data-testid="kernel-detector"]'),
     };
   });
   expect(afterDelete.segments).toBeGreaterThan(0); // rays continue into open space
   expect(afterDelete.findingCodes).toContain('E_NO_TARGET');
   expect(afterDelete.detectorReadings).toBe(0);
+  // EMB-E: no detector in the scene → the readout empties and the panel hides.
+  expect(afterDelete.detector).toBeNull();
+  expect(afterDelete.panelGone).toBe(true);
 });

@@ -17,6 +17,7 @@
 import type { Scene3Response } from '../api/coreClient';
 import { CoreServiceError } from '../api/coreClient';
 import type { UnmappedPlacement } from '../document/designBuilder';
+import type { DetectorReadoutWire } from './detector';
 
 export interface KernelBuildOutput {
   yaml: string;
@@ -24,10 +25,17 @@ export interface KernelBuildOutput {
   unmapped: UnmappedPlacement[];
 }
 
+export interface WorldTraceResult {
+  segments: Float32Array;
+  detector: DetectorReadoutWire | null;
+}
+
 export interface KernelPassResult {
   requestId: number;
   /** World-frame segment buffer, 11 floats per segment (spec 18.7). */
   segments: Float32Array;
+  /** First-detector readout of the settled f64 trace (EMB-E), or null. */
+  detector: DetectorReadoutWire | null;
   findings: Scene3Response['findings'];
   warnings: string[];
   mapped: string[];
@@ -44,7 +52,7 @@ export interface KernelLoopDeps {
   build: () => KernelBuildOutput | null | Promise<KernelBuildOutput | null>;
   scene3: (designYaml: string) => Promise<Scene3Response>;
   loadScene: (sceneJson: string) => Promise<string>;
-  traceWorld: () => Promise<Float32Array>;
+  traceWorld: () => Promise<WorldTraceResult>;
   onResult: (result: KernelPassResult) => void;
   onError: (error: unknown, requestId: number) => void;
   onBusy?: (busy: boolean) => void;
@@ -113,6 +121,7 @@ export class KernelLoop {
         this.render(id, {
           requestId: id,
           segments: new Float32Array(0),
+          detector: null,
           findings: [],
           warnings: [],
           mapped: [],
@@ -136,12 +145,13 @@ export class KernelLoop {
         if (id !== this.issued || this.disposed) return;
         const t1 = now();
         await this.deps.loadScene(JSON.stringify(response.scene));
-        const segments = await this.deps.traceWorld();
+        const { segments, detector } = await this.deps.traceWorld();
         const traceMs = now() - t1;
         if (id !== this.issued || this.disposed) return;
         this.render(id, {
           requestId: id,
           segments,
+          detector,
           findings: response.findings,
           warnings: response.warnings,
           mapped: build.mapped,

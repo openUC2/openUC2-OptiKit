@@ -27,9 +27,19 @@ export class KernelCore {
           const report = this.canvas.loadScene3JSON(req.sceneJson);
           return { id: req.id, type: 'sceneLoaded', report };
         }
-        case 'traceWorld':
-          return { id: req.id, type: 'segments', buffer: this.canvas.traceWorld3D() };
+        case 'traceWorld': {
+          // Settled f64 trace: the picture plus the first-detector readout
+          // (EMB-E). The f64 result JSON is the only displayed-number source.
+          const buffer = this.canvas.traceWorld3D();
+          const resultJson = this.canvas.firstDetectorResultJSON();
+          const detector =
+            resultJson && resultJson !== 'null'
+              ? { resultJson, hits: this.canvas.firstDetectorHitsF32() }
+              : null;
+          return { id: req.id, type: 'segments', buffer, detector };
+        }
         case 'traceWorldFast':
+          // f32 preview: the picture only, no readout (rule 5).
           return { id: req.id, type: 'segments', buffer: this.canvas.traceWorld3DFast() };
       }
     } catch (e) {

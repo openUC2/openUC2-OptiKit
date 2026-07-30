@@ -3,7 +3,15 @@
  * matched by id. One client owns one worker owning one loaded scene.
  */
 
+import type { DetectorReadoutWire } from './detector';
 import type { KernelRequest, KernelResponse } from './messages';
+
+export interface WorldTrace {
+  /** World-frame segments, 11 floats each (spec 18.7). */
+  segments: Float32Array;
+  /** First-detector readout; only f64 traces carry one (rule 5). */
+  detector: DetectorReadoutWire | null;
+}
 
 type Settle = { resolve: (value: KernelResponse) => void; reject: (reason: Error) => void };
 
@@ -61,10 +69,11 @@ export class KernelClient {
     return res.type === 'sceneLoaded' ? res.report : '';
   }
 
-  /** Settled f64 world-frame trace; 11 floats per segment (spec 18.7). */
-  async traceWorld(): Promise<Float32Array> {
+  /** Settled f64 world-frame trace: segments plus the detector readout. */
+  async traceWorld(): Promise<WorldTrace> {
     const res = await this.request({ type: 'traceWorld' });
-    return res.type === 'segments' ? res.buffer : new Float32Array(0);
+    if (res.type !== 'segments') return { segments: new Float32Array(0), detector: null };
+    return { segments: res.buffer, detector: res.detector ?? null };
   }
 
   /** f32 preview trace, same layout. The picture, not the numbers. */

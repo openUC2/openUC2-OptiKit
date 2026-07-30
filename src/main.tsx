@@ -50,7 +50,7 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
   import('./kernel/KernelClient').then(async ({ getKernelClient }) => {
     const kernel = getKernelClient();
     await kernel.ready;
-    const segments = await kernel.traceWorld(); // no scene loaded: empty buffer
+    const { segments } = await kernel.traceWorld(); // no scene loaded: empty buffer
     (window as any).__ocKernelReady = segments.length === 0;
     console.log('oc-wasm kernel ready');
   }).catch((e) => {

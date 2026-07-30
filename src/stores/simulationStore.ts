@@ -19,6 +19,8 @@ import { getDefaultSimulationConfig, buildScene } from '../utils/sceneBuilder';
 import { getSimulationManager } from '../simulation';
 import { useAppStore } from './appStore';
 import { triggerKernelPass } from '../kernel/kernelBridge';
+import type { DetectorResult } from '../kernel/detector';
+import { parseDetectorResult } from '../kernel/detector';
 import type { KernelPassResult } from '../kernel/kernelLoop';
 import type { Scene3Finding } from '../api/coreClient';
 import { CoreServiceError } from '../api/coreClient';
@@ -44,10 +46,20 @@ function initialEngine(): SimulationEngineKind {
   return 'kernel';
 }
 
+/** First-detector readout of the latest settled trace (EMB-E). */
+export interface KernelDetectorState {
+  /** Parsed f64 result — the only source of displayed numbers (rule 5). */
+  result: DetectorResult;
+  /** Spot-diagram hit records, render-only f32 (`decodeHits` layout). */
+  hits: Float32Array;
+}
+
 /** Kernel-loop state (EMB-D): the latest settled f64 trace and diagnostics. */
 export interface KernelSimState {
   /** World-frame segment buffer, 11 floats/segment — render-only (rule 5). */
   segments: Float32Array | null;
+  /** Detector readout of the settled trace; null when no detector/hits. */
+  detector: KernelDetectorState | null;
   /** Request id of the rendered trace (monotonic; stale responses dropped). */
   requestId: number;
   findings: Scene3Finding[];
@@ -65,6 +77,7 @@ export interface KernelSimState {
 
 const defaultKernelState: KernelSimState = {
   segments: null,
+  detector: null,
   requestId: 0,
   findings: [],
   warnings: [],
@@ -137,10 +150,13 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   },
 
   setKernelResult: (result) => {
+    const parsed = parseDetectorResult(result.detector?.resultJson);
     set(state => ({
       kernel: {
         ...state.kernel,
         segments: result.segments,
+        detector:
+          parsed && result.detector ? { result: parsed, hits: result.detector.hits } : null,
         requestId: result.requestId,
         findings: result.findings,
         warnings: result.warnings,

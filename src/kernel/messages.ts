@@ -6,6 +6,8 @@
  * The unsolicited `ready` response (id 0) is posted once, after wasm init.
  */
 
+import type { DetectorReadoutWire } from './detector';
+
 export type KernelRequest =
   | { id: number; type: 'loadScene'; sceneJson: string }
   | { id: number; type: 'traceWorld' }
@@ -14,7 +16,16 @@ export type KernelRequest =
 export type KernelResponse =
   | { id: 0; type: 'ready' }
   | { id: number; type: 'sceneLoaded'; report: string }
-  | { id: number; type: 'segments'; buffer: Float32Array }
+  | {
+      id: number;
+      type: 'segments';
+      buffer: Float32Array;
+      /** First-detector readout (EMB-E). Present ONLY on settled f64
+       * `traceWorld` responses — never on the f32 fast path (rule 5: displayed
+       * numbers come from f64 traces only). `null` when the scene has no
+       * detector or no hits. */
+      detector?: DetectorReadoutWire | null;
+    }
   | { id: number; type: 'error'; message: string };
 
 /** Floats per segment in a `segments` buffer (integration spec 18.7):

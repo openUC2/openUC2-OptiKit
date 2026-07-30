@@ -37,7 +37,11 @@ function harness(overrides: Partial<ConstructorParameters<typeof KernelLoop>[0]>
     build: () => BUILD,
     scene3: () => Promise.resolve(response(0)),
     loadScene: () => Promise.resolve('{}'),
-    traceWorld: () => Promise.resolve(new Float32Array(11)),
+    traceWorld: () =>
+      Promise.resolve({
+        segments: new Float32Array(11),
+        detector: { resultJson: '{"hits":1}', hits: new Float32Array([5, 5, 0]) },
+      }),
     onResult: r => results.push(r),
     onError: e => errors.push(e),
     now: () => 0,
@@ -153,5 +157,13 @@ describe('KernelLoop', () => {
     expect(loop.requestsIssued).toBe(0);
     expect(results).toHaveLength(1);
     expect(results[0].segments).toHaveLength(0);
+    expect(results[0].detector).toBeNull();
+  });
+
+  it('passes the detector readout of the settled trace through (EMB-E)', async () => {
+    const { loop, results } = harness();
+    await loop.flush();
+    expect(results[0].detector?.resultJson).toBe('{"hits":1}');
+    expect(results[0].detector?.hits).toHaveLength(3);
   });
 });

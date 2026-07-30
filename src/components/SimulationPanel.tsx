@@ -50,6 +50,7 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { useAppStore } from '../stores/appStore';
 import { hasSimulationModel, isSourceElement, isDetectorElement } from '../utils/sceneBuilder';
 import { KernelDiagnostics } from './KernelDiagnostics';
+import { KernelDetectorPanel } from './KernelDetectorPanel';
 import { segmentCount } from '../kernel/segments';
 
 export const SimulationPanel: React.FC = () => {
@@ -137,6 +138,9 @@ export const SimulationPanel: React.FC = () => {
 
       {/* Kernel-engine diagnostics (EMB-D): wall times, findings, warnings */}
       <KernelDiagnostics />
+
+      {/* Detector readouts (EMB-E): spot diagram, bin heatmap, f64 numbers */}
+      <KernelDetectorPanel />
       
       {/* Controls - only show when enabled */}
       {config.enabled && (

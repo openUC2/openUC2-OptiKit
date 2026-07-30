@@ -17,7 +17,9 @@ const queued: KernelRequest[] = [];
 
 function respond(res: KernelResponse) {
   if (res.type === 'segments') {
-    postMessage(res, { transfer: [res.buffer.buffer] });
+    const transfer = [res.buffer.buffer];
+    if (res.detector) transfer.push(res.detector.hits.buffer);
+    postMessage(res, { transfer });
   } else {
     postMessage(res);
   }
