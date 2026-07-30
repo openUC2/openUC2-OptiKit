@@ -9,7 +9,9 @@ optics" toolchain. Strategy and work packages: `DOCS/kicad-for-optics-execution.
 sibling repo `../optikit-core` (Pydantic → JSON Schema in `schema/dist/`). For
 what that repo actually does, its relationship to the Go repo, and the
 day-to-day workflow between the two repos, see `../optikit-core/DOCS/ARCHITECTURE.md`,
-`GO_INTEGRATION.md`, and `WORKING_WITH_FRONTEND.md`.
+`GO_INTEGRATION.md`, and `WORKING_WITH_FRONTEND.md`. This repo's own architecture
+walkthrough (what the editor can do, the layering, the conventions) is
+`DOCS/ARCHITECTURE.md`; `DOCS/CODEBASE-GUIDE.md` is the cross-repo file-by-file map.
 
 ## Hard rule: the document boundary
 

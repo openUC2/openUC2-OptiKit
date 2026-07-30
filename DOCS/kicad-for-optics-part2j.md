@@ -360,7 +360,7 @@ and speaks that language; and turning a housed part into a cube becomes a
 deliberate later step — generated, not assumed.
 
 
-### WP-70 — The publish loop: save to GitHub, see it in Explore
+### WP-70 — The publish loop: save to GitHub, see it in Explore 
 
 ```
 PROMPT (repo: openUC2-OptiKit + the Store repo — closes the WP-54/58 loop)

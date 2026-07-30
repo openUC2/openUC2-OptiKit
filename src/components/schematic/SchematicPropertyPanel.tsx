@@ -45,6 +45,9 @@ import {
   captureUndo,
   commitUndo,
   groupInstanceOf,
+  groupNameOf,
+  isAdhocGroup,
+  renameGroup,
   isSourceOn,
   setActiveWavelengthUm,
   setSourceOn,
@@ -55,16 +58,19 @@ import {
   removePath,
   renamePart,
   rotatePart,
+  selectPart,
   setDofValue,
   setPartParam,
   tiltPart,
   ungroupInstance,
   updateFiber,
   useDocPart,
+  useDocParts,
   useDocPaths,
   useFibersStore,
   useGroupEditStore,
   useSelectedPartId,
+  useSelectedPartIds,
 } from '../../document';
 
 function NumberField({
@@ -144,6 +150,10 @@ function PartProperties({ part }: { part: DocPart }) {
   // WP-44: group membership + edit-mode toggle.
   const groupInstance = groupInstanceOf(part.id);
   const groupRef = typeof part.params.groupRef === 'string' ? part.params.groupRef : null;
+  // WP-71: an ad-hoc group carries an editable name rather than a record id.
+  const adhoc = isAdhocGroup(part);
+  const [groupLabel, setGroupLabel] = useState(() => groupNameOf(part));
+  useEffect(() => setGroupLabel(groupNameOf(part)), [part]);
   const unlockedMap = useGroupEditStore(s => s.unlocked);
   const toggleUnlocked = useGroupEditStore(s => s.toggleUnlocked);
   const groupUnlocked = groupInstance ? !!unlockedMap[groupInstance] : false;
@@ -238,17 +248,32 @@ function PartProperties({ part }: { part: DocPart }) {
       </Stack>
 
       {/* WP-44: group membership — the instance moves as one rigid unit until
-          unlocked for member editing. */}
+          unlocked for member editing. WP-71: an AD-HOC group's name is
+          editable here (a library OPM's is not — it comes from the record). */}
       {groupInstance && (
         <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
           <Tooltip title={`part of group instance ${groupInstance}${groupRef ? ` (${groupRef})` : ''}`}>
             <Chip
               size="small"
               color="secondary"
-              label={`⬚ ${groupRef ? groupRef.split('.').pop() : 'group'}`}
+              label={`⬚ ${adhoc ? groupNameOf(part) : groupRef?.split('.').pop() ?? 'group'}`}
               sx={{ fontWeight: 700, height: 20 }}
             />
           </Tooltip>
+          {adhoc && (
+            <TextField
+              size="small" variant="standard" label="group name"
+              value={groupLabel}
+              onChange={e => setGroupLabel(e.target.value)}
+              onBlur={() => {
+                if (groupLabel !== groupNameOf(part)) renameGroup(groupInstance, groupLabel);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') renameGroup(groupInstance, groupLabel);
+              }}
+              sx={{ width: 130 }}
+            />
+          )}
           <Button size="small" onClick={() => toggleUnlocked(groupInstance)}>
             {groupUnlocked ? 'lock group (move as unit)' : 'edit members'}
           </Button>
@@ -622,6 +647,61 @@ function PartProperties({ part }: { part: DocPart }) {
   );
 }
 
+/**
+ * WP-71: what a multi-selection can say for itself — how many parts, in which
+ * categories, the cells they span, and whether they are already one group.
+ * The verbs live on the keyboard (Ctrl+G / Ctrl+Shift+G) and in the context
+ * menu; this is the readout that makes them make sense.
+ */
+function MultiSelectionSummary({ parts }: { parts: DocPart[] }) {
+  const byCategory = new Map<string, number>();
+  for (const p of parts) byCategory.set(p.category, (byCategory.get(p.category) ?? 0) + 1);
+  const cells = parts.map(p => p.gridPose.cell);
+  const span = [0, 1, 2].map(
+    i => Math.max(...cells.map(c => c[i])) - Math.min(...cells.map(c => c[i])) + 1,
+  );
+  const instances = new Set(
+    parts.map(p => p.params.groupId).filter((g): g is string => typeof g === 'string'),
+  );
+  const grouped = instances.size === 1 && parts.every(p => typeof p.params.groupId === 'string');
+
+  return (
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+        <Typography variant="subtitle2" sx={{ flex: 1 }}>
+          {parts.length} parts selected
+        </Typography>
+        {grouped && (
+          <Chip size="small" color="secondary" label={`⬚ ${groupNameOf(parts[0])}`}
+            sx={{ fontWeight: 700, height: 20 }} />
+        )}
+      </Stack>
+      <Typography variant="caption" color="text.secondary">
+        {[...byCategory.entries()].map(([cat, n]) => `${n}× ${cat}`).join(' · ')}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        spans {span.join(' × ')} cell(s)
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {grouped
+          ? 'already one group — ⇧⌘G ungroups it, or right-click → “save as group record…”'
+          : instances.size > 0
+            ? 'some of these already belong to a group — ⌘G re-groups them all into a new one'
+            : '⌘G groups them (they then move as one rigid unit); right-click for the rest'}
+      </Typography>
+      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+        {parts.map(p => (
+          <Chip
+            key={p.id} size="small" variant="outlined" label={p.ref}
+            onClick={() => selectPart(p.id)}
+            sx={{ height: 20 }}
+          />
+        ))}
+      </Stack>
+    </Stack>
+  );
+}
+
 export function SchematicPropertyPanel({
   chainDraft,
   activePathName,
@@ -635,11 +715,18 @@ export function SchematicPropertyPanel({
 }) {
   const selectedId = useSelectedPartId();
   const part = useDocPart(selectedId);
+  const selectedIds = useSelectedPartIds();
+  const parts = useDocParts();
   const paths = useDocPaths();
+  // WP-71: with a SET selected, the panel summarizes it — a single part's pose
+  // fields would be misleading when Ctrl+G is about to act on five.
+  const multi = selectedIds.length > 1 ? parts.filter(p => selectedIds.includes(p.id)) : [];
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {part ? (
+      {multi.length > 1 ? (
+        <MultiSelectionSummary parts={multi} />
+      ) : part ? (
         <PartProperties part={part} />
       ) : (
         <Typography variant="body2" color="text.secondary">

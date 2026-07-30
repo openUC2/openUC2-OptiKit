@@ -353,6 +353,45 @@ that makes it callable from OptiKit.
   running instrument → back" closure that is OptiKit's genuine differentiator
   over PyOpticL/KiCad.
 
+### Round-11 additions (Part 2l, 2026-07-29) — folded into Phases 1–4
+
+Collected from real use; full prompts in `kicad-for-optics-part2l.md`. They
+interleave with the phases above (all **before** Phase 7):
+
+- **WP-92 — Editor bug sweep, round 2** *(with Phase 1)*. WebGL context loss
+  after the holder preview (the canvas dies until reload — this is also why a
+  generated cube doesn't appear); decimal-comma number inputs yielding NaN;
+  an unbound lens's yaw snapping to N·90° with snap off (the residual yaw is
+  not rendered for a part with no cube shell); interface-part (puzzle/plate)
+  glyphs still invisible. The daily-use blockers.
+- **WP-89 — The part inspector shows the optics** *(Phase 2)*. Clicking a part
+  surfaces its optiland facts (EFL, aperture, per-surface radius/thickness/
+  material, source lines) + a legible port list + a ray sketch — and answers
+  "do we still need ports?" by making them visible (yes; they are the pins).
+- **WP-90 — Parts editor per-category authoring** *(Phase 3, extends WP-67/77)*.
+  Category-driven fields (a mirror gets a substrate + reflective surface, not a
+  lens's radii); rectangular apertures; a `mechanics:` reference so a hand-
+  authored record can name its housing STEP; template-class routing (T1→WP-84,
+  T2→WP-85, T3→WP-77).
+- **WP-87 — Import an Optiland setup** *(Phase 3–4)*. A whole Optiland system
+  JSON → a row of unbound free primitives on the schematic (no T-class until
+  cubify), each a temporary component promotable to the library. The third
+  import road beside zmx (WP-82) and glb.
+- **WP-88 — Sequential beam-path scripting** *(Phase 4, with WP-78)*. A small
+  Optiland/PyOpticL-style DSL that builds the circuit line by line and stays
+  two-way in sync with the canvas — the inverse authoring direction to chain
+  inference.
+- **WP-91 — Library UX + multispectral sources** *(Phase 4)*. A list view for
+  the palette beside the icon grid; a multi-line source shows all its lines
+  with an active-line picker and "simulate all lines".
+
+Answers (not work) also in Part 2l: why ports stay (they are the pins — chain
+inference, compilation, the WP-74 spectral gate all walk them); why inference
+snaps within 20° not 45° (after grid placement a real target is ~0° off and a
+non-target ≥90°, so 20° is the tolerant-but-safe band); sources are already
+multi-line in the datamodel; and how to attach Inventor mechanics to an
+optics-only record (WP-67 housing / WP-84 attach).
+
 ### Phase 7 — After the MVP: community, accounts, UX *(explicitly last)*
 
 None of these are on the Scenario 1–5 path; they are the product layer on top of

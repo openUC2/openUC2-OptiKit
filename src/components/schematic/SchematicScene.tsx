@@ -22,6 +22,8 @@ import {
   parsePortRef,
   rotatePart,
   selectPart,
+  togglePartSelection,
+  useSelectedPartIds,
   templateClassOf,
   useDocParts,
   useLayerStore,
@@ -94,12 +96,19 @@ function SchematicPart({
   dimmed?: boolean;
 }) {
   const selectedId = useSelectedPartId();
-  const selected = selectedId === part.id;
+  // WP-71: the whole selection set reads as selected, not just the primary —
+  // otherwise a shift-selected cluster looks unselected while Ctrl+G groups it.
+  const selectedIds = useSelectedPartIds();
+  const selected = selectedId === part.id || selectedIds.includes(part.id);
   const [hovered, setHovered] = useState(false);
   const camera = useThree(s => s.camera);
   const drag = useRef<{
     mode: 'plane' | 'height';
     grabOffset: Vec3;
+    /** WP-71: did the pointer actually move? A shift press that does not
+     * becomes a selection toggle instead of a height drag. */
+    moved: boolean;
+    toggleOnRelease: boolean;
   } | null>(null);
 
   const pos = toThree(part.worldPose.positionMm);
@@ -171,7 +180,19 @@ function SchematicPart({
     (e: ThreeEvent<PointerEvent>) => {
       if (e.button !== 0 || chaining) return;
       e.stopPropagation();
-      selectPart(part.id);
+      // WP-71 multi-select. Ctrl/Cmd+click toggles outright (it never
+      // drags). Shift is already the height-drag modifier, so a SHIFT click
+      // only toggles when it turns out not to be a drag — decided on
+      // pointer-up, below.
+      if (e.ctrlKey || e.metaKey) {
+        togglePartSelection(part.id);
+        return;
+      }
+      // A plain click selects. A SHIFT press keeps an existing selection set
+      // intact (it may be about to grow, or to be dragged in height), but
+      // still selects when nothing is selected at all — so shift-dragging an
+      // untouched part behaves as it did before WP-71.
+      if (!e.shiftKey || selectedIds.length === 0) selectPart(part.id);
       const mode: 'plane' | 'height' = e.shiftKey ? 'height' : 'plane';
       const hit = intersectDragPlane(e, mode);
       if (!hit) return;
@@ -182,11 +203,13 @@ function SchematicPart({
           hit[1] - part.worldPose.positionMm[1],
           hit[2] - part.worldPose.positionMm[2],
         ],
+        moved: false,
+        toggleOnRelease: e.shiftKey,
       };
       setOrbitEnabled(false);
       (e.target as Element).setPointerCapture(e.pointerId);
     },
-    [chaining, intersectDragPlane, part, setOrbitEnabled],
+    [chaining, intersectDragPlane, part, selectedIds.length, setOrbitEnabled],
   );
 
   const onPointerMove = useCallback(
@@ -196,6 +219,7 @@ function SchematicPart({
       e.stopPropagation();
       const hit = intersectDragPlane(e, d.mode);
       if (!hit) return;
+      d.moved = true;
       const [px, py, pz] = part.worldPose.positionMm;
       let target: Vec3;
       if (d.mode === 'plane') {
@@ -219,12 +243,16 @@ function SchematicPart({
 
   const endDrag = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      if (!drag.current) return;
+      const d = drag.current;
+      if (!d) return;
       drag.current = null;
+      // A shift press that never moved was a multi-select click, not a
+      // height drag (WP-71).
+      if (d.toggleOnRelease && !d.moved) togglePartSelection(part.id);
       setOrbitEnabled(true);
       (e.target as Element).releasePointerCapture(e.pointerId);
     },
-    [setOrbitEnabled],
+    [part.id, setOrbitEnabled],
   );
 
   const color = GLYPH_COLORS[part.category];

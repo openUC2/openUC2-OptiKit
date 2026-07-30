@@ -17,7 +17,8 @@ This is the map. It answers three questions:
 Related reading, not repeated here:
 | Document | What it has that this doesn't |
 |---|---|
-| `../../optikit-core/DOCS/ARCHITECTURE.md` | Deeper prose on core internals (parts predate WP-11) |
+| `ARCHITECTURE.md` | This repo's own architecture walkthrough: the verb table (what the editor can do), the layering diagram, and the conventions you must not break |
+| `../../optikit-core/DOCS/ARCHITECTURE.md` | The engine's counterpart: every capability, module and error code, current as of WP-86 |
 | `../../optikit-core/DOCS/LIBRARY.md` | How to contribute records; the one-database contract |
 | `../../optikit-core/DOCS/GO_INTEGRATION.md` | Correspondence with Ethan's Go repo, E2 asks |
 | `../../optikit-core/DOCS/WORKING_WITH_FRONTEND.md` | Running both repos together |

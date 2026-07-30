@@ -9,6 +9,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   IconButton,
   Paper,
@@ -16,6 +21,7 @@ import {
   Stack,
   Tab,
   Tabs,
+  TextField,
   ToggleButton,
   Tooltip,
   Typography,
@@ -54,6 +60,8 @@ import {
   copyPart,
   duplicatePart,
   getPart,
+  groupInstanceOf,
+  groupParts,
   libraryEntryOf,
   listLibraryEntries,
   listParts,
@@ -63,10 +71,13 @@ import {
   removePartUndoable,
   selectPart,
   setPath,
+  setSelectedParts,
   swapPartModule,
+  ungroupParts,
   useDocPaths,
   useLayerStore,
   useSelectedPartId,
+  useSelectedPartIds,
   UC2_GRID_MM,
 } from '../../document';
 import { runUnbind } from './unbindAction';
@@ -82,6 +93,7 @@ import { BomDialog } from '../bom/BomDialog';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
 import { ServicePanel } from './ServicePanel';
 import { ModulesPanel } from './ModulesPanel';
+import { GroupRecordDialog } from './GroupRecordDialog';
 
 export function SchematicPage() {
   const muiTheme = useTheme();
@@ -122,6 +134,13 @@ export function SchematicPage() {
   const activePathName = `path-${paths.length + 1}`;
 
   const selectedId = useSelectedPartId();
+  // WP-71: the multi-selection set (shift / ctrl-click) grouping works on.
+  const selectedIds = useSelectedPartIds();
+  // Parts awaiting a group name (Ctrl+G), and the instance being graduated
+  // into a library record ("save as group record…").
+  const [groupPrompt, setGroupPrompt] = useState<string[] | null>(null);
+  const [groupName, setGroupName] = useState('');
+  const [recordInstance, setRecordInstance] = useState<string | null>(null);
   const modules = useAppStore(s => s.modules);
   const loadModules = useAppStore(s => s.loadModules);
   const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
@@ -326,6 +345,30 @@ export function SchematicPage() {
       // WP-78: copy / paste / duplicate with keyboard parity.
       if (e.metaKey || e.ctrlKey) {
         const key = e.key.toLowerCase();
+        // WP-71: Ctrl+G groups the selection, Ctrl+Shift+G ungroups it.
+        if (key === 'g') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            const freed = ungroupParts(selectedIds.length > 0 ? selectedIds : selectedId ? [selectedId] : []);
+            if (freed > 0) {
+              useAppStore.getState().addNotification({
+                type: 'info', title: 'ungrouped',
+                message: `${freed} part(s) move independently again`,
+                duration: 4000,
+              });
+            }
+          } else {
+            setGroupPrompt(selectedIds.length >= 2 ? selectedIds : null);
+            if (selectedIds.length < 2) {
+              useAppStore.getState().addNotification({
+                type: 'info', title: 'select at least two parts',
+                message: 'shift-click (or ctrl/cmd-click) the parts to group, then Ctrl+G',
+                duration: 5000,
+              });
+            }
+          }
+          return;
+        }
         if (key === 'c' && selectedId) {
           copyToClipboard(selectedId);
           return;
@@ -348,6 +391,7 @@ export function SchematicPage() {
           if (fiberDraft) setFiberDraft(null);
           else if (fiberMode) setFiberMode(false);
           else if (chainDraft) setChainDraft(null);
+          else if (selectedIds.length > 1) setSelectedParts([]); // drop the set first
           else selectPart(null);
           break;
         case 'Enter':
@@ -364,7 +408,8 @@ export function SchematicPage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chainDraft, copyToClipboard, fiberDraft, fiberMode, finishChain, pasteClipboard, selectedId]);
+  }, [chainDraft, copyToClipboard, fiberDraft, fiberMode, finishChain, pasteClipboard,
+      selectedId, selectedIds]);
 
   // ── pointer → active working plane (shared by drop / context menu) ─────────
   const planeHitAt = useCallback(
@@ -737,9 +782,98 @@ export function SchematicPage() {
                     onClick={() => setMenu(m => (m ? { ...m, swapMode: true } : m))}>
                     swap module…
                   </MenuItem>,
+                  // WP-71: grouping, on the selection this part belongs to.
+                  <Divider key="d2" />,
+                  ...(selectedIds.length >= 2
+                    ? [
+                        <MenuItem key="group" dense
+                          onClick={() => { close(); setGroupPrompt(selectedIds); }}>
+                          group {selectedIds.length} selected parts… (⌘G)
+                        </MenuItem>,
+                      ]
+                    : [
+                        <MenuItem key="group-hint" dense disabled>
+                          shift-click more parts to group them
+                        </MenuItem>,
+                      ]),
+                  ...(groupInstanceOf(part.id)
+                    ? [
+                        <MenuItem key="ungroup" dense
+                          onClick={() => { close(); ungroupParts([part.id]); }}>
+                          ungroup (⇧⌘G)
+                        </MenuItem>,
+                        <MenuItem key="save-group" dense
+                          onClick={() => { close(); setRecordInstance(groupInstanceOf(part.id)); }}>
+                          save as group record…
+                        </MenuItem>,
+                      ]
+                    : []),
                 ];
               })()}
             </Menu>
+
+            {/* WP-71: name the ad-hoc group (Ctrl+G / the context menu). */}
+            <Dialog
+              open={groupPrompt !== null}
+              onClose={() => setGroupPrompt(null)}
+              maxWidth="xs"
+              fullWidth
+            >
+              <DialogTitle>group {groupPrompt?.length ?? 0} parts</DialogTitle>
+              <DialogContent>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                  They move as one rigid unit from now on (unlock a member in the property
+                  panel to edit it individually). No library record is involved — “save as
+                  group record…” turns the cluster into a reusable OPM later.
+                </Typography>
+                <TextField
+                  autoFocus fullWidth size="small" label="group name"
+                  placeholder="periscope · relay arm · illumination"
+                  value={groupName}
+                  onChange={e => setGroupName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter' || !groupPrompt) return;
+                    const result = groupParts(groupPrompt, groupName);
+                    setGroupPrompt(null);
+                    setGroupName('');
+                    if (result) {
+                      useAppStore.getState().addNotification({
+                        type: 'success', title: 'grouped',
+                        message: `${result.name}: ${result.partIds.length} parts move as one`,
+                        duration: 5000,
+                      });
+                    }
+                  }}
+                />
+              </DialogContent>
+              <DialogActions>
+                <Button size="small" onClick={() => setGroupPrompt(null)}>cancel</Button>
+                <Button
+                  size="small" variant="contained"
+                  onClick={() => {
+                    if (!groupPrompt) return;
+                    const result = groupParts(groupPrompt, groupName);
+                    setGroupPrompt(null);
+                    setGroupName('');
+                    if (result) {
+                      useAppStore.getState().addNotification({
+                        type: 'success', title: 'grouped',
+                        message: `${result.name}: ${result.partIds.length} parts move as one`,
+                        duration: 5000,
+                      });
+                    }
+                  }}
+                >
+                  group
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            <GroupRecordDialog
+              instanceId={recordInstance}
+              open={recordInstance !== null}
+              onClose={() => setRecordInstance(null)}
+            />
             {holderPart && (
               <GenerateHolderDialog
                 part={holderPart}

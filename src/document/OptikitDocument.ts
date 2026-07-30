@@ -504,6 +504,38 @@ export function selectPart(partId: string | null): void {
   useAppStore.getState().selectItem(partId, partId ? 'module' : null);
 }
 
+// ── multi-selection (WP-71) ──────────────────────────────────────────────────
+// The legacy store keeps `selectedItems` alongside the single
+// `selectedItemId`; `selectItem` collapses it to one. Grouping needs the set,
+// so these keep BOTH in step: the last-touched part stays the "primary"
+// selection every existing panel reads, and `selectedItems` carries the rest.
+
+/** Every selected part id (the primary selection included). */
+export function listSelectedPartIds(): string[] {
+  const s = useAppStore.getState();
+  return s.selectedItems.filter(i => i.type === 'module').map(i => i.id);
+}
+
+/** Replace the selection; the last id becomes the primary one. */
+export function setSelectedParts(partIds: string[]): void {
+  const ids = [...new Set(partIds)];
+  useAppStore.setState({
+    selectedItems: ids.map(id => ({ id, type: 'module' as const })),
+    selectedItemId: ids.length > 0 ? ids[ids.length - 1] : null,
+    selectedItemType: ids.length > 0 ? 'module' : null,
+  });
+}
+
+/** Shift-click semantics: add when absent, remove when present. */
+export function togglePartSelection(partId: string): void {
+  const current = listSelectedPartIds();
+  setSelectedParts(
+    current.includes(partId)
+      ? current.filter(id => id !== partId)
+      : [...current, partId],
+  );
+}
+
 /**
  * Undo bracket for continuous interactions (e.g. an insert drag): capture the
  * pre-interaction state at pointer-down, commit once at pointer-up. The
@@ -591,6 +623,15 @@ export function useSelectedPartId(): string | null {
   const id = useAppStore(s => s.selectedItemId);
   const type = useAppStore(s => s.selectedItemType);
   return type === 'module' ? id : null;
+}
+
+/** WP-71: reactive multi-selection (empty when nothing is selected). */
+export function useSelectedPartIds(): string[] {
+  const items = useAppStore(s => s.selectedItems);
+  return useMemo(
+    () => items.filter(i => i.type === 'module').map(i => i.id),
+    [items],
+  );
 }
 
 /** Subscribe outside React; returns an unsubscribe function. */

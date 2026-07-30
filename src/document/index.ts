@@ -111,6 +111,23 @@ export { unbindPart } from './unbind';
 export type { UnbindOutcome } from './unbind';
 export { copyPart, duplicatePart, pastePart, removePartUndoable, uniquifiedRef } from './clipboard';
 export type { PartClipboard } from './clipboard';
+export {
+  listSelectedPartIds,
+  setSelectedParts,
+  togglePartSelection,
+  useSelectedPartIds,
+} from './OptikitDocument';
+export {
+  ADHOC_PREFIX,
+  groupNameOf,
+  groupParts,
+  groupRecordYaml,
+  isAdhocGroup,
+  partsOfGroupInstance,
+  renameGroup,
+  ungroupParts,
+} from './adhocGroup';
+export type { GroupRecordDraft, GroupResult } from './adhocGroup';
 export { getDocRevision, useDocRevision } from './revision';
 export { classifyPart, layerOf, layerRangeOf } from './layers';
 export type { LayerClassification, LayerRange } from './layers';
