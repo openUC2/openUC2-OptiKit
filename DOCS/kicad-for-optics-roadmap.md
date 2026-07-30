@@ -9,9 +9,93 @@ build, in what order, and why** — so that when it is done a user can drive eve
 one of the five scenarios through the editor, then simulate → optimise → cubify
 → produce.
 
-**Status date:** 2026-07-28. Everything through WP-69 has landed (Parts 2a–2j
-bugs + the free-placement/holder round + the starter library + the legacy
-sweep). This roadmap is the work *from here to the MVP*.
+**Status date:** 2026-07-29. Everything through **WP-86** has landed (Parts
+2a–2k: the physics-correctness round, the verbs, part-first, the Inventor loop,
+hardware write-back, grouping). Open: Part 2l's **WP-87…92** and Part 2m's
+**WP-93…95**, then Phase 7. This roadmap is the work *from here to the MVP*.
+
+---
+
+## 0a. The schedule — milestones M0…M10
+
+Eleven milestones covering **every** work package, past and coming. M0–M7 are
+delivered; **M8 + M9 are the MVP finish line**; M10 is deliberately after it.
+
+> Dates: M0–M7 are the actual delivery dates from the ledger (compressed —
+> they were AI-paced implementation sessions). M8–M10 are **estimates in
+> working weeks** for a human-paced team; treat the ordering as firm and the
+> durations as provisional.
+
+```mermaid
+gantt
+  title OptiKit — road to the MVP (M8/M9 = finish line)
+  dateFormat YYYY-MM-DD
+  axisFormat %b %d
+
+  section M0 · foundations
+  schema · engine · service · editors (WP-1…33)   :done, m0, 2026-07-12, 4d
+
+  section M1 · library & T-classes
+  records · palette · T1/T2/T3 · actuation (WP-34…48) :done, m1, 2026-07-16, 4d
+
+  section M2 · design tooling
+  BOM · groups · carriers · fibers · STEP export (WP-50…58) :done, m2, 2026-07-20, 6d
+
+  section M3 · free placement
+  unbound symbols · T3 holders · prescription solids (WP-60…62) :done, m3, 2026-07-26, 2d
+
+  section M4 · correctness & cleanup
+  materials 500 · layers · modules panel · starter lib · legacy sweep (WP-63…69, 71) :done, m4, 2026-07-27, 1d
+
+  section M5 · physics lossless
+  spectral response · lossy channel · rotation DOFs (WP-74, 79, 80, 82a) :done, m5, 2026-07-28, 1d
+
+  section M6 · verbs & part-first
+  unbind · editor T3 · beam bore · optics groups · housings · refs (WP-75,76,77,81,67,83) :done, m6, 2026-07-28, 1d
+
+  section M7 · reach & Inventor loop
+  import UI · ergonomics · round-trip · T2 bridge · hardware (WP-82,78,84,85,86) :done, m7, 2026-07-29, 1d
+
+  section M8 · workflow polish
+  bug sweep round 2 (WP-92)                        :active, m8a, 2026-07-30, 5d
+  part inspector · optics visible (WP-89)          :m8b, after m8a, 5d
+  Parts authoring · multi-axis T2 (WP-90)          :m8c, after m8b, 7d
+  Optiland setup import (WP-87)                    :m8d, after m8c, 5d
+  beam-path scripting (WP-88)                      :m8e, after m8d, 7d
+  palette list view · multispectral (WP-91)        :m8f, after m8e, 4d
+  MILESTONE M8 — the editor is pleasant            :milestone, m8done, after m8f, 0d
+
+  section M9 · MVP proven
+  virtual detectors / probes (WP-94)               :m9a, after m8done, 7d
+  optimizer: free poses · constraints · re-hold (WP-93) :m9b, after m9a, 10d
+  benchmark suite: fluo · light-sheet · confocal (WP-95) :m9c, after m9b, 10d
+  MILESTONE M9 — MVP PROVEN (3 instruments green)  :milestone, mvp, after m9c, 0d
+
+  section M10 · post-MVP
+  publish loop · docs sideload · viewer (WP-70,55,56) :m10a, after mvp, 14d
+  OSHWLab phases · accounts ADR (WP-59, 72)        :m10b, after m10a, 14d
+  UX overhaul (WP-73)                              :m10c, after m10b, 21d
+```
+
+### Milestone definitions
+
+| # | Milestone | Exit criterion | Packages |
+|---|---|---|---|
+| **M0** | Foundations | a `.dsn` validates, flattens, compiles, simulates; both editors render | WP-1…33 |
+| **M1** | Library & T-classes | records drive the palette; T1/T2/T3 enforced; actuation contract | WP-34…48 |
+| **M2** | Design tooling | live BOM, groups/carriers, fibers, STEP assembly, community mount | WP-50…58 |
+| **M3** | Free placement | an unbound optic places freely and gets a generated holder | WP-60, 61, 62 |
+| **M4** | Correctness & cleanup | simulate works; layers; module swap; starter library; lint at zero | WP-63…69, 71 |
+| **M5** | Physics lossless | authored data reaches the engine; the right physics runs | WP-74, 79, 80, 82a |
+| **M6** | Verbs & part-first | unbind/re-hold; editor-side T3; housings; beam bore | WP-75, 76, 77, 81, 67, 83 |
+| **M7** | Reach & Inventor loop | CLI reachable from the UI; the T2/T1 Inventor round trip; hardware write-back | WP-82, 78, 84, 85, 86 |
+| **M8** | **The editor is pleasant** | no daily-use paper cuts; optics visible on click; every optic authorable honestly; three import roads | WP-92, 89, 90, 87, 88, 91 |
+| **M9** | **MVP PROVEN** | fluorescence + light-sheet + confocal all design→simulate→optimize→cubify→produce, green in CI | WP-94, 93, 95 |
+| **M10** | Post-MVP | community loop, accounts, the UX overhaul | WP-70, 55, 56, 59, 72, 73 |
+
+**The gate that matters is M9.** M8 makes the tool pleasant; M9 *proves* it — when
+the three benchmark instruments pass end to end, every one of Scenarios 1–5 has
+been exercised by a real design, not a demo.
 
 ---
 
@@ -391,6 +475,36 @@ snaps within 20° not 45° (after grid placement a real target is ~0° off and a
 non-target ≥90°, so 20° is the tolerant-but-safe band); sources are already
 multi-line in the datamodel; and how to attach Inventor mechanics to an
 optics-only record (WP-67 housing / WP-84 attach).
+
+### Round-12 additions (Part 2m, 2026-07-29) — M9, the "MVP proven" gate
+
+From the spoken workflow walkthrough + the three benchmark instruments. Full
+prompts in `kicad-for-optics-part2m.md`. Most of that transcript is already
+built (vendor zmx→cube, STEP+datum assignment, housing association, Inventor
+export/attach, prescription→volume); four items were genuinely new:
+
+- **WP-93 — The optimizer becomes a design tool** *(M9)*. Free-space **pose
+  variables** for unbound optics — today `_free_dofs` varies only *declared*
+  DOFs, so "break the optic loose so the optimizer finds its ideal position"
+  silently does nothing; plus per-variable **constraints** (bounds, fix, link),
+  a **merit choice** (rms spot / homogeneity / encircled energy) instead of the
+  hardcoded RMS-spot, and the **"change the holder…"** verb so parts moved by
+  the optimizer get new T1/T2/T3 mechanics in one undo step.
+- **WP-94 — Virtual detectors** *(M9)*. Non-physical measurement probes placed
+  anywhere in the beam (including inside a sample volume) returning an
+  irradiance map + **homogeneity**, power, D86. Consumes no cube, appears in no
+  BOM, never perturbs the trace. Feeds WP-93's merit — this is what makes the
+  fluo-scope's stated acceptance criterion computable at all.
+- **WP-95 — The benchmark suite** *(M9)*. Three instruments as goldens + CI
+  tests: the fluorescence scope (exists; gains the optimization + probe
+  acceptance), the **light sheet** (two fully independent arms crossing at the
+  "aquarium" — the geometry-complexity test), and the **laser-scanning
+  confocal** (galvo tilt deflecting at 2θ, pinhole gating the return — the
+  reference test).
+- **WP-90 amendment** *(M8)*. Multi-axis DOF authoring plus a generic
+  `openuc2.tpl.lens_holder_xyz` T2 holder with independent dx/dy/dz — every T2
+  template in the library today declares exactly one translation axis, though
+  the placement machinery already handles N.
 
 ### Phase 7 — After the MVP: community, accounts, UX *(explicitly last)*
 
