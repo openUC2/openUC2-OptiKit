@@ -87,13 +87,13 @@ components:
               type: Material
               name: N-BK7
             thickness: 5
-            semi_aperture: 12.5
+            semi_aperture: 10
           - type: standard
             geometry:
               type: StandardGeometry
               radius: -25.8
               conic: 0
-            semi_aperture: 12.5
+            semi_aperture: 10
       frames:
         optical:
           z-mm: 0

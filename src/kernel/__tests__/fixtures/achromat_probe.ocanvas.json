@@ -1,5 +1,64 @@
 {
- "apertures": [],
+ "apertures": [
+  {
+   "common": {
+    "id": 5,
+    "label": "",
+    "layer": 0,
+    "locked": false,
+    "transform": {
+     "pos": [
+      -0.05,
+      0.0,
+      0.0
+     ],
+     "rot_xyzw": [
+      0.0,
+      0.7071067811865475,
+      0.0,
+      0.7071067811865475
+     ]
+    },
+    "visible": true
+   },
+   "interaction": "Absorb",
+   "primary_stop_for": [],
+   "shape": {
+    "clear_opening": {
+     "Disc": {
+      "radius_mm": 10.0
+     }
+    },
+    "outer_extent": {
+     "Disc": {
+      "radius_mm": 25.0
+     }
+    },
+    "plane_local": {
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "u": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "v": [
+      0.0,
+      1.0,
+      0.0
+     ]
+    }
+   }
+  }
+ ],
  "bodies": [
   {
    "absorption": "None",
@@ -36,7 +95,7 @@
            0.0
           ],
           "c": 0.03875968992248062,
-          "half_ap": 12.5,
+          "half_ap": 10.0,
           "k": 0.0,
           "vertex": [
            -2.5,
@@ -50,12 +109,12 @@
         "curve": {
          "Line": {
           "a": [
-           0.7303300865963038,
-           12.5
+           -0.48318733895858657,
+           10.0
           ],
           "b": [
-           -0.7303300865963038,
-           12.5
+           0.48318733895858657,
+           10.0
           ]
          }
         },
@@ -69,7 +128,7 @@
            0.0
           ],
           "c": -0.03875968992248062,
-          "half_ap": 12.5,
+          "half_ap": 10.0,
           "k": 0.0,
           "vertex": [
            2.5,
@@ -83,12 +142,12 @@
         "curve": {
          "Line": {
           "a": [
-           -0.7303300865963038,
-           -12.5
+           0.48318733895858657,
+           -10.0
           ],
           "b": [
-           0.7303300865963038,
-           -12.5
+           -0.48318733895858657,
+           -10.0
           ]
          }
         },
@@ -151,7 +210,7 @@
     64
    ],
    "common": {
-    "id": 6,
+    "id": 7,
     "label": "",
     "layer": 0,
     "locked": false,
@@ -195,10 +254,10 @@
  "intent": {
   "primary_paths": [
    {
-    "detector": 6,
-    "id": 7,
+    "detector": 7,
+    "id": 8,
     "label": "probe",
-    "source": 5,
+    "source": 6,
     "stop": null
    }
   ]
@@ -210,7 +269,7 @@
    "visible": true
   }
  ],
- "next_id": 8,
+ "next_id": 9,
  "sources": [
   {
    "angular": {
@@ -223,7 +282,7 @@
     }
    },
    "flux": 1.0,
-   "id": 5,
+   "id": 6,
    "samples": {
     "angular_samples": 1,
     "seed": 0,

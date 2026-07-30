@@ -1,8 +1,11 @@
 # Optical component ("symbol"): a biconvex singlet standing in for a 25 mm f/50
 # achromat. Its `optics` block drops verbatim into a design's component.
+# Semi-aperture is bounded by the edge: with r = ±25.8 and ct = 5.0 the two
+# caps meet at r = 11.08 mm (zero edge thickness), so the clear aperture must
+# stay below that. 10.0 mm keeps a 0.97 mm edge.
 kind: optical_component
 id: openuc2.lens.achromat_25mm_f50
-version: 1.0.0
+version: 1.1.0
 category: lens
 description: 25 mm biconvex singlet, f = 50 mm (achromat placeholder)
 tags: [lens, lens/convex]
@@ -14,10 +17,10 @@ optics:
         geometry: {type: StandardGeometry, radius: 25.8, conic: 0.0}
         material_post: {type: Material, name: N-BK7}
         thickness: 5.0
-        semi_aperture: 12.5
+        semi_aperture: 10.0
       - type: standard
         geometry: {type: StandardGeometry, radius: -25.8, conic: 0.0}
-        semi_aperture: 12.5
+        semi_aperture: 10.0
   frames:
     optical: {z-mm: 0.0}
     exit: {z-mm: 5.0}
