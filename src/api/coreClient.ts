@@ -161,11 +161,22 @@ export class CoreClient {
     return record;
   }
 
-  /** Fetch the records for a set of ids (deduplicated, cache-aware). */
+  /** Fetch the records for a set of ids (deduplicated, cache-aware).
+   *
+   * An id with no library record is OMITTED from the result rather than
+   * throwing: a mis-mapped part must degrade to "not simulated" (decision E4)
+   * instead of blanking the whole trace. Genuine service failures (network,
+   * 5xx) still propagate so the loop can retry them. */
   async componentRecords(recordIds: Iterable<string>): Promise<Map<string, OptikitRecord>> {
     const out = new Map<string, OptikitRecord>();
     for (const id of new Set(recordIds)) {
-      out.set(id, await this.componentRecord(id));
+      try {
+        out.set(id, await this.componentRecord(id));
+      } catch (error) {
+        const missing = error instanceof CoreServiceError && error.status >= 400 && error.status < 500;
+        if (!missing) throw error;
+        console.warn(`no library record for optikitId "${id}" — part will not be simulated`);
+      }
     }
     return out;
   }

@@ -34,15 +34,70 @@ export interface ModuleCSVRow {
   optikitId?: string;    // optikit-core library component record id (EMB-C)
 }
 
+/**
+ * Split semicolon-delimited CSV into rows of fields, honouring quoted fields
+ * (RFC 4180 semantics with `;` as the delimiter): a quoted field may contain
+ * delimiters and newlines, and `""` inside a quoted field is a literal quote.
+ *
+ * A naive `split(';')` shifts every column after any description containing a
+ * semicolon — which silently mis-assigned late columns such as `optikitId`,
+ * and broke `defaultParams` on rows whose JSON spans lines.
+ */
+function splitCSVRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"'; // escaped quote
+          i++;
+        } else {
+          quoted = false; // closing quote
+        }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+
+    if (ch === '"' && field.trim() === '') {
+      quoted = true; // opening quote (leading whitespace tolerated)
+      field = '';
+    } else if (ch === ';') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\n' || ch === '\r') {
+      // CRLF or LF ends the record; ignore blank lines between records.
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field);
+      field = '';
+      if (row.length > 1 || row[0].trim() !== '') rows.push(row);
+      row = [];
+    } else {
+      field += ch;
+    }
+  }
+
+  row.push(field);
+  if (row.length > 1 || row[0].trim() !== '') rows.push(row);
+  return rows;
+}
+
 export function parseCSV(csvText: string): ModuleCSVRow[] {
-  const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(';');
-  
-  return lines.slice(1).map(line => {
-    const values = line.split(';');
+  const rows = splitCSVRows(csvText);
+  if (rows.length === 0) return [];
+  const headers = rows[0].map(h => h.trim());
+
+  return rows.slice(1).map(values => {
     const row: Record<string, string> = {};
     headers.forEach((header, index) => {
-      row[header.trim()] = values[index]?.trim() || '';
+      row[header] = values[index]?.trim() ?? '';
     });
     return row as unknown as ModuleCSVRow;
   });
@@ -76,30 +131,26 @@ function addGLBStorePrefix(path: string | undefined): string | undefined {
 }
 
 export function csvRowToModuleDefinition(row: ModuleCSVRow): ModuleDefinition {
+  // parseCSV already strips enclosing quotes and unescapes doubled quotes, so
+  // the field is normally valid JSON as-is. The legacy unescaping is kept only
+  // as a fallback for hand-edited rows that are still doubly quoted.
   let defaultParams = {};
-  try {
-    // Handle escaped quotes in CSV - more robust handling
-    let cleanedParams = row.defaultParams;
-    
-    // Replace doubled quotes with single quotes
-    cleanedParams = cleanedParams.replace(/""/g, '"');
-    
-    // If the string starts and ends with quotes, remove them
-    if (cleanedParams.startsWith('"') && cleanedParams.endsWith('"')) {
-      cleanedParams = cleanedParams.slice(1, -1);
+  const rawParams = row.defaultParams ?? '';
+  if (rawParams.trim()) {
+    try {
+      defaultParams = JSON.parse(rawParams);
+    } catch {
+      try {
+        let legacy = rawParams.replace(/""/g, '"');
+        if (legacy.startsWith('"') && legacy.endsWith('"')) legacy = legacy.slice(1, -1);
+        defaultParams = JSON.parse(legacy);
+      } catch {
+        console.warn(`Invalid defaultParams for module ${row.id}:`, rawParams);
+      }
     }
-    
-    defaultParams = JSON.parse(cleanedParams);
-  } catch {
-    console.warn(`Invalid defaultParams for module ${row.id}:`, row.defaultParams);
   }
 
-  // Parse notification field
-  let notification = '';
-  if (row.notification && row.notification.trim()) {
-    // Remove quotes and handle escaped quotes
-    notification = row.notification.replace(/^"(.+)"$/, '$1').replace(/""/g, '"');
-  }
+  const notification = (row.notification ?? '').trim();
 
   return {
     id: row.id,
