@@ -74,33 +74,44 @@ components:
     category: lens
     primitive:
       type: step
-      model: openuc2.lens.achromat_25mm_f50
+      model: thorlabs.lens.ac254-050-a
     optics:
       fragment:
         surfaces:
           - type: standard
             geometry:
               type: StandardGeometry
-              radius: 25.8
+              radius: 33.34000000000005
               conic: 0
             material_post:
               type: Material
-              name: N-BK7
-            thickness: 5
-            semi_aperture: 10
+              name: N-BAF10
+            thickness: 9
+            is_stop: true
+            semi_aperture: 12.7
           - type: standard
             geometry:
               type: StandardGeometry
-              radius: -25.8
+              radius: -22.27999999999998
               conic: 0
-            semi_aperture: 10
+            material_post:
+              type: Material
+              name: N-SF10
+            thickness: 2.5
+            semi_aperture: 12.7
+          - type: standard
+            geometry:
+              type: StandardGeometry
+              radius: -291.07000000000244
+              conic: 0
+            semi_aperture: 12.7
       frames:
         optical:
           z-mm: 0
         exit:
-          z-mm: 5
+          z-mm: 11.5
         mount:
-          z-mm: 2.6
+          z-mm: 6.868213
       ports:
         front:
           frame: optical
@@ -108,7 +119,7 @@ components:
         back:
           frame: exit
           direction: +z
-          after-surface: 1
+          after-surface: 2
     pose:
       rotation:
         type: grid

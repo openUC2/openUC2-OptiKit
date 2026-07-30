@@ -130,7 +130,7 @@ describe('buildDesign', () => {
       RECORDS.get('openuc2.source.laser_488')!.optics,
     );
     expect(doc.components['lens-pos-1x1-b2'].optics).toEqual(
-      RECORDS.get('openuc2.lens.achromat_25mm_f50')!.optics,
+      RECORDS.get('thorlabs.lens.ac254-050-a')!.optics,
     );
   });
 

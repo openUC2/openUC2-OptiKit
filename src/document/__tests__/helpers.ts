@@ -6,7 +6,6 @@ import { parse } from 'yaml';
 import type { PlacedModule } from '../../types';
 import type { OptikitRecord } from '../designBuilder';
 
-import achromatYml from './fixtures/openuc2.lens.achromat_25mm_f50.component.yml?raw';
 import beamsplitterYml from './fixtures/openuc2.beamsplitter.cube_5050.component.yml?raw';
 import cameraYml from './fixtures/openuc2.detector.camera_cs165.component.yml?raw';
 import dichroicYml from './fixtures/openuc2.dichroic.filter_dichroic.component.yml?raw';
@@ -15,6 +14,7 @@ import laserYml from './fixtures/openuc2.source.laser_488.component.yml?raw';
 import mirrorYml from './fixtures/openuc2.mirror.flat_45.component.yml?raw';
 import objectiveYml from './fixtures/openuc2.objective.refractive_20x.component.yml?raw';
 import sampleYml from './fixtures/openuc2.sample.fluoro_slide.component.yml?raw';
+import ac254Yml from './fixtures/thorlabs.lens.ac254-050-a.component.yml?raw';
 
 function record(text: string): OptikitRecord {
   const doc = parse(text) as { id: string; category: string; optics: unknown };
@@ -22,7 +22,7 @@ function record(text: string): OptikitRecord {
 }
 
 export const RECORDS = new Map<string, OptikitRecord>(
-  [laserYml, cameraYml, achromatYml, mirrorYml, dichroicYml, filterYml, beamsplitterYml,
+  [laserYml, cameraYml, ac254Yml, mirrorYml, dichroicYml, filterYml, beamsplitterYml,
    objectiveYml, sampleYml]
     .map(record)
     .map((r) => [r.id, r]),
@@ -31,7 +31,7 @@ export const RECORDS = new Map<string, OptikitRecord>(
 const OPTIKIT_IDS: Record<string, string> = {
   'laser-488nm': 'openuc2.source.laser_488',
   'camera-usb-daheng': 'openuc2.detector.camera_cs165',
-  'lens-pos-1x1': 'openuc2.lens.achromat_25mm_f50',
+  'lens-pos-1x1': 'thorlabs.lens.ac254-050-a',
   'mirror-1x1': 'openuc2.mirror.flat_45',
   'filter-dichroic': 'openuc2.dichroic.filter_dichroic',
   'filter-bandpass': 'openuc2.filter.emission_525',
