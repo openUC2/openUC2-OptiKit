@@ -32,6 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
+import { segmentCount } from '../kernel/segments';
 import { getSimulationModel, getElementTypeName } from '../utils/sceneBuilder';
 import { useLocation } from 'react-router-dom';
 import { loadThumbnailManifest, orientationsFor, thumbnailUrl, defaultOrientation, type ThumbnailManifest } from '../utils/moduleThumbnails';
@@ -80,8 +81,26 @@ const ModuleThumbnailPreview: React.FC<{ moduleId: string }> = ({ moduleId }) =>
 // Proper React component so hooks are never called conditionally
 const DetectorSignalPlot: React.FC<{ module: PlacedModule }> = ({ module }) => {
   const { detectorReadings } = useSimulationStore();
+  // This plot is built from the legacy engine's per-detector readings, which
+  // stay empty on the kernel engine — so it must not claim "no rays" while
+  // kernel rays are on the canvas. Per-detector kernel readouts (bins, spot,
+  // centroid from the f64 readout APIs) are EMB-E.
+  const engine = useSimulationStore(s => s.engine);
+  const kernelSegments = useSimulationStore(s => segmentCount(s.kernel.segments));
 
   const reading = detectorReadings.find(r => r.moduleInstanceId === module.id);
+
+  if (engine === 'kernel') {
+    return (
+      <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary" align="center">
+          {kernelSegments > 0
+            ? `Kernel traced ${kernelSegments} ray segments. Per-detector readouts are not wired up yet; see the rays on the canvas and the Simulation tab for diagnostics.`
+            : 'No kernel trace yet. Place a mapped source (Laser 488nm) and check the Simulation tab for diagnostics.'}
+        </Typography>
+      </Box>
+    );
+  }
 
   if (!reading || reading.rayCount === 0) {
     return (

@@ -50,6 +50,7 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { useAppStore } from '../stores/appStore';
 import { hasSimulationModel, isSourceElement, isDetectorElement } from '../utils/sceneBuilder';
 import { KernelDiagnostics } from './KernelDiagnostics';
+import { segmentCount } from '../kernel/segments';
 
 export const SimulationPanel: React.FC = () => {
   const [detailsExpanded, setDetailsExpanded] = React.useState(true);
@@ -69,6 +70,12 @@ export const SimulationPanel: React.FC = () => {
     clearResults
   } = useSimulationStore();
   
+  // On the kernel engine the legacy `rays` array stays empty, so the status
+  // chip must read the kernel's own trace or it contradicts the canvas.
+  const engine = useSimulationStore(s => s.engine);
+  const kernelSegments = useSimulationStore(s => segmentCount(s.kernel.segments));
+  const busy = useSimulationStore(s => s.kernel.busy);
+
   const { placedModules, modules } = useAppStore();
   
   // Count optical elements
@@ -168,15 +175,21 @@ export const SimulationPanel: React.FC = () => {
               
               {/* Status */}
               <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip 
-                  size="small" 
-                  icon={isRunning ? <CircularProgress size={12} /> : undefined}
-                  label={isRunning ? 'Running...' : `${rays.length} rays`}
-                  color={isRunning ? 'warning' : 'default'}
+                <Chip
+                  size="small"
+                  icon={busy || isRunning ? <CircularProgress size={12} /> : undefined}
+                  label={
+                    busy || isRunning
+                      ? 'Tracing...'
+                      : engine === 'kernel'
+                        ? `${kernelSegments} ray segments`
+                        : `${rays.length} rays`
+                  }
+                  color={busy || isRunning ? 'warning' : 'default'}
                 />
                 {lastRunTime > 0 && (
-                  <Chip 
-                    size="small" 
+                  <Chip
+                    size="small"
                     label={`${lastRunTime.toFixed(1)} ms`}
                     variant="outlined"
                   />

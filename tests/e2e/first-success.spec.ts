@@ -69,6 +69,16 @@ test('first success: place, trace, drag, delete (spec 18.1)', async ({ page }) =
   expect(kernelState.engine).toBe('kernel');
   expect(kernelState.serviceError).toBeNull();
 
+  // The rays must actually be DRAWN, not merely present in the store: count
+  // the Konva line nodes on the 2D ray layer. Asserting only store state let a
+  // "traced but invisible" regression through once already.
+  const drawn = await page.evaluate(() => {
+    const stage = (window as any).Konva?.stages?.[0];
+    if (!stage) return null;
+    return stage.getLayers().reduce((max: number, l: any) => Math.max(max, l.find('Line').length), 0);
+  });
+  expect(drawn).toBeGreaterThanOrEqual(first.segments);
+
   // Drag the lens one cell east: the trace re-runs and the picture changes.
   await page.evaluate(() => {
     const app = (window as any).__stores.app.getState();
