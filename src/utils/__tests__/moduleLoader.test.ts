@@ -51,3 +51,33 @@ describe('parseCSV', () => {
     expect(def.defaultParams).toEqual({ customText: '' });
   });
 });
+
+describe('the shipped catalogue (public/modules_updated.csv)', () => {
+  it('maps the curated simulated set, with mounts on every fold record', async () => {
+    const { readFileSync } = await import('node:fs');
+    const csv = readFileSync(
+      new URL('../../../public/modules_updated.csv', import.meta.url),
+      'utf8',
+    );
+    const byId = new Map(
+      parseCSV(csv).map(csvRowToModuleDefinition).map((d) => [d.id, d]),
+    );
+    // Slug → [record id, optikitMount]. Fold records (reflected: local +x)
+    // mount x:90 so the fold lands in the grid plane (designBuilder.ts).
+    const expected: Record<string, [string, string | undefined]> = {
+      'laser-488nm': ['openuc2.source.laser_488', undefined],
+      'lens-pos-1x1': ['openuc2.lens.achromat_25mm_f50', undefined],
+      'camera-usb-daheng': ['openuc2.detector.camera_cs165', undefined],
+      'mirror-1x1': ['openuc2.mirror.flat_45', 'x:90'],
+      'filter-dichroic': ['openuc2.dichroic.filter_dichroic', 'x:90'],
+      'filter-bandpass': ['openuc2.filter.emission_525', undefined],
+      'beamsplitter-1x1': ['openuc2.beamsplitter.cube_5050', 'x:90'],
+    };
+    for (const [slug, [id, mount]] of Object.entries(expected)) {
+      const def = byId.get(slug);
+      expect(def, slug).toBeDefined();
+      expect(def!.optikitId, slug).toBe(id);
+      expect(def!.optikitMount, slug).toBe(mount);
+    }
+  });
+});

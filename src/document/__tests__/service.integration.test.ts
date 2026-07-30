@@ -31,6 +31,34 @@ async function serviceAvailable(): Promise<boolean> {
 const available = await serviceAvailable();
 const client = new CoreClient({ baseUrl: BASE_URL });
 
+/** True when the service's dialect accepts the dichroic record (WP-74
+ * `response` blocks + the importer's quoted `'.inf'` radii). Probed with the
+ * record itself so the dichroic tests skip against a stale process — one
+ * running pre-merge code or an older branch commit — instead of failing. */
+async function serviceHasCurrentDialect(): Promise<boolean> {
+  if (!available) return false;
+  try {
+    const { buildDesign } = await import('../designBuilder');
+    const { optikitRefFor, placed, RECORDS } = await import('./helpers');
+    const { yaml } = buildDesign(
+      [placed('filter-dichroic', 'probe', 0, 0)],
+      optikitRefFor,
+      RECORDS,
+    );
+    const response = await fetch(`${BASE_URL}/v1/scene3`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ files: { 'optikit-design.yml': yaml } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const merged = await serviceHasCurrentDialect();
+
 /** Rotate a vector by an [x, y, z, w] quaternion (kernel transform layout). */
 function quatApply(q: number[], v: [number, number, number]): [number, number, number] {
   const [x, y, z, w] = q;
@@ -184,11 +212,74 @@ describe.skipIf(!available)('optikit-core service integration', () => {
   });
 });
 
+// The dichroic/beamsplitter records author WP-74 response blocks and quoted
+// '.inf' radii, which only the post-merge service dialect accepts.
+describe.skipIf(!merged)('optikit-core service integration (merged service)', () => {
+  it('laser → dichroic → camera: both arms trace, the fold lands on the sensor', async () => {
+    const placements = [
+      placed('laser-488nm', 'a1', 0, 0),
+      placed('filter-dichroic', 'b2', 2, 0),
+      placed('camera-usb-daheng', 'c3', 2, 2, { rotation: 90 }),
+    ];
+    const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
+    expect(unmapped).toEqual([]);
+    const response = await fetch(`${BASE_URL}/v1/scene3`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ files: { 'optikit-design.yml': yaml } }),
+    });
+    expect(response.status).toBe(200);
+    const data = (await response.json()) as {
+      scene: unknown;
+      findings: { code: string }[];
+      warnings: string[];
+    };
+    expect(data.findings.map((f) => f.code)).not.toContain('E_NO_TARGET');
+    // The kernel is wavelength-blind: the dichroic is an explicit 50/50 split.
+    expect(data.warnings.join('\n')).toContain('W_DICHROIC_SPLIT');
+
+    const { readFileSync } = await import('node:fs');
+    const { default: init, Canvas } = await import('oc-wasm');
+    const { KernelCore } = await import('../../kernel/kernelCore');
+    const { SEGMENT_FLOATS } = await import('../../kernel/messages');
+    const wasm = new URL('../../../node_modules/oc-wasm/oc_wasm_bg.wasm', import.meta.url);
+    await init({ module_or_path: readFileSync(wasm) });
+    const core = new KernelCore(new Canvas());
+    expect(core.handle({ id: 1, type: 'loadScene', sceneJson: JSON.stringify(data.scene) }).type)
+      .toBe('sceneLoaded');
+    const traced = core.handle({ id: 2, type: 'traceWorld' });
+    expect(traced.type).toBe('segments');
+    if (traced.type !== 'segments') return;
+
+    // Dichroic at grid (2,0) = world (100, 0); camera at (2,2), sensor y = 90.
+    let foldedReachY = -Infinity;
+    let transmittedReachX = -Infinity;
+    for (let i = 0; i + SEGMENT_FLOATS <= traced.buffer.length; i += SEGMENT_FLOATS) {
+      const [ax, ay, az, bx, by, bz] = traced.buffer.subarray(i, i + SEGMENT_FLOATS);
+      const len = Math.hypot(bx - ax, by - ay, bz - az);
+      if (by - ay > 0.99 * len && Math.abs(ax - 100) < 5) {
+        foldedReachY = Math.max(foldedReachY, by);
+      }
+      if (bx - ax > 0.99 * len && ax > 99) {
+        transmittedReachX = Math.max(transmittedReachX, bx);
+      }
+      expect(bz).toBeGreaterThan(-27.5);
+    }
+    expect(foldedReachY, 'the reflected arm ends on the camera sensor plane').toBeCloseTo(90, 6);
+    expect(transmittedReachX, 'the transmitted arm continues east').toBeGreaterThan(110);
+  });
+});
+
 it('reports whether the integration suite ran', () => {
   if (!available) {
     console.warn(
       `optikit-core service not reachable at ${BASE_URL} — integration tests skipped. ` +
         'Start it with: uv run optikit-core serve',
+    );
+  } else if (!merged) {
+    console.warn(
+      `service at ${BASE_URL} rejects the dichroic record — its process predates the ` +
+        'current kit-canvas-scene3-export dialect. Restart: uv run optikit-core serve',
     );
   }
   expect(true).toBe(true);

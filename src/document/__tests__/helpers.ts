@@ -7,7 +7,10 @@ import type { PlacedModule } from '../../types';
 import type { OptikitRecord } from '../designBuilder';
 
 import achromatYml from './fixtures/openuc2.lens.achromat_25mm_f50.component.yml?raw';
+import beamsplitterYml from './fixtures/openuc2.beamsplitter.cube_5050.component.yml?raw';
 import cameraYml from './fixtures/openuc2.detector.camera_cs165.component.yml?raw';
+import dichroicYml from './fixtures/openuc2.dichroic.filter_dichroic.component.yml?raw';
+import filterYml from './fixtures/openuc2.filter.emission_525.component.yml?raw';
 import laserYml from './fixtures/openuc2.source.laser_488.component.yml?raw';
 import mirrorYml from './fixtures/openuc2.mirror.flat_45.component.yml?raw';
 
@@ -17,7 +20,9 @@ function record(text: string): OptikitRecord {
 }
 
 export const RECORDS = new Map<string, OptikitRecord>(
-  [laserYml, cameraYml, achromatYml, mirrorYml].map(record).map((r) => [r.id, r]),
+  [laserYml, cameraYml, achromatYml, mirrorYml, dichroicYml, filterYml, beamsplitterYml]
+    .map(record)
+    .map((r) => [r.id, r]),
 );
 
 const OPTIKIT_IDS: Record<string, string> = {
@@ -25,11 +30,18 @@ const OPTIKIT_IDS: Record<string, string> = {
   'camera-usb-daheng': 'openuc2.detector.camera_cs165',
   'lens-pos-1x1': 'openuc2.lens.achromat_25mm_f50',
   'mirror-1x1': 'openuc2.mirror.flat_45',
+  'filter-dichroic': 'openuc2.dichroic.filter_dichroic',
+  'filter-bandpass': 'openuc2.filter.emission_525',
+  'beamsplitter-1x1': 'openuc2.beamsplitter.cube_5050',
 };
 
-/** The curated `optikitMount` values (CSV column), keyed by module slug. */
+/** The curated `optikitMount` values (CSV column), keyed by module slug.
+ * Every fold record (reflected: record-local +x) mounts x:90 so the fold
+ * lands in the grid plane and yaw steers it. */
 const OPTIKIT_MOUNTS: Record<string, string> = {
   'mirror-1x1': 'x:90',
+  'filter-dichroic': 'x:90',
+  'beamsplitter-1x1': 'x:90',
 };
 
 export const optikitIdFor = (moduleId: string) => OPTIKIT_IDS[moduleId];

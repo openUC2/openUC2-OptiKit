@@ -163,6 +163,24 @@ describe('buildDesign', () => {
     expect(doc.components['laser-488nm-a1'].pose.rotation.grid).toEqual({ z: '+x', x: '-z' });
   });
 
+  it('maps the dichroic and beamsplitter with the mirror mount convention', () => {
+    const placements = [
+      placed('laser-488nm', 'a1', 0, 0),
+      placed('filter-dichroic', 'b2', 1, 0),
+      placed('beamsplitter-1x1', 'c3', 2, 0),
+      placed('filter-bandpass', 'd4', 3, 0),
+    ];
+    const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
+    expect(unmapped).toEqual([]);
+    const doc = parse(yaml) as {
+      components: Record<string, { pose: { rotation: { grid: { z: string; x: string } } } }>;
+    };
+    // Fold records land in-plane (x:90); the pass-through filter keeps R0.
+    expect(doc.components['filter-dichroic-b2'].pose.rotation.grid).toEqual({ z: '+x', x: '+y' });
+    expect(doc.components['beamsplitter-1x1-c3'].pose.rotation.grid).toEqual({ z: '+x', x: '+y' });
+    expect(doc.components['filter-bandpass-d4'].pose.rotation.grid).toEqual({ z: '+x', x: '-z' });
+  });
+
   it('bare-string refs (no mount) build identically to the pre-mount output', () => {
     const viaStrings = buildDesign(threeModuleRow(), optikitIdFor, RECORDS);
     const viaRefs = buildDesign(threeModuleRow(), optikitRefFor, RECORDS);
