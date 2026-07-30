@@ -46,11 +46,16 @@ test('first success: place, trace, drag, delete (spec 18.1)', async ({ page }) =
   });
 
   // Place laser -> lens -> camera on one row, beam east (+x, rotation 0).
+  // The camera rotates to 270°: its z:90 mount runs the sensor axis along the
+  // 1×2 tile, and 270 turns the drawn lens end west, into the beam.
   await page.evaluate(() => {
     const app = (window as any).__stores.app.getState();
     app.placeModule('laser-488nm', { x: 2, y: 3 }, 0);
     app.placeModule('lens-pos-1x1', { x: 4, y: 3 }, 0);
     app.placeModule('camera-usb-daheng', { x: 6, y: 3 }, 0);
+    const camera = (window as any).__stores.app.getState().placedModules
+      .find((m: any) => m.moduleId === 'camera-usb-daheng');
+    app.rotateModule(camera.id, 270);
   });
 
   // Rays appear without further action (kernel engine is on by default).

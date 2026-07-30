@@ -182,9 +182,19 @@ describe('buildDesign', () => {
   });
 
   it('bare-string refs (no mount) build identically to the pre-mount output', () => {
-    const viaStrings = buildDesign(threeModuleRow(), optikitIdFor, RECORDS);
-    const viaRefs = buildDesign(threeModuleRow(), optikitRefFor, RECORDS);
+    const unmounted = [placed('laser-488nm', 'a1', 0, 0), placed('lens-pos-1x1', 'b2', 1, 0)];
+    const viaStrings = buildDesign(unmounted, optikitIdFor, RECORDS);
+    const viaRefs = buildDesign(unmounted, optikitRefFor, RECORDS);
     expect(viaRefs.yaml).toBe(viaStrings.yaml);
+  });
+
+  it('mounts the 1×2 camera along its tile: rotation 0 looks north', () => {
+    // The camera artwork runs along the tile's long side with the lens end at
+    // the top; the z:90 mount makes the physics agree, so pointing the drawn
+    // lens at the beam is always correct. Rotation 0 → sensor faces north
+    // (accepts a south-travelling beam); 270 → faces west (east beam).
+    expect(gridRotation({ rotation: 0 }, 'z:90')).toEqual({ z: '+y', x: '-z' });
+    expect(gridRotation({ rotation: 270 }, 'z:90')).toEqual({ z: '+x', x: '-z' });
   });
 
   it('encodes layers as offset-grid z (the 55 mm axis)', () => {

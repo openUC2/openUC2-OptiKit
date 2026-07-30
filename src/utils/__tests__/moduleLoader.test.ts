@@ -67,7 +67,7 @@ describe('the shipped catalogue (public/modules_updated.csv)', () => {
     const expected: Record<string, [string, string | undefined]> = {
       'laser-488nm': ['openuc2.source.laser_488', undefined],
       'lens-pos-1x1': ['openuc2.lens.achromat_25mm_f50', undefined],
-      'camera-usb-daheng': ['openuc2.detector.camera_cs165', undefined],
+      'camera-usb-daheng': ['openuc2.detector.camera_cs165', 'z:90'],
       'mirror-1x1': ['openuc2.mirror.flat_45', 'x:90'],
       'filter-dichroic': ['openuc2.dichroic.filter_dichroic', 'x:90'],
       'filter-bandpass': ['openuc2.filter.emission_525', undefined],

@@ -158,7 +158,7 @@ describe.skipIf(!available)('optikit-core service integration', () => {
     const placements = [
       placed('laser-488nm', 'a1', 0, 0),
       placed('mirror-1x1', 'b2', 2, 0),
-      placed('camera-usb-daheng', 'c3', 2, 2, { rotation: 90 }),
+      placed('camera-usb-daheng', 'c3', 2, 2),
     ];
     const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
     expect(unmapped).toEqual([]);
@@ -222,7 +222,9 @@ describe.skipIf(!merged)('optikit-core service integration (merged service)', ()
     const placements = [
       placed('laser-488nm', 'a1', 0, 0),
       placed('filter-dichroic', 'b2', 2, 0),
-      placed('camera-usb-daheng', 'c3', 2, 2, { rotation: 90 }),
+      // Camera mount z:90: rotation 0 = the drawn lens end faces north, into
+      // the south-travelling folded beam.
+      placed('camera-usb-daheng', 'c3', 2, 2),
     ];
     const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
     expect(unmapped).toEqual([]);
@@ -289,7 +291,9 @@ describe.skipIf(!merged)('optikit-core service integration (merged service)', ()
       placed('objective-20x-Nikon-0.75NA-1x1', 'd4', 2, 3, { rotation: 270 }),
       placed('sampleholder-1x1', 'e5', 2, 4, { rotation: 270 }),
       placed('lens-pos-1x1', 'f6', 2, 1, { rotation: 270 }),
-      placed('camera-usb-daheng', 'g7', 2, 0, { rotation: 270 }),
+      // Camera at 180: the drawn lens end faces south, into the northbound
+      // emission (mount z:90 keeps art and physics aligned).
+      placed('camera-usb-daheng', 'g7', 2, 0, { rotation: 180 }),
     ];
     const { yaml, unmapped } = buildDesign(placements, optikitRefFor, RECORDS);
     expect(unmapped).toEqual([]);

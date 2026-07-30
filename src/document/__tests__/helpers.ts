@@ -41,12 +41,15 @@ const OPTIKIT_IDS: Record<string, string> = {
 };
 
 /** The curated `optikitMount` values (CSV column), keyed by module slug.
- * Every fold record (reflected: record-local +x) mounts x:90 so the fold
- * lands in the grid plane and yaw steers it. */
+ * Fold records (reflected: record-local +x) mount x:90 so the fold lands in
+ * the grid plane and yaw steers it. The 1×2 camera mounts z:90 so its optical
+ * axis runs along the tile's long side and the sensor faces the drawn lens
+ * end — at rotation 0 it looks north (accepts a south-travelling beam). */
 const OPTIKIT_MOUNTS: Record<string, string> = {
   'mirror-1x1': 'x:90',
   'filter-dichroic': 'x:90',
   'beamsplitter-1x1': 'x:90',
+  'camera-usb-daheng': 'z:90',
 };
 
 export const optikitIdFor = (moduleId: string) => OPTIKIT_IDS[moduleId];
