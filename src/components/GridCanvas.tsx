@@ -192,9 +192,11 @@ export const GridCanvas: React.FC = () => {
         y: (pointerPos.y - viewport.pan.y) / viewport.zoom
       };
 
-      const snappedPos = snapToGrid(transformedPos);
-      const gridPos = pixelToGrid(snappedPos);
-      
+      // The cell under the finger is floor(pos / cellSize) of the RAW position.
+      // Snapping to the nearest grid corner first shifted any drop in a cell's
+      // lower-right three-quarters into the neighbouring cell.
+      const gridPos = pixelToGrid(transformedPos);
+
       // Ensure grid position is valid (within bounds)
       if (gridPos.x >= 0 && gridPos.x < GRID_SIZE && gridPos.y >= 0 && gridPos.y < GRID_SIZE) {
         placeModule(moduleId, gridPos, currentLayerIndex);
@@ -226,7 +228,7 @@ export const GridCanvas: React.FC = () => {
       window.removeEventListener('mobile-drop', handleMobileDrop as EventListener);
       resizeObserver?.disconnect();
     };
-  }, [viewport.pan.x, viewport.pan.y, viewport.zoom, currentLayerIndex, placeModule, pixelToGrid, snapToGrid]);
+  }, [viewport.pan.x, viewport.pan.y, viewport.zoom, currentLayerIndex, placeModule, pixelToGrid]);
 
   // Keyboard shortcuts: Delete, Ctrl+C/X/V, Arrow nudge
   useEffect(() => {
@@ -545,9 +547,15 @@ export const GridCanvas: React.FC = () => {
       y: (pointerPos.y - viewport.pan.y) / viewport.zoom
     };
 
-    const snappedPos = snapToGrid(transformedPos);
-    const gridPos = pixelToGrid(snappedPos);
-    
+    // Place in the cell under the cursor (floor of the raw position — see the
+    // mobile-drop handler for why corner-snapping first was wrong), clamped
+    // into the grid so an edge drop still lands on the board.
+    const raw = pixelToGrid(transformedPos);
+    const gridPos = {
+      x: Math.max(0, Math.min(GRID_SIZE - 1, raw.x)),
+      y: Math.max(0, Math.min(GRID_SIZE - 1, raw.y)),
+    };
+
     placeModule(moduleId, gridPos, currentLayerIndex);
   };
 

@@ -102,7 +102,10 @@ export const SimulationPanel: React.FC = () => {
   };
   
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 2, p: 1 }}>
+    // No fixed height here: the tab body scrolls (overflow auto). A height of
+    // 100% made this flex column shrink its cards to fit the viewport, which
+    // clipped the detector plots instead of scrolling.
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 1 }}>
       <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <ScienceIcon />
         Ray Simulation

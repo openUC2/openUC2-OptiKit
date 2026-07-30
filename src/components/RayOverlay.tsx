@@ -80,14 +80,11 @@ const LegacyRayOverlay: React.FC<RayOverlayProps> = ({ viewport, gridCellSize })
             key={`ray-${rayIndex}-${segIndex}`}
             points={[start.x, start.y, end.x, end.y]}
             stroke={color}
-            strokeWidth={Math.max(2.5, 3 / viewport.zoom)}
+            strokeWidth={1.4 / viewport.zoom}
             opacity={opacity}
             lineCap="round"
             lineJoin="round"
-            // Add glow effect for better visibility
-            shadowColor={color}
-            shadowBlur={6 / viewport.zoom}
-            shadowOpacity={0.7}
+            perfectDrawEnabled={false}
           />
         );
       });

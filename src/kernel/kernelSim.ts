@@ -41,7 +41,13 @@ export function startKernelSimulation(): () => void {
       const records = ids.length ? await client.componentRecords(ids) : new Map();
       return buildDesign(placedModules, optikitRefFor, records);
     },
-    scene3: yaml => client.scene3(yaml),
+    // The "Max Rays per Source" slider drives the materializer's sampling
+    // policy: its value becomes spatial_samples (rays across the emitting
+    // aperture). setConfig() already re-triggers a pass on change.
+    scene3: yaml =>
+      client.scene3(yaml, {
+        spatial_samples: useSimulationStore.getState().config.maxRays,
+      }),
     loadScene: json => getKernelClient().loadScene(json),
     traceWorld: () => getKernelClient().traceWorld(),
     onResult: result => useSimulationStore.getState().setKernelResult(result),

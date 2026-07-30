@@ -63,19 +63,20 @@ export const KernelRayOverlay: React.FC<KernelRayOverlayProps> = ({ viewport, gr
       const y1 = (lerp(seg.ay, seg.by, t1) + CANVAS_HALF_CELL_MM) * scale;
 
       const color = segmentCssColor(seg.r, seg.g, seg.b);
-      const opacity = (seg.ghost ? 0.3 : 0.9) * (busy ? 0.5 : 1);
+      const opacity = (seg.ghost ? 0.25 : 0.8) * (busy ? 0.5 : 1);
       lines.push(
+        // Hairline rays, the canvas app's look: a constant ~1.4 px on screen
+        // (stage scale × strokeWidth), translucent so crossing bundles read as
+        // density, no glow — the shadow pass also cost a blur per segment.
         <Line
           key={`kray-${i}`}
           points={[x0, y0, x1, y1]}
           stroke={color}
-          strokeWidth={Math.max(2.5, 3 / viewport.zoom)}
+          strokeWidth={1.4 / viewport.zoom}
           opacity={opacity}
           lineCap="round"
           lineJoin="round"
-          shadowColor={color}
-          shadowBlur={6 / viewport.zoom}
-          shadowOpacity={0.7}
+          perfectDrawEnabled={false}
         />,
       );
     });

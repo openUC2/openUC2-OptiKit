@@ -109,6 +109,19 @@ test('first success: place, trace, drag, delete (spec 18.1)', async ({ page }) =
   });
   expect(drawn).toBeGreaterThanOrEqual(first.segments);
 
+  // The "Max Rays per Source" slider is live: raising it re-traces with more
+  // spatial samples, so the segment count grows.
+  await page.evaluate(() => {
+    (window as any).__stores.sim.getState().setConfig({ maxRays: 200 });
+  });
+  await page.waitForFunction(
+    prev => (window as any).__stores.sim.getState().kernel.requestId > prev,
+    first.requestId,
+    { timeout: 60_000 },
+  );
+  const dense = await page.evaluate(FINGERPRINT);
+  expect(dense.segments).toBeGreaterThan(first.segments);
+
   // Drag the lens one cell east: the trace re-runs and the picture changes.
   await page.evaluate(() => {
     const app = (window as any).__stores.app.getState();
@@ -117,12 +130,12 @@ test('first success: place, trace, drag, delete (spec 18.1)', async ({ page }) =
   });
   await page.waitForFunction(
     prev => (window as any).__stores.sim.getState().kernel.requestId > prev,
-    first.requestId,
+    dense.requestId,
     { timeout: 60_000 },
   );
   const moved = await page.evaluate(FINGERPRINT);
   expect(moved.segments).toBeGreaterThan(0);
-  expect(moved.sum).not.toBe(first.sum); // the focus visibly moved
+  expect(moved.sum).not.toBe(dense.sum); // the focus visibly moved
 
   // Delete the camera: the laser keeps emitting through the lens into open
   // space, E_NO_TARGET renders as a finding, and the readouts are empty.
