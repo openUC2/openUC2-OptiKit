@@ -1,234 +1,195 @@
-# Ray Optics Simulation Architecture Decision
+# Ray Simulation Architecture
 
-## Decision: Custom Lightweight Engine
+**Status**: implemented, default engine
+**Updated**: July 2026
 
-**Date**: December 2025 (Updated: January 2026)  
-**Status**: Implemented  
-**Author**: OpenUC2 Development Team
+Since the kernel integration (EMB-B..E), every ray a user sees comes from the
+oc-wasm physics kernel: an f64 3D non-sequential tracer compiled to
+WebAssembly, fed by the optikit-core service. The old TypeScript 2D engine
+still exists behind a developer flag (below) but no user-facing path runs it.
 
----
+## The live loop
 
-## Context
-
-The OptiKit Configurator needed a 2D ray tracing capability to allow users to visualize light propagation through their optical setups. The project includes the **ray-optics** library source code at `/ray-optics-src/`, which is a sophisticated open-source ray tracing simulator.
-
-## Decision
-
-We chose a **Custom Engine Approach**:
-- **Primary**: Custom lightweight `SimulationEngine` built specifically for OptiKit
-- **Future**: The ray-optics library (`/ray-optics-src/`) is available but not currently integrated
-
-### Why Not ray-optics Library?
-
-The ray-optics library requires several additional dependencies and build configurations that are challenging to integrate with Vite:
-
-1. **Canvas Rendering**: ray-optics renders directly to HTML Canvas, but we need ray data for Konva overlay
-2. **Dependencies**: Requires `i18next`, `canvas2svg`, `seedrandom`, `bezier-js`, `file-saver`
-3. **Build Issues**: ES module imports from outside `/src/` cause Vite resolution errors
-4. **Data Extraction**: ray-optics doesn't expose ray path data easily - it's designed for rendering
-
-The custom `SimulationEngine` provides:
-- Direct ray path data for visualization
-- Simple integration with React/Konva
-- Type-safe TypeScript implementation
-- Easy parameter mapping from OptiKit modules
-
----
-
-## Architecture Overview
+Placing, moving, rotating, or deleting a module re-traces the scene without
+any user action:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Main Thread (UI)                         │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   Toolbar    │  │ PropertyPanel│  │   SimulationPanel    │  │
-│  │ (toggle sim) │  │ (opt params) │  │ (controls/readings)  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
-│                            │                    │               │
-│                            ▼                    ▼               │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                   simulationStore.ts                     │   │
-│  │  - config (enabled, autoRun, maxRays, etc.)              │   │
-│  │  - rays[], detectorReadings[], elements[]                │   │
-│  │  - runSimulation(), stopSimulation(), setConfig()        │   │
-│  │  - Auto-triggers on placedModules changes                │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                            │                                    │
-│                            ▼                                    │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  SimulationManager.ts                    │   │
-│  │  - Manages WebWorker lifecycle                           │   │
-│  │  - Handles fallback to main thread                       │   │
-│  │  - Provides async run() API with callbacks               │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                            │                                    │
-│                            ▼                                    │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              SimulationEngine.ts (Custom)                │   │
-│  │  - 2D geometric ray tracing                              │   │
-│  │  - Lens refraction with principal plane offset           │   │
-│  │  - Mirror/beamsplitter reflection                        │   │
-│  │  - Aperture blocking                                     │   │
-│  │  - Detector hit detection                                │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              RayOpticsAdapter.ts (Disabled)              │   │
-│  │  - Adapter for ray-optics library (not currently used)   │   │
-│  │  - Available at /ray-optics-src/ for future integration  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+edit (2D or 3D view)
+  └─ appStore.placedModules changes
+       └─ kernelLoop (src/kernel/kernelLoop.ts) — debounce 300 ms
+            ├─ designBuilder (src/document/designBuilder.ts)
+            │    placements → optikit-design.yml (grid poses, library refs)
+            ├─ POST /v1/scene3 to optikit-core (:8000)          ← "materialize N ms"
+            │    service resolves records → physical Scene3 JSON
+            ├─ kernel worker (src/kernel/kernel.worker.ts)      ← "trace N ms"
+            │    oc-wasm loads the scene, traces in f64
+            └─ simulationStore.kernel
+                 ├─ segments   → KernelRayOverlay (2D), KernelRays3D (3D)
+                 ├─ detector   → KernelDetectorPanel (spot, heatmap, numbers)
+                 └─ findings   → KernelDiagnostics
 ```
 
----
+Loop guarantees (unit-tested in `src/kernel/__tests__/kernelLoop.test.ts`):
 
-## Key Components
+- Request ids are monotonic; a response renders only if it is the newest
+  issued. A slow old trace can never overwrite a newer one.
+- The worker holds one scene, so scene loads are serialized: an older scene
+  never loads after a newer one.
+- Network failures retry with backoff (500 ms, 1500 ms). A 422 never
+  retries: same input, same answer.
+- A burst of edits inside the debounce window issues one service request.
 
-### 1. RayOpticsAdapter (`src/simulation/RayOpticsAdapter.ts`)
-- **Primary simulation backend** using the ray-optics library
-- Converts OptiKit modules to ray-optics scene objects (`Scene`, `sceneObjs`)
-- Creates: `IdealLens`, `Mirror`, `BeamSplitter`, `SingleRay`, `PointSource`, `Detector`
-- Uses `Simulator` class for ray tracing
-- Extracts ray paths and detector readings from simulation
+## Two engines, one visible
 
-### 2. SimulationEngine (`src/simulation/SimulationEngine.ts`)
-- **Fallback/lightweight** custom ray tracing engine
-- Pure TypeScript geometric ray tracing
-- Simpler implementation for basic scenarios
-- Faster for simple setups
+| Engine | Where | Role |
+|---|---|---|
+| kernel (oc-wasm) | `vendor/oc-wasm-*.tgz`, worker-hosted | default; every user-visible ray |
+| legacy TS 2D | `src/simulation/` | developer debug only |
 
-### 3. SceneBuilder (`src/utils/sceneBuilder.ts`)
-- Converts OptiKit modules to simulation optical elements
-- Handles coordinate transformation (grid units → mm)
-- Maintains module-to-simulation parameter mappings
-- Provides wavelength-to-color conversion for visualization
+Enable the legacy engine with `localStorage['oc-debug-engine'] = 'legacy'`
+and reload. Nothing in the product UI switches engines.
 
-### 4. SimulationStore (`src/stores/simulationStore.ts`)
-- Zustand store for simulation state
-- Auto-run with debouncing when modules change
-- Persists configuration across sessions
+## What is simulated
 
-### 5. RayOverlay (`src/components/RayOverlay.tsx`)
-- Konva layer for rendering ray paths
-- Color modes: wavelength, intensity, source
-- Detector hit point visualization
+A module simulates when its row in `public/modules_updated.csv` names a
+library record (`optikitId` column). Unmapped modules still place, render,
+and appear in the BOM; the diagnostics card lists them as "not simulated".
 
-### 6. SimulationPanel (`src/components/SimulationPanel.tsx`)
-- Run/stop controls
-- Configuration sliders (ray count, bounces, brightness)
-- Detector reading table
+Mapped set as of this document:
 
----
+| Module slug | Library record | Mount |
+|---|---|---|
+| laser-488nm | openuc2.source.laser_488 | |
+| lens-pos-1x1 | openuc2.lens.achromat_25mm_f50 | |
+| camera-usb-daheng | openuc2.detector.camera_cs165 | z:90 |
+| mirror-1x1 | openuc2.mirror.flat_45 | x:90 |
+| filter-dichroic | openuc2.dichroic.filter_dichroic | x:90 |
+| filter-bandpass | openuc2.filter.emission_525 | |
+| beamsplitter-1x1 | openuc2.beamsplitter.cube_5050 | x:90 |
+| objective-20x-Nikon-0.75NA-1x1 | openuc2.objective.refractive_20x | |
+| sampleholder-1x1 | openuc2.sample.fluoro_slide | |
 
-## Ray-Optics Library Integration
+To simulate a new module: author a component record in
+`optikit-core/library/components/` and put its id in the module's
+`optikitId` CSV column. The configurator never interprets the record's
+optics; it inlines the block verbatim (rule 12 of the integration spec).
 
-The ray-optics library (`/ray-optics-src/`) provides:
+### Mounts and orientation
 
-### Scene Objects (from `sceneObjs/`)
-| OptiKit Type | Ray-Optics Class | Location |
-|--------------|------------------|----------|
-| Laser | `SingleRay` | `lightSource/SingleRay.js` |
-| LED | `PointSource` | `lightSource/PointSource.js` |
-| Lens | `IdealLens` | `glass/IdealLens.js` |
-| Mirror | `Mirror` | `mirror/Mirror.js` |
-| Beam Splitter | `BeamSplitter` | `mirror/BeamSplitter.js` |
-| Aperture | `Blocker` | `blocker/Blocker.js` |
-| Detector | `Detector` | `other/Detector.js` |
+At rotation 0 a record's optical axis points grid east. The `optikitMount`
+CSV column declares how a record sits inside its cube, as quarter-turns
+about the world axes, applied before the placement rotation:
 
-### Key Classes
-- **`Scene`**: Manages optical elements, simulation settings
-- **`Simulator`**: Performs ray tracing, handles rendering
-- **`geometry`**: 2D vector operations, intersections
+- Fold records (mirror, dichroic, beamsplitter) mount `x:90` so the fold
+  lands in the grid plane. Rotating the module then steers the fold through
+  all four in-plane directions.
+- The 1×2 camera mounts `z:90` so the sensor faces the drawn lens end of
+  the tile. Point the artwork at the beam and it reads: rotation 0 accepts a
+  south-travelling beam, 270 an east beam, 180 a north beam.
 
-### Creating Elements (example)
-```javascript
-// Create an IdealLens from ray-optics
-const lens = new sceneObjs.IdealLens(scene);
-lens.p1 = geometry.point(x1, y1);  // First endpoint
-lens.p2 = geometry.point(x2, y2);  // Second endpoint
-lens.focalLength = 100;            // mm
-scene.objs.push(lens);
+If a module's artwork disagrees with where its physics points, the mount is
+the place to fix it. Two of these mismatches shipped and confused users
+(mirror, camera); both fixes were one CSV entry.
+
+## Rays and numbers
+
+The kernel returns world-frame segments as a `Float32Array`, 11 floats per
+segment: endpoints, linear-light RGB, flux, flags (TIR, ghost). The 2D
+overlay clips segments to the active layer's 55 mm slab; the 3D view draws
+them as merged line segments. Ghost segments render at reduced opacity.
+
+Numbers follow one rule: **f32 draws pictures, f64 produces numbers.**
+Every value on screen (hit count, flux, centroid, mean OPL) comes from the
+kernel's f64 detector result. The f32 hit records feed the spot diagram
+only, which is why it has no per-point hover readout.
+
+The detector panel (simulation tab) shows the first detector's spot
+diagram, an incident-flux heatmap (sqrt-compressed for display; the honest
+magnitudes stay in the quoted numbers), and the readout line. A camera that
+catches nothing shows "0 hits" with likely causes instead of hiding.
+
+## Controls: what acts on the kernel
+
+| Control | Effect on kernel engine |
+|---|---|
+| Simulation ON/OFF | gates the loop and all overlays |
+| Auto-run on changes | edits re-trace; off = only the Run button traces |
+| Run Simulation | immediate pass, skips the debounce |
+| Max Rays per Source | becomes `trace_quality.spatial_samples`; re-traces live |
+| Show Rays | hides/shows ray overlays |
+| Max Bounces | legacy engine only; no kernel effect |
+| Ray Brightness, Color Mode | legacy engine only |
+
+## Diagnostics
+
+The simulation tab's kernel card shows:
+
+- segment count and the engine name
+- **materialize N ms**: designBuilder plus the `/v1/scene3` round-trip,
+  network included
+- **trace N ms**: scene load plus the f64 trace in the worker
+- findings from the service (`E_NO_TARGET`, `W_DICHROIC_SPLIT`, ...) with
+  the component they concern. Intent findings arrive beside a full physical
+  scene, never instead of one: an unconnected laser still emits.
+- the not-simulated list
+
+Measured on a 24-component three-bench layout (July 2026): materialize
+15 ms median, trace 1-30 ms depending on ray count. Both sit well inside
+the 300 ms debounce. If materialize grows past ~50 ms, profile the service
+first; glass resolution and YAML parsing were the two hotspots fixed in
+optikit-core.
+
+## The vendored kernel
+
+`vendor/oc-wasm-<version>+<commit>.tgz` pins the kernel build; the package
+version carries the source commit. `vendor/README.md` has the rebuild
+recipe (`npm run wasm` in the canvas repo's `web/`, then `npm pack` with
+the commit-stamped version). Update the tarball and the README pin
+together.
+
+## Running it
+
+```
+# service (separate checkout of optikit-core)
+uv run optikit-core serve          # :8000, CORS admits :5173
+
+# configurator
+npm run dev                        # :5173
 ```
 
----
+Place a laser, a lens, and a camera (rotate the camera so its lens faces
+the beam). Rays appear within ~350 ms of the last edit; the camera's
+readout card appears in the simulation tab.
 
-## Type Definitions
+## Tests
 
-All simulation types are defined in `src/types/index.ts`:
+- `npx vitest run` — unit: loop invariants, designBuilder rotation
+  contract, CSV mapping drift guard, detector decode.
+- `src/document/__tests__/service.integration.test.ts` — live service
+  tests (beam directions, mirror fold, dichroic split, full
+  epi-fluorescence chain). They skip unless :8000 answers with a current
+  dialect; a stale service prints a restart hint.
+- `npx playwright test` — `first-success.spec.ts` (place → trace → slider
+  → drag → delete, needs the service) and `canvas-placement.spec.ts`
+  (drop-position regression, dev server only).
 
-- `OpticalElement` - Simulation representation of optical components
-- `OpticalElementParams` - Parameters for each element type
-- `RayPath` / `RaySegment` - Ray trajectory data
-- `DetectorReading` - Power/position measurements
-- `SimulationConfig` - Global simulation settings
-- `SimulationResult` - Complete simulation output
-- `ModuleSimulationModel` - Mapping from OptiKit module to sim element
+## Known limits
 
----
+- Every edit re-materializes the whole design (tier 1). The pose-only fast
+  path (CV-C/EMB-F: local transform + f32 preview during drags) is
+  designed but not built.
+- The materializer ignores `FrameSpec.rotation` and warns
+  (`W_FRAME_ROTATION_IGNORED`).
+- The 20x objective simulates via a purpose-built refractive record; the
+  catalog's `thin_lens` interaction model has no kernel representation.
+- One detector panel: the first detector in the scene. Multi-detector
+  layouts trace correctly but only the first gets plots.
+- `.dsn` export/import with a catalog lock is not wired into the
+  configurator yet.
 
-## Module Mapping
+## Legacy engine notes
 
-The `MODULE_SIMULATION_MODELS` constant maps OptiKit module IDs to their simulation representations:
-
-| Module ID | Simulation Type | Key Parameters |
-|-----------|-----------------|----------------|
-| `lens-pos-1x1` | `lens` | focalLength (positive) |
-| `lens-neg-1x1` | `lens` | focalLength (negative) |
-| `mirror-1x1` | `mirror` | curvature, reflectivity |
-| `beamsplitter-1x1` | `beamsplitter` | splitRatio |
-| `filter-dichroic` | `dichroic` | cutoffWavelength |
-| `laser-*` | `laser` | wavelength, power, divergence=0 |
-| `led-*` | `led` | wavelength, divergence |
-| `camera-*` | `detector` | width, height |
-| `pinhole-1x1` | `aperture` | diameter |
-
----
-
-## Performance Considerations
-
-1. **Ray Count Limits**
-   - Default: 100 rays max per source
-   - User-adjustable via SimulationPanel
-   - Higher counts increase accuracy but slow rendering
-
-2. **Bounce Limits**
-   - Default: 20 max bounces per ray
-   - Prevents infinite loops in resonant cavities
-
-3. **Debouncing**
-   - Auto-run waits 300ms after last change
-   - Prevents excessive recalculation during editing
-
-4. **Worker Fallback**
-   - If WebWorker fails, simulation runs on main thread
-   - May cause brief UI freezes for complex scenes
-
----
-
-## Future Enhancements
-
-1. **Wave Optics Mode** (if needed)
-   - Gaussian beam propagation
-   - Diffraction at apertures
-   - Interference effects
-
-2. **Optimization Tools**
-   - Auto-focus (find detector position)
-   - Beam expander design wizard
-
-3. **Export/Import**
-   - Save simulation state with projects
-   - Export ray data as CSV
-
-4. **Advanced Visualization**
-   - Irradiance heatmap overlay
-   - 3D perspective view option
-
----
-
-## Attribution
-
-This implementation uses the [ray-optics](https://github.com/ricktu288/ray-optics) library (Apache-2.0 license) for advanced ray tracing capabilities. The library source is included at `/ray-optics-src/`.
-
-The custom `SimulationEngine` serves as a lightweight alternative for simple scenarios.
+The pre-kernel custom engine (`src/simulation/SimulationEngine.ts`) and the
+unused ray-optics adapter remain in the tree for debugging. The bundled
+[ray-optics](https://github.com/ricktu288/ray-optics) source at
+`/ray-optics-src/` (Apache-2.0) is not integrated.
