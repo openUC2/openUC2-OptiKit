@@ -83,6 +83,7 @@ export const KernelDetectorPanel: React.FC = () => {
   const engine = useSimulationStore(s => s.engine);
   const enabled = useSimulationStore(s => s.config.enabled);
   const detector = useSimulationStore(s => s.kernel.detector);
+  const detectorCount = useSimulationStore(s => s.kernel.detectorCount);
   const busy = useSimulationStore(s => s.kernel.busy);
   const spotRef = useRef<HTMLCanvasElement>(null);
   const heatRef = useRef<HTMLCanvasElement>(null);
@@ -95,7 +96,31 @@ export const KernelDetectorPanel: React.FC = () => {
     if (heat) drawHeatmap(heat, detector);
   }, [detector]);
 
-  if (engine !== 'kernel' || !enabled || !detector) return null;
+  if (engine !== 'kernel' || !enabled) return null;
+  if (!detector && detectorCount === 0) return null;
+
+  // A detector exists in the traced scene but caught nothing: say so rather
+  // than vanish — the usual causes are a camera whose sensor faces away from
+  // the beam, or a beam that never crosses the camera's cell.
+  if (!detector) {
+    return (
+      <Card data-testid="kernel-detector">
+        <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
+          <Typography variant="subtitle2">Detector</Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            display="block"
+            data-testid="kernel-detector-nohits"
+          >
+            0 hits — no ray reaches the sensor. Check that the camera faces the
+            incoming beam (rotate it so the sensor looks up-beam) and that the
+            traced rays actually cross its cell.
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const hits = decodeHits(detector.hits);
   const extent = hits ? `±${hits.halfW.toFixed(hits.halfW < 10 ? 1 : 0)} mm` : '';

@@ -166,4 +166,21 @@ describe('KernelLoop', () => {
     expect(results[0].detector?.resultJson).toBe('{"hits":1}');
     expect(results[0].detector?.hits).toHaveLength(3);
   });
+
+  it('counts the scene-declared detectors so "0 hits" is distinguishable', async () => {
+    const { loop, results } = harness({
+      scene3: () =>
+        Promise.resolve({
+          scene: { detectors: [{}, {}] },
+          manifest: null,
+          warnings: [],
+          findings: [],
+        }),
+      // A declared detector the beam misses: the kernel readout is null.
+      traceWorld: () => Promise.resolve({ segments: new Float32Array(11), detector: null }),
+    });
+    await loop.flush();
+    expect(results[0].detectorCount).toBe(2);
+    expect(results[0].detector).toBeNull();
+  });
 });

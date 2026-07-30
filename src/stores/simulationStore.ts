@@ -60,6 +60,9 @@ export interface KernelSimState {
   segments: Float32Array | null;
   /** Detector readout of the settled trace; null when no detector/hits. */
   detector: KernelDetectorState | null;
+  /** Detector3 count the scene declares — distinguishes "no camera" (panel
+   * hidden) from "camera present, zero hits" (panel says so). */
+  detectorCount: number;
   /** Request id of the rendered trace (monotonic; stale responses dropped). */
   requestId: number;
   findings: Scene3Finding[];
@@ -78,6 +81,7 @@ export interface KernelSimState {
 const defaultKernelState: KernelSimState = {
   segments: null,
   detector: null,
+  detectorCount: 0,
   requestId: 0,
   findings: [],
   warnings: [],
@@ -157,6 +161,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
         segments: result.segments,
         detector:
           parsed && result.detector ? { result: parsed, hits: result.detector.hits } : null,
+        detectorCount: result.detectorCount,
         requestId: result.requestId,
         findings: result.findings,
         warnings: result.warnings,

@@ -36,6 +36,10 @@ export interface KernelPassResult {
   segments: Float32Array;
   /** First-detector readout of the settled f64 trace (EMB-E), or null. */
   detector: DetectorReadoutWire | null;
+  /** Detector3 objects the materialized scene declares. The kernel's readout
+   * is null BOTH without a detector and without hits; this count lets the
+   * panel say "0 hits" instead of silently vanishing. */
+  detectorCount: number;
   findings: Scene3Response['findings'];
   warnings: string[];
   mapped: string[];
@@ -122,6 +126,7 @@ export class KernelLoop {
           requestId: id,
           segments: new Float32Array(0),
           detector: null,
+          detectorCount: 0,
           findings: [],
           warnings: [],
           mapped: [],
@@ -148,10 +153,12 @@ export class KernelLoop {
         const { segments, detector } = await this.deps.traceWorld();
         const traceMs = now() - t1;
         if (id !== this.issued || this.disposed) return;
+        const declared = (response.scene as { detectors?: unknown[] } | null)?.detectors;
         this.render(id, {
           requestId: id,
           segments,
           detector,
+          detectorCount: Array.isArray(declared) ? declared.length : 0,
           findings: response.findings,
           warnings: response.warnings,
           mapped: build.mapped,
