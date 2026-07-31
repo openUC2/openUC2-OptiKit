@@ -81,6 +81,9 @@ interface AppStore extends AppState {
   generateShareableLink: () => string;
   downloadSTLBundle: (password: string) => Promise<void>;
   importData: (data: string) => void;
+  /** Replace the placed modules wholesale (the .dsn import path, WP-12).
+   * Layers are rebuilt to cover the imported range; annotations reset. */
+  loadPlacements: (placements: PlacedModule[]) => void;
   importFromUrl: (url: string) => Promise<boolean>;
   undo: () => void;
   redo: () => void;
@@ -807,6 +810,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
   exportToPyInventor: () => {
     // This is now deprecated - use exportData instead
     return get().exportData();
+  },
+
+  loadPlacements: (placedModules: PlacedModule[]) => {
+    const maxLayer = placedModules.reduce((m, p) => Math.max(m, p.layer), 0);
+    set({
+      placedModules,
+      annotations: [],
+      selectedItems: [],
+      layers: Array.from({ length: maxLayer + 1 }, (_, index) => ({
+        id: `layer-${index}`,
+        name: `Layer ${index}`,
+        index,
+        visible: true,
+      })),
+    });
   },
 
   importData: (data: string) => {

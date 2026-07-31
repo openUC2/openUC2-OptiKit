@@ -281,6 +281,95 @@ openUC2 team via GitHub repository
     input.click();
   };
 
+  // .dsn export/import (WP-12 / EMB-E): the placements as an optikit-core
+  // design record, records inlined from the live library, provenance.catalog
+  // stamped with the index hash so drift is detectable on import.
+  const handleExportDsn = async () => {
+    const state = useAppStore.getState();
+    const { dsnFromPlacements } = await import('../document/dsn');
+    const { CoreClient } = await import('../api/coreClient');
+    const { coreServiceBaseUrl } = await import('../kernel/kernelSim');
+    const refFor = (moduleId: string) => {
+      const def = state.modules.find(m => m.id === moduleId);
+      if (!def?.optikitId) return undefined;
+      return { id: def.optikitId, mount: def.optikitMount };
+    };
+    try {
+      const client = new CoreClient({ baseUrl: coreServiceBaseUrl() });
+      const index = await client.libraryIndex();
+      const ids = new Set(
+        state.placedModules
+          .map(p => refFor(p.moduleId)?.id)
+          .filter((id): id is string => Boolean(id)),
+      );
+      const records = await client.componentRecords(ids);
+      const { yaml, unmapped } = dsnFromPlacements(
+        state.placedModules, refFor, records, index.hash,
+      );
+      const blob = new Blob([yaml], { type: 'application/yaml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'optikit-design.yml';
+      a.click();
+      URL.revokeObjectURL(url);
+      if (unmapped.length > 0) {
+        state.addNotification({
+          type: 'warning',
+          title: '.dsn export',
+          message: `${unmapped.length} module(s) have no library record and were left out of the design`,
+          duration: 8000,
+        });
+      }
+    } catch (error) {
+      state.addNotification({
+        type: 'error',
+        title: '.dsn export failed',
+        message: `The library service is required to inline records: ${error instanceof Error ? error.message : String(error)}`,
+        duration: 8000,
+      });
+    }
+  };
+
+  const handleImportDsn = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.yml,.yaml,.dsn';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const text = ev.target?.result as string;
+        const state = useAppStore.getState();
+        const { placementsFromDsn } = await import('../document/dsn');
+        const slugByRecord = new Map(
+          state.modules
+            .filter(m => m.optikitId)
+            .map(m => [m.optikitId as string, m.id]),
+        );
+        const res = placementsFromDsn(
+          text,
+          id => slugByRecord.get(id),
+          slug => state.modules.find(m => m.id === slug)?.optikitMount,
+        );
+        state.loadPlacements(res.placements);
+        if (res.skipped.length > 0) {
+          state.addNotification({
+            type: 'warning',
+            title: '.dsn import',
+            message: `${res.placements.length} placed; skipped ${res.skipped
+              .map(s => `${s.component} (${s.reason})`)
+              .join('; ')}`,
+            duration: 10000,
+          });
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   const handleImportFromUrl = async () => {
     const url = prompt('Enter URL to JSON layout file:');
     if (url) {
@@ -526,6 +615,15 @@ openUC2 team via GitHub repository
               <MenuItem onClick={() => { handleImportFromUrl(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><UrlIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Import from URL</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => { handleExportDsn(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Export Design (.dsn)</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleImportDsn(); setFileMenuAnchor(null); }}>
+                <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Import Design (.dsn)</ListItemText>
               </MenuItem>
               <Divider />
               <MenuItem onClick={() => { handleGenerateShareableLink(); setFileMenuAnchor(null); }}>
