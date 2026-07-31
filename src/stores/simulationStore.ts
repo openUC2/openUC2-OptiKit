@@ -101,6 +101,10 @@ interface SimulationStore extends SimulationState {
 
   kernel: KernelSimState;
   setKernelResult: (result: KernelPassResult) => void;
+  /** Tier-2 f32 preview frame (EMB-F): replaces the picture only. Detector
+   * readouts, findings, and every displayed number stay from the last settled
+   * f64 result (rule 5). */
+  setKernelPreview: (segments: Float32Array) => void;
   setKernelError: (error: unknown, requestId: number) => void;
   setKernelBusy: (busy: boolean) => void;
 
@@ -173,6 +177,10 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
         serviceError: null,
       },
     }));
+  },
+
+  setKernelPreview: (segments) => {
+    set(state => ({ kernel: { ...state.kernel, segments } }));
   },
 
   setKernelError: (error, requestId) => {

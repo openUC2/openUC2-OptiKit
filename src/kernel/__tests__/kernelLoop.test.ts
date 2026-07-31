@@ -184,3 +184,124 @@ describe('KernelLoop', () => {
     expect(results[0].detector).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tier-2 pose fast path (EMB-F)
+// ---------------------------------------------------------------------------
+
+import type { TransformBatch } from '../messages';
+import { worldPose } from '../../document/designBuilder';
+
+const poseAt = (x: number, y: number, rotation = 0) =>
+  worldPose({ position: { x, y }, layer: 0, rotation });
+
+const MANIFEST = {
+  components: {
+    'laser-1': { bodies: [], surfaces: [], apertures: [], sources: [7], detectors: [] },
+  },
+};
+
+function tier2Harness(overrides: Partial<ConstructorParameters<typeof KernelLoop>[0]> = {}) {
+  const calls: TransformBatch[][] = [];
+  const previews: Float32Array[] = [];
+  const h = harness({
+    build: () => ({ ...BUILD, poses: new Map([['laser-1', poseAt(0, 0)]]) }),
+    scene3: () => Promise.resolve({ scene: {}, manifest: MANIFEST, warnings: [], findings: [] }),
+    transformTrace: b => {
+      calls.push(b);
+      return Promise.resolve(new Float32Array(22));
+    },
+    onPreview: s => previews.push(s),
+    ...overrides,
+  });
+  return { ...h, calls, previews };
+}
+
+describe('KernelLoop tier-2 pose fast path (EMB-F)', () => {
+  it('applies a pose delta as one transformTrace and renders the preview', async () => {
+    const { loop, calls, previews, results } = tier2Harness();
+    await loop.flush(); // settle: manifest + build poses arm the fast path
+    loop.posePreview(new Map([['laser-1', poseAt(2, 0)]]));
+    await tick();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toHaveLength(1);
+    expect(calls[0][0].ids).toEqual([7]);
+    // Two cells east = +100 mm, no rotation.
+    expect(calls[0][0].delta).toEqual([100, 0, 0, 0, 0, 0, 1]);
+    expect(previews).toHaveLength(1);
+    // The preview never re-rendered a settled result.
+    expect(results).toHaveLength(1);
+  });
+
+  it('sends deltas relative to the last applied pose, not the base', async () => {
+    const { loop, calls } = tier2Harness();
+    await loop.flush();
+    loop.posePreview(new Map([['laser-1', poseAt(1, 0)]]));
+    await tick();
+    loop.posePreview(new Map([['laser-1', poseAt(3, 0)]]));
+    await tick();
+    expect(calls.map(c => c[0].delta[0])).toEqual([50, 100]); // +1 cell, then +2 more
+  });
+
+  it('coalesces a drag burst while a transform is in flight (latest wins)', async () => {
+    const gate = deferred<Float32Array>();
+    const calls: TransformBatch[][] = [];
+    const { loop } = tier2Harness({
+      transformTrace: b => {
+        calls.push(b);
+        return calls.length === 1 ? gate.promise : Promise.resolve(new Float32Array(0));
+      },
+    });
+    await loop.flush();
+    loop.posePreview(new Map([['laser-1', poseAt(1, 0)]]));
+    await tick(); // first transform now in flight, holding the chain
+    for (let x = 2; x <= 5; x++) loop.posePreview(new Map([['laser-1', poseAt(x, 0)]]));
+    gate.resolve(new Float32Array(0));
+    await tick();
+    await tick();
+    // The four queued edits collapsed into one catch-up transform.
+    expect(calls).toHaveLength(2);
+    expect(calls[1][0].delta[0]).toBe(200); // from cell 1 to cell 5
+  });
+
+  it('does nothing before a settled scene', async () => {
+    const { loop, calls } = tier2Harness();
+    loop.posePreview(new Map([['laser-1', poseAt(2, 0)]]));
+    await tick();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('an unchanged pose issues no transform', async () => {
+    const { loop, calls } = tier2Harness();
+    await loop.flush();
+    loop.posePreview(new Map([['laser-1', poseAt(0, 0)]]));
+    await tick();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('a refused batch disarms the fast path until the next settle', async () => {
+    let fail = true;
+    const calls: TransformBatch[][] = [];
+    const { loop, previews } = tier2Harness({
+      transformTrace: b => {
+        calls.push(b);
+        return fail ? Promise.reject(new Error('stale ids')) : Promise.resolve(new Float32Array(0));
+      },
+    });
+    await loop.flush();
+    loop.posePreview(new Map([['laser-1', poseAt(2, 0)]]));
+    await tick();
+    expect(calls).toHaveLength(1);
+    expect(previews).toHaveLength(0); // the failed preview never rendered
+    // Disarmed: further pose edits go tier-1 only.
+    loop.posePreview(new Map([['laser-1', poseAt(3, 0)]]));
+    await tick();
+    expect(calls).toHaveLength(1);
+    // A fresh settle re-arms.
+    fail = false;
+    await loop.flush();
+    loop.posePreview(new Map([['laser-1', poseAt(2, 0)]]));
+    await tick();
+    expect(calls).toHaveLength(2);
+  });
+});

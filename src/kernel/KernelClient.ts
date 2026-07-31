@@ -4,7 +4,7 @@
  */
 
 import type { DetectorReadoutWire } from './detector';
-import type { KernelRequest, KernelResponse } from './messages';
+import type { KernelRequest, KernelResponse, TransformBatch } from './messages';
 
 export interface WorldTrace {
   /** World-frame segments, 11 floats each (spec 18.7). */
@@ -79,6 +79,15 @@ export class KernelClient {
   /** f32 preview trace, same layout. The picture, not the numbers. */
   async traceWorldFast(): Promise<Float32Array> {
     const res = await this.request({ type: 'traceWorldFast' });
+    return res.type === 'segments' ? res.buffer : new Float32Array(0);
+  }
+
+  /** Tier-2 pose fast path (EMB-F): apply rigid deltas to the loaded scene's
+   * objects and f32-retrace, one worker round trip. Rejects (worker `error`)
+   * when a batch names an id the scene does not have — the caller falls back
+   * to a tier-1 reload. */
+  async transformTrace(batches: TransformBatch[]): Promise<Float32Array> {
+    const res = await this.request({ type: 'transformTrace', batches });
     return res.type === 'segments' ? res.buffer : new Float32Array(0);
   }
 

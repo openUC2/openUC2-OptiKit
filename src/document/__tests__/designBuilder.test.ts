@@ -214,3 +214,56 @@ describe('buildDesign', () => {
     expect(doc.components['laser-488nm-a1'].pose.translation['offset-grid'].z).toBe(-2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// World poses and rigid deltas (EMB-F)
+// ---------------------------------------------------------------------------
+
+import { poseDelta, quatFromMat3, samePose, worldPose } from '../designBuilder';
+
+describe('worldPose / poseDelta', () => {
+  const at = (x: number, y: number, rotation = 0, layer = 0) =>
+    worldPose({ position: { x, y }, layer, rotation });
+
+  it('positions are grid cells in millimetres (50/50/55)', () => {
+    expect(at(2, 1, 0, 1).position).toEqual([100, 50, 55]);
+  });
+
+  it('a pure drag is a pure translation delta', () => {
+    expect(poseDelta(at(1, 0), at(2, 3))).toEqual([50, 150, 0, 0, 0, 0, 1]);
+  });
+
+  it('a rotation in place pivots about the cell center', () => {
+    const d = poseDelta(at(1, 0, 0), at(1, 0, 90));
+    // R_d = Rz(90): quat [0, 0, sin45, cos45]; t_d = p - R_d p = (50, -50, 0).
+    expect(d[0]).toBeCloseTo(50, 12);
+    expect(d[1]).toBeCloseTo(-50, 12);
+    expect(d[2]).toBe(0);
+    expect(d[3]).toBeCloseTo(0, 12);
+    expect(d[4]).toBeCloseTo(0, 12);
+    expect(d[5]).toBeCloseTo(Math.SQRT1_2, 12);
+    expect(d[6]).toBeCloseTo(Math.SQRT1_2, 12);
+    // Applying the delta to the old cell center returns the same center.
+    const [px, py] = [50 * Math.cos(Math.PI / 2) - 0 * Math.sin(Math.PI / 2) + d[0],
+                      50 * Math.sin(Math.PI / 2) + d[1]];
+    expect(px).toBeCloseTo(50, 12);
+    expect(py).toBeCloseTo(0, 12);
+  });
+
+  it('quatFromMat3 of the identity is the identity quaternion', () => {
+    expect(quatFromMat3([[1, 0, 0], [0, 1, 0], [0, 0, 1]])).toEqual([0, 0, 0, 1]);
+  });
+
+  it('samePose distinguishes position, layer, and rotation changes', () => {
+    expect(samePose(at(1, 0), at(1, 0))).toBe(true);
+    expect(samePose(at(1, 0), at(2, 0))).toBe(false);
+    expect(samePose(at(1, 0, 0), at(1, 0, 90))).toBe(false);
+    expect(samePose(at(1, 0, 0, 0), at(1, 0, 0, 1))).toBe(false);
+  });
+
+  it('buildDesign reports the world pose of every mapped component', () => {
+    const { poses, mapped } = buildDesign(threeModuleRow(), optikitIdFor, RECORDS);
+    expect([...poses.keys()].sort()).toEqual([...mapped].sort());
+    expect(poses.get('lens-pos-1x1-b2')!.position).toEqual([50, 0, 0]);
+  });
+});

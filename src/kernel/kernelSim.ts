@@ -8,7 +8,9 @@
  */
 
 import { CoreClient } from '../api/coreClient';
-import { buildDesign } from '../document/designBuilder';
+import type { WorldPose } from '../document/designBuilder';
+import { buildDesign, worldPose } from '../document/designBuilder';
+import type { PlacedModule } from '../types';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { getKernelClient } from './KernelClient';
@@ -50,19 +52,57 @@ export function startKernelSimulation(): () => void {
       }),
     loadScene: json => getKernelClient().loadScene(json),
     traceWorld: () => getKernelClient().traceWorld(),
+    transformTrace: batches => getKernelClient().transformTrace(batches),
     onResult: result => useSimulationStore.getState().setKernelResult(result),
+    onPreview: segments => useSimulationStore.getState().setKernelPreview(segments),
     onError: (error, requestId) => useSimulationStore.getState().setKernelError(error, requestId),
     onBusy: busy => useSimulationStore.getState().setKernelBusy(busy),
   });
 
   registerKernelTrigger(() => loop.trigger());
 
+  /** World pose per mapped component id — placement + mount only, no records
+   * needed, so it is cheap enough to run per drag event. */
+  const currentPoses = (placements: readonly PlacedModule[]): Map<string, WorldPose> => {
+    const { modules } = useAppStore.getState();
+    const poses = new Map<string, WorldPose>();
+    for (const p of placements) {
+      const def = modules.find(m => m.id === p.moduleId);
+      if (!def?.optikitId) continue;
+      poses.set(`${p.moduleId}-${p.id}`, worldPose(p, def.optikitMount));
+    }
+    return poses;
+  };
+
+  /** A pose-only edit keeps the same placement set (ids, modules, order-free)
+   * and changes only position/rotation/layer — the tier-2 fast path's domain.
+   * Anything structural (add/remove/module swap) is tier 1 alone. */
+  const isPoseOnly = (
+    prev: readonly PlacedModule[],
+    next: readonly PlacedModule[],
+  ): boolean => {
+    if (prev.length !== next.length) return false;
+    const before = new Map(prev.map(p => [p.id, p]));
+    for (const p of next) {
+      const b = before.get(p.id);
+      if (!b || b.moduleId !== p.moduleId) return false;
+    }
+    return true;
+  };
+
   // Edits (place/move/rotate/delete, either view) re-enter the loop; the
-  // 300 ms debounce inside KernelLoop coalesces a drag into one request.
+  // 300 ms debounce inside KernelLoop coalesces a drag into one settled
+  // request. Pose-only edits ALSO take the tier-2 fast path (EMB-F): the
+  // loaded scene transforms and f32-retraces immediately, and the debounced
+  // tier-1 pass reconciles with f64 + validation on settle.
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     const sim = useSimulationStore.getState();
     if (sim.engine !== 'kernel' || !sim.config.enabled || !sim.config.autoRun) return;
-    if (state.placedModules !== prevState.placedModules) loop.trigger();
+    if (state.placedModules === prevState.placedModules) return;
+    if (isPoseOnly(prevState.placedModules, state.placedModules)) {
+      loop.posePreview(currentPoses(state.placedModules));
+    }
+    loop.trigger();
   });
 
   const dispose = () => {

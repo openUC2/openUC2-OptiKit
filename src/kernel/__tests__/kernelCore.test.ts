@@ -100,3 +100,51 @@ describe('kernel round-trip (EMB-B)', () => {
     expect(res.detector).toBeUndefined();
   });
 });
+
+describe('tier-2 transformTrace (EMB-F / CV-C)', () => {
+  it('moves a batch on the loaded scene and the fast retrace follows', () => {
+    // Fresh scene so earlier tests' state cannot leak in.
+    core.handle({ id: 10, type: 'loadScene', sceneJson: readFileSync(FIXTURE, 'utf8') });
+    const scene = JSON.parse(readFileSync(FIXTURE, 'utf8')) as {
+      bodies: { common: { id: number } }[];
+      apertures: { common: { id: number } }[];
+    };
+    const lensIds = [
+      ...scene.bodies.map(b => b.common.id),
+      ...scene.apertures.map(a => a.common.id),
+    ];
+
+    const before = core.handle({ id: 11, type: 'traceWorldFast' });
+    if (before.type !== 'segments') throw new Error('baseline trace failed');
+
+    // Identity delta: picture unchanged.
+    const same = core.handle({
+      id: 12,
+      type: 'transformTrace',
+      batches: [{ ids: lensIds, delta: [0, 0, 0, 0, 0, 0, 1] }],
+    });
+    if (same.type !== 'segments') throw new Error('identity transform failed');
+    expect(Array.from(same.buffer)).toEqual(Array.from(before.buffer));
+
+    // Move the lens (body + mount) 20 mm sideways: the 1 mm probe beam misses
+    // the glass and the picture must change without any scene reload.
+    const moved = core.handle({
+      id: 13,
+      type: 'transformTrace',
+      batches: [{ ids: lensIds, delta: [0, 20, 0, 0, 0, 0, 1] }],
+    });
+    expect(moved.type).toBe('segments');
+    if (moved.type !== 'segments') return;
+    expect(Array.from(moved.buffer)).not.toEqual(Array.from(before.buffer));
+  });
+
+  it('an unknown id answers error and the caller falls back to tier 1', () => {
+    core.handle({ id: 14, type: 'loadScene', sceneJson: readFileSync(FIXTURE, 'utf8') });
+    const res = core.handle({
+      id: 15,
+      type: 'transformTrace',
+      batches: [{ ids: [99999], delta: [1, 0, 0, 0, 0, 0, 1] }],
+    });
+    expect(res.type).toBe('error');
+  });
+});

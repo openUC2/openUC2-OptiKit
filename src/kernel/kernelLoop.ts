@@ -16,13 +16,18 @@
 
 import type { Scene3Response } from '../api/coreClient';
 import { CoreServiceError } from '../api/coreClient';
-import type { UnmappedPlacement } from '../document/designBuilder';
+import type { UnmappedPlacement, WorldPose } from '../document/designBuilder';
+import { poseDelta, samePose } from '../document/designBuilder';
 import type { DetectorReadoutWire } from './detector';
+import type { TransformBatch } from './messages';
 
 export interface KernelBuildOutput {
   yaml: string;
   mapped: string[];
   unmapped: UnmappedPlacement[];
+  /** World pose per mapped component id at build time — the tier-2 baseline
+   * the pose fast path measures drags against (EMB-F). */
+  poses?: Map<string, WorldPose>;
 }
 
 export interface WorldTraceResult {
@@ -57,7 +62,12 @@ export interface KernelLoopDeps {
   scene3: (designYaml: string) => Promise<Scene3Response>;
   loadScene: (sceneJson: string) => Promise<string>;
   traceWorld: () => Promise<WorldTraceResult>;
+  /** Tier-2 (EMB-F): apply pose deltas to the loaded scene + f32 retrace.
+   * Absent = no fast path; every edit takes tier 1. */
+  transformTrace?: (batches: TransformBatch[]) => Promise<Float32Array>;
   onResult: (result: KernelPassResult) => void;
+  /** Tier-2 f32 preview frames — the picture only; numbers stay settled. */
+  onPreview?: (segments: Float32Array) => void;
   onError: (error: unknown, requestId: number) => void;
   onBusy?: (busy: boolean) => void;
   debounceMs?: number;
@@ -69,6 +79,14 @@ export interface KernelLoopDeps {
 const DEFAULT_DEBOUNCE_MS = 300;
 const DEFAULT_RETRY_DELAYS_MS = [500, 1500];
 
+/** What the tier-2 fast path needs about the scene the worker holds: the
+ * manifest's object ids per component, and each component's pose as currently
+ * applied to those objects. */
+interface SettledScene {
+  objects: Map<string, number[]>;
+  applied: Map<string, WorldPose>;
+}
+
 export class KernelLoop {
   private readonly deps: KernelLoopDeps;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -76,8 +94,15 @@ export class KernelLoop {
   private rendered = 0;
   private workerChain: Promise<void> = Promise.resolve();
   private disposed = false;
+  private settled: SettledScene | null = null;
+  /** Latest-wins coalescing for pose previews: a drag posts poses faster than
+   * the worker traces; only the newest matters. */
+  private pendingPoses: Map<string, WorldPose> | null = null;
+  private previewScheduled = false;
   /** Service requests actually sent — the burst test asserts on this. */
   requestsIssued = 0;
+  /** transformTrace round trips actually sent (tests/diagnostics). */
+  previewsIssued = 0;
 
   constructor(deps: KernelLoopDeps) {
     this.deps = deps;
@@ -96,6 +121,47 @@ export class KernelLoop {
       this.timer = null;
       void this.pass();
     }, this.deps.debounceMs ?? DEFAULT_DEBOUNCE_MS);
+  }
+
+  /** Tier-2 entry point (EMB-F): the current world poses of every mapped
+   * component after a pose-only edit. Applies the delta against the loaded
+   * scene and f32-retraces immediately — the settled tier-1 pass still runs
+   * via the caller's `trigger()`. Falls back to tier 1 (silently — trigger is
+   * already scheduled) when there is no settled scene, no fast path, or the
+   * scene refuses a batch. */
+  posePreview(poses: Map<string, WorldPose>): void {
+    if (this.disposed || !this.deps.transformTrace) return;
+    this.pendingPoses = poses;
+    if (this.previewScheduled) return;
+    this.previewScheduled = true;
+    const section = this.workerChain.then(async () => {
+      this.previewScheduled = false;
+      const current = this.pendingPoses;
+      this.pendingPoses = null;
+      const settled = this.settled;
+      if (!current || !settled || this.disposed) return;
+
+      const batches: TransformBatch[] = [];
+      for (const [comp, pose] of current) {
+        const applied = settled.applied.get(comp);
+        if (!applied || samePose(applied, pose)) continue;
+        const ids = settled.objects.get(comp);
+        if (!ids || ids.length === 0) return; // moved component unknown to the scene: tier 1 handles it
+        batches.push({ ids, delta: poseDelta(applied, pose) });
+        settled.applied.set(comp, pose);
+      }
+      if (batches.length === 0) return;
+      try {
+        this.previewsIssued++;
+        const segments = await this.deps.transformTrace!(batches);
+        if (!this.disposed && this.settled === settled) this.deps.onPreview?.(segments);
+      } catch {
+        // Scene and UI disagree (stale manifest mid-reload): drop the preview;
+        // the debounced tier-1 pass reconciles.
+        this.settled = null;
+      }
+    });
+    this.workerChain = section.catch(() => undefined);
   }
 
   /** Immediate pass, skipping the debounce (tests, explicit "run now"). */
@@ -122,6 +188,7 @@ export class KernelLoop {
 
       if (!build || build.mapped.length === 0) {
         // Nothing to materialize: clear the trace, keep the unmapped list.
+        this.settled = null;
         this.render(id, {
           requestId: id,
           segments: new Float32Array(0),
@@ -153,6 +220,9 @@ export class KernelLoop {
         const { segments, detector } = await this.deps.traceWorld();
         const traceMs = now() - t1;
         if (id !== this.issued || this.disposed) return;
+        // The worker now holds THIS scene: rebase the tier-2 fast path on its
+        // manifest object ids and the build-time poses.
+        this.settled = settledFrom(response.manifest, build.poses);
         const declared = (response.scene as { detectors?: unknown[] } | null)?.detectors;
         this.render(id, {
           requestId: id,
@@ -201,4 +271,26 @@ export class KernelLoop {
     this.rendered = id;
     this.deps.onResult(result);
   }
+}
+
+/** Object ids per component from the materializer's manifest, paired with the
+ * build-time poses; null (no fast path) when either half is missing. */
+function settledFrom(
+  manifest: unknown,
+  poses: Map<string, WorldPose> | undefined,
+): SettledScene | null {
+  if (!poses) return null;
+  const components = (manifest as { components?: Record<string, unknown> } | null)?.components;
+  if (!components || typeof components !== 'object') return null;
+  const objects = new Map<string, number[]>();
+  for (const [comp, entry] of Object.entries(components)) {
+    const e = entry as Partial<Record<'bodies' | 'surfaces' | 'apertures' | 'sources' | 'detectors', unknown>>;
+    const ids: number[] = [];
+    for (const key of ['bodies', 'surfaces', 'apertures', 'sources', 'detectors'] as const) {
+      const list = e[key];
+      if (Array.isArray(list)) ids.push(...list.filter((v): v is number => typeof v === 'number'));
+    }
+    objects.set(comp, ids);
+  }
+  return { objects, applied: new Map(poses) };
 }

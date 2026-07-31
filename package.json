@@ -42,7 +42,7 @@
     "intro.js": "^8.3.2",
     "jszip": "^3.10.1",
     "konva": "^9.3.22",
-    "oc-wasm": "file:vendor/oc-wasm-0.0.1+83bcea9fa.tgz",
+    "oc-wasm": "file:vendor/oc-wasm-0.0.1+eeeaa2f34.tgz",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-konva": "^19.0.7",

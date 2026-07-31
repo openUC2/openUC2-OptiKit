@@ -41,6 +41,22 @@ export class KernelCore {
         case 'traceWorldFast':
           // f32 preview: the picture only, no readout (rule 5).
           return { id: req.id, type: 'segments', buffer: this.canvas.traceWorld3DFast() };
+        case 'transformTrace': {
+          // Tier-2 (EMB-F): batch pose edits on the loaded scene, then one f32
+          // retrace. transformObjects3 is atomic per batch; a refusal means the
+          // scene and the UI disagree (stale manifest) — report it so the
+          // caller falls back to a tier-1 reload.
+          for (const batch of req.batches) {
+            const ok = this.canvas.transformObjects3(
+              Float64Array.from(batch.ids),
+              Float64Array.from(batch.delta),
+            );
+            if (!ok) {
+              return { id: req.id, type: 'error', message: 'transformObjects3 refused a batch' };
+            }
+          }
+          return { id: req.id, type: 'segments', buffer: this.canvas.traceWorld3DFast() };
+        }
       }
     } catch (e) {
       return { id: req.id, type: 'error', message: e instanceof Error ? e.message : String(e) };

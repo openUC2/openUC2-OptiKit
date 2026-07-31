@@ -69,6 +69,9 @@ export interface DesignBuildResult {
   /** Placements with no library mapping: placed, rendered, in the BOM, but
    * absent from the design — rendered as "not simulated" (decision E4). */
   unmapped: UnmappedPlacement[];
+  /** World pose per mapped component id — the tier-2 fast path's baseline
+   * for this build (EMB-F). */
+  poses: Map<string, WorldPose>;
 }
 
 // --- 24-rotation mapping (integer 3×3 matrices, exact) -------------------------
@@ -161,6 +164,92 @@ export function gridRotation(
   };
 }
 
+// --- world poses (EMB-F) --------------------------------------------------------
+
+/** A component's rigid pose in the optikit world frame (mm; exact integer
+ * rotation matrix — every placement rotation is a 90° grid rotation). */
+export interface WorldPose {
+  rotation: Mat3;
+  /** Cell center in world mm: `[x·50, y·50, layer·55]` (UC2_GRID_MM). */
+  position: readonly [number, number, number];
+}
+
+const GRID_MM = [50, 50, 55] as const;
+
+/** The world pose the materializer gives this placement's component frame —
+ * the same `R_w` the design's `rotation.grid` literals are read from, plus the
+ * grid translation. The tier-2 fast path moves scene objects by deltas between
+ * two of these. */
+export function worldPose(
+  m: Pick<PlacedModule, 'position' | 'layer' | 'rotation' | 'topRotation' | 'tiltRotation'>,
+  mount?: string,
+): WorldPose {
+  const yaw = quarterTurns(m.rotation, 'rotation');
+  const tilt = quarterTurns(-(m.tiltRotation ?? 0), 'tiltRotation');
+  const top = quarterTurns(-(m.topRotation ?? 0), 'topRotation');
+  const rotation = mul(mul(mul(mul(rotZ(yaw), rotX(tilt)), rotY(top)), mountRotation(mount)), R0);
+  return {
+    rotation,
+    position: [m.position.x * GRID_MM[0], m.position.y * GRID_MM[1], m.layer * GRID_MM[2]],
+  };
+}
+
+/** `[x, y, z, w]` quaternion of an exact rotation matrix (Shepperd's method —
+ * safe for every branch since the inputs are orthonormal). */
+export function quatFromMat3(m: Mat3): [number, number, number, number] {
+  const t = m[0][0] + m[1][1] + m[2][2];
+  if (t > 0) {
+    const s = Math.sqrt(t + 1) * 2;
+    return [(m[2][1] - m[1][2]) / s, (m[0][2] - m[2][0]) / s, (m[1][0] - m[0][1]) / s, s / 4];
+  }
+  if (m[0][0] >= m[1][1] && m[0][0] >= m[2][2]) {
+    const s = Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]) * 2;
+    return [s / 4, (m[0][1] + m[1][0]) / s, (m[0][2] + m[2][0]) / s, (m[2][1] - m[1][2]) / s];
+  }
+  if (m[1][1] >= m[2][2]) {
+    const s = Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]) * 2;
+    return [(m[0][1] + m[1][0]) / s, s / 4, (m[1][2] + m[2][1]) / s, (m[0][2] - m[2][0]) / s];
+  }
+  const s = Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]) * 2;
+  return [(m[0][2] + m[2][0]) / s, (m[1][2] + m[2][1]) / s, s / 4, (m[1][0] - m[0][1]) / s];
+}
+
+/** The rigid delta carrying `from` onto `to` (`T_to ∘ T_from⁻¹`), in the
+ * kernel wire layout `[px, py, pz, qx, qy, qz, qw]` — what
+ * `transformObjects3` composes onto every object of the moved component. */
+export function poseDelta(from: WorldPose, to: WorldPose): number[] {
+  const rd = mul(to.rotation, transpose(from.rotation));
+  const rp = [
+    rd[0][0] * from.position[0] + rd[0][1] * from.position[1] + rd[0][2] * from.position[2],
+    rd[1][0] * from.position[0] + rd[1][1] * from.position[1] + rd[1][2] * from.position[2],
+    rd[2][0] * from.position[0] + rd[2][1] * from.position[1] + rd[2][2] * from.position[2],
+  ];
+  const q = quatFromMat3(rd);
+  return [
+    to.position[0] - rp[0],
+    to.position[1] - rp[1],
+    to.position[2] - rp[2],
+    q[0], q[1], q[2], q[3],
+  ];
+}
+
+export function samePose(a: WorldPose, b: WorldPose): boolean {
+  return (
+    a.position[0] === b.position[0] &&
+    a.position[1] === b.position[1] &&
+    a.position[2] === b.position[2] &&
+    a.rotation.every((row, i) => row.every((v, j) => v === b.rotation[i][j]))
+  );
+}
+
+function transpose(m: Mat3): Mat3 {
+  return [
+    [m[0][0], m[1][0], m[2][0]],
+    [m[0][1], m[1][1], m[2][1]],
+    [m[0][2], m[1][2], m[2][2]],
+  ];
+}
+
 // --- design generation ---------------------------------------------------------
 
 export interface BuildDesignOptions {
@@ -239,9 +328,13 @@ export function buildDesign(
     },
     components,
   };
+  const poses = new Map<string, WorldPose>(
+    entries.map(([compId, placement, , mount]) => [compId, worldPose(placement, mount)]),
+  );
   return {
     yaml: stringify(design),
     mapped: entries.map(([compId]) => compId),
     unmapped,
+    poses,
   };
 }

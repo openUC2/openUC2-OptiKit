@@ -4,7 +4,7 @@
 vendored here as an npm tarball because the source repository (`optiland-canvas`)
 is private, so public CI cannot build it from source (integration spec rule 13).
 
-- **Current pin:** `oc-wasm-0.0.1+83bcea9fa.tgz` — the `+<sha>` build metadata is
+- **Current pin:** `oc-wasm-0.0.1+eeeaa2f34.tgz` — the `+<sha>` build metadata is
   the `optiland-canvas` commit the tarball was packed from. This build adds the
   exact pointwise R+T validation for tabulated response pairs (spectral
   dichroics: complementary step curves validate).

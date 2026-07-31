@@ -8,10 +8,21 @@
 
 import type { DetectorReadoutWire } from './detector';
 
+/** One moved component: the manifest object ids of everything it owns, and
+ * the rigid delta `[px, py, pz, qx, qy, qz, qw]` to compose onto them. */
+export interface TransformBatch {
+  ids: number[];
+  delta: number[];
+}
+
 export type KernelRequest =
   | { id: number; type: 'loadScene'; sceneJson: string }
   | { id: number; type: 'traceWorld' }
-  | { id: number; type: 'traceWorldFast' };
+  | { id: number; type: 'traceWorldFast' }
+  /** Tier-2 pose fast path (EMB-F): apply the batches to the loaded scene and
+   * f32-retrace in one round trip. An unknown id or malformed delta answers
+   * `error` — the caller's tier-1 reload is the recovery. */
+  | { id: number; type: 'transformTrace'; batches: TransformBatch[] };
 
 export type KernelResponse =
   | { id: 0; type: 'ready' }
