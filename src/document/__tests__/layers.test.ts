@@ -5,6 +5,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument } from '../documentStore';
 import {
   entriesFromIndex,
   groupEntriesFromIndex,
@@ -77,7 +78,8 @@ const TOWER_GROUP: IndexGroup = {
 };
 
 beforeEach(() => {
-  useAppStore.setState({ placedModules: [], modules: [] });
+  resetDocument();
+  useAppStore.setState({ modules: [] });
   registerLibraryModules(entriesFromIndex([CUBE, PLATE, PUZZLE], 'http://x'));
   registerLibraryGroups(groupEntriesFromIndex([TOWER_GROUP]));
 });

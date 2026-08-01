@@ -22,6 +22,7 @@ import { copyPart, duplicatePart, pastePart, uniquifiedRef } from '../clipboard'
 import { makePortRef } from '../types';
 import { usePathsStore } from '../pathsStore';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument } from '../documentStore';
 import type { IndexModule } from '../../model/libraryIndex';
 
 const LENS: IndexModule = {
@@ -54,14 +55,8 @@ const LENS: IndexModule = {
 
 describe('clipboard (WP-78)', () => {
   beforeEach(() => {
-    useAppStore.setState({
-      placedModules: [],
-      modules: [],
-      history: [],
-      historyIndex: -1,
-      selectedItemId: null,
-      selectedItemType: null,
-    });
+    resetDocument();
+    useAppStore.setState({ modules: [] });
     usePathsStore.getState().clear();
     registerLibraryModules(entriesFromIndex([LENS], 'http://x'));
   });

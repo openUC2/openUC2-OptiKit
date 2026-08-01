@@ -9,12 +9,10 @@
  * Every paste is ONE undo step.
  */
 
-// Same boundary exception OptikitDocument itself uses: clipboard.ts IS part
-// of src/document, and the store's raw orientation triple must be copied
-// verbatim — two different triples can realize the SAME R24 while the 2.5D
-// yaw readout (and thus the drawn glyph) differs, so a decompose→recompose
-// round trip would paste a part that renders 180° off.
-import { useAppStore } from '../stores/appStore';
+// WP-96: this used to copy the legacy store's raw euler triple verbatim,
+// because two triples could realize the SAME R24 while the 2.5D yaw readout
+// differed. The document now stores `rot24` itself and derives the yaw from
+// it, so an orientation has exactly one spelling and copying it is lossless.
 import {
   addPart,
   captureUndo,
@@ -37,15 +35,12 @@ export interface PartClipboard {
   dofValues: Record<string, number>;
   rot24: Rot24;
   offsetDeg: { x: number; y: number; z: number };
-  /** The store's raw orientation triple, copied verbatim (see above). */
-  storeRotation: { rotation: number; tiltRotation: number; topRotation: number };
 }
 
 /** Snapshot `partId` for pasting; null for unknown parts. */
 export function copyPart(partId: string): PartClipboard | null {
   const part = getPart(partId);
-  const m = useAppStore.getState().placedModules.find(p => p.id === partId);
-  if (!part || !m) return null;
+  if (!part) return null;
   const params = { ...part.params };
   // Group membership is an instance property, not part identity (WP-44).
   delete params.groupId;
@@ -55,13 +50,8 @@ export function copyPart(partId: string): PartClipboard | null {
     ref: part.ref,
     params,
     dofValues: Object.fromEntries(part.dofs.map(d => [d.name, d.value])),
-    rot24: part.gridPose.rot24,
+    rot24: { ...part.gridPose.rot24 },
     offsetDeg: { ...part.gridPose.offsetDeg },
-    storeRotation: {
-      rotation: m.rotation,
-      tiltRotation: m.tiltRotation ?? 0,
-      topRotation: m.topRotation ?? 0,
-    },
   };
 }
 
@@ -90,14 +80,8 @@ export function pastePart(clip: PartClipboard, positionMm: Vec3): string | null 
   const id = addPart(clip.libraryRef, positionMm);
   if (id === null) return null;
   // addPart applied the palette's default rotation — overwrite with the
-  // copied orientation. setPartOrientation lands the offset-deg residual
-  // (and A triple realizing the R24); the raw triple then goes in verbatim
-  // so the glyph renders exactly like the original (yaw readout included).
+  // copied orientation (rot24 + residual, exactly as it was stored).
   setPartOrientation(id, clip.rot24, clip.offsetDeg);
-  const store = useAppStore.getState();
-  store.rotateModule(id, clip.storeRotation.rotation);
-  store.rotateModuleTilt(id, clip.storeRotation.tiltRotation);
-  store.rotateModuleTop(id, clip.storeRotation.topRotation);
   for (const [key, value] of Object.entries(clip.params)) {
     setPartParam(id, key, value);
   }

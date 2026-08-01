@@ -25,6 +25,7 @@ import { unbindPart } from '../unbind';
 import { makePortRef } from '../types';
 import { usePathsStore } from '../pathsStore';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument } from '../documentStore';
 import type { IndexComponent, IndexModule } from '../../model/libraryIndex';
 
 const MIRROR_MODULE: IndexModule = {
@@ -92,14 +93,8 @@ function registerAll(components: IndexComponent[]) {
 
 describe('unbindPart (WP-76)', () => {
   beforeEach(() => {
-    useAppStore.setState({
-      placedModules: [],
-      modules: [],
-      history: [],
-      historyIndex: -1,
-      selectedItemId: null,
-      selectedItemType: null,
-    });
+    resetDocument();
+    useAppStore.setState({ modules: [] });
     usePathsStore.getState().clear();
     registerAll([MIRROR_COMPONENT]);
   });

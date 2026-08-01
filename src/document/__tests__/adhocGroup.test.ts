@@ -25,6 +25,7 @@ import {
   ungroupParts,
 } from '../adhocGroup';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument, useDocumentStore } from '../documentStore';
 import type { IndexModule } from '../../model/libraryIndex';
 
 const MIRROR: IndexModule = {
@@ -52,10 +53,8 @@ const GRID = 50; // UC2 pitch in x/y
 
 describe('ad-hoc grouping (WP-71)', () => {
   beforeEach(() => {
-    useAppStore.setState({
-      placedModules: [], modules: [], history: [], historyIndex: -1,
-      selectedItems: [], selectedItemId: null, selectedItemType: null,
-    });
+    resetDocument();
+    useAppStore.setState({ modules: [] });
     registerLibraryModules(entriesFromIndex([MIRROR, LENS], 'http://x'));
   });
 
@@ -73,10 +72,13 @@ describe('ad-hoc grouping (WP-71)', () => {
 
   it('toggles selection like shift-click, keeping a primary', () => {
     const [a, b] = placeThree();
+    // WP-96: placing a part selects it — the set and the primary now stay in
+    // step (the legacy store set only the primary, leaving the set empty).
+    setSelectedParts([]);
     togglePartSelection(a);
     togglePartSelection(b);
     expect(listSelectedPartIds()).toEqual([a, b]);
-    expect(useAppStore.getState().selectedItemId).toBe(b); // last = primary
+    expect(useDocumentStore.getState().primaryId).toBe(b); // last = primary
     togglePartSelection(a);
     expect(listSelectedPartIds()).toEqual([b]);
   });
@@ -185,6 +187,6 @@ describe('ad-hoc grouping (WP-71)', () => {
     expect(listSelectedPartIds()).toEqual([a, b]);
     setSelectedParts([]);
     expect(listSelectedPartIds()).toEqual([]);
-    expect(useAppStore.getState().selectedItemId).toBeNull();
+    expect(useDocumentStore.getState().primaryId).toBeNull();
   });
 });

@@ -8,8 +8,12 @@ import {
   addFiber,
   addPart,
   categoryOf,
+  entriesFromWorkspace,
   getSnapshot,
+  libraryEntryOf,
+  listLibraryEntries,
   makePortRef,
+  registerLibraryModules,
   removePart,
   renamePart,
   setDofValue,
@@ -23,18 +27,56 @@ import {
 } from '../../document';
 import { useAppStore } from '../../stores/appStore';
 import { usePathsStore } from '../../document/pathsStore';
+import { useWorkspaceLibrary } from '../workspaceLibrary';
+import { recordToYaml } from '../componentRecord';
 import type { DsnFiles } from './io';
 import { designFromFiles, zipDsn, DESIGN_DECL_FILE } from './io';
 import { designToParts } from './convert';
 import { serviceFiles } from './serviceExport';
+import { bundleFiles, registerBundleLibrary, useBundleLibrary } from './bundleImport';
+
+/** Fold workspace + bundle entries into the live palette registration NOW —
+ * the React registration hook repeats this idempotently on the next render. */
+function syncRegistration(): void {
+  const ws = useWorkspaceLibrary.getState();
+  const existing = listLibraryEntries();
+  const known = new Set(existing.map(e => e.moduleId));
+  const fresh = [
+    ...entriesFromWorkspace(ws.records, ws.thumbnails),
+    ...useBundleLibrary.getState().entries,
+  ].filter(e => !known.has(e.moduleId));
+  if (fresh.length > 0) registerLibraryModules([...existing, ...fresh]);
+}
 
 /**
  * Serialize the current document to a .dsn file map. When a source design was
  * imported this is the merged document (its optics/template/dof blocks
  * survive the round trip); otherwise the plain snapshot.
+ *
+ * WP-98: the map also carries the `library/` records the design depends on
+ * but the shared registry does not have — browser-local workspace components
+ * and any session-bundle module trios that are actually placed — so an
+ * exported zip is a SELF-CONTAINED setup bundle another user can import.
  */
 export function exportDsnFiles(): DsnFiles {
-  return serviceFiles();
+  const files: DsnFiles = { ...serviceFiles() };
+  const placedRefs = new Set<string>();
+  const componentRefs = new Set<string>();
+  for (const part of listParts()) {
+    placedRefs.add(part.libraryRef);
+    componentRefs.add(part.libraryRef);
+    const componentId = libraryEntryOf(part.libraryRef)?.componentId;
+    if (componentId) componentRefs.add(componentId);
+  }
+  for (const [id, record] of Object.entries(useWorkspaceLibrary.getState().records)) {
+    if (componentRefs.has(id)) {
+      files[`library/components/${id}/component.yml`] = recordToYaml(record);
+    }
+  }
+  if (useBundleLibrary.getState().entries.some(e => placedRefs.has(e.moduleId))) {
+    Object.assign(files, bundleFiles());
+  }
+  return files;
 }
 
 /** Export the current document as a downloadable .dsn zip. */
@@ -49,19 +91,32 @@ export interface ImportReport {
   placed: number;
   skipped: string[];
   warnings: string[];
+  /** WP-98: records the bundle's `library/` half registered before placing. */
+  libraryComponents: number;
+  libraryModules: number;
 }
 
 /**
  * Replace the current document with the design in the given .dsn file map.
- * Unknown library refs fall back to the first wildcard module definition so the
- * layout is still visible/editable (flagged in the report).
+ *
+ * WP-98: a bundle's `library/` records register FIRST (components → workspace,
+ * modules → the session bundle registry with their GLB and docs), so refs the
+ * zip itself carries resolve instead of being substituted. Only refs known
+ * nowhere fall back to a lookalike module (flagged in the report).
  */
 export function importDsnFiles(files: DsnFiles): ImportReport {
+  const bundle = registerBundleLibrary(files, {
+    registeredIds: new Set(useAppStore.getState().modules.map(m => m.id)),
+  });
+  // Make the bundle's entries resolvable IN THIS TICK (the registration hook
+  // re-registers canonically on the next render; both are idempotent).
+  syncRegistration();
+
   const decl = designFromFiles(files);
   const imported = designToParts(decl);
   const store = useAppStore.getState();
   const skipped: string[] = [];
-  const warnings = [...imported.warnings];
+  const warnings = [...bundle.warnings, ...imported.warnings];
   const rawYaml =
     (files[DESIGN_DECL_FILE] ??
       Object.entries(files).find(([p]) => p.endsWith(`/${DESIGN_DECL_FILE}`))?.[1]) as
@@ -152,5 +207,11 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
     useSourceDesignStore.getState().clear();
   }
 
-  return { placed: Object.keys(idByKey).length, skipped, warnings };
+  return {
+    placed: Object.keys(idByKey).length,
+    skipped,
+    warnings,
+    libraryComponents: bundle.components,
+    libraryModules: bundle.modules,
+  };
 }

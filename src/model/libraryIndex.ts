@@ -111,18 +111,15 @@ export interface IndexModule {
   description: string;
   tags: string[];
   category: string;
-  /** WP-58 mount annotation (stamped by `mergeRepoIndexes`, never served):
-   * the community repo slug + ref this module came from — asset paths of
-   * mounted modules resolve against raw.githubusercontent, not the local
-   * core service. */
-  repo?: string;
-  repoRef?: string;
   thumbnail: string | null;
   footprint_grid: [number, number, number];
   /** Kit price in EUR from the module record (null = unpriced). */
   price?: number | null;
-  /** WP-58: `<owner>/<repo>` when this came from a mounted community repo. */
+  /** WP-58 mount annotation (stamped by `mergeRepoIndexes`, never served):
+   * `<owner>/<repo>` and the ref this module came from. A mounted module's
+   * asset paths resolve against raw.githubusercontent, not the core service. */
   repo?: string;
+  repoRef?: string;
   review: boolean;
   component: {
     ref: string;

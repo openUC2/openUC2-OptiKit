@@ -18,6 +18,7 @@ import { rot24Matrix } from '../rot24';
 import { addPart, getPart, movePartWorld } from '../OptikitDocument';
 import { buildServiceDesign, listPartMechanics } from '../../model/dsn/serviceExport';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument } from '../documentStore';
 import type { IndexComponent, IndexModule } from '../../model/libraryIndex';
 import type { SourcePort } from '../sourceDesignStore';
 
@@ -221,7 +222,8 @@ describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () =
   });
 
   it('groups them apart as "<category> · unbound"', () => {
-    useAppStore.setState({ placedModules: [], modules: [] });
+    resetDocument();
+  useAppStore.setState({ modules: [] });
     registerLibraryModules(entriesFromComponents([AC254], [], 'http://x'));
     const def = useAppStore.getState().modules.find(m => m.id === AC254.id);
     expect(def?.group).toBe('lens · unbound');
@@ -265,7 +267,8 @@ describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () =
 
 describe('unbound placement (WP-60 pin: continuous mm, no cell claim)', () => {
   beforeEach(() => {
-    useAppStore.setState({ placedModules: [], modules: [] });
+    resetDocument();
+  useAppStore.setState({ modules: [] });
     registerLibraryModules(
       entriesFromComponents([AC254], [], 'http://localhost:8010'),
     );
@@ -310,7 +313,8 @@ describe('T-class movement contract (through the document facade)', () => {
 
   beforeEach(() => {
     entries = entriesFromIndex([MIRROR_MODULE, LENS_Z_MODULE], 'http://localhost:8010');
-    useAppStore.setState({ placedModules: [], modules: [] });
+    resetDocument();
+  useAppStore.setState({ modules: [] });
     registerLibraryModules(entries);
   });
 

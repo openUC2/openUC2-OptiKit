@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { useAppStore } from '../stores/appStore';
+import { useDocumentStore } from './documentStore';
 import { usePathsStore } from './pathsStore';
 
 interface RevisionState {
@@ -23,13 +23,13 @@ export function useDocRevision(): number {
 }
 
 // Singleton wiring: compare the underlying references so selection changes
-// (which replace neither placedModules nor paths) do not count as edits.
-let lastModules = useAppStore.getState().placedModules;
+// (which replace neither the parts array nor paths) do not count as edits.
+let lastParts = useDocumentStore.getState().parts;
 let lastPaths = usePathsStore.getState().paths;
 
-useAppStore.subscribe(state => {
-  if (state.placedModules !== lastModules) {
-    lastModules = state.placedModules;
+useDocumentStore.subscribe(state => {
+  if (state.parts !== lastParts) {
+    lastParts = state.parts;
     useDocRevisionStore.setState(s => ({ revision: s.revision + 1 }));
   }
 });

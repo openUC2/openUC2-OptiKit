@@ -23,12 +23,15 @@ import { useAppStore } from '../stores/appStore';
 import { useLibraryIndex } from './libraryIndex';
 import { mergeRepoIndexes, useMountedRepos } from './communityRepos';
 import { useWorkspaceLibrary } from './workspaceLibrary';
+import { useBundleLibrary } from './dsn/bundleImport';
 import { getCoreUrl } from '../api/coreClient';
 
 export function useLibraryRegistration() {
   const libraryIndex = useLibraryIndex();
   const workspaceRecords = useWorkspaceLibrary(s => s.records);
   const workspaceThumbs = useWorkspaceLibrary(s => s.thumbnails);
+  // WP-98: modules a .dsn bundle registered for this session.
+  const bundleEntries = useBundleLibrary(s => s.entries);
   const modules = useAppStore(s => s.modules);
   // WP-58: libraries mounted from community GitHub repos. Precedence is
   // builtin < mounted < local drafts, so a fork can ADD parts but never
@@ -54,10 +57,18 @@ export function useLibraryRegistration() {
       getCoreUrl(),
       libraryIndex.housings,
     ).filter(e => !registryIds.has(e.moduleId) && !workspaceIds.has(e.moduleId));
-    registerLibraryModules([...registry, ...workspace, ...unbound]);
+    // WP-98: bundle modules come LAST — a zip can never shadow the registry
+    // or the user's own drafts.
+    const known = new Set([
+      ...registryIds,
+      ...workspaceIds,
+      ...unbound.map(e => e.moduleId),
+    ]);
+    const bundle = bundleEntries.filter(e => !known.has(e.moduleId));
+    registerLibraryModules([...registry, ...workspace, ...unbound, ...bundle]);
     // WP-44: groups (the OPM arrangements) register alongside the modules.
     registerLibraryGroups(groupEntriesFromIndex(merged.groups));
-  }, [merged, libraryIndex.components, libraryIndex.housings, workspaceRecords, workspaceThumbs, modules]);
+  }, [merged, libraryIndex.components, libraryIndex.housings, workspaceRecords, workspaceThumbs, bundleEntries, modules]);
 
   return { libraryIndex, merged, mountedRepos };
 }

@@ -14,10 +14,15 @@
  * mounted by the schematic property panel AND the assembly panel.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
+  Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   Stack,
@@ -29,7 +34,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Edit as EditIcon } from '@mui/icons-material';
+import { Edit as EditIcon, MenuBook as DocsIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import type { DocPart } from '../../document';
 import { libraryEntryOf } from '../../document';
@@ -61,10 +66,14 @@ export function PartOpticsSection({ part }: { part: DocPart }) {
     [part.libraryRef, entry, index.components],
   );
   const ports = useMemo(() => recordPortsOf(part), [part]);
+  // WP-98: the record's `docs:` markdown, when the source shipped it
+  // (a .dsn bundle resolves the files from its own zip).
+  const docs = entry?.docs ?? [];
+  const [openDoc, setOpenDoc] = useState<{ title: string; text: string } | null>(null);
 
   const hasOptics =
     facts.surfaces.length > 0 || facts.eflMm !== null || facts.wavelengthsUm.length > 0;
-  if (!hasOptics && ports.length === 0) return null;
+  if (!hasOptics && ports.length === 0 && docs.length === 0) return null;
 
   return (
     <>
@@ -73,6 +82,13 @@ export function PartOpticsSection({ part }: { part: DocPart }) {
         <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
           Optics
         </Typography>
+        {docs.map(doc => (
+          <Tooltip key={doc.title} title={`part docs — ${doc.title}`}>
+            <IconButton size="small" onClick={() => setOpenDoc(doc)}>
+              <DocsIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        ))}
         {facts.componentId && (
           <Tooltip title="edit in Parts… (the inspector is read-only)">
             <IconButton
@@ -210,6 +226,26 @@ export function PartOpticsSection({ part }: { part: DocPart }) {
           </Stack>
         </>
       )}
+
+      {/* WP-98: the documentation that travels with the record. Rendered as
+          plain markdown text — the docs slot is a file, not a wiki. */}
+      <Dialog open={openDoc !== null} onClose={() => setOpenDoc(null)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'monospace', fontSize: 15 }}>
+          {openDoc?.title} · {part.ref}
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            component="pre"
+            variant="body2"
+            sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', m: 0 }}
+          >
+            {openDoc?.text}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button size="small" onClick={() => setOpenDoc(null)}>close</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

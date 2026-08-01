@@ -6,6 +6,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument } from '../documentStore';
 import {
   entriesFromIndex,
   groupEntriesFromIndex,
@@ -72,7 +73,8 @@ const PAIR_GROUP: IndexGroup = {
 };
 
 beforeEach(() => {
-  useAppStore.setState({ placedModules: [], modules: [] });
+  resetDocument();
+  useAppStore.setState({ modules: [] });
   registerLibraryModules(entriesFromIndex([CUBE_MODULE, FRAME_MODULE], 'http://x'));
   registerLibraryGroups(groupEntriesFromIndex([PAIR_GROUP]));
   useGroupEditStore.setState({ unlocked: {} });

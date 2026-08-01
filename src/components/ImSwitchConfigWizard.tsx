@@ -32,11 +32,12 @@ import {
   Download as DownloadIcon,
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
+import { useDocParts } from '../document';
+import { rotationTripleOf } from '../document/legacyLayout';
 import { ImSwitchJsonEditor } from './ImSwitchJsonEditor';
 import type { 
   ImSwitchConfiguration, 
   AvailableController,
-  PlacedModule 
 } from '../types';
 
 // Base path for standalone JSON config fragments shipped under public/imswitch_configs
@@ -136,7 +137,9 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   open,
   onClose,
 }) => {
-  const { modules, placedModules } = useAppStore();
+  const { modules } = useAppStore();
+  // WP-96: placed parts come from the document, not the legacy store.
+  const parts = useDocParts();
   const [activeStep, setActiveStep] = useState(0);
   const [controllerDatabase, setControllerDatabase] = useState<AvailableController[]>([]);
   const [detectedHardware, setDetectedHardware] = useState<{
@@ -348,8 +351,8 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
 
       // Load each placed module's config fragment in parallel, preserving order.
       const fragments = await Promise.all(
-        placedModules.map(async (placedModule: PlacedModule) => {
-          const moduleDefinition = modules.find(m => m.id === placedModule.moduleId);
+        parts.map(async (part) => {
+          const moduleDefinition = modules.find(m => m.id === part.libraryRef);
           if (!moduleDefinition) return null;
 
           // Prefer the new file-based reference
@@ -396,7 +399,7 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, placedModules, modules]);
+  }, [open, parts, modules]);
 
   const handleNext = () => {
     if (activeStep === 2) {
@@ -566,22 +569,26 @@ export const ImSwitchConfigWizard: React.FC<ImSwitchConfigWizardProps> = ({
   const handleDownload = () => {
     // Build uc2_components in the same format as the standalone OptiKit JSON export
     // so the file can be re-imported by the OptiKit layout tools.
-    const uc2Components = placedModules.flatMap((pm: PlacedModule, index: number) => {
-      const def = modules.find(m => m.id === pm.moduleId);
+    const uc2Components = parts.flatMap((part, index: number) => {
+      const def = modules.find(m => m.id === part.libraryRef);
       if (!def) return [];
       const baseName = def.name.replace(/\s+/g, '_');
       const runningNumber = index.toString().padStart(2, '0');
+      const cell = part.gridPose.cell;
+      const [tilt, yaw, top] = rotationTripleOf(part.gridPose.rot24);
       return [{
         name: `${baseName}_${runningNumber}`,
         file: def.autodeskInventor ||
               `C:\\UC2_Components\\${def.name.replace(/\s+/g, '_')}.iam`,
-        grid_pos: [pm.position.x, pm.position.y, pm.layer] as [number, number, number],
-        rotation: [0, pm.rotation, 0] as [number, number, number],
-        moduleId: pm.moduleId,
+        // Layout files store the STORE cell (y grows south).
+        grid_pos: [cell[0], -cell[1], cell[2]] as [number, number, number],
+        // WP-96: the full triple — this used to drop tilt/top on the floor.
+        rotation: [tilt, yaw, top] as [number, number, number],
+        moduleId: part.libraryRef,
         originalName: def.name,
         description: def.description,
-        params: pm.params || {},
-        ...(pm.customText ? { customText: pm.customText } : {}),
+        params: part.params || {},
+        ...(part.ref ? { customText: part.ref } : {}),
       }];
     });
 

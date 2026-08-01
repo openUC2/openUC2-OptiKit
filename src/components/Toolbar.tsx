@@ -39,6 +39,7 @@ import {
 import { saveAs } from 'file-saver';
 import { useAppStore } from '../stores/appStore';
 import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
+import { redo, undo } from '../document';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 import { ImportOptilandDialog } from './library/ImportOptilandDialog';
@@ -81,8 +82,6 @@ export const Toolbar: React.FC = () => {
     downloadSTLBundle,
     importData,
     importFromUrl,
-    undo,
-    redo,
     clearAll,
     remoteSourcePath,
     addNotification
@@ -162,6 +161,13 @@ export const Toolbar: React.FC = () => {
         const report = importDsnFiles(await unzipDsn(file));
         const details = [
           `${report.placed} part(s) placed`,
+          // WP-98: the bundle's own records registered before placing.
+          ...(report.libraryComponents || report.libraryModules
+            ? [
+                `bundle library: ${report.libraryComponents} component(s), ` +
+                  `${report.libraryModules} module(s) registered (modules last until reload)`,
+              ]
+            : []),
           ...(report.skipped.length ? [`skipped: ${report.skipped.join(', ')}`] : []),
           ...report.warnings.slice(0, 3),
         ].join(' · ');

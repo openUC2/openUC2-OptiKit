@@ -1,7 +1,19 @@
 /**
- * Pose mapping between the legacy appStore model and the document frame.
+ * Pose math for the document frame, in two clearly separated halves.
  *
- * ## Backing model (appStore `PlacedModule`)
+ * ## 1 · CANONICAL — the `.dsn` pose (`DsnPart`)
+ * `worldPoseOfPart` / `gridPoseOfPart` / `partRotationMatrix` resolve the
+ * stored DSN pose (`cell`, `offsetMm`, `rot24`, `offsetDeg`) into what the
+ * views need. This is the only pose representation the editor stores.
+ *
+ * ## 2 · LEGACY INTERCHANGE — the `PlacedModule` layout format
+ * Everything below the "legacy" banner exists so the OLD interchange files
+ * still load and save byte-compatibly (the layout JSON in the Store repo,
+ * `?data=` share links, the ImSwitch config, the pre-WP-96 localStorage blob).
+ * It describes a *file format*, not the editor's state — `legacyLayout.ts` is
+ * its only consumer. Do not reach for it in new code.
+ *
+ * ## Legacy backing model (`PlacedModule`)
  * The current store is the *flattened* form of the future `.dsn` tree:
  *   - `position.x`, `position.y` — integer grid cell (2D top view; y grows "south",
  *     i.e. downward on the 2D canvas / +Z in the three.js scene)
@@ -34,19 +46,16 @@
 
 import * as THREE from 'three';
 import type { PlacedModule } from '../types';
-import { decomposeRot24, rot24Matrix } from './rot24';
+import { decomposeRot24, rot24Matrix, rot24WithYawStep, yawStepOfRot24 } from './rot24';
 import type { Rot24 } from './rot24';
-import type { DocGridPose, DocWorldPose, Vec3 } from './types';
-import { UC2_GRID_MM } from './types';
+import type { DocGridPose, DocWorldPose, DsnPart, OffsetDeg, Vec3 } from './types';
+import { UC2_GRID_MM, ZERO_OFFSET_DEG } from './types';
+
+export type { OffsetDeg } from './types';
+export { ZERO_OFFSET_DEG } from './types';
 
 /** Reserved key inside PlacedModule.params for document-layer instance data. */
 export const DOC_PARAMS_KEY = '__doc';
-
-export interface OffsetDeg {
-  x: number;
-  y: number;
-  z: number;
-}
 
 export interface DocParams {
   /** Continuous residual offset from the grid cell, mm, document frame. */
@@ -61,8 +70,6 @@ export interface DocParams {
   /** Resolved DOF values by name. */
   dofValues?: Record<string, number>;
 }
-
-export const ZERO_OFFSET_DEG: OffsetDeg = { x: 0, y: 0, z: 0 };
 
 export function getDocParams(m: PlacedModule): DocParams {
   const raw = m.params?.[DOC_PARAMS_KEY];
@@ -79,6 +86,80 @@ export function getDocParams(m: PlacedModule): DocParams {
 /** The part's rotation residual, defaulting to zero. */
 export function offsetDegOf(m: PlacedModule): OffsetDeg {
   return getDocParams(m).offsetDeg ?? ZERO_OFFSET_DEG;
+}
+
+// ── CANONICAL: the .dsn pose ─────────────────────────────────────────────────
+
+/** Absolute document-frame position of a part: `p = S·cell + δ`. */
+export function partPositionMm(part: DsnPart): Vec3 {
+  return [
+    part.cell[0] * UC2_GRID_MM[0] + part.offsetMm[0],
+    part.cell[1] * UC2_GRID_MM[1] + part.offsetMm[1],
+    part.cell[2] * UC2_GRID_MM[2] + part.offsetMm[2],
+  ];
+}
+
+/** Full orientation `R = R24 · ΔR` (the residual acts in the LOCAL frame). */
+export function partRotationMatrix(part: DsnPart): THREE.Matrix4 {
+  const snapped = rot24Matrix(part.rot24);
+  const off = part.offsetDeg;
+  if (off.x === 0 && off.y === 0 && off.z === 0) return snapped;
+  return snapped.multiply(offsetDegMatrix(off));
+}
+
+/**
+ * The part's yaw about document +z in degrees.
+ *
+ * The yaw is the rotation ABOUT the vertical that the discrete orientation
+ * carries, which is not readable off any single local axis — a part whose
+ * local +x points along ±z (every optic laid into the document plane) makes
+ * that projection degenerate. The 90°-step decomposition names it exactly
+ * (and is cached), so the snapped yaw comes from there and the residual adds
+ * on top. For a tipped part a single yaw number is ill-defined anyway — this
+ * stays the 2.5D editor's working value.
+ */
+export function partYawDeg(part: DsnPart): number {
+  return normalizeDeg(yawStepOfRot24(part.rot24) * 90 + part.offsetDeg.z);
+}
+
+/**
+ * Split a target document yaw into the discrete orientation it implies and
+ * the continuous residual — the inverse of `partYawDeg`, and the only way the
+ * editor changes a yaw.
+ */
+export function applyYawToRot24(
+  rot24: Rot24,
+  yawDeg: number,
+  snap: boolean,
+): { rot24: Rot24; residualDeg: number } {
+  const step = Math.round(yawDeg / 90);
+  let residual = yawDeg - step * 90;
+  if (residual > 180) residual -= 360;
+  if (residual < -180) residual += 360;
+  return {
+    rot24: rot24WithYawStep(rot24, ((step % 4) + 4) % 4),
+    residualDeg: snap ? 0 : residual,
+  };
+}
+
+export function worldPoseOfPart(part: DsnPart): DocWorldPose {
+  const q = new THREE.Quaternion().setFromRotationMatrix(partRotationMatrix(part));
+  return {
+    positionMm: partPositionMm(part),
+    rotation: [q.x, q.y, q.z, q.w],
+    yawDeg: partYawDeg(part),
+  };
+}
+
+/** The grid pose IS the stored pose — no decomposition needed any more. */
+export function gridPoseOfPart(part: DsnPart): DocGridPose {
+  return {
+    cell: [...part.cell] as Vec3,
+    rot24: { ...part.rot24 },
+    offsetMm: [...part.offsetMm] as Vec3,
+    offsetDeg: { ...part.offsetDeg },
+    residualYawDeg: part.offsetDeg.z,
+  };
 }
 
 // ── frame conversion ─────────────────────────────────────────────────────────
@@ -120,7 +201,10 @@ export function rotateDocVec(q: [number, number, number, number], v: Vec3): Vec3
   return [out.x, out.y, out.z];
 }
 
-// ── store → document ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// LEGACY INTERCHANGE below this line — the PlacedModule layout FILE format.
+// Only `legacyLayout.ts` may use it. See the module header.
+// ═══════════════════════════════════════════════════════════════════════════
 
 /** Document yaw (CCW about +z) from a store yaw. */
 export function docYawFromStoreYaw(storeDeg: number): number {
@@ -282,6 +366,32 @@ export function eulerTripleForRot24(rot24: Rot24): {
 }
 
 const eulerTripleCache = new Map<string, { rotation: number; tiltRotation: number; topRotation: number }>();
+
+/**
+ * Inverse of `eulerTripleForRot24`: the rot24 a 90°-step euler triple realizes.
+ *
+ * Used for two things and nothing else: reading the legacy layout format, and
+ * replacing ONLY the yaw component of an orientation (the yaw ring / "type
+ * yaw = 55°"), where the triple is a convenient decomposition device — the
+ * tilt/roll steps stay put while `rotation` changes.
+ */
+export function rot24FromEulerTriple(
+  rotation: number,
+  tiltRotation = 0,
+  topRotation = 0,
+): Rot24 {
+  return decomposeRot24(
+    docRotationMatrix({
+      id: '',
+      moduleId: '',
+      position: { x: 0, y: 0 },
+      layer: 0,
+      rotation,
+      tiltRotation,
+      topRotation,
+    }),
+  ).rot24;
+}
 
 function matricesClose(a: THREE.Matrix4, b: THREE.Matrix4): boolean {
   for (let i = 0; i < 16; i++) {

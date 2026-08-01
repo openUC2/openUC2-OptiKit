@@ -82,14 +82,16 @@ export interface Layer {
 }
 
 // Simplified state snapshot for undo/redo
+/**
+ * @deprecated WP-96 — the undo stack moved into the document store
+ * (`DocumentSnapshot`). Kept only because the legacy layout files reference
+ * the same field names.
+ */
 export interface StateSnapshot {
   placedModules: PlacedModule[];
   annotations: Annotation[];
   layers: Layer[];
   activeLayerId: string;
-  selectedItems: SelectedItem[];
-  selectedItemId: string | null;
-  selectedItemType: 'module' | 'annotation' | null;
 }
 
 // Setup metadata interface
@@ -133,19 +135,21 @@ export interface SelectedItem {
   type: 'module' | 'annotation';
 }
 
+/**
+ * The APP shell's state — everything that is NOT the design.
+ *
+ * WP-96: the design itself (parts, selection, undo) lives in
+ * `src/document/documentStore.ts` in its `.dsn` spelling. This store keeps the
+ * module catalog, the working-plane layers, setup metadata, notifications and
+ * the legacy interchange plumbing.
+ */
 export interface AppState {
   modules: ModuleDefinition[];
-  placedModules: PlacedModule[];
   /** Legacy-setup annotations — kept as round-trip data (import/export);
    *  the annotation drawing tools retired with the grid builder (WP-69). */
   annotations: Annotation[];
   layers: Layer[];
   activeLayerId: string;
-  selectedItemId: string | null;
-  selectedItemType: 'module' | 'annotation' | null;
-  selectedItems: SelectedItem[];
-  history: StateSnapshot[]; // Command history for undo/redo
-  historyIndex: number;
   setupMetadata: SetupMetadata;
   notifications: Notification[];
   // Path of the remotely loaded setup (for overwrite-save)

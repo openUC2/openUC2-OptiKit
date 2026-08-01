@@ -29,6 +29,9 @@ export const DEFAULT_CORE_URL =
     : 'http://localhost:8000';
 
 export function getCoreUrl(): string {
+  // Node/test contexts have no localStorage — and this runs at module-eval
+  // time via libraryIndex's DEFAULT_INDEX_URL, so it must not throw there.
+  if (typeof localStorage === 'undefined') return DEFAULT_CORE_URL;
   return localStorage.getItem(URL_STORAGE_KEY) ?? DEFAULT_CORE_URL;
 }
 

@@ -24,6 +24,7 @@ import { swapPartModule } from '../swap';
 import { makePortRef } from '../types';
 import { usePathsStore } from '../pathsStore';
 import { useAppStore } from '../../stores/appStore';
+import { resetDocument } from '../documentStore';
 import type { IndexModule } from '../../model/libraryIndex';
 
 const BASE: IndexModule = {
@@ -91,14 +92,8 @@ const LENS_TIGHT: IndexModule = {
 
 describe('swapPartModule (WP-66)', () => {
   beforeEach(() => {
-    useAppStore.setState({
-      placedModules: [],
-      modules: [],
-      history: [],
-      historyIndex: -1,
-      selectedItemId: null,
-      selectedItemType: null,
-    });
+    resetDocument();
+    useAppStore.setState({ modules: [] });
     usePathsStore.getState().clear();
     registerLibraryModules(
       entriesFromIndex([MIRROR_1X1, MIRROR_45, LENS_DZ, LENS_TIGHT], 'http://x'),

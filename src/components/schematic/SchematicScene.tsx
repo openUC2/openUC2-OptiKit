@@ -12,7 +12,9 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, Text } from '@react-three/drei';
 import type { DocFiber, DocPart, DocPath, LayerAppearance, PortRef, Vec3 } from '../../document';
 import {
+  captureUndo,
   classifyPart,
+  commitUndo,
   docQuatToThree,
   interfaceKindOf,
   layerAppearance,
@@ -34,6 +36,7 @@ import {
   useSelectedPartId,
   UC2_GRID_MM,
 } from '../../document';
+import type { UndoToken } from '../../document';
 import { wavelengthToColor } from '../../utils/sceneBuilder';
 import { AuthoritativeRays } from './AuthoritativeRays';
 import { AuthoredSymbol } from './AuthoredSymbol';
@@ -109,6 +112,8 @@ function SchematicPart({
      * becomes a selection toggle instead of a height drag. */
     moved: boolean;
     toggleOnRelease: boolean;
+    /** WP-96: the whole drag is ONE undo step. */
+    undo: UndoToken;
   } | null>(null);
 
   const pos = toThree(part.worldPose.positionMm);
@@ -197,6 +202,7 @@ function SchematicPart({
       const hit = intersectDragPlane(e, mode);
       if (!hit) return;
       drag.current = {
+        undo: captureUndo(),
         mode,
         grabOffset: [
           hit[0] - part.worldPose.positionMm[0],
@@ -246,6 +252,7 @@ function SchematicPart({
       const d = drag.current;
       if (!d) return;
       drag.current = null;
+      commitUndo(d.undo);
       // A shift press that never moved was a multi-select click, not a
       // height drag (WP-71).
       if (d.toggleOnRelease && !d.moved) togglePartSelection(part.id);

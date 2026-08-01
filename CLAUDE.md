@@ -24,18 +24,25 @@ that manifest, not at this repo's internals.
 
 ## Hard rule: the document boundary
 
-**New editor components must import design-model state ONLY from `src/document`
-(the `OptikitDocument` facade) — never from `stores/appStore` directly.**
+**Editor components import design-model state ONLY from `src/document` (the
+`OptikitDocument` facade) — never from `stores/appStore`.**
 
-The facade is this repo's DSN-speaking surface. It currently wraps the legacy
-appStore (`PlacedModule[]`); it will be re-backed by the `.dsn` schema-v0
-document without changing its API — which stays possible only while nothing
-reaches around it. This rule therefore RESOLVES by finishing that re-backing
-and porting the remaining legacy appStore consumers (GridCanvas, PropertyPanel,
-Toolbar, …), not by allowing new ones; until then, do not add new appStore
-consumers. The store↔document pose mapping lives in `src/document/mapping.ts` —
-read it before touching any coordinate code (conventions themselves:
-DSN-CONTRACT.md above).
+Since **WP-96 the facade IS the `.dsn` document**: `src/document/documentStore.ts`
+holds `DsnPart[]` in the schema's own spelling (`cell` + `offsetMm`, `rot24` +
+`offsetDeg`), plus the selection and the undo stack. The legacy
+`PlacedModule[]` design state is gone from `appStore`, which now keeps only
+the module catalog, layers, setup metadata, notifications and the legacy
+interchange plumbing.
+
+- Pose math: `src/document/mapping.ts` — the **canonical** half (`DsnPart`)
+  is the only one new code touches; the **legacy interchange** half below the
+  banner belongs to `legacyLayout.ts` alone.
+- `src/document/legacyLayout.ts` is the *only* file that may mention
+  `PlacedModule`. It converts to/from the old layout JSON, share links, the
+  ImSwitch export and the pre-WP-96 localStorage blob (migrated once on load).
+- The yaw of a discrete orientation is coset arithmetic in
+  `src/document/rot24.ts` (`yawStepOfRot24` / `rot24WithYawStep`) — never
+  read it off a local axis or a 90°-step euler triple, both are ambiguous.
 
 The component ("symbol") editor lives at `/configurator/components`
 (`src/components/component-editor/`); its record model, YAML serialization,

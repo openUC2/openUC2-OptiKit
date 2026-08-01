@@ -1,37 +1,47 @@
 /**
  * OptikitDocument — the single boundary between editor UI and the design model.
  *
- * Editor components (schematic view, assembly view, property panels) must import
- * ONLY from `src/document`, never `appStore` directly. Today the facade is backed
- * by the legacy appStore (`PlacedModule[]` — the flattened form of the `.dsn`
- * component tree); when the backing model becomes the `.dsn` document (WP-12+),
- * views keep working unchanged.
+ * Editor components (schematic view, assembly view, property panels) import
+ * ONLY from `src/document`. Since WP-96 the backing model IS the `.dsn`
+ * document: `useDocumentStore` holds `DsnPart[]` — cell + offset-mm, rot24 +
+ * offset-deg — with the selection and the undo history. The legacy
+ * `PlacedModule` shape is gone from the editor's state; it survives only in
+ * `legacyLayout.ts`, which reads and writes the old interchange files.
  *
- * Pose semantics and the store↔document frame mapping: see `mapping.ts`.
+ * Pose semantics: `mapping.ts` (canonical half) and
+ * `../optikit-core/DOCS/DSN-CONTRACT.md` §3.
  */
 
 import { useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../stores/appStore';
 import { MODULE_SIMULATION_MODELS } from '../types';
-import type { ModuleDefinition, PlacedModule } from '../types';
+import type { ModuleDefinition } from '../types';
 import {
-  DOC_PARAMS_KEY,
-  ZERO_OFFSET_DEG,
-  eulerTripleForRot24,
-  getDocParams,
-  gridPoseOf,
+  applyYawToRot24,
+  gridPoseOfPart,
   rotateDocVec,
-  splitDocYaw,
   splitWorldPosition,
-  worldPoseOf,
+  worldPoseOfPart,
 } from './mapping';
+import { useDocumentStore } from './documentStore';
+import type { DocumentSnapshot } from './documentStore';
 import { defaultRotationFor, groupEntryOf, libraryEntryOf } from './libraryPalette';
 import { useGroupEditStore } from './groupStore';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
 import { useFibersStore } from './fibersStore';
-import { UC2_GRID_MM } from './types';
-import type { DocCategory, DocDof, DocPart, DocPath, DocSnapshot, PortRef, Vec3 } from './types';
+import { UC2_GRID_MM, ZERO_OFFSET_DEG } from './types';
+import type {
+  DocCategory,
+  DocDof,
+  DocPart,
+  DocPath,
+  DocSnapshot,
+  DsnPart,
+  PortRef,
+  Vec3,
+} from './types';
 
 // ── category derivation ──────────────────────────────────────────────────────
 
@@ -70,11 +80,10 @@ export function categoryOf(moduleId: string, def?: ModuleDefinition): DocCategor
 
 // ── part projection ──────────────────────────────────────────────────────────
 
-function dofsOf(m: PlacedModule): DocDof[] {
-  const values = getDocParams(m).dofValues ?? {};
+function dofsOf(part: DsnPart): DocDof[] {
   // Until library records declare DOFs (WP-12/WP-7), only explicitly set values
   // appear, with an open range.
-  return Object.entries(values).map(([name, value]) => ({
+  return Object.entries(part.dofValues).map(([name, value]) => ({
     name,
     range: null,
     unit: 'mm',
@@ -82,33 +91,39 @@ function dofsOf(m: PlacedModule): DocDof[] {
   }));
 }
 
-function toDocPart(m: PlacedModule, defs: ModuleDefinition[]): DocPart {
-  const def = defs.find(d => d.id === m.moduleId);
-  const userParams = { ...(m.params ?? {}) };
-  delete userParams[DOC_PARAMS_KEY];
+function toDocPart(part: DsnPart, defs: ModuleDefinition[]): DocPart {
+  const def = defs.find(d => d.id === part.libraryRef);
   return {
-    id: m.id,
-    ref: m.customText || def?.name || m.moduleId,
-    category: categoryOf(m.moduleId, def),
-    worldPose: worldPoseOf(m),
-    gridPose: gridPoseOf(m),
-    libraryRef: m.moduleId,
-    dofs: dofsOf(m),
-    params: userParams,
+    id: part.id,
+    ref: part.ref || def?.name || part.libraryRef,
+    category: categoryOf(part.libraryRef, def),
+    worldPose: worldPoseOfPart(part),
+    gridPose: gridPoseOfPart(part),
+    libraryRef: part.libraryRef,
+    dofs: dofsOf(part),
+    params: { ...part.params },
   };
 }
 
 // ── read selectors (plain) ────────────────────────────────────────────────────
 
+/** The raw stored parts — the `.dsn` components. */
+export function listDsnParts(): DsnPart[] {
+  return useDocumentStore.getState().parts;
+}
+
+function findDsnPart(partId: string): DsnPart | undefined {
+  return useDocumentStore.getState().parts.find(p => p.id === partId);
+}
+
 export function listParts(): DocPart[] {
-  const s = useAppStore.getState();
-  return s.placedModules.map(m => toDocPart(m, s.modules));
+  const modules = useAppStore.getState().modules;
+  return useDocumentStore.getState().parts.map(p => toDocPart(p, modules));
 }
 
 export function getPart(partId: string): DocPart | undefined {
-  const s = useAppStore.getState();
-  const m = s.placedModules.find(p => p.id === partId);
-  return m ? toDocPart(m, s.modules) : undefined;
+  const part = findDsnPart(partId);
+  return part ? toDocPart(part, useAppStore.getState().modules) : undefined;
 }
 
 export function listPaths(): DocPath[] {
@@ -134,23 +149,39 @@ export function addPart(
   libraryRef: string,
   positionMm: Vec3,
 ): string | null {
-  const store = useAppStore.getState();
+  const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
+  if (!def) return null;
   const placement = splitWorldPosition(positionMm);
-  const before = new Set(store.placedModules.map(m => m.id));
-  store.placeModule(libraryRef, placement.position, placement.layer);
-  const after = useAppStore.getState().placedModules;
-  const created = after.find(m => !before.has(m.id));
-  if (!created) return null;
-  if (placement.offsetMm.some(v => v !== 0)) {
-    setDocParams(created.id, { offsetMm: placement.offsetMm });
-  }
   // Library records author their optics along ±z (schema convention); rotate
   // the placement so the entry beam runs along document +x and any fold arm
   // points -y — the WP-29 plane convention (like the golden designs do).
   const lib = libraryEntryOf(libraryRef);
-  const rot = lib ? defaultRotationFor(lib.ports) : null;
-  if (rot) setPartOrientation(created.id, rot);
-  return created.id;
+  const rot24: Rot24 =
+    (lib ? defaultRotationFor(lib.ports) : null) ?? { z: '+z', x: '+x' };
+  const params = { ...(def.defaultParams ?? {}) };
+  const part: DsnPart = {
+    id: uuidv4(),
+    ref: def.isWildCard ? String(params.customText ?? '') : '',
+    libraryRef,
+    cell: [placement.position.x, -placement.position.y, placement.layer],
+    offsetMm: placement.offsetMm,
+    rot24,
+    offsetDeg: { ...ZERO_OFFSET_DEG },
+    dofValues: {},
+    params,
+  };
+  autoPush();
+  useDocumentStore.getState().insertPart(part);
+  // A module record may carry a one-shot placement notice (safety warnings).
+  if (def.notification && def.notification.trim()) {
+    useAppStore.getState().addNotification({
+      type: 'warning',
+      title: `${def.name} Notice`,
+      message: def.notification,
+      duration: 6000,
+    });
+  }
+  return part.id;
 }
 
 let groupCounter = 0;
@@ -216,6 +247,9 @@ export function addGroup(groupId: string, positionMm: Vec3): AddGroupResult | nu
   }
 
   const partIds: string[] = [];
+  // The whole arrangement is ONE undo step.
+  autoPush();
+  batchDepth++;
   const placeAt = (moduleId: string, cell: [number, number, number]): void => {
     const world: Vec3 = [
       (origin[0] + cell[0]) * pitch[0],
@@ -245,15 +279,14 @@ export function addGroup(groupId: string, positionMm: Vec3): AddGroupResult | nu
       placeAt(group.structure.jointModuleId, cell);
     }
   }
+  batchDepth--;
 
   return { instanceId, partIds, snappedToBay, bayOverflow };
 }
 
 /** Dissolve a group instance: members stay, the rigid-drag tag goes (WP-44). */
 export function ungroupInstance(instanceId: string): void {
-  for (const part of useAppStore
-    .getState()
-    .placedModules.filter(p => p.params?.groupId === instanceId)) {
+  for (const part of listDsnParts().filter(p => p.params.groupId === instanceId)) {
     setPartParam(part.id, 'groupId', undefined);
     setPartParam(part.id, 'groupRef', undefined);
   }
@@ -266,15 +299,15 @@ export function ungroupInstance(instanceId: string): void {
  * T2 adaptive templates only move along their declared DOF axes, clamped to
  * the declared range. Unclassified parts move freely.
  */
-function constrainOffsetToTemplate(m: PlacedModule, offsetMm: Vec3): Vec3 {
-  const lib = libraryEntryOf(m.moduleId);
+function constrainOffsetToTemplate(part: DsnPart, offsetMm: Vec3): Vec3 {
+  const lib = libraryEntryOf(part.libraryRef);
   if (!lib?.templateClass) return offsetMm;
   if (lib.templateClass === 'fixed') return [0, 0, 0];
   if (lib.templateClass === 'adaptive' && lib.dofs.length > 0) {
     // Project the residual onto the world-frame images of the declared
     // translation axes (part-local), each clamped to its range.
     const constrained: Vec3 = [0, 0, 0];
-    const rotation = worldPoseOf(m).rotation;
+    const rotation = worldPoseOfPart(part).rotation;
     for (const dof of lib.dofs) {
       if (dof.kind !== 'translation') continue;
       const local: Vec3 =
@@ -298,65 +331,62 @@ export function movePartWorld(partId: string, positionMm: Vec3, opts?: { snap?: 
   // is unlocked for member editing (the delta fans out to every sibling).
   const groupId = groupInstanceOf(partId);
   if (groupId && !useGroupEditStore.getState().unlocked[groupId]) {
-    const current = worldPoseOf(
-      useAppStore.getState().placedModules.find(p => p.id === partId)!,
-    ).positionMm;
+    const anchor = findDsnPart(partId);
+    if (!anchor) return;
+    const current = worldPoseOfPart(anchor).positionMm;
     const delta: Vec3 = [
       positionMm[0] - current[0],
       positionMm[1] - current[1],
       positionMm[2] - current[2],
     ];
-    for (const sibling of partsOfGroup(groupId)) {
-      const pos = worldPoseOf(sibling).positionMm;
-      movePartWorldSingle(
-        sibling.id,
-        [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]],
-        opts,
-      );
-    }
+    autoPush();
+    withBatch(() => {
+      for (const sibling of partsOfGroup(groupId)) {
+        const pos = worldPoseOfPart(sibling).positionMm;
+        movePartWorldSingle(
+          sibling.id,
+          [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]],
+          opts,
+        );
+      }
+    });
     return;
   }
   movePartWorldSingle(partId, positionMm, opts);
 }
 
 function movePartWorldSingle(partId: string, positionMm: Vec3, opts?: { snap?: boolean }): void {
-  const store = useAppStore.getState();
-  const m = store.placedModules.find(p => p.id === partId);
-  if (!m) return;
+  const part = findDsnPart(partId);
+  if (!part) return;
   const placement = splitWorldPosition(positionMm);
   const offsetMm: Vec3 = opts?.snap
     ? [0, 0, 0]
-    : constrainOffsetToTemplate(m, placement.offsetMm);
-  if (m.position.x !== placement.position.x || m.position.y !== placement.position.y) {
-    store.moveModule(partId, placement.position);
-  }
-  if (m.layer !== placement.layer) {
-    store.moveModuleToLayer(partId, placement.layer);
-  }
-  setDocParams(partId, { offsetMm });
+    : constrainOffsetToTemplate(part, placement.offsetMm);
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, {
+    cell: [placement.position.x, -placement.position.y, placement.layer],
+    offsetMm,
+  });
 }
 
 /** WP-44: the group-instance id a part belongs to (null = ungrouped). */
 export function groupInstanceOf(partId: string): string | null {
-  const m = useAppStore.getState().placedModules.find(p => p.id === partId);
-  const gid = m?.params?.groupId;
+  const gid = findDsnPart(partId)?.params.groupId;
   return typeof gid === 'string' && gid ? gid : null;
 }
 
-function partsOfGroup(instanceId: string) {
-  return useAppStore
-    .getState()
-    .placedModules.filter(p => p.params?.groupId === instanceId);
+function partsOfGroup(instanceId: string): DsnPart[] {
+  return listDsnParts().filter(p => p.params.groupId === instanceId);
 }
 
 /** Move a part to an integer grid cell (clears the continuous residual). */
 export function movePartGrid(partId: string, cell: Vec3): void {
-  const store = useAppStore.getState();
-  const m = store.placedModules.find(p => p.id === partId);
-  if (!m) return;
-  store.moveModule(partId, { x: cell[0], y: -cell[1] });
-  if (m.layer !== cell[2]) store.moveModuleToLayer(partId, cell[2]);
-  setDocParams(partId, { offsetMm: [0, 0, 0] });
+  if (!findDsnPart(partId)) return;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, {
+    cell: [...cell] as Vec3,
+    offsetMm: [0, 0, 0],
+  });
 }
 
 /**
@@ -364,16 +394,16 @@ export function movePartGrid(partId: string, cell: Vec3): void {
  * residual; the yaw residual lands in offsetDeg.z (schema `offset-deg`).
  */
 export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boolean }): void {
-  const store = useAppStore.getState();
-  const m = store.placedModules.find(p => p.id === partId);
-  if (!m) return;
-  const { rotation, freeYawDeg } = splitDocYaw(yawDeg, opts?.snap ?? false);
-  if (m.rotation !== rotation) store.rotateModule(partId, rotation);
-  const prev = getDocParams(m).offsetDeg ?? ZERO_OFFSET_DEG;
-  // Store free yaw is measured opposite to the document (see mapping.ts).
-  setDocParams(partId, {
-    offsetDeg: { x: prev.x, y: prev.y, z: -freeYawDeg },
-    freeYawDeg: undefined,
+  const part = findDsnPart(partId);
+  if (!part) return;
+  // Yaw replaces ONLY the yaw component of the discrete orientation; any
+  // tilt/roll stays put, and the sub-90° remainder becomes the offset-deg
+  // residual. `applyYawToRot24` is the exact inverse of `partYawDeg`.
+  const { rot24, residualDeg } = applyYawToRot24(part.rot24, yawDeg, opts?.snap ?? false);
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, {
+    rot24,
+    offsetDeg: { x: part.offsetDeg.x, y: part.offsetDeg.y, z: residualDeg },
   });
 }
 
@@ -383,13 +413,15 @@ export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boole
  * Omitted axes keep their value.
  */
 export function tiltPart(partId: string, tilt: { x?: number; y?: number }): void {
-  const store = useAppStore.getState();
-  const m = store.placedModules.find(p => p.id === partId);
-  if (!m) return;
-  const prev = getDocParams(m).offsetDeg ?? ZERO_OFFSET_DEG;
-  setDocParams(partId, {
-    offsetDeg: { x: tilt.x ?? prev.x, y: tilt.y ?? prev.y, z: prev.z },
-    freeYawDeg: undefined,
+  const part = findDsnPart(partId);
+  if (!part) return;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, {
+    offsetDeg: {
+      x: tilt.x ?? part.offsetDeg.x,
+      y: tilt.y ?? part.offsetDeg.y,
+      z: part.offsetDeg.z,
+    },
   });
 }
 
@@ -404,49 +436,46 @@ export function setPartOrientation(
   rot24: Rot24,
   offsetDeg: { x?: number; y?: number; z?: number } = {},
 ): void {
-  const store = useAppStore.getState();
-  const m = store.placedModules.find(p => p.id === partId);
-  if (!m) return;
-  const triple = eulerTripleForRot24(rot24);
-  if (m.rotation !== triple.rotation) store.rotateModule(partId, triple.rotation);
-  if ((m.tiltRotation ?? 0) !== triple.tiltRotation) {
-    store.rotateModuleTilt(partId, triple.tiltRotation);
-  }
-  if ((m.topRotation ?? 0) !== triple.topRotation) {
-    store.rotateModuleTop(partId, triple.topRotation);
-  }
-  setDocParams(partId, {
+  if (!findDsnPart(partId)) return;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, {
+    rot24: { ...rot24 },
     offsetDeg: { x: offsetDeg.x ?? 0, y: offsetDeg.y ?? 0, z: offsetDeg.z ?? 0 },
-    freeYawDeg: undefined,
   });
 }
 
 export function setDofValue(partId: string, dofName: string, value: number): void {
-  const m = useAppStore.getState().placedModules.find(p => p.id === partId);
-  if (!m) return;
-  const dofValues = { ...(getDocParams(m).dofValues ?? {}), [dofName]: value };
-  setDocParams(partId, { dofValues });
+  const part = findDsnPart(partId);
+  if (!part) return;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, {
+    dofValues: { ...part.dofValues, [dofName]: value },
+  });
 }
 
 /** WP-66: remove a stored DOF value (a module swap dropped the DOF). */
 export function clearDofValue(partId: string, dofName: string): void {
-  const m = useAppStore.getState().placedModules.find(p => p.id === partId);
-  if (!m) return;
-  const dofValues = { ...(getDocParams(m).dofValues ?? {}) };
-  if (!(dofName in dofValues)) return;
+  const part = findDsnPart(partId);
+  if (!part || !(dofName in part.dofValues)) return;
+  const dofValues = { ...part.dofValues };
   delete dofValues[dofName];
-  setDocParams(partId, { dofValues });
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, { dofValues });
 }
 
 export function removePart(partId: string): void {
-  useAppStore.getState().removeModule(partId);
+  if (!findDsnPart(partId)) return;
+  autoPush();
+  useDocumentStore.getState().deletePart(partId);
   usePathsStore.getState().prunePart(partId);
   // WP-46: patch cords that terminated on this part go with it.
   useFibersStore.getState().prunePart(partId);
 }
 
 export function renamePart(partId: string, ref: string): void {
-  useAppStore.getState().updateModuleCustomText(partId, ref);
+  if (!findDsnPart(partId)) return;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, { ref });
 }
 
 /**
@@ -456,17 +485,21 @@ export function renamePart(partId: string, ref: string): void {
  * The revision bumps via the placedModules subscription.
  */
 export function repointPartLibraryRef(partId: string, libraryRef: string): void {
-  useAppStore.setState(s => ({
-    placedModules: s.placedModules.map(m =>
-      m.id === partId ? { ...m, moduleId: libraryRef } : m,
-    ),
-  }));
+  if (!findDsnPart(partId)) return;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, { libraryRef });
 }
 
 /** Set a user-level part parameter (round-trips through `.dsn` params) —
  * e.g. the selected T1 state (WP-34). */
 export function setPartParam(partId: string, key: string, value: unknown): void {
-  useAppStore.getState().updateModuleParams(partId, { [key]: value });
+  const part = findDsnPart(partId);
+  if (!part) return;
+  const params = { ...part.params };
+  if (value === undefined) delete params[key];
+  else params[key] = value;
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, { params });
 }
 
 // ── source runtime state (WP-47) ──────────────────────────────────────────────
@@ -501,29 +534,21 @@ export function removePath(name: string): void {
 }
 
 export function selectPart(partId: string | null): void {
-  useAppStore.getState().selectItem(partId, partId ? 'module' : null);
+  useDocumentStore.getState().setSelection(partId ? [partId] : []);
 }
 
 // ── multi-selection (WP-71) ──────────────────────────────────────────────────
-// The legacy store keeps `selectedItems` alongside the single
-// `selectedItemId`; `selectItem` collapses it to one. Grouping needs the set,
-// so these keep BOTH in step: the last-touched part stays the "primary"
-// selection every existing panel reads, and `selectedItems` carries the rest.
+// The document keeps the selection SET; its last member is the "primary"
+// selection the single-part panels read.
 
 /** Every selected part id (the primary selection included). */
 export function listSelectedPartIds(): string[] {
-  const s = useAppStore.getState();
-  return s.selectedItems.filter(i => i.type === 'module').map(i => i.id);
+  return useDocumentStore.getState().selectedIds;
 }
 
 /** Replace the selection; the last id becomes the primary one. */
 export function setSelectedParts(partIds: string[]): void {
-  const ids = [...new Set(partIds)];
-  useAppStore.setState({
-    selectedItems: ids.map(id => ({ id, type: 'module' as const })),
-    selectedItemId: ids.length > 0 ? ids[ids.length - 1] : null,
-    selectedItemType: ids.length > 0 ? 'module' : null,
-  });
+  useDocumentStore.getState().setSelection(partIds);
 }
 
 /** Shift-click semantics: add when absent, remove when present. */
@@ -536,46 +561,55 @@ export function togglePartSelection(partId: string): void {
   );
 }
 
-/**
- * Undo bracket for continuous interactions (e.g. an insert drag): capture the
- * pre-interaction state at pointer-down, commit once at pointer-up. The
- * legacy history applies `history[index-1]` on undo, so a committed step
- * pushes the pre-state AND the post-state — one undo then restores the
- * pre-interaction state, one redo re-applies the result.
- */
+// ── undo ─────────────────────────────────────────────────────────────────────
+// Every command records the pre-edit state as one undo step. A bracket
+// (captureUndo … commitUndo) suppresses those intermediate records so a whole
+// interaction — a drag, a group placement, a swap — is exactly ONE step.
+
 export interface UndoToken {
-  snapshot: ReturnType<typeof storeSnapshot>;
+  snapshot: DocumentSnapshot;
 }
 
-function storeSnapshot() {
-  const s = useAppStore.getState();
-  return {
-    placedModules: s.placedModules,
-    annotations: s.annotations,
-    layers: s.layers,
-    activeLayerId: s.activeLayerId,
-    selectedItems: s.selectedItems,
-    selectedItemId: s.selectedItemId,
-    selectedItemType: s.selectedItemType,
-  };
+let batchDepth = 0;
+
+/** Record the pre-edit state, unless a bracket already owns this step. */
+function autoPush(): void {
+  if (batchDepth > 0) return;
+  const store = useDocumentStore.getState();
+  store.pushHistory(store.snapshot());
+}
+
+/** Run `fn` as one undo step (used internally for fan-outs). */
+function withBatch(fn: () => void): void {
+  batchDepth++;
+  try {
+    fn();
+  } finally {
+    batchDepth--;
+  }
 }
 
 export function captureUndo(): UndoToken {
-  return { snapshot: storeSnapshot() };
+  const token = { snapshot: useDocumentStore.getState().snapshot() };
+  batchDepth++;
+  return token;
 }
 
 export function commitUndo(token: UndoToken): void {
-  const s = useAppStore.getState();
-  s.pushToHistory(token.snapshot);
-  s.pushToHistory(storeSnapshot());
+  batchDepth = Math.max(0, batchDepth - 1);
+  if (batchDepth > 0) return; // an outer bracket owns the step
+  const store = useDocumentStore.getState();
+  // Nothing changed → nothing to undo.
+  if (store.parts === token.snapshot.parts) return;
+  store.pushHistory(token.snapshot);
 }
 
 export function undo(): void {
-  useAppStore.getState().undo();
+  useDocumentStore.getState().undo();
 }
 
 export function redo(): void {
-  useAppStore.getState().redo();
+  useDocumentStore.getState().redo();
 }
 
 export interface PartRenderInfo {
@@ -589,20 +623,13 @@ export function renderInfoOf(libraryRef: string): PartRenderInfo {
   return { glbUrl: def?.glbUrl, glbOffset: def?.glbOffset };
 }
 
-function setDocParams(partId: string, patch: Partial<ReturnType<typeof getDocParams>>): void {
-  const store = useAppStore.getState();
-  const m = store.placedModules.find(p => p.id === partId);
-  if (!m) return;
-  store.updateModuleParams(partId, { [DOC_PARAMS_KEY]: { ...getDocParams(m), ...patch } });
-}
-
 // ── React subscriptions ───────────────────────────────────────────────────────
 
-/** Reactive list of parts (re-renders on any placed-module change). */
+/** Reactive list of parts (re-renders on any document change). */
 export function useDocParts(): DocPart[] {
-  const placedModules = useAppStore(s => s.placedModules);
+  const parts = useDocumentStore(s => s.parts);
   const modules = useAppStore(s => s.modules);
-  return useMemo(() => placedModules.map(m => toDocPart(m, modules)), [placedModules, modules]);
+  return useMemo(() => parts.map(p => toDocPart(p, modules)), [parts, modules]);
 }
 
 export function useDocPart(partId: string | null): DocPart | undefined {
@@ -618,25 +645,19 @@ export function useDocPaths(): DocPath[] {
   );
 }
 
-/** Reactive selected part id (module selections only). */
+/** Reactive primary selection. */
 export function useSelectedPartId(): string | null {
-  const id = useAppStore(s => s.selectedItemId);
-  const type = useAppStore(s => s.selectedItemType);
-  return type === 'module' ? id : null;
+  return useDocumentStore(s => s.primaryId);
 }
 
 /** WP-71: reactive multi-selection (empty when nothing is selected). */
 export function useSelectedPartIds(): string[] {
-  const items = useAppStore(s => s.selectedItems);
-  return useMemo(
-    () => items.filter(i => i.type === 'module').map(i => i.id),
-    [items],
-  );
+  return useDocumentStore(s => s.selectedIds);
 }
 
 /** Subscribe outside React; returns an unsubscribe function. */
 export function subscribe(listener: () => void): () => void {
-  const a = useAppStore.subscribe(listener);
+  const a = useDocumentStore.subscribe(listener);
   const b = usePathsStore.subscribe(listener);
   return () => {
     a();

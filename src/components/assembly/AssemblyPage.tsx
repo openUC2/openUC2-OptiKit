@@ -39,6 +39,7 @@ import { useAppStore } from '../../stores/appStore';
 import {
   T_CLASS_LABEL,
   getPart,
+  listParts,
   libraryEntryOf,
   selectPart,
   useDocParts,
@@ -208,7 +209,7 @@ export function AssemblyPage() {
   useEffect(() => {
     if (modules.length === 0) {
       loadModules().then(() => loadStateFromStorage());
-    } else if (useAppStore.getState().placedModules.length === 0) {
+    } else if (listParts().length === 0) {
       // Modules already loaded by another view; still restore the layout.
       loadStateFromStorage();
     }

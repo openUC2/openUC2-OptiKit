@@ -146,9 +146,14 @@ export function GenerateHolderDialog({
   const materialized = () => {
     if (!result) return null;
     const indexComponent = index.components.find(c => c.id === part.libraryRef);
-    const ports =
+    // A port direction is an axis literal OR a continuous unit vector
+    // (WP-39); the template records it verbatim as a string.
+    const asText = (d: unknown) => (Array.isArray(d) ? d.join(' ') : String(d));
+    const ports = (
       libraryEntryOf(part.libraryRef)?.ports ??
-      (indexComponent?.ports ?? []).map(p => ({ name: p.name, direction: p.direction }));
+      indexComponent?.ports ??
+      []
+    ).map(p => ({ name: p.name, direction: asText(p.direction) }));
     const records = holderRecords({
       componentId: part.libraryRef,
       componentVersion: indexComponent?.version ?? null,

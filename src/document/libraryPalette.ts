@@ -105,6 +105,10 @@ export interface LibraryPaletteEntry {
    * exports THIS as its fragment (the real prescription) instead of the
    * thin-lens approximation. Empty for module-backed entries. */
   fragmentSurfaces: Record<string, unknown>[];
+  /** Part documentation that travels with the record (`docs:` list), resolved
+   * to markdown text where the source ships it (a .dsn bundle). The inspector
+   * renders these; empty/absent = the record names no docs. */
+  docs?: { title: string; text: string }[];
   /** WP-45: carriers host cubes (FRAME, baseplates, plates, puzzle pieces). */
   carrier: boolean;
   /** WP-45: docking bays on a carrier (cells relative to its placement). */
@@ -238,7 +242,7 @@ function indexPortsToSource(ports: IndexPort[] | undefined): SourcePort[] {
   }));
 }
 
-function recordPortsToSource(record: ComponentRecord): SourcePort[] {
+export function recordPortsToSource(record: ComponentRecord): SourcePort[] {
   const optics = record.optics ?? {};
   const frames = (optics.frames ?? {}) as Record<string, Record<string, unknown>>;
   const ports = (optics.ports ?? {}) as Record<

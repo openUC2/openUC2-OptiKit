@@ -1,10 +1,14 @@
 /**
  * Document-layer types — the editor-facing view of an Optikit design.
  *
- * The document speaks the `.dsn` schema-v0 language (see
- * DOCS/kicad-for-optics-execution.md): millimeters, a right-handed frame with
- * z pointing UP, and grid cells of UC2_GRID_MM. How this maps onto the legacy
- * appStore backing model is documented in `mapping.ts`.
+ * The document speaks the `.dsn` schema-v0 language (the normative contract is
+ * `../optikit-core/DOCS/DSN-CONTRACT.md`): millimeters, a right-handed frame
+ * with z pointing UP, grid cells of UC2_GRID_MM, and the pose composition
+ * `p = S·cell + δ`, `R = R24 · ΔR`.
+ *
+ * `DsnPart` below is the STORED form — one design component, spelled the way
+ * the `.dsn` spells it. `DocPart` is the DERIVED form the views read (world
+ * pose resolved, category resolved, library facts joined).
  */
 
 import type { Rot24 } from './rot24';
@@ -66,8 +70,54 @@ export interface DocDof {
   value: number;
 }
 
+/** Rotation residual ΔR as extrinsic-ZXY degrees, in the part's LOCAL frame. */
+export interface OffsetDeg {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export const ZERO_OFFSET_DEG: OffsetDeg = { x: 0, y: 0, z: 0 };
+
+/**
+ * One design component, in the `.dsn` spelling — THE stored form.
+ *
+ * Every field maps 1:1 onto the schema:
+ *   cell      → pose.translation.offset-grid   (integer cells, document frame)
+ *   offsetMm  → pose.translation.offset-mm     (continuous residual δ)
+ *   rot24     → pose.rotation.grid {z, x}      (one of the 24 orientations)
+ *   offsetDeg → pose.rotation.offset-deg       (the residual ΔR)
+ *   ref       → the component KEY in the design's `components:` map
+ *   dofValues → instantiation.dof_values["<key>.<dof>"]
+ *
+ * There is no second pose representation: nothing in the editor stores a
+ * store-frame euler triple any more (`legacyLayout.ts` converts on the way in
+ * and out of the old interchange files, and nowhere else).
+ */
+export interface DsnPart {
+  /** Stable instance id (uuid) — identity, not a design field. */
+  id: string;
+  /** Component key / display ref; '' = derive from the library record. */
+  ref: string;
+  /** Library record this instance places (module or bare component id). */
+  libraryRef: string;
+  /** Integer grid cell [x, y, layer] in the DOCUMENT frame. */
+  cell: Vec3;
+  /** Continuous residual from the cell center, mm, document frame. */
+  offsetMm: Vec3;
+  /** The discrete orientation. */
+  rot24: Rot24;
+  /** The continuous rotation residual (R = R24 · ΔR). */
+  offsetDeg: OffsetDeg;
+  /** Resolved DOF values by name. */
+  dofValues: Record<string, number>;
+  /** User/authoring params that round-trip through the `.dsn` (groupId,
+   * enabled, wavelengthUm, T1 state, …). */
+  params: Record<string, unknown>;
+}
+
 export interface DocPart {
-  /** Stable instance id (backing PlacedModule.id). */
+  /** Stable instance id. */
   id: string;
   /** Human-readable reference (customText or moduleId + index). */
   ref: string;

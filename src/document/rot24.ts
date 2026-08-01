@@ -46,6 +46,61 @@ export function rot24Matrix(name: Rot24): THREE.Matrix4 {
   return entry.matrix.clone();
 }
 
+// ── the yaw component of a discrete orientation ──────────────────────────────
+// Yaw is rotation about document +z. It is NOT readable off a single local
+// axis (a part whose local +x points along ±z makes that projection
+// degenerate) and NOT recoverable from a 90°-step euler triple (several
+// triples realize the same orientation with different yaw numbers — the
+// ambiguity the pre-WP-96 clipboard had to work around).
+//
+// It IS well defined as coset arithmetic: Rz(k·90°) acts on the 24
+// orientations with 6 orbits of 4. Fixing one representative per orbit — the
+// lowest-indexed member of ROT24_TABLE — names the yaw step of every
+// orientation unambiguously, and makes `yawStepOfRot24` and
+// `rot24WithYawStep` exact inverses.
+
+function matrixIndex(m: THREE.Matrix4): number {
+  for (let i = 0; i < ROT24_TABLE.length; i++) {
+    const t = ROT24_TABLE[i].matrix.elements;
+    let same = true;
+    for (let e = 0; e < 16; e++) {
+      if (Math.abs(t[e] - m.elements[e]) > 1e-9) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return i;
+  }
+  throw new Error('matrix is not one of the 24 axis-aligned rotations');
+}
+
+/** Rz(k·90°) about the DOCUMENT +z axis. */
+function zSpin(k: number): THREE.Matrix4 {
+  return new THREE.Matrix4().makeRotationZ((k * Math.PI) / 2);
+}
+
+/** Which quarter-turn about +z this orientation carries (0…3). */
+export function yawStepOfRot24(rot: Rot24): number {
+  const m = rot24Matrix(rot);
+  let bestK = 0;
+  let bestIndex = Infinity;
+  for (let k = 0; k < 4; k++) {
+    const index = matrixIndex(zSpin(-k).multiply(m.clone()));
+    if (index < bestIndex) {
+      bestIndex = index;
+      bestK = k;
+    }
+  }
+  return bestK;
+}
+
+/** The same orientation with its yaw replaced by `k` quarter-turns. */
+export function rot24WithYawStep(rot: Rot24, k: number): Rot24 {
+  const delta = (((k - yawStepOfRot24(rot)) % 4) + 4) % 4;
+  if (delta === 0) return { ...rot };
+  return ROT24_TABLE[matrixIndex(zSpin(delta).multiply(rot24Matrix(rot)))].name;
+}
+
 export interface Rot24Decomposition {
   rot24: Rot24;
   /** Residual ΔR such that R = R24 · ΔR. */

@@ -506,6 +506,52 @@ export/attach, prescription→volume); four items were genuinely new:
   template in the library today declares exactly one translation axis, though
   the placement machinery already handles N.
 
+### Round-13 additions (2026-08-01) — the contract, the architecture, the review lifecycle
+
+Three items from the "what is the common ground?" conversation. The first two
+are **done** (this round); the third is scoped and unscheduled.
+
+- **WP-96 — DSN-first architecture** *(done, 2026-08-01)*. The editor's design
+  state IS the `.dsn` now: `src/document/documentStore.ts` holds `DsnPart[]`
+  (`cell` + `offset-mm`, `rot24` + `offset-deg`) with the selection and a real
+  undo stack; `appStore` keeps only catalog, layers, metadata, notifications
+  and the legacy interchange. The old `PlacedModule[]` shape survives *as a
+  file format* in `legacyLayout.ts` (layout JSON, share links, ImSwitch, the
+  one-shot localStorage migration). Shook out two latent bugs: the yaw of a
+  discrete orientation is coset arithmetic, not a euler-triple field
+  (`rot24.ts::yawStepOfRot24`), and `tsc -b` had been failing on three
+  pre-existing type errors nobody was running.
+- **The DSN contract manifest** *(done)*. `../optikit-core/DOCS/DSN-CONTRACT.md`
+  — one normative document for the frontend↔backend common ground (rank order
+  of truth, document frame, pose composition, ports, record trio, API
+  surface, extension protocol), with `rot24.svg` and `part-anatomy.svg`. This
+  is what external contributors get pointed at.
+- **WP-98 — Bundle-aware .dsn import** *(done, 2026-08-01)*. A `.dsn` zip's
+  `library/` half registers BEFORE the design places: components → the
+  browser-local workspace (persistent), modules → a session bundle registry
+  (`dsn/bundleImport.ts`) with the template's GLB served from a blob URL and
+  the record's `docs:` markdown resolved from the zip (rendered by the
+  inspector). Refs the bundle carries no longer get substituted by lookalike
+  modules; export is symmetric (workspace/bundle records the design uses
+  travel in the zip → a self-contained SETUP bundle). Second community
+  template added: `setups/demo-bench.dsn/` — a whole assembly in one zip.
+- **WP-97 — The review lifecycle** *(proposed, Phase 3–4)*. `review:` notes
+  exist on every record kind and reach the index and the palette chip, but
+  they are a flat list of free-text strings with **no severity and no
+  resolution path**: "placeholder CAD, do not print" and "confirm the glass
+  name" are indistinguishable, nothing aggregates them per design, and no
+  outward-facing exit consults them. Three parts: (1) an optional structured
+  form (`{level: blocker|verify|note, text}`) that stays backward-compatible
+  with plain strings; (2) a **design-level review panel** listing every note
+  of every placed part, so "what is unfinished in this instrument?" is one
+  click; (3) **gate the outward exits** — release bundle, STEP assembly,
+  "publish to community" — on an explicit acknowledgement when a blocker-level
+  note is in the BOM. Motivation: community forks legitimately ship
+  placeholder CAD (the template does), and the failure mode is someone
+  printing or ordering from it. Validation must stay permissive — a record
+  that admits incompleteness is honest and must keep validating; this is
+  about making the admission *visible at the moment it matters*.
+
 ### Phase 7 — After the MVP: community, accounts, UX *(explicitly last)*
 
 None of these are on the Scenario 1–5 path; they are the product layer on top of

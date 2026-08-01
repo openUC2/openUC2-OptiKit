@@ -9,6 +9,8 @@ import { FrameWizardPage } from './components/FrameWizardPage'
 import { StartupDialog } from './components/StartupDialog'
 import { NotificationDisplay } from './components/NotificationDisplay'
 import { useAppStore } from './stores/appStore'
+import { useDocumentStore } from './document/documentStore'
+import { redo, undo } from './document'
 import { materialTheme } from './theme/materialTheme'
 import { trackUserVisit } from './utils/statisticsHandler'
 import './styles/fonts.css'
@@ -41,7 +43,7 @@ const DesignDetailPage = lazy(() =>
 );
 
 function App() {
-  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData, undo, redo } = useAppStore();
+  const { loadModules, loadStateFromStorage, saveStateToStorage, importFromUrl, importData } = useAppStore();
   const [showStartupDialog, setShowStartupDialog] = useState(false);
 
   const handleCloseStartupDialog = () => {
@@ -76,17 +78,14 @@ function App() {
     return () => {
       window.removeEventListener('popstate', handleHistoryChange);
     };
-  }, [undo, redo]);
+  }, []);
 
   useEffect(() => {
-    // Subscribe to app state changes to sync with browser history
-    const unsubscribe = useAppStore.subscribe((state) => {
-      // Only push to browser history when internal history changes
-      if (state.historyIndex > 0) {
-        const newPosition = state.historyIndex;
-        if (history.state?.position !== newPosition) {
-          history.pushState({ position: newPosition }, '', window.location.href);
-        }
+    // Mirror the DOCUMENT's undo depth into browser history (WP-96).
+    const unsubscribe = useDocumentStore.subscribe((state) => {
+      const newPosition = state.past.length;
+      if (newPosition > 0 && history.state?.position !== newPosition) {
+        history.pushState({ position: newPosition }, '', window.location.href);
       }
     });
 

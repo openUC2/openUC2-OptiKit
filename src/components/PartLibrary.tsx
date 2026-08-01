@@ -28,13 +28,17 @@ import {
 import { useAppStore } from '../stores/appStore';
 import {
   T_CLASS_LABEL,
+  UC2_GRID_MM,
   addGroup,
+  addPart,
   categoryOf,
   groupEntriesFromIndex,
   isLibraryModule,
   libraryEntryOf,
   templateClassOf,
+  useDocParts,
 } from '../document';
+import type { DocCategory } from '../document';
 import { AddCommunityRepoDialog } from './library/AddCommunityRepoDialog';
 import { useLibraryRegistration } from '../model/useLibraryRegistration';
 import { GlyphThumb } from './schematic/GlyphThumb';
@@ -67,7 +71,9 @@ const SymbolOrGlyphThumb: React.FC<{
 export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
   opticalGlyphs = false,
 }) => {
-  const { modules, loadModules, placeModule, placedModules, layers, activeLayerId } = useAppStore();
+  const { modules, loadModules, layers, activeLayerId } = useAppStore();
+  // WP-96: placement goes through the document facade, never a store action.
+  const parts = useDocParts();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   // WP-58: the "Add library from GitHub" dialog.
@@ -131,11 +137,20 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
   const activeLayer = layers.find(layer => layer.id === activeLayerId);
   const currentLayerIndex = activeLayer?.index ?? 0;
 
-  // Double-click / tap to place module at the next free grid position
+  // Double-click / tap to place module at the next free grid position.
+  // Cells are DOCUMENT cells (x east, y north) — addPart takes world mm.
+  const placeAtCell = (moduleId: string, cellX: number, cellY: number) => {
+    addPart(moduleId, [
+      cellX * UC2_GRID_MM[0],
+      cellY * UC2_GRID_MM[1],
+      currentLayerIndex * UC2_GRID_MM[2],
+    ]);
+  };
+
   const handleQuickPlace = (moduleId: string) => {
     // Find the center of the visible grid area – just pick the next free spot
     const occupied = new Set(
-      placedModules.map(m => `${m.position.x},${m.position.y}`)
+      parts.map(p => `${p.gridPose.cell[0]},${p.gridPose.cell[1]}`)
     );
     // Try center-first spiral: 5,5 → 4,5 → 5,4 → 6,5 → …
     for (let r = 0; r < 10; r++) {
@@ -145,15 +160,15 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
           const x = 5 + dx;
           const y = 5 + dy;
           if (x >= 0 && x < 10 && y >= 0 && y < 10 && !occupied.has(`${x},${y}`)) {
-            placeModule(moduleId, { x, y }, currentLayerIndex);
+            placeAtCell(moduleId, x, y);
             if ('vibrate' in navigator) navigator.vibrate(30);
             return;
           }
         }
       }
     }
-    // Fallback: place at 0,0
-    placeModule(moduleId, { x: 0, y: 0 }, currentLayerIndex);
+    // Fallback: place at the origin cell
+    placeAtCell(moduleId, 0, 0);
   };
 
   const handleDragStart = (e: React.DragEvent, moduleId: string) => {

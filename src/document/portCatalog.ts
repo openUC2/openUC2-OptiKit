@@ -67,6 +67,11 @@ const CATEGORY_PORTS: Record<DocCategory, SourcePort[]> = {
   dichroic: SPLIT,
   lens: THROUGH,
   filter: THROUGH,
+  // WP-47: a programmable surface traces as a plate — reflective (DMD/LCoS)
+  // parts fold like a mirror, transmissive ones pass straight through. The
+  // 45° fold is the safe default, matching how the glyph draws them.
+  slm: FOLD_90,
+  display: THROUGH,
   other: THROUGH,
 };
 
