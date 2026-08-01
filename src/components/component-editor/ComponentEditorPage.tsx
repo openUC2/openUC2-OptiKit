@@ -58,6 +58,7 @@ import { RaySketch } from './RaySketch';
 import { MechanicsPanel, type MeshStatus } from '../bind/MechanicsPanel';
 import { useBindStore } from '../bind/bindStore';
 import { ImportVendorDialog } from './ImportVendorDialog';
+import { ImportOptilandDialog } from '../library/ImportOptilandDialog';
 
 export function ComponentEditorPage({
   initialTab = 'optics',
@@ -155,6 +156,8 @@ export function ComponentEditorPage({
   const [deepLinked, setDeepLinked] = useState(false);
   // WP-82: the vendor-import drop-zone (.zmx / marker-stamped .glb).
   const [importOpen, setImportOpen] = useState(false);
+  // WP-87: the Optiland-setup wizard (also reachable from the File menu).
+  const [optilandOpen, setOptilandOpen] = useState(false);
   useEffect(() => {
     if (deepLinked) return;
     const id = new URLSearchParams(window.location.search).get('open');
@@ -227,8 +230,16 @@ export function ComponentEditorPage({
               >
                 import…
               </Button>
+              {/* WP-87: a whole Optiland system → free primitives. */}
+              <Button
+                size="small" startIcon={<ImportIcon />}
+                onClick={() => setOptilandOpen(true)}
+              >
+                import Optiland setup…
+              </Button>
             </Stack>
             <ImportVendorDialog open={importOpen} onClose={() => setImportOpen(false)} />
+            <ImportOptilandDialog open={optilandOpen} onClose={() => setOptilandOpen(false)} />
 
             {/* WP-38: published records open as editable copies. */}
             {openedFrom?.origin === 'index' && (
@@ -292,7 +303,12 @@ export function ComponentEditorPage({
               </>
             )}
             {tab === 'mechanics' && (
-              <MechanicsPanel draft={draft} record={record} meshStatus={meshStatus} />
+              <MechanicsPanel
+                draft={draft}
+                record={record}
+                meshStatus={meshStatus}
+                onDraftChange={setDraft}
+              />
             )}
           </Box>
 

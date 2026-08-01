@@ -129,7 +129,7 @@ export function mergeRepoIndexes(
         continue;
       }
       seen.add(module.id);
-      modules.push({ ...module, repo: repo.slug } as typeof module);
+      modules.push({ ...module, repo: repo.slug, repoRef: repo.ref } as typeof module);
     }
     for (const group of repo.index.groups ?? []) {
       if (seenGroups.has(group.id)) {

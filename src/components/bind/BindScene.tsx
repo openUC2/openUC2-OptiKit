@@ -17,7 +17,6 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Canvas } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import {
   Billboard,
@@ -45,6 +44,7 @@ import {
   threePoseToMeshTransform,
 } from '../../model/bindRecord';
 import { useBindStore } from './bindStore';
+import { PreviewCanvas } from '../common/PreviewCanvas';
 import { OpticGlyph, OpticsOverlay } from './OpticsOverlay';
 import type { RecordDraft } from '../../model/componentRecord';
 import { useSceneColors } from '../../theme/sceneColors';
@@ -376,7 +376,10 @@ function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDra
   // Resolved outside the Canvas (MUI context doesn't cross R3F).
   const colors = useSceneColors();
   return (
-    <Canvas
+    // WP-92: quad view is FOUR live WebGL contexts, remounted on every
+    // mechanics-tab flip — released synchronously via PreviewCanvas so the
+    // browser's context cap never evicts the main scene canvases.
+    <PreviewCanvas
       camera={ortho ? undefined : { position: [120, 100, 140], near: 0.5, far: 10000, fov: 45 }}
       style={{ width: '100%', height: '100%' }}
       gl={{ alpha: false, preserveDrawingBuffer: true }}
@@ -405,7 +408,7 @@ function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDra
           <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
         </GizmoHelper>
       )}
-    </Canvas>
+    </PreviewCanvas>
   );
 }
 

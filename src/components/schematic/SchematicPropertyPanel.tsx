@@ -31,6 +31,9 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { GenerateHolderDialog } from '../assembly/GenerateHolderDialog';
 import { runUnbind } from './unbindAction';
+import { parseDecimal } from '../../utils/parseDecimal';
+import { PartOpticsSection } from '../inspector/PartOpticsSection';
+import { useServiceStore } from './serviceStore';
 import type { DocPart, Vec3 } from '../../document';
 import {
   firmwareCommand,
@@ -89,8 +92,10 @@ function NumberField({
   const [text, setText] = useState(value.toFixed(2));
   useEffect(() => setText(value.toFixed(2)), [value]);
   const commit = () => {
-    const v = parseFloat(text);
-    if (Number.isFinite(v)) onCommit(v);
+    // WP-92: locale-tolerant — "0,15" commits as 0.15 (parseFloat would have
+    // silently truncated it to 0).
+    const v = parseDecimal(text);
+    if (v !== null) onCommit(v);
     else setText(value.toFixed(2));
   };
   return (
@@ -134,6 +139,9 @@ function PartProperties({ part }: { part: DocPart }) {
   const activeUm = activeWavelengthUm(part);
   const lines = lib?.wavelengthsUm ?? [];
   const tint = sourceTint(activeUm);
+  // WP-91: "simulate all lines" — one trace per line, spot per wavelength.
+  const simBusy = useServiceStore(s => s.simBusy);
+  const runSimulateAllLines = useServiceStore(s => s.runSimulateAllLines);
   const programmable = lib?.programmable ?? null;
   const activeAreaMm =
     programmable?.pixelPitchUm != null && programmable.resolution
@@ -446,26 +454,50 @@ function PartProperties({ part }: { part: DocPart }) {
             />
           </Stack>
           {lines.length > 0 ? (
-            <TextField
-              select
-              size="small"
-              label="wavelength"
-              value={activeUm ?? ''}
-              onChange={e =>
-                withUndoStep(() =>
-                  setActiveWavelengthUm(part.id, e.target.value ? Number(e.target.value) : null),
-                )
-              }
-            >
-              <MenuItem value="">
-                <em>unset</em>
-              </MenuItem>
-              {lines.map(um => (
-                <MenuItem key={um} value={um}>
-                  {(um * 1000).toFixed(0)} nm
-                </MenuItem>
-              ))}
-            </TextField>
+            <>
+              {/* WP-91: a multi-line source SHOWS all its lines — each chip a
+                  line in its own colour, the ACTIVE one filled. Click to pick;
+                  click the active line again to unset. */}
+              <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+                {lines.map(um => {
+                  const active = activeUm === um;
+                  const lineTint = sourceTint(um) ?? undefined;
+                  return (
+                    <Chip
+                      key={um}
+                      size="small"
+                      label={`${(um * 1000).toFixed(0)} nm`}
+                      variant={active ? 'filled' : 'outlined'}
+                      onClick={() =>
+                        withUndoStep(() => setActiveWavelengthUm(part.id, active ? null : um))
+                      }
+                      sx={{
+                        height: 20,
+                        fontSize: 11,
+                        borderColor: lineTint,
+                        ...(active
+                          ? { bgcolor: lineTint, color: '#0b0e13', fontWeight: 700 }
+                          : { color: lineTint }),
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+              {lines.length > 1 && (
+                <Tooltip title="trace the beam path once per line and overlay the spot per wavelength — the fluorescence case (excitation + emission through the same optics)">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={simBusy}
+                      onClick={() => void runSimulateAllLines(lines)}
+                    >
+                      simulate all {lines.length} lines
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+            </>
           ) : (
             <Typography variant="caption" color="text.secondary">
               the record declares no lines — add `source.wavelengths_um` to tint the beam
@@ -563,6 +595,9 @@ function PartProperties({ part }: { part: DocPart }) {
           ))}
         </>
       )}
+
+      {/* WP-89: the record's optics + the port list, read-only. */}
+      <PartOpticsSection part={part} />
 
       <Typography variant="caption" color="text.secondary">
         grid cell [{part.gridPose.cell.join(', ')}]

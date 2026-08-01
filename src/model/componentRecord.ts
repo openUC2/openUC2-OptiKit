@@ -69,6 +69,13 @@ export interface SurfaceDraft {
    * stays plano, no glass). null/absent = an ordinary refractive surface.
    */
   paraxialFocalMm?: number | null;
+  /**
+   * WP-90: a RECTANGULAR clear aperture, width × height in mm — a beam-fold
+   * mirror is often rectangular, which a semi-aperture alone cannot say.
+   * Serialized as Optiland's own `aperture` block (RectangularAperture);
+   * null/absent = circular via `semiApertureMm`.
+   */
+  apertureRectMm?: [number, number] | null;
 }
 
 /** One glass element of the stack (WP-75): surfaces [start..end] form a
@@ -96,6 +103,10 @@ export function glassElements(surfaces: SurfaceDraft[]): GlassElement[] {
 export interface FrameDraft {
   name: string;
   zMm: number;
+  /** WP-90: the frame's clear aperture (marker-disc DIAMETER, mm) — feeds
+   * the index's per-port `clear_aperture_mm` and DRC_APERTURE (WP-79).
+   * null = not declared (the editor used to drop this field entirely). */
+  clearApertureMm?: number | null;
 }
 
 export interface PortDraft {
@@ -123,6 +134,20 @@ export interface RecordDraft {
   sourceDivergenceDeg: number | null;
   detectorSensorMm: [number, number] | null;
   detectorPixelPitchUm: number | null;
+  /**
+   * WP-90/WP-74: the coated surface's spectral band in µm, [lo, hi] with
+   * null = open-ended. Category decides the semantics on serialization —
+   * mirror/dichroic REFLECT the band, a filter TRANSMITS it — written as the
+   * WP-74 `response` block on the coated surface of the fragment.
+   */
+  responseBandUm: [number | null, number | null] | null;
+  /**
+   * WP-90: a component may name its housing mechanical_template directly
+   * (`mechanics: {template: <id>}`) so a hand-authored record can point at
+   * its Inventor STEP without going through the workbench. Additive; the
+   * schema is extra=allow (E2 note to core). '' = none.
+   */
+  mechanicsTemplate: string;
 }
 
 // ── defaults ─────────────────────────────────────────────────────────────────
@@ -159,6 +184,8 @@ export function defaultDraft(category: RecordCategory): RecordDraft {
     sourceDivergenceDeg: null,
     detectorSensorMm: null,
     detectorPixelPitchUm: null,
+    responseBandUm: null,
+    mechanicsTemplate: '',
   };
   if (NONOPTICAL_CATEGORIES.includes(category)) {
     // Non-optical records carry NO optics at all (WP-30).
@@ -172,7 +199,14 @@ export function defaultDraft(category: RecordCategory): RecordDraft {
       ];
       break;
     case 'mirror':
-      base.surfaces = [surface({ reflective: true })];
+      // WP-90: a mirror is a SUBSTRATE — a reflective front surface, a real
+      // thickness and a back surface — not a lens's biconvex default. The
+      // beam reflects at surface 0; the substrate solid is what a holder
+      // (WP-61/77) carves its cavity around.
+      base.surfaces = [
+        surface({ reflective: true, thicknessMm: 6, material: 'N-BK7' }),
+        surface({}),
+      ];
       base.mirrorAngleDeg = 45;
       base.ports = [
         { name: 'front', frame: 'optical', direction: '-z', afterSurface: null },
@@ -406,6 +440,22 @@ export function validateDraft(draft: RecordDraft): string[] {
       if (s.paraxialFocalMm === 0) errors.push(`surface ${i}: a paraxial element needs a non-zero focal length`);
       if (s.reflective) errors.push(`surface ${i}: a paraxial element cannot also be reflective`);
     }
+    // WP-90: a rectangular clear aperture needs both extents.
+    if (s.apertureRectMm && (s.apertureRectMm[0] <= 0 || s.apertureRectMm[1] <= 0)) {
+      errors.push(`surface ${i}: rectangular aperture needs width > 0 and height > 0`);
+    }
+  });
+  // WP-90/WP-74: a spectral band must be ordered (null = open-ended is fine).
+  if (draft.responseBandUm) {
+    const [lo, hi] = draft.responseBandUm;
+    if (lo !== null && hi !== null && lo > hi) {
+      errors.push(`response band [${lo}, ${hi}] µm has lo > hi`);
+    }
+  }
+  draft.frames.forEach(f => {
+    if (f.clearApertureMm != null && f.clearApertureMm <= 0) {
+      errors.push(`frame '${f.name}': clear aperture must be > 0`);
+    }
   });
   if (draft.surfaces.length > 0 && draft.surfaces[draft.surfaces.length - 1].thicknessMm !== null) {
     errors.push('the last surface must not carry a thickness (gaps to the next component are air gaps)');
@@ -457,12 +507,54 @@ function surfaceToFragment(s: SurfaceDraft, isLast: boolean): Json {
     out.interaction_model = { type: 'refractive_reflective', is_reflective: true };
   }
   if (s.semiApertureMm !== null) out.semi_aperture = s.semiApertureMm;
+  // WP-90: a rectangular clear aperture, in Optiland's own serialization —
+  // the fragment stays a verbatim Optiland surface dict.
+  if (s.apertureRectMm) {
+    const [w, h] = s.apertureRectMm;
+    out.aperture = {
+      type: 'RectangularAperture',
+      x_min: -w / 2,
+      x_max: w / 2,
+      y_min: -h / 2,
+      y_max: h / 2,
+    };
+  }
   return out;
+}
+
+/**
+ * WP-90/WP-74: the draft-level band as a `response` block for the coated
+ * surface. Mirror/dichroic reflect the band; a filter transmits it
+ * (absorptive — straight-through, no reflect arm).
+ */
+function responseBlockFor(
+  category: RecordCategory,
+  band: [number | null, number | null],
+): Json | null {
+  if (category === 'mirror' || category === 'dichroic') {
+    return { kind: category, 'reflect-bands-um': [band] };
+  }
+  if (category === 'filter') {
+    return { kind: 'absorptive', 'transmit-bands-um': [band] };
+  }
+  return null;
+}
+
+/** The surface the category's coating lives on: the reflective surface for
+ * mirror/dichroic (fall back to 0), the front surface for a filter. */
+function coatedSurfaceIndex(draft: RecordDraft): number {
+  const reflective = draft.surfaces.findIndex(s => s.reflective);
+  return reflective >= 0 ? reflective : 0;
 }
 
 export function draftToRecord(draft: RecordDraft): ComponentRecord {
   const frames: Json = {};
-  for (const f of draft.frames) frames[f.name] = { 'z-mm': f.zMm };
+  for (const f of draft.frames) {
+    const frame: Json = { 'z-mm': f.zMm };
+    // WP-90: the editor used to silently drop the frame aperture.
+    if (f.clearApertureMm != null) frame['clear-aperture-mm'] = f.clearApertureMm;
+    frames[f.name] = frame;
+  }
   const ports: Json = {};
   for (const p of draft.ports) {
     const port: Json = { frame: p.frame, direction: p.direction };
@@ -471,9 +563,15 @@ export function draftToRecord(draft: RecordDraft): ComponentRecord {
   }
   const optics: Json = { frames, ports };
   if (draft.surfaces.length > 0) {
-    optics.fragment = {
-      surfaces: draft.surfaces.map((s, i) => surfaceToFragment(s, i === draft.surfaces.length - 1)),
-    };
+    const surfaces = draft.surfaces.map((s, i) =>
+      surfaceToFragment(s, i === draft.surfaces.length - 1),
+    );
+    // WP-90/WP-74: the spectral band lands on the coated surface.
+    if (draft.responseBandUm) {
+      const block = responseBlockFor(draft.category, draft.responseBandUm);
+      if (block) surfaces[coatedSurfaceIndex(draft)].response = block;
+    }
+    optics.fragment = { surfaces };
   }
   const record: Json = {
     kind: 'optical_component',
@@ -506,6 +604,11 @@ export function draftToRecord(draft: RecordDraft): ComponentRecord {
       pixel_pitch_um: draft.detectorPixelPitchUm ?? null,
     };
   }
+  // WP-90: a component naming its housing template directly (E2 schema note:
+  // additive, Go round-trips it through extra="allow").
+  if (draft.mechanicsTemplate) {
+    record.mechanics = { template: draft.mechanicsTemplate };
+  }
   return record as unknown as ComponentRecord;
 }
 
@@ -519,17 +622,61 @@ export function recordFromYaml(text: string): ComponentRecord {
 
 // ── reopening records for editing ────────────────────────────────────────────
 
-interface FragmentSurfaceJson {
+export interface FragmentSurfaceJson {
   geometry?: { radius?: number | string; conic?: number };
   material_post?: { name?: string };
   thickness?: number;
   is_stop?: boolean;
   interaction_model?: { type?: string; is_reflective?: boolean; focal_length?: number };
   semi_aperture?: number;
+  /** WP-90: Optiland's own aperture serialization (RectangularAperture…). */
+  aperture?: { type?: string; x_min?: number; x_max?: number; y_min?: number; y_max?: number } | null;
+  /** WP-74: spectral response block, validated by the core schema. */
+  response?: {
+    kind?: string;
+    'reflect-bands-um'?: [number | null, number | null][] | null;
+    'transmit-bands-um'?: [number | null, number | null][] | null;
+  } | null;
 }
 
 /** WP-75: both authoring spellings of the paraxial model reopen. */
 const THIN_LENS_TYPES = /^(thin_lens|thinlensinteractionmodel)$/i;
+
+/**
+ * Verbatim optiland fragment dicts → editable/displayable SurfaceDraft rows.
+ * The inverse of `surfaceToFragment`; ±Infinity radii (also their JSON-lossy
+ * spellings: null, "inf", 1e999-as-Infinity) read back as flat. Shared by
+ * `draftFromRecord` and the WP-89 part inspector, which reads the same
+ * fragments straight from the library index.
+ */
+export function fragmentSurfacesToDrafts(surfaces: FragmentSurfaceJson[]): SurfaceDraft[] {
+  return surfaces.map((s, i) => {
+    const radius = s.geometry?.radius;
+    const flat = radius === undefined || radius === null ||
+      (typeof radius === 'number' && !Number.isFinite(radius)) ||
+      (typeof radius === 'string' && /inf/i.test(radius));
+    const thinLens = THIN_LENS_TYPES.test(s.interaction_model?.type ?? '');
+    const ap = s.aperture;
+    const rect =
+      ap && /rectangular/i.test(ap.type ?? '') &&
+      ap.x_min != null && ap.x_max != null && ap.y_min != null && ap.y_max != null
+        ? ([ap.x_max - ap.x_min, ap.y_max - ap.y_min] as [number, number])
+        : null;
+    return {
+      radiusMm: flat ? null : Number(radius),
+      thicknessMm: i === surfaces.length - 1 ? null : (s.thickness ?? null),
+      material: s.material_post?.name ?? '',
+      semiApertureMm: s.semi_aperture ?? null,
+      conic: s.geometry?.conic ?? 0,
+      isStop: Boolean(s.is_stop),
+      reflective: Boolean(s.interaction_model?.is_reflective),
+      // Only present for thin-lens rows, so ordinary stacks round-trip
+      // byte-identically through draftFromRecord.
+      ...(thinLens ? { paraxialFocalMm: s.interaction_model?.focal_length ?? null } : {}),
+      ...(rect ? { apertureRectMm: rect } : {}),
+    };
+  });
+}
 
 export function draftFromRecord(record: ComponentRecord): RecordDraft {
   const rec = record as unknown as Json;
@@ -551,30 +698,27 @@ export function draftFromRecord(record: ComponentRecord): RecordDraft {
 
   const optics = (rec.optics ?? {}) as Json;
   const fragment = (optics.fragment ?? null) as { surfaces?: FragmentSurfaceJson[] } | null;
-  const surfaces = fragment?.surfaces ?? [];
-  draft.surfaces = surfaces.map((s, i) => {
-    const radius = s.geometry?.radius;
-    const flat = radius === undefined || radius === null ||
-      (typeof radius === 'number' && !Number.isFinite(radius)) ||
-      (typeof radius === 'string' && /inf/i.test(radius));
-    const thinLens = THIN_LENS_TYPES.test(s.interaction_model?.type ?? '');
-    return {
-      radiusMm: flat ? null : Number(radius),
-      thicknessMm: i === surfaces.length - 1 ? null : (s.thickness ?? null),
-      material: s.material_post?.name ?? '',
-      semiApertureMm: s.semi_aperture ?? null,
-      conic: s.geometry?.conic ?? 0,
-      isStop: Boolean(s.is_stop),
-      reflective: Boolean(s.interaction_model?.is_reflective),
-      // Only present for thin-lens rows, so ordinary stacks round-trip
-      // byte-identically through draftFromRecord.
-      ...(thinLens ? { paraxialFocalMm: s.interaction_model?.focal_length ?? null } : {}),
-    };
-  });
-  const frames = (optics.frames ?? {}) as Record<string, { 'z-mm'?: number | string }>;
+  const rawSurfaces = fragment?.surfaces ?? [];
+  draft.surfaces = fragmentSurfacesToDrafts(rawSurfaces);
+  // WP-90/WP-74: the first response block reopens as the draft-level band
+  // (reflect for mirror/dichroic, transmit for a filter). An imported record
+  // with several response surfaces keeps only the first through an edit.
+  const responded = rawSurfaces.find(s => s.response);
+  if (responded?.response) {
+    const bands =
+      responded.response['reflect-bands-um'] ?? responded.response['transmit-bands-um'];
+    if (bands && bands.length > 0) draft.responseBandUm = bands[0];
+  }
+  const frames = (optics.frames ?? {}) as Record<
+    string,
+    { 'z-mm'?: number | string; 'clear-aperture-mm'?: number | string | null }
+  >;
   draft.frames = Object.entries(frames).map(([name, f]) => ({
     name,
     zMm: Number(f?.['z-mm'] ?? 0),
+    ...(f?.['clear-aperture-mm'] != null
+      ? { clearApertureMm: Number(f['clear-aperture-mm']) }
+      : {}),
   }));
   if (draft.frames.length === 0) draft.frames = [{ name: 'optical', zMm: 0 }];
   const ports = (optics.ports ?? {}) as Record<
@@ -599,5 +743,8 @@ export function draftFromRecord(record: ComponentRecord): RecordDraft {
     draft.detectorSensorMm = detector.sensor_mm;
     draft.detectorPixelPitchUm = detector.pixel_pitch_um ?? null;
   }
+  // WP-90: the housing-template reference reopens.
+  const mechanics = rec.mechanics as { template?: string } | undefined;
+  if (mechanics?.template) draft.mechanicsTemplate = String(mechanics.template);
   return draft;
 }

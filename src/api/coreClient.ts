@@ -461,6 +461,40 @@ export function importGlb(
   );
 }
 
+// WP-87: a whole Optiland SETUP (serialized system JSON) → free primitives.
+const importOptilandSchema = z.object({
+  components: z.array(z.record(z.string(), z.unknown())),
+  placements: z.array(
+    z.object({
+      component: z.string(),
+      'z-mm': z.number(),
+      kind: z.string(),
+    }),
+  ),
+  review: z.array(z.string()),
+  records: z.record(z.string(), z.string()),
+  wavelengths_um: z.array(z.number()),
+});
+export type ImportOptilandResponse = z.infer<typeof importOptilandSchema>;
+
+export function importOptilandSetup(
+  filename: string,
+  bytes: Uint8Array,
+  opts: { namespace?: string } = {},
+  signal?: AbortSignal,
+): Promise<ImportOptilandResponse> {
+  return post(
+    '/v1/import/optiland',
+    {
+      filename,
+      data_b64: bytesToBase64(bytes),
+      ...(opts.namespace ? { namespace: opts.namespace } : {}),
+    },
+    importOptilandSchema,
+    signal,
+  );
+}
+
 /** WP-82: the compiled path drawn by optiland's own 2D viewer, as a PNG blob. */
 export async function drawLayout(
   files: DsnFiles,

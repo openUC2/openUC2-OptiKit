@@ -31,38 +31,55 @@ import {
 } from '@mui/icons-material';
 import { DEFAULT_CORE_URL, getCoreUrl, setCoreUrl } from '../../api/coreClient';
 import { selectPart, useDocPaths, useDocRevision } from '../../document';
-import { pathColor } from './colors';
+import { pathColor, sourceTint } from './colors';
 import { CalibrateDialog } from './CalibrateDialog';
 import { LayoutDialog } from './LayoutDialog';
 import { MarkerList } from './MarkerList';
 import { OptimizeDialog } from './OptimizeDialog';
 import { useServiceStore, useSimFreshness } from './serviceStore';
 
-function SpotDiagram({ x, y, color }: { x: number[]; y: number[]; color: string }) {
+interface SpotLayer {
+  x: number[];
+  y: number[];
+  color: string;
+  /** WP-91: legend label for a multi-line overlay ("488 nm"). */
+  label?: string;
+}
+
+function SpotDiagram({ layers }: { layers: SpotLayer[] }) {
   const size = 120;
   // WP-51.4: the spot plot is panel chrome, not a 3D canvas — it follows the
   // theme so it reads in light mode too (the dark 2D/3D drawing surfaces are
   // the deliberate exception, not this).
   const theme = useTheme();
-  const points = useMemo(() => {
-    const xs = x.filter(Number.isFinite);
-    const ys = y.filter(Number.isFinite);
-    if (xs.length === 0) return { dots: [] as { cx: number; cy: number }[], radiusUm: 0 };
-    const cx0 = xs.reduce((a, b) => a + b, 0) / xs.length;
-    const cy0 = ys.reduce((a, b) => a + b, 0) / ys.length;
+  // WP-91: one shared centroid + scale over ALL layers, so the chromatic
+  // shift between wavelengths stays visible instead of being normalized away.
+  const view = useMemo(() => {
+    const allX = layers.flatMap(l => l.x.filter(Number.isFinite));
+    const allY = layers.flatMap(l => l.y.filter(Number.isFinite));
+    if (allX.length === 0) {
+      return { perLayer: [] as { cx: number; cy: number }[][], radiusUm: 0 };
+    }
+    const cx0 = allX.reduce((a, b) => a + b, 0) / allX.length;
+    const cy0 = allY.reduce((a, b) => a + b, 0) / allY.length;
     const r = Math.max(
       1e-6,
-      ...xs.map((v, i) => Math.hypot(v - cx0, (ys[i] ?? cy0) - cy0)),
+      ...allX.map((v, i) => Math.hypot(v - cx0, (allY[i] ?? cy0) - cy0)),
     );
     const scale = (size / 2 - 8) / r;
     return {
-      dots: xs.map((v, i) => ({
-        cx: size / 2 + (v - cx0) * scale,
-        cy: size / 2 - ((ys[i] ?? cy0) - cy0) * scale,
-      })),
+      perLayer: layers.map(l =>
+        l.x
+          .map((v, i) => ({ v, w: l.y[i] }))
+          .filter(p => Number.isFinite(p.v) && Number.isFinite(p.w))
+          .map(p => ({
+            cx: size / 2 + (p.v - cx0) * scale,
+            cy: size / 2 - (p.w - cy0) * scale,
+          })),
+      ),
       radiusUm: r * 1e3,
     };
-  }, [x, y]);
+  }, [layers]);
 
   return (
     <Box sx={{ textAlign: 'center' }}>
@@ -73,12 +90,23 @@ function SpotDiagram({ x, y, color }: { x: number[]; y: number[]; color: string 
       >
         <line x1={size / 2} y1={0} x2={size / 2} y2={size} stroke={theme.palette.divider} />
         <line x1={0} y1={size / 2} x2={size} y2={size / 2} stroke={theme.palette.divider} />
-        {points.dots.map((d, i) => (
-          <circle key={i} cx={d.cx} cy={d.cy} r={1.6} fill={color} opacity={0.8} />
-        ))}
+        {view.perLayer.map((dots, li) =>
+          dots.map((d, i) => (
+            <circle key={`${li}-${i}`} cx={d.cx} cy={d.cy} r={1.6} fill={layers[li].color} opacity={0.8} />
+          )),
+        )}
       </svg>
+      {layers.length > 1 && (
+        <Stack direction="row" spacing={1} justifyContent="center">
+          {layers.map((l, i) => (
+            <Typography key={i} variant="caption" sx={{ color: l.color }}>
+              ● {l.label ?? ''}
+            </Typography>
+          ))}
+        </Stack>
+      )}
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        max radius {points.radiusUm.toFixed(1)} µm
+        max radius {view.radiusUm.toFixed(1)} µm
       </Typography>
     </Box>
   );
@@ -253,7 +281,22 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
               </Alert>
             ) : (
               <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }}>
-                {result.spot && <SpotDiagram x={result.spot.x} y={result.spot.y} color={pathColor(i)} />}
+                {/* WP-91: a multi-line run overlays one spot per wavelength,
+                    each in its own line colour. */}
+                {result.multiSpot ? (
+                  <SpotDiagram
+                    layers={result.multiSpot.map(m => ({
+                      x: m.spot.x,
+                      y: m.spot.y,
+                      color: sourceTint(m.um) ?? pathColor(i),
+                      label: `${(m.um * 1000).toFixed(0)} nm`,
+                    }))}
+                  />
+                ) : (
+                  result.spot && (
+                    <SpotDiagram layers={[{ x: result.spot.x, y: result.spot.y, color: pathColor(i) }]} />
+                  )
+                )}
                 {result.paraxial && (
                   <Box>
                     {Object.entries(result.paraxial)

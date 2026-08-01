@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -14,33 +14,29 @@ import {
   Paper,
   Button,
   Divider,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   DragIndicator as DragIcon,
-  GitHub as GitHubIcon
+  GitHub as GitHubIcon,
+  GridView as GridViewIcon,
+  ViewList as ViewListIcon,
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import {
   T_CLASS_LABEL,
   addGroup,
   categoryOf,
-  entriesFromComponents,
-  entriesFromIndex,
-  entriesFromWorkspace,
   groupEntriesFromIndex,
   isLibraryModule,
   libraryEntryOf,
-  registerLibraryGroups,
-  registerLibraryModules,
   templateClassOf,
 } from '../document';
-import { useLibraryIndex } from '../model/libraryIndex';
-import { mergeRepoIndexes, useMountedRepos } from '../model/communityRepos';
 import { AddCommunityRepoDialog } from './library/AddCommunityRepoDialog';
-import { useWorkspaceLibrary } from '../model/workspaceLibrary';
-import { getCoreUrl } from '../api/coreClient';
+import { useLibraryRegistration } from '../model/useLibraryRegistration';
 import { GlyphThumb } from './schematic/GlyphThumb';
 import type { ModuleDefinition } from '../types';
 
@@ -53,16 +49,17 @@ const SymbolOrGlyphThumb: React.FC<{
   symbolUrl: string | null;
   category: DocCategory;
   name: string;
-}> = ({ symbolUrl, category, name }) => {
+  size?: number;
+}> = ({ symbolUrl, category, name, size = 58 }) => {
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => setFailed(false), [symbolUrl]);
-  if (!symbolUrl || failed) return <GlyphThumb category={category} size={58} />;
+  if (!symbolUrl || failed) return <GlyphThumb category={category} size={size} />;
   return (
     <img
       src={symbolUrl}
       alt={name}
       onError={() => setFailed(true)}
-      style={{ width: 58, height: 58, objectFit: 'contain' }}
+      style={{ width: size, height: size, objectFit: 'contain' }}
     />
   );
 };
@@ -75,40 +72,21 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   // WP-58: the "Add library from GitHub" dialog.
   const [repoDialogOpen, setRepoDialogOpen] = useState(false);
+  // WP-91: icon grid ⇄ compact list — the list scans many parts by facts.
+  const [view, setView] = useState<'grid' | 'list'>(
+    () => (localStorage.getItem('optikit-palette-view') === 'list' ? 'list' : 'grid'),
+  );
+  const switchView = (v: 'grid' | 'list') => {
+    setView(v);
+    localStorage.setItem('optikit-palette-view', v);
+  };
 
   // WP-34: registry + workspace parts join the palette as the "Library"
   // group. Re-registers whenever the index refreshes (bumpLibraryIndex after
   // a dev write / workspace save) or a loadModules() call wiped the list.
-  const libraryIndex = useLibraryIndex();
-  const workspaceRecords = useWorkspaceLibrary(s => s.records);
-  const workspaceThumbs = useWorkspaceLibrary(s => s.thumbnails);
-  // WP-58: libraries mounted from community GitHub repos. Precedence is
-  // builtin < mounted < local drafts, so a fork can ADD parts but never
-  // silently override a curated openuc2.* id (clashes are surfaced below).
-  const mountedRepos = useMountedRepos();
-  const merged = useMemo(
-    () => mergeRepoIndexes(libraryIndex.modules, libraryIndex.groups, mountedRepos),
-    [libraryIndex.modules, libraryIndex.groups, mountedRepos],
-  );
-
-  useEffect(() => {
-    const registry = entriesFromIndex(merged.modules, getCoreUrl());
-    const registryIds = new Set(registry.map(e => e.moduleId));
-    const workspace = entriesFromWorkspace(workspaceRecords, workspaceThumbs)
-      .filter(e => !registryIds.has(e.moduleId));
-    const workspaceIds = new Set(workspace.map(e => e.moduleId));
-    // WP-60: published symbols NO module binds place directly — grouped
-    // "<category> · unbound". Local drafts with the same id keep precedence.
-    const unbound = entriesFromComponents(
-      libraryIndex.components,
-      merged.modules,
-      getCoreUrl(),
-      libraryIndex.housings,
-    ).filter(e => !registryIds.has(e.moduleId) && !workspaceIds.has(e.moduleId));
-    registerLibraryModules([...registry, ...workspace, ...unbound]);
-    // WP-44: groups (the OPM arrangements) register alongside the modules.
-    registerLibraryGroups(groupEntriesFromIndex(merged.groups));
-  }, [merged, libraryIndex.components, libraryIndex.housings, workspaceRecords, workspaceThumbs, modules]);
+  // WP-92: the registration effect lives in useLibraryRegistration so pages
+  // without the palette (AssemblyPage) stay registered too.
+  const { merged, mountedRepos } = useLibraryRegistration();
 
   const paletteGroups = groupEntriesFromIndex(merged.groups);
 
@@ -347,6 +325,70 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
     );
   };
 
+  // WP-91: the compact list row — small icon + name + key facts (category,
+  // T-class, EFL, footprint, vendor), for scanning many parts at once. Same
+  // drag/double-tap placement handlers as the tiles.
+  const renderModuleRow = (module: ModuleDefinition) => {
+    const entry = libraryEntryOf(module.id);
+    const tClass = templateClassOf(module.id);
+    const facts = [
+      String(categoryOf(module.id, module)),
+      entry?.eflMm != null ? `EFL ${entry.eflMm.toFixed(0)} mm` : '',
+      `${module.footprint.width}×${module.footprint.height}`,
+      entry?.vendorName ?? '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <Paper
+        key={module.id}
+        variant="outlined"
+        draggable
+        onDragStart={e => handleDragStart(e, module.id)}
+        onDoubleClick={() => handleQuickPlace(module.id)}
+        sx={{
+          display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5,
+          cursor: 'grab', userSelect: 'none',
+          '&:hover': { bgcolor: 'action.hover' },
+          '&:active': { cursor: 'grabbing' },
+        }}
+      >
+        <Box sx={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {module.thumbnail ? (
+            <img src={module.thumbnail} alt={module.name} style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          ) : (
+            <SymbolOrGlyphThumb
+              symbolUrl={entry?.symbolUrl ?? null}
+              category={categoryOf(module.id, module)}
+              name={module.name}
+              size={26}
+            />
+          )}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', lineHeight: 1.2 }} noWrap>
+            {module.name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }} noWrap>
+            {facts}
+          </Typography>
+        </Box>
+        {entry?.unbound && (
+          <Chip label="UNBOUND" size="small" color="info" variant="outlined"
+            sx={{ height: 16, fontSize: '0.5rem', flexShrink: 0, fontWeight: 700 }} />
+        )}
+        {tClass && (
+          <Chip
+            label={T_CLASS_LABEL[tClass]}
+            size="small"
+            color={tClass === 'fixed' ? 'default' : tClass === 'adaptive' ? 'success' : 'secondary'}
+            sx={{ height: 16, fontSize: '0.55rem', flexShrink: 0, fontWeight: 700 }}
+          />
+        )}
+      </Paper>
+    );
+  };
+
   return (
     <Box data-tour="part-library" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
@@ -355,6 +397,21 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
           <Typography variant="h6" sx={{ fontWeight: 500, flex: 1 }}>
             Part Library
           </Typography>
+          {/* WP-91: grid ⇄ list view toggle */}
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={view}
+            onChange={(_, v) => v && switchView(v)}
+            sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 0.75 } }}
+          >
+            <ToggleButton value="grid" aria-label="icon grid">
+              <Tooltip title="icon grid"><GridViewIcon sx={{ fontSize: 16 }} /></Tooltip>
+            </ToggleButton>
+            <ToggleButton value="list" aria-label="compact list">
+              <Tooltip title="compact list — small icon + name + key facts"><ViewListIcon sx={{ fontSize: 16 }} /></Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
 
         <TextField
@@ -464,15 +521,22 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
             ))}
           </Box>
         )}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(100px, 1fr))', sm: 'repeat(auto-fill, minmax(120px, 1fr))', md: 'repeat(auto-fill, minmax(130px, 1fr))' },
-            gap: 1.5,
-          }}
-        >
-          {filteredModules.map(renderModuleTile)}
-        </Box>
+        {view === 'grid' ? (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(100px, 1fr))', sm: 'repeat(auto-fill, minmax(120px, 1fr))', md: 'repeat(auto-fill, minmax(130px, 1fr))' },
+              gap: 1.5,
+            }}
+          >
+            {filteredModules.map(renderModuleTile)}
+          </Box>
+        ) : (
+          /* WP-91: list view — one row per part, dense enough to scan. */
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            {filteredModules.map(renderModuleRow)}
+          </Box>
+        )}
         
         {filteredModules.length === 0 && (
           <Paper 

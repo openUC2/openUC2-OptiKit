@@ -53,12 +53,14 @@ import {
   generateTemplate,
 } from '../../api/coreClient';
 import { zipDsn } from '../../model/dsn/io';
-import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
+import { assetsBaseUrl } from '../../model/libraryIndex';
+import { useLibraryRegistration } from '../../model/useLibraryRegistration';
 import { buildServiceDesign, listPartMechanics, serviceFiles } from '../../model/dsn/serviceExport';
 import { BomDialog } from '../bom/BomDialog';
 import { MarkerList } from '../schematic/MarkerList';
 import { LayerChips } from '../schematic/LayerChips';
 import { AssemblyScene } from './AssemblyScene';
+import { PartOpticsSection } from '../inspector/PartOpticsSection';
 import { AttachInventorDialog } from './AttachInventorDialog';
 import { CubifyDialog } from './CubifyDialog';
 import { GenerateHolderDialog } from './GenerateHolderDialog';
@@ -83,7 +85,11 @@ export function AssemblyPage() {
   const selectedEntry = selected ? libraryEntryOf(selected.libraryRef) : undefined;
   // WP-51.1: the raw index module — versions, assets and electronics for the
   // composition card ("cube + insert + part" in one place).
-  const index = useLibraryIndex();
+  // WP-92: mounting the registration hook keeps the palette registry
+  // (libraryEntryOf / renderInfoOf) live on this page too — a holder accepted
+  // HERE re-registers its new T3 module on the index bump, so the fresh cube
+  // renders its mesh instead of a "no template" ghost.
+  const { libraryIndex: index } = useLibraryRegistration();
   const selectedIndexModule = selected
     ? index.modules.find(m => m.id === selected.libraryRef)
     : undefined;
@@ -526,6 +532,11 @@ export function AssemblyPage() {
                     )}
                   </Box>
                   )}
+                  {/* WP-89: the record's optics + the port list — the same
+                      read-only section the schematic inspector mounts. */}
+                  <Stack spacing={0.75} sx={{ mt: 1 }}>
+                    <PartOpticsSection part={selected} />
+                  </Stack>
                   {/* WP-84: the Inventor round-trip, both legs. Export the
                       part posed w.r.t. its cube frame; attach the resulting
                       STP/GLB back onto the SAME template record. */}

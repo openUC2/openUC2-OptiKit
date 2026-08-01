@@ -119,6 +119,27 @@ describe('entriesFromIndex', () => {
     expect(lens.eflMm).toBe(50);
     expect(lens.ports[1].positionMm).toEqual([0, 0, 5]);
   });
+
+  it('resolves a MOUNTED module\'s assets against its repo, not the core service (WP-58)', () => {
+    const mounted: IndexModule = {
+      ...MIRROR_MODULE,
+      id: 'user.cube.demo_lens_50',
+      repo: 'someone/optikit-community-template',
+      repoRef: 'main',
+    };
+    const [entry] = entriesFromIndex([mounted], 'http://localhost:8010');
+    expect(entry.glbUrl).toBe(
+      'https://raw.githubusercontent.com/someone/optikit-community-template/main/library/templates/t/model.glb',
+    );
+    // Absolute URLs keep working untouched.
+    const absolute: IndexModule = {
+      ...mounted,
+      assets: { thumbnail: null, glb: 'https://cdn.example.org/m.glb', step: null },
+    };
+    expect(entriesFromIndex([absolute], 'http://localhost:8010')[0].glbUrl).toBe(
+      'https://cdn.example.org/m.glb',
+    );
+  });
 });
 
 // WP-60: the zmx-imported achromat — a published symbol NO module binds.

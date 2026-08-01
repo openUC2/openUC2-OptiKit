@@ -31,9 +31,10 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
 import { saveAs } from 'file-saver';
+import { PreviewCanvas } from '../common/PreviewCanvas';
+import { DecimalField } from '../common/DecimalField';
 import {
   CoreServiceError,
   base64ToBytes,
@@ -95,9 +96,26 @@ export function GenerateHolderDialog({
       }));
   }, [result]);
   useEffect(
-    () => () => halfUrls.forEach(h => URL.revokeObjectURL(h.url)),
+    () => () =>
+      halfUrls.forEach(h => {
+        URL.revokeObjectURL(h.url);
+        // WP-92: drop drei's cached GLTF scene too — the cache is keyed on
+        // the (now dead) blob URL, so without this every generate leaks two
+        // parsed scenes for the rest of the session.
+        useGLTF.clear(h.url);
+      }),
     [halfUrls],
   );
+
+  // WP-92: closing the dialog tears the preview down completely — the result
+  // (and with it the preview <Canvas> + its WebGL context) must not survive
+  // into the next open.
+  useEffect(() => {
+    if (!open) {
+      setResult(null);
+      setError(null);
+    }
+  }, [open]);
 
   const meta = (result?.meta ?? {}) as MetaShape;
   const bbox = meta.bbox_mm?.size;
@@ -209,10 +227,9 @@ export function GenerateHolderDialog({
           in its cell).
         </Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: 1.5 }}>
-          <TextField
-            size="small" type="number" label="clearance (mm)" value={clearanceMm}
-            inputProps={{ step: 0.05, min: 0, max: 1 }}
-            onChange={e => setClearanceMm(Number(e.target.value))}
+          <DecimalField
+            size="small" label="clearance (mm)" value={clearanceMm}
+            onValue={v => v !== null && setClearanceMm(v)}
             sx={{ width: 140 }}
           />
           <TextField
@@ -264,7 +281,7 @@ export function GenerateHolderDialog({
             </Stack>
             {/* The two printable halves, pulled slightly apart. */}
             <div style={{ height: 220, borderRadius: 4, overflow: 'hidden' }}>
-              <Canvas camera={{ position: [70, 55, 70], fov: 40 }}>
+              <PreviewCanvas camera={{ position: [70, 55, 70], fov: 40 }}>
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[80, 120, 60]} intensity={1.1} />
                 <OrbitControls enableDamping />
@@ -279,7 +296,7 @@ export function GenerateHolderDialog({
                     }
                   />
                 ))}
-              </Canvas>
+              </PreviewCanvas>
             </div>
           </>
         )}

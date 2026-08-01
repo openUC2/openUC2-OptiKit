@@ -15,6 +15,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -63,6 +64,8 @@ import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import { zipDsn } from '../../model/dsn/io';
 import { GenerateDraftHolderDialog } from '../component-editor/GenerateDraftHolderDialog';
 import { BindScene } from './BindScene';
+import { DecimalField } from '../common/DecimalField';
+import { AttachInventorDialog } from '../assembly/AttachInventorDialog';
 import { useBindStore } from './bindStore';
 
 const DATUM_KINDS: { value: DatumKind; label: string }[] = [
@@ -123,11 +126,14 @@ export function MechanicsPanel({
   draft,
   record,
   meshStatus = null,
+  onDraftChange,
 }: {
   draft: RecordDraft;
   /** The draft's validated component record (null while incomplete). */
   record: ComponentRecord | null;
   meshStatus?: MeshStatus;
+  /** WP-90: the mechanics tab writes the draft's `mechanics:` reference. */
+  onDraftChange?: (draft: RecordDraft) => void;
 }) {
   const store = useBindStore();
   const saveThumbnail = useWorkspaceLibrary(s => s.saveThumbnail);
@@ -140,11 +146,35 @@ export function MechanicsPanel({
   const [showComponentPicker, setShowComponentPicker] = useState(false);
   // WP-77: the T3 verb from the editor — the draft-driven holder dialog.
   const [holderOpen, setHolderOpen] = useState(false);
+  // WP-90: the T1 route — attach Inventor files onto the resolved template.
+  const [attachOpen, setAttachOpen] = useState(false);
 
   const allowedKinds = KINDS_BY_CATEGORY[draft.category] ?? KINDS_BY_CATEGORY.other;
   // WP-77: the live lensmaker number, without switching to the optics tab.
   // null (reflective stack / afocal / no surfaces) renders as "—".
   const eflMm = paraxialEflMm(draft.surfaces);
+
+  // WP-90: the template the T1 attach road targets — the draft's own
+  // `mechanics:` reference first, else a published template already bound to
+  // this component (module template or WP-67 housing).
+  const attachTemplateId = useMemo(() => {
+    if (draft.mechanicsTemplate) return draft.mechanicsTemplate;
+    const cid = record?.id ?? null;
+    if (!cid) return null;
+    const viaModule = index.modules.find(
+      m => (m.component?.ref ?? '').split('@')[0] === cid,
+    )?.template?.id;
+    const viaHousing = index.housings.find(h => h.component.id === cid)?.id;
+    return viaModule ?? viaHousing ?? null;
+  }, [draft.mechanicsTemplate, record?.id, index.modules, index.housings]);
+
+  // WP-90: known housing/template ids for the `mechanics:` reference field.
+  const mechanicsTemplateOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of index.modules) if (m.template?.id) ids.add(m.template.id);
+    for (const h of index.housings) ids.add(h.id);
+    return [...ids].sort();
+  }, [index.modules, index.housings]);
 
   // Existing-component options: published index + local workspace drafts.
   const componentOptions = useMemo(() => {
@@ -302,6 +332,60 @@ export function MechanicsPanel({
           <MenuItem value="generative">T3 · generative</MenuItem>
         </TextField>
       </Stack>
+
+      {/* WP-90: the template-class ROUTE — each class leads to its real
+          road instead of a dead record. T3's buttons live below (WP-77). */}
+      {store.templateClass === 'fixed' && (
+        <Alert severity="info" sx={{ py: 0 }}>
+          <Typography variant="caption">
+            T1 · fixed: attach an EXISTING Inventor cube (WP-84).{' '}
+            {attachTemplateId ? (
+              <Button size="small" sx={{ py: 0 }} onClick={() => setAttachOpen(true)}>
+                attach Inventor files… ({attachTemplateId})
+              </Button>
+            ) : (
+              'Publish the record pair first (below), then attach the STP/GLB onto its template — or do it from the assembly page with the part placed.'
+            )}
+          </Typography>
+        </Alert>
+      )}
+      {store.templateClass === 'adaptive' && (
+        <Alert severity="info" sx={{ py: 0 }}>
+          <Typography variant="caption">
+            T2 · adaptive: the Inventor MASTER INSERT road (WP-85) — the insert is
+            parameterized from the placed part's prescription and regenerated through the
+            Inventor bridge. Place the part, then use “regenerate insert” on the assembly page
+            (fallback: the fx-changeset download from Optimize…). The workbench cannot author
+            DOFs, so the record pair below stays refused for T2 (WP-77 guard).
+          </Typography>
+        </Alert>
+      )}
+
+      {/* WP-90: `mechanics:` — a hand-authored record naming its housing
+          template directly (the laser_488 case), no workbench round trip. */}
+      <Autocomplete
+        freeSolo
+        size="small"
+        options={mechanicsTemplateOptions}
+        value={draft.mechanicsTemplate}
+        onInputChange={(_, v) => onDraftChange?.({ ...draft, mechanicsTemplate: (v ?? '').trim() })}
+        renderInput={params => (
+          <TextField
+            {...params}
+            size="small"
+            label="mechanics: housing template (record reference)"
+            placeholder="user.tpl.laser_488_housing"
+            helperText="written onto the component record as `mechanics: {template: …}` — points at the housing that carries the Inventor STEP"
+          />
+        )}
+      />
+      {attachTemplateId && (
+        <AttachInventorDialog
+          templateId={attachTemplateId}
+          open={attachOpen}
+          onClose={() => setAttachOpen(false)}
+        />
+      )}
 
       {store.wholeModule && (
         <Stack direction="row" spacing={1} alignItems="center">
@@ -466,9 +550,9 @@ export function MechanicsPanel({
       <Stack spacing={1}>
         {store.datums.map(datum => {
           const snap = snapToAxis(datum.direction);
-          const setAxis = (i: 0 | 1 | 2) => (v: string) => {
+          const setAxis = (i: 0 | 1 | 2) => (v: number | null) => {
             const next = [...datum.pointMm] as Vec3;
-            next[i] = Number(v) || 0;
+            next[i] = v ?? 0;
             store.updateDatum(datum.id, { pointMm: next });
           };
           const isPlaced = Boolean(datum.quaternion);
@@ -509,11 +593,11 @@ export function MechanicsPanel({
               </Stack>
               <Stack direction="row" spacing={0.5} alignItems="center">
                 {(['x', 'y', 'z'] as const).map((axis, i) => (
-                  <TextField
+                  <DecimalField
                     key={axis} size="small" variant="standard" label={axis}
-                    type="number" value={datum.pointMm[i]}
-                    onChange={e => setAxis(i as 0 | 1 | 2)(e.target.value)}
-                    inputProps={{ step: 0.1, style: { width: 56, fontSize: 12 } }}
+                    value={datum.pointMm[i]}
+                    onValue={setAxis(i as 0 | 1 | 2)}
+                    slotProps={{ htmlInput: { style: { width: 56, fontSize: 12 } } }}
                   />
                 ))}
                 <Tooltip
@@ -535,15 +619,11 @@ export function MechanicsPanel({
                     ))}
                   </TextField>
                 </Tooltip>
-                <TextField
-                  size="small" variant="standard" label="⌀mm" type="number"
-                  value={datum.areaDiameterMm ?? ''}
-                  onChange={e =>
-                    store.updateDatum(datum.id, {
-                      areaDiameterMm: e.target.value === '' ? null : Number(e.target.value),
-                    })
-                  }
-                  inputProps={{ style: { width: 48, fontSize: 12 } }}
+                <DecimalField
+                  size="small" variant="standard" label="⌀mm"
+                  value={datum.areaDiameterMm ?? null}
+                  onValue={v => store.updateDatum(datum.id, { areaDiameterMm: v })}
+                  slotProps={{ htmlInput: { style: { width: 48, fontSize: 12 } } }}
                 />
               </Stack>
               {/* WP-41 follow-up: dial in the placed orientation by typing
@@ -557,14 +637,14 @@ export function MechanicsPanel({
                     const euler = quatToEulerDeg(datum.quaternion ?? [0, 0, 0, 1]);
                     const label = axis === 'x' ? 'pitch' : axis === 'y' ? 'roll' : 'yaw';
                     return (
-                      <TextField
+                      <DecimalField
                         key={axis} size="small" variant="standard" label={`${label} ${axis}°`}
-                        type="number" value={euler[axis]}
-                        onChange={e => {
-                          const next = { ...euler, [axis]: Number(e.target.value) || 0 };
+                        value={euler[axis]}
+                        onValue={v => {
+                          const next = { ...euler, [axis]: v ?? 0 };
                           store.updateDatum(datum.id, { quaternion: eulerDegToQuat(next) });
                         }}
-                        inputProps={{ step: 5, style: { width: 52, fontSize: 12 } }}
+                        slotProps={{ htmlInput: { style: { width: 52, fontSize: 12 } } }}
                       />
                     );
                   })}

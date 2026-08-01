@@ -3,14 +3,14 @@
  * for this category, on a small orbitable stage.
  */
 
-import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { DocCategory } from '../../document';
 import { SchematicGlyph, OpticalAxisArrow } from '../schematic/glyphs';
+import { PreviewCanvas } from '../common/PreviewCanvas';
 
 export function GlyphPreview({ category, label }: { category: DocCategory; label: string }) {
   return (
-    <Canvas
+    <PreviewCanvas
       camera={{ position: [45, 35, 55], fov: 40 }}
       style={{ width: '100%', height: 180, borderRadius: 8, background: '#10151c' }}
     >
@@ -19,6 +19,6 @@ export function GlyphPreview({ category, label }: { category: DocCategory; label
       <SchematicGlyph category={category} label={label} />
       <OpticalAxisArrow />
       <OrbitControls enablePan={false} minDistance={40} maxDistance={140} />
-    </Canvas>
+    </PreviewCanvas>
   );
 }

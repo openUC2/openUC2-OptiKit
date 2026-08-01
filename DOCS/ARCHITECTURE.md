@@ -13,6 +13,7 @@ put together*, then *which conventions you must not break*.
 
 | Also read | For |
 |---|---|
+| `../../optikit-core/DOCS/DSN-CONTRACT.md` | **the normative frontend↔backend contract** — document frame, the 24 rotations (`rot24.svg`), pose composition, ports, API surface. We speak DSN; start external contributors here |
 | [CODEBASE-GUIDE.md](CODEBASE-GUIDE.md) | the file-by-file map across **both** repos, plus a diagram per user flow and a debugging map |
 | `../../optikit-core/DOCS/ARCHITECTURE.md` | the engine: what every `/v1/*` endpoint actually computes |
 | `../../optikit-core/DOCS/LIBRARY.md` | how to author and contribute a part record |

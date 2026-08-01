@@ -180,6 +180,24 @@ export function serviceFiles(snap?: DocSnapshot): DsnFiles {
   return { [DESIGN_DECL_FILE]: serializeDesign(design) };
 }
 
+/**
+ * WP-91: the same files with every path's `simulation.wavelengths` pinned to
+ * ONE line. "Simulate all lines" traces the design once per source line — a
+ * fluorescence design cares about excitation AND emission through the same
+ * optics, which a single active line cannot show. The compiler reads the
+ * path's simulation block verbatim (PathSpec.simulation), so this is the
+ * whole contract.
+ */
+export function serviceFilesAtWavelength(um: number, snap?: DocSnapshot): DsnFiles {
+  const { design } = buildServiceDesign(snap);
+  for (const path of Object.values(design.paths ?? {})) {
+    if (!path) continue;
+    const p = path as { simulation?: Record<string, unknown> };
+    p.simulation = { ...(p.simulation ?? {}), wavelengths: [{ value: um, is_primary: true }] };
+  }
+  return { [DESIGN_DECL_FILE]: serializeDesign(design) };
+}
+
 export interface RangedDof {
   /** dotted key, e.g. "objective.dz" */
   key: string;

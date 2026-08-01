@@ -17,7 +17,7 @@ import { getDocRevision, makePortRef, setPath, useDocRevision } from '../../docu
 import type { Vec3 } from '../../document';
 import { UC2_GRID_MM } from '../../document/types';
 import { useAppStore } from '../../stores/appStore';
-import { buildServiceDesign, serviceFiles } from '../../model/dsn/serviceExport';
+import { buildServiceDesign, serviceFiles, serviceFilesAtWavelength } from '../../model/dsn/serviceExport';
 
 /**
  * Auto-chaining (WP-32): when the document declares NO paths, ask
@@ -103,6 +103,9 @@ export interface PathSimResult {
   warnings: string[];
   /** Compile/trace failure for this path (other paths may still succeed). */
   error: { code: string; message: string } | null;
+  /** WP-91: one spot per source line ("simulate all lines"), overlaid in the
+   * panel — null when the run traced a single wavelength. */
+  multiSpot: { um: number; spot: { x: number[]; y: number[] } }[] | null;
 }
 
 interface ServiceState {
@@ -122,6 +125,8 @@ interface ServiceState {
   live: boolean;
   runCheck: () => Promise<void>;
   runSimulate: (numRays?: number) => Promise<void>;
+  /** WP-91: trace every path once per source line, spot per wavelength. */
+  runSimulateAllLines: (linesUm: number[], numRays?: number) => Promise<void>;
   setLive: (live: boolean) => void;
   clearError: () => void;
   /** WP-78: silent inference dry run → `proposals` only (debounced by the
@@ -435,12 +440,13 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             photonBudget: result.photon_budget ?? null,
             warnings: result.warnings,
             error: null,
+            multiSpot: null,
           };
         } catch (err) {
           if (err instanceof CoreServiceError && err.status !== 0) {
             simByPath[name] = {
               raysWorld: [], spot: null, paraxial: null, photonBudget: null,
-              warnings: [], error: toError(err),
+              warnings: [], error: toError(err), multiSpot: null,
             };
           } else {
             throw err; // unreachable service: abort the whole run
@@ -448,6 +454,61 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
         }
       }
       // Rays traced → the beam has a home; clear any stale escape overlay.
+      set({ simByPath, simRevision: revision, simBusy: false, escapes: [] });
+    } catch (err) {
+      set({ error: toError(err), simBusy: false });
+    }
+  },
+
+  // WP-91: the fluorescence case — trace every path once per source line and
+  // keep a spot per wavelength. The first line's trace doubles as the main
+  // result (rays, paraxial, budget); the overlay carries the rest.
+  runSimulateAllLines: async (linesUm, numRays = 6) => {
+    if (get().simBusy || linesUm.length === 0) return;
+    const revision = getDocRevision();
+    // Paths must exist first — the plain run auto-chains (WP-32) if needed.
+    if (Object.keys(buildServiceDesign().design.paths ?? {}).length === 0) {
+      await get().runSimulate(numRays);
+      if (Object.keys(buildServiceDesign().design.paths ?? {}).length === 0) return;
+    }
+    set({ simBusy: true, error: null });
+    try {
+      const pathNames = Object.keys(buildServiceDesign().design.paths ?? {});
+      const simByPath: Record<string, PathSimResult> = {};
+      for (const name of pathNames) {
+        try {
+          let main: PathSimResult | null = null;
+          const spots: { um: number; spot: { x: number[]; y: number[] } }[] = [];
+          for (const um of linesUm) {
+            const files = serviceFilesAtWavelength(um);
+            const result: SimulateResponse = await simulatePath(files, name, { numRays });
+            const spot = cleanSpot(result.spot);
+            if (spot) spots.push({ um, spot });
+            main ??= {
+              raysWorld: (result.rays_world ?? []) as [number, number, number][][],
+              spot,
+              paraxial: result.paraxial ?? null,
+              photonBudget: result.photon_budget ?? null,
+              warnings: result.warnings,
+              error: null,
+              multiSpot: null,
+            };
+          }
+          if (main) {
+            main.multiSpot = spots.length > 1 ? spots : null;
+            simByPath[name] = main;
+          }
+        } catch (err) {
+          if (err instanceof CoreServiceError && err.status !== 0) {
+            simByPath[name] = {
+              raysWorld: [], spot: null, paraxial: null, photonBudget: null,
+              warnings: [], error: toError(err), multiSpot: null,
+            };
+          } else {
+            throw err;
+          }
+        }
+      }
       set({ simByPath, simRevision: revision, simBusy: false, escapes: [] });
     } catch (err) {
       set({ error: toError(err), simBusy: false });

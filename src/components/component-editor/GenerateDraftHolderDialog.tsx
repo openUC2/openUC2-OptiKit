@@ -28,9 +28,10 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
 import { saveAs } from 'file-saver';
+import { PreviewCanvas } from '../common/PreviewCanvas';
+import { DecimalField } from '../common/DecimalField';
 import {
   CoreServiceError,
   base64ToBytes,
@@ -92,9 +93,22 @@ export function GenerateDraftHolderDialog({
       }));
   }, [result]);
   useEffect(
-    () => () => halfUrls.forEach(h => URL.revokeObjectURL(h.url)),
+    () => () =>
+      halfUrls.forEach(h => {
+        URL.revokeObjectURL(h.url);
+        // WP-92: drop drei's cached GLTF scene keyed on the dead blob URL.
+        useGLTF.clear(h.url);
+      }),
     [halfUrls],
   );
+
+  // WP-92: closing the dialog tears the preview (and its WebGL context) down.
+  useEffect(() => {
+    if (!open) {
+      setResult(null);
+      setError(null);
+    }
+  }, [open]);
 
   const meta = (result?.meta ?? {}) as MetaShape;
   const bbox = meta.bbox_mm?.size;
@@ -211,10 +225,9 @@ export function GenerateDraftHolderDialog({
                frame — no placement needed. Accept writes component + template + module.`}
         </Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: 1.5 }}>
-          <TextField
-            size="small" type="number" label="clearance (mm)" value={clearanceMm}
-            inputProps={{ step: 0.05, min: 0, max: 1 }}
-            onChange={e => setClearanceMm(Number(e.target.value))}
+          <DecimalField
+            size="small" label="clearance (mm)" value={clearanceMm}
+            onValue={v => v !== null && setClearanceMm(v)}
             sx={{ width: 140 }}
           />
           <TextField
@@ -265,7 +278,7 @@ export function GenerateDraftHolderDialog({
               )}
             </Stack>
             <div style={{ height: 220, borderRadius: 4, overflow: 'hidden' }}>
-              <Canvas camera={{ position: [70, 55, 70], fov: 40 }}>
+              <PreviewCanvas camera={{ position: [70, 55, 70], fov: 40 }}>
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[80, 120, 60]} intensity={1.1} />
                 <OrbitControls enableDamping />
@@ -280,7 +293,7 @@ export function GenerateDraftHolderDialog({
                     }
                   />
                 ))}
-              </Canvas>
+              </PreviewCanvas>
             </div>
           </>
         )}

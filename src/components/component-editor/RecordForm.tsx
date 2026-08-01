@@ -27,12 +27,47 @@ import {
   type RecordDraft,
 } from '../../model/componentRecord';
 import { SurfacesTable } from './SurfacesTable';
+import { DecimalField } from '../common/DecimalField';
 
 function Row({ children }: { children: React.ReactNode }) {
   return (
     <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', rowGap: 1.5 }}>
       {children}
     </Stack>
+  );
+}
+
+/** WP-90/WP-74: a spectral band [lo, hi] in µm; either side empty = open. */
+function BandFields({
+  label,
+  hint,
+  band,
+  onBand,
+}: {
+  label: string;
+  hint: string;
+  band: [number | null, number | null] | null;
+  onBand: (band: [number | null, number | null] | null) => void;
+}) {
+  const setSide = (side: 0 | 1) => (v: number | null) => {
+    const next: [number | null, number | null] = [band?.[0] ?? null, band?.[1] ?? null];
+    next[side] = v;
+    onBand(next[0] === null && next[1] === null ? null : next);
+  };
+  return (
+    <Tooltip title={hint}>
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <DecimalField
+          size="small" label={`${label} · lo`} value={band?.[0] ?? null}
+          onValue={setSide(0)} sx={{ width: 130 }}
+        />
+        <Typography variant="caption" color="text.secondary">–</Typography>
+        <DecimalField
+          size="small" label="hi" value={band?.[1] ?? null}
+          onValue={setSide(1)} sx={{ width: 100 }}
+        />
+      </Stack>
+    </Tooltip>
   );
 }
 
@@ -66,7 +101,9 @@ export function RecordForm({
           onChange={e => {
             const category = e.target.value as RecordCategory;
             const fresh = defaultDraft(category);
-            // Keep identity fields; reset the geometry to the category default.
+            // Keep identity fields; reset the geometry to the category
+            // default — WP-90: each category seeds ITS OWN surface stack (a
+            // mirror gets a substrate, not a lens's biconvex).
             set({
               category,
               surfaces: fresh.surfaces,
@@ -77,6 +114,7 @@ export function RecordForm({
               sourceDivergenceDeg: fresh.sourceDivergenceDeg,
               detectorSensorMm: fresh.detectorSensorMm,
               detectorPixelPitchUm: fresh.detectorPixelPitchUm,
+              responseBandUm: fresh.responseBandUm,
             });
           }}
           sx={{ width: 140 }}
@@ -115,14 +153,46 @@ export function RecordForm({
           onChange={e => set({ vendorUrl: e.target.value })} sx={{ flex: 1, minWidth: 180 }} />
       </Row>
 
-      {/* ── category-specific ────────────────────────────────────────────── */}
+      {/* ── category-specific (WP-90: honest per-category fields) ────────── */}
       {draft.category === 'mirror' && (
+        <>
+          <Row>
+            <DecimalField
+              size="small" label="mount angle °"
+              value={draft.mirrorAngleDeg}
+              onValue={v => set({ mirrorAngleDeg: v })}
+              sx={{ width: 140 }}
+            />
+            <BandFields
+              label="reflect band µm"
+              hint="the coating's reflect band (WP-74 response) — empty = broadband (reflects everything)"
+              band={draft.responseBandUm}
+              onBand={b => set({ responseBandUm: b })}
+            />
+          </Row>
+          <Typography variant="caption" color="text.secondary">
+            substrate: surface 0 is the reflective front; its thickness + back surface below are
+            the physical substrate a holder carves around.
+          </Typography>
+        </>
+      )}
+      {draft.category === 'dichroic' && (
         <Row>
-          <TextField
-            size="small" type="number" label="mount angle °"
-            value={draft.mirrorAngleDeg ?? ''}
-            onChange={e => set({ mirrorAngleDeg: e.target.value === '' ? null : Number(e.target.value) })}
-            sx={{ width: 140 }}
+          <BandFields
+            label="reflect band µm"
+            hint="the dichroic's reflect band (WP-74) — e.g. hi 0.505 for a 505 nm cut-on longpass; the rest transmits"
+            band={draft.responseBandUm}
+            onBand={b => set({ responseBandUm: b })}
+          />
+        </Row>
+      )}
+      {draft.category === 'filter' && (
+        <Row>
+          <BandFields
+            label="transmit band µm"
+            hint="the filter's pass band (WP-74, absorptive) — the beam outside it is absorbed, no reflect arm"
+            band={draft.responseBandUm}
+            onBand={b => set({ responseBandUm: b })}
           />
         </Row>
       )}
@@ -141,32 +211,32 @@ export function RecordForm({
             }
             sx={{ width: 240 }}
           />
-          <TextField
-            size="small" type="number" label="divergence ° (half-angle)"
-            value={draft.sourceDivergenceDeg ?? ''}
-            onChange={e => set({ sourceDivergenceDeg: e.target.value === '' ? null : Number(e.target.value) })}
+          <DecimalField
+            size="small" label="divergence ° (half-angle)"
+            value={draft.sourceDivergenceDeg}
+            onValue={v => set({ sourceDivergenceDeg: v })}
             sx={{ width: 180 }}
           />
         </Row>
       )}
       {draft.category === 'detector' && (
         <Row>
-          <TextField
-            size="small" type="number" label="sensor width mm"
-            value={draft.detectorSensorMm?.[0] ?? ''}
-            onChange={e => set({ detectorSensorMm: [Number(e.target.value), draft.detectorSensorMm?.[1] ?? 0] })}
+          <DecimalField
+            size="small" label="sensor width mm"
+            value={draft.detectorSensorMm?.[0] ?? null}
+            onValue={v => set({ detectorSensorMm: [v ?? 0, draft.detectorSensorMm?.[1] ?? 0] })}
             sx={{ width: 140 }}
           />
-          <TextField
-            size="small" type="number" label="sensor height mm"
-            value={draft.detectorSensorMm?.[1] ?? ''}
-            onChange={e => set({ detectorSensorMm: [draft.detectorSensorMm?.[0] ?? 0, Number(e.target.value)] })}
+          <DecimalField
+            size="small" label="sensor height mm"
+            value={draft.detectorSensorMm?.[1] ?? null}
+            onValue={v => set({ detectorSensorMm: [draft.detectorSensorMm?.[0] ?? 0, v ?? 0] })}
             sx={{ width: 140 }}
           />
-          <TextField
-            size="small" type="number" label="pixel pitch µm"
-            value={draft.detectorPixelPitchUm ?? ''}
-            onChange={e => set({ detectorPixelPitchUm: e.target.value === '' ? null : Number(e.target.value) })}
+          <DecimalField
+            size="small" label="pixel pitch µm"
+            value={draft.detectorPixelPitchUm}
+            onValue={v => set({ detectorPixelPitchUm: v })}
             sx={{ width: 140 }}
           />
         </Row>
@@ -206,14 +276,28 @@ export function RecordForm({
                 }}
                 sx={{ width: 140 }}
               />
-              <TextField
-                size="small" type="number" label="z-mm" value={f.zMm}
-                onChange={e => {
-                  const frames = draft.frames.map((x, k) => (k === i ? { ...x, zMm: Number(e.target.value) } : x));
+              <DecimalField
+                size="small" label="z-mm" value={f.zMm}
+                onValue={v => {
+                  const frames = draft.frames.map((x, k) => (k === i ? { ...x, zMm: v ?? 0 } : x));
                   set({ frames });
                 }}
                 sx={{ width: 110 }}
               />
+              <Tooltip title="clear aperture at this frame (diameter, mm) — ships as the port's clear_aperture_mm and feeds DRC_APERTURE (WP-79); empty = undeclared">
+                <span>
+                  <DecimalField
+                    size="small" label="Ø mm" value={f.clearApertureMm ?? null}
+                    onValue={v => {
+                      const frames = draft.frames.map((x, k) =>
+                        k === i ? { ...x, clearApertureMm: v } : x,
+                      );
+                      set({ frames });
+                    }}
+                    sx={{ width: 90 }}
+                  />
+                </span>
+              </Tooltip>
               {f.name !== 'optical' && (
                 <IconButton size="small" onClick={() => set({ frames: draft.frames.filter((_, k) => k !== i) })}>
                   <DeleteIcon fontSize="inherit" />

@@ -326,6 +326,20 @@ function AssemblyPart({
   const templateClass = mechanics?.templateClass ?? null;
   const partMarkers = markers.filter(m => m.partId === part.id);
   const locked = templateClass === 'fixed';
+  // WP-92: a part with NO cube shell (unbound primitive or template-less
+  // module) has nothing the T-rule could pin to the grid — its body renders
+  // at the FULL world pose (discrete + residual yaw + δ), so typing yaw 55°
+  // with snap off visibly sits at 55°, not the snapped 90°.
+  const noShell = unbound || templateClass === null;
+  const bodyOffset: [number, number, number] = noShell
+    ? [insertPos[0] - shellPos[0], insertPos[1] - shellPos[1], insertPos[2] - shellPos[2]]
+    : [0, 0, 0];
+  const bodyQuat = noShell ? insertQuat : shellQuat;
+  // WP-92: an interface part (plate / puzzle joint / baseplate) draws its
+  // flat glyph AS the body, full size — before, the "no template" ghost cube
+  // drew on top of a 0.55-scale glyph and the joints read as generic ghosts.
+  const ifaceKind = useMemo(() => interfaceKindOf(part.libraryRef), [part.libraryRef]);
+  const ifaceBody = ifaceKind !== null && !render.glbUrl;
 
   // WP-65: dimmed layers are non-interactive — without handlers R3F skips
   // raycasting these meshes entirely, so clicks fall through.
@@ -349,8 +363,18 @@ function AssemblyPart({
 
   return (
     <group position={shellPos}>
-      <group quaternion={shellQuat} {...handlers}>
-        {unbound ? (
+      <group position={bodyOffset} quaternion={bodyQuat} {...handlers}>
+        {ifaceBody ? (
+          // WP-92: the flat interface glyph IS the body — no ghost cube to
+          // occlude it, and at full size.
+          <SchematicGlyph
+            category={part.category}
+            label={part.ref}
+            foldDeg={null}
+            dimmed={dimmed}
+            interfaceKind={ifaceKind}
+          />
+        ) : unbound ? (
           // WP-60: an optical primitive with no mechanics at all — drawn as a
           // fainter "not in a cube yet" ghost, distinct from the missing-
           // template ghost (that one is a module whose mesh is absent).
@@ -380,22 +404,23 @@ function AssemblyPart({
       </group>
 
       {/* Insert content at the true world pose (residual yaw + δ visible
-          against the axis-aligned shell). */}
-      <group position={[insertPos[0] - shellPos[0], insertPos[1] - shellPos[1], insertPos[2] - shellPos[2]]}>
-        <group quaternion={insertQuat} scale={0.55}>
-          <group quaternion={insertAxisQuat}>
-            {/* WP-64: interface parts (plates/puzzle/baseplates) share the
-                schematic's distinct flat glyphs here too. */}
-            <SchematicGlyph
-              category={part.category}
-              label={part.ref}
-              foldDeg={insertFoldDeg}
-              dimmed={dimmed}
-              interfaceKind={interfaceKindOf(part.libraryRef)}
-            />
+          against the axis-aligned shell). An interface part already drew its
+          glyph as the body above — no 0.55-scale duplicate. */}
+      {!ifaceBody && (
+        <group position={[insertPos[0] - shellPos[0], insertPos[1] - shellPos[1], insertPos[2] - shellPos[2]]}>
+          <group quaternion={insertQuat} scale={0.55}>
+            <group quaternion={insertAxisQuat}>
+              <SchematicGlyph
+                category={part.category}
+                label={part.ref}
+                foldDeg={insertFoldDeg}
+                dimmed={dimmed}
+                interfaceKind={null}
+              />
+            </group>
           </group>
         </group>
-      </group>
+      )}
 
       <Text
         position={[0, 34, 0]}

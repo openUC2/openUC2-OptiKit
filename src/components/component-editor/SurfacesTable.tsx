@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { MATERIAL_NAMES } from '../../model/materials';
+import { DecimalField } from '../common/DecimalField';
 import { glassElements } from '../../model/componentRecord';
 import type { SurfaceDraft } from '../../model/componentRecord';
 
@@ -44,19 +45,16 @@ function NumberCell({
   placeholder?: string;
   width?: number;
 }) {
+  // WP-92: DecimalField accepts a decimal comma and holds intermediate
+  // typing states ("0," / "-") without snapping back.
   return (
-    <TextField
+    <DecimalField
       size="small"
       variant="standard"
-      value={value ?? ''}
+      value={value}
+      onValue={onChange}
       placeholder={placeholder}
-      onChange={e => {
-        const raw = e.target.value.trim();
-        if (raw === '') return onChange(null);
-        const num = Number(raw);
-        if (!Number.isNaN(num)) onChange(num);
-      }}
-      inputProps={{ inputMode: 'decimal', style: { width, fontSize: 13 } }}
+      slotProps={{ htmlInput: { style: { width, fontSize: 13 } } }}
     />
   );
 }
@@ -118,7 +116,11 @@ export function SurfacesTable({
                 <span>f mm (ideal)</span>
               </Tooltip>
             </TableCell>
-            <TableCell>semi-ap. mm</TableCell>
+            <TableCell>
+              <Tooltip title="clear aperture (WP-90): circular (semi-aperture) or rectangular (w × h) — Optiland supports both; a beam-fold mirror is often rectangular">
+                <span>aperture mm</span>
+              </Tooltip>
+            </TableCell>
             <TableCell>conic</TableCell>
             <TableCell align="center">stop</TableCell>
             <TableCell align="center">refl.</TableCell>
@@ -212,7 +214,45 @@ export function SurfacesTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <NumberCell value={s.semiApertureMm} onChange={v => update(i, { semiApertureMm: v })} width={56} />
+                  {s.apertureRectMm ? (
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                      <NumberCell
+                        value={s.apertureRectMm[0]}
+                        width={40}
+                        onChange={v => update(i, { apertureRectMm: [v ?? 0, s.apertureRectMm![1]] })}
+                      />
+                      {' × '}
+                      <NumberCell
+                        value={s.apertureRectMm[1]}
+                        width={40}
+                        onChange={v => update(i, { apertureRectMm: [s.apertureRectMm![0], v ?? 0] })}
+                      />
+                      <Tooltip title="switch to a circular aperture (semi-aperture)">
+                        <IconButton size="small" onClick={() => update(i, { apertureRectMm: null })}>
+                          <span style={{ fontSize: 12 }}>○</span>
+                        </IconButton>
+                      </Tooltip>
+                    </span>
+                  ) : (
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                      <NumberCell value={s.semiApertureMm} onChange={v => update(i, { semiApertureMm: v })} width={44} />
+                      <Tooltip title="switch to a rectangular aperture (width × height)">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            update(i, {
+                              apertureRectMm: [
+                                (s.semiApertureMm ?? 12.7) * 2,
+                                (s.semiApertureMm ?? 12.7) * 2,
+                              ],
+                            })
+                          }
+                        >
+                          <span style={{ fontSize: 12 }}>▭</span>
+                        </IconButton>
+                      </Tooltip>
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <NumberCell value={s.conic} onChange={v => update(i, { conic: v ?? 0 })} width={44} />

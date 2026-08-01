@@ -315,11 +315,15 @@ export function SchematicGlyph({
   /** WP-47: a source that is switched off reads greyed out. */
   dimmed?: boolean;
   /** WP-64: structural interface-zone parts (plate/puzzle/baseplate) draw a
-   * distinct flat glyph instead of the generic blob. Only consulted for
-   * categories without a dedicated glyph ('other' mechanics records). */
+   * distinct flat glyph instead of the generic blob. */
   interfaceKind?: InterfaceKind | null;
 }) {
   const color = dimmed ? '#6b7280' : (tint ?? GLYPH_COLORS[category]);
+  // WP-92: an interface part IS its flat glyph, whatever category its record
+  // declares — before the fix a puzzle joint whose index category was not
+  // 'other' fell into a dedicated optics glyph and the joints stayed
+  // invisible ghosts.
+  if (interfaceKind) return <InterfaceGlyph kind={interfaceKind} color={color} label={label} />;
   // 180° (normal incidence) is the safe default when no fold is known.
   const fold = foldDeg ?? 180;
   switch (category) {
@@ -351,7 +355,6 @@ export function SchematicGlyph({
     case 'display':
       return <MirrorGlyph color={color} foldDeg={fold} />;
     default:
-      if (interfaceKind) return <InterfaceGlyph kind={interfaceKind} color={color} label={label} />;
       return <FallbackGlyph color={color} label={label} />;
   }
 }

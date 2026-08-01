@@ -85,6 +85,8 @@ export interface LibraryPaletteEntry {
     resolution: [number, number] | null;
     fillFactor: number | null;
   } | null;
+  /** WP-91: vendor name for the palette's list view (null = unbranded). */
+  vendorName?: string | null;
   /** WP-50: kit price in EUR from the module record (null = unpriced). */
   priceEur: number | null;
   /** WP-50: record still carries review flags (drafts marked in the BOM). */
@@ -278,9 +280,30 @@ export function entriesFromIndex(
   coreUrl: string,
 ): LibraryPaletteEntry[] {
   const origin = coreUrl.replace(/\/$/, '');
-  const abs = (path: string | null | undefined) =>
-    path ? (path.startsWith('http') ? path : `${origin}${path}`) : null;
-  return modules.map(mod => ({
+  const ASSET_PREFIX = '/v1/library/assets/';
+  return modules.map(mod => {
+    // Service-relative asset paths normally absolutize against the core
+    // service — but a MOUNTED community module's assets live in ITS repo, not
+    // in the local registry, so they resolve against raw.githubusercontent
+    // (the same host the index itself was fetched from). Without this every
+    // mounted mesh/thumbnail 404s against localhost.
+    const abs = (path: string | null | undefined) => {
+      if (!path) return null;
+      if (path.startsWith('http')) return path;
+      if (mod.repo && path.startsWith(ASSET_PREFIX)) {
+        return `https://raw.githubusercontent.com/${mod.repo}/${mod.repoRef ?? 'main'}/library/${path.slice(ASSET_PREFIX.length)}`;
+      }
+      return `${origin}${path}`;
+    };
+    return entryFromIndexModule(mod, abs);
+  });
+}
+
+function entryFromIndexModule(
+  mod: IndexModule,
+  abs: (path: string | null | undefined) => string | null,
+): LibraryPaletteEntry {
+  return {
     moduleId: mod.id,
     componentId: mod.component?.ref?.split('@')[0] ?? null,
     name: shortName(mod.id),
@@ -314,6 +337,7 @@ export function entriesFromIndex(
           fillFactor: mod.component.programmable['fill-factor'],
         }
       : null,
+    vendorName: mod.component?.vendor?.name || null,
     priceEur: typeof mod.price === 'number' ? mod.price : null,
     review: mod.review,
     source: 'registry',
@@ -326,7 +350,7 @@ export function entriesFromIndex(
         { originCell: bay.origin_cell, size: bay.size, axis: bay.axis },
       ]),
     ),
-  }));
+  };
 }
 
 /** Registry index groups → palette group entries (WP-44). */
@@ -382,11 +406,16 @@ export function entriesFromWorkspace(
     // Workspace drafts have no served asset yet — they derive their glyph.
     symbolUrl: null,
     programmable: null,
+    vendorName: (record.vendor as { name?: string } | undefined)?.name || null,
     // Drafts are unpriced by definition and always review-marked.
     priceEur: null,
     review: true,
     source: 'workspace',
-    unbound: false,
+    // WP-87: a draft IS a symbol no module binds — the same unbound shape as
+    // WP-60 published components, so an imported Optiland primitive placed
+    // from the workspace offers "generate a holder…" like any other unbound
+    // part (cubify is the T-class binding moment).
+    unbound: true,
     // A draft's authored surfaces ARE its prescription (WP-60 convention).
     fragmentSurfaces:
       ((record.optics as { fragment?: { surfaces?: Record<string, unknown>[] } } | undefined)
@@ -461,6 +490,7 @@ export function entriesFromComponents(
       wavelengthsUm: component.wavelengths_um ?? [],
       symbolUrl: abs(component.symbol),
       programmable: null,
+      vendorName: component.vendor?.name || null,
       priceEur: null,
       review: component.review || Boolean(housing?.review),
       source: 'registry' as const,

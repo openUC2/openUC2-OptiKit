@@ -41,6 +41,7 @@ import { useAppStore } from '../stores/appStore';
 import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
+import { ImportOptilandDialog } from './library/ImportOptilandDialog';
 import { SyncChip } from './sync/SyncChip';
 import { GuidesDialog } from './guides/GuidesDialog';
 import { BrandLogo } from './BrandLogo';
@@ -64,6 +65,8 @@ export const Toolbar: React.FC = () => {
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [feedbackTrigger, setFeedbackTrigger] = React.useState<'download' | 'github' | 'manual'>('manual');
   const [imSwitchWizardOpen, setImSwitchWizardOpen] = React.useState(false);
+  // WP-87: the Optiland-setup import wizard.
+  const [optilandImportOpen, setOptilandImportOpen] = React.useState(false);
   const [editMenuAnchor, setEditMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [helpMenuAnchor, setHelpMenuAnchor] = React.useState<null | HTMLElement>(null);
@@ -582,6 +585,12 @@ openUC2 team via GitHub repository
                 <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Import .dsn (zip)</ListItemText>
               </MenuItem>
+              {/* WP-87: a whole Optiland system JSON → a row of unbound
+                  free primitives on the schematic. */}
+              <MenuItem onClick={() => { setOptilandImportOpen(true); setFileMenuAnchor(null); }}>
+                <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Import Optiland setup…</ListItemText>
+              </MenuItem>
               <MenuItem onClick={() => { handleExportReleaseBundle(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><STLIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Export Release Bundle (zip)</ListItemText>
@@ -683,9 +692,15 @@ openUC2 team via GitHub repository
       />
       
       {/* ImSwitch Configuration Wizard */}
-      <ImSwitchConfigWizard 
+      <ImSwitchConfigWizard
         open={imSwitchWizardOpen}
         onClose={() => setImSwitchWizardOpen(false)}
+      />
+
+      {/* WP-87: import an Optiland setup as free primitives */}
+      <ImportOptilandDialog
+        open={optilandImportOpen}
+        onClose={() => setOptilandImportOpen(false)}
       />
     </AppBar>
   );

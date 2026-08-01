@@ -13,17 +13,29 @@ day-to-day workflow between the two repos, see `../optikit-core/DOCS/ARCHITECTUR
 walkthrough (what the editor can do, the layering, the conventions) is
 `DOCS/ARCHITECTURE.md`; `DOCS/CODEBASE-GUIDE.md` is the cross-repo file-by-file map.
 
+## We speak DSN — the one contract
+
+The frontend↔backend common ground (document frame, grid pitch, the 24
+rotations + `offset-deg` residuals, ports, record trio, API surface) is
+defined ONCE in **`../optikit-core/DOCS/DSN-CONTRACT.md`** (with the
+`rot24.svg` drawing). Everything on the wire is `.dsn`; internal stores are
+private representations, never a contract. Point external contributors at
+that manifest, not at this repo's internals.
+
 ## Hard rule: the document boundary
 
 **New editor components must import design-model state ONLY from `src/document`
 (the `OptikitDocument` facade) — never from `stores/appStore` directly.**
 
-The facade currently wraps the legacy appStore (`PlacedModule[]`); it will be
-re-backed by the `.dsn` schema-v0 document without changing its API. Pose
-conventions (document frame: mm, z-up, right-handed; store frame: grid cells,
-layer, three 90° rotations) are documented in `src/document/mapping.ts` — read it
-before touching any coordinate code. Legacy components (GridCanvas, PropertyPanel,
-Toolbar, …) still use appStore; do not add new appStore consumers.
+The facade is this repo's DSN-speaking surface. It currently wraps the legacy
+appStore (`PlacedModule[]`); it will be re-backed by the `.dsn` schema-v0
+document without changing its API — which stays possible only while nothing
+reaches around it. This rule therefore RESOLVES by finishing that re-backing
+and porting the remaining legacy appStore consumers (GridCanvas, PropertyPanel,
+Toolbar, …), not by allowing new ones; until then, do not add new appStore
+consumers. The store↔document pose mapping lives in `src/document/mapping.ts` —
+read it before touching any coordinate code (conventions themselves:
+DSN-CONTRACT.md above).
 
 The component ("symbol") editor lives at `/configurator/components`
 (`src/components/component-editor/`); its record model, YAML serialization,
