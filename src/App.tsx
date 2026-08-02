@@ -10,6 +10,7 @@ import { StartupDialog } from './components/StartupDialog'
 import { NotificationDisplay } from './components/NotificationDisplay'
 import { useAppStore } from './stores/appStore'
 import { useDocumentStore } from './document/documentStore'
+import { confirmReplaceDocument } from './document'
 import { redo, undo } from './document'
 import { materialTheme } from './theme/materialTheme'
 import { trackUserVisit } from './utils/statisticsHandler'
@@ -116,15 +117,20 @@ function App() {
       const layoutUrl = urlParams.get('layout');
       const encodedData = urlParams.get('data');
       
+      // WP-105: these two fire on PAGE LOAD from the router root — on any
+      // route, including the parts editor — so without a guard a link opened
+      // in a working tab silently replaced the design in it.
       if (layoutUrl) {
-        importFromUrl(layoutUrl).then(success => {
-          if (success) {
-            console.log('Layout loaded from URL:', layoutUrl);
-          } else {
-            console.error('Failed to load layout from URL:', layoutUrl);
-          }
-        });
-      } else if (encodedData) {
+        if (confirmReplaceDocument('the layout in this link')) {
+          importFromUrl(layoutUrl).then(success => {
+            if (success) {
+              console.log('Layout loaded from URL:', layoutUrl);
+            } else {
+              console.error('Failed to load layout from URL:', layoutUrl);
+            }
+          });
+        }
+      } else if (encodedData && confirmReplaceDocument('the shared layout in this link')) {
         try {
           // Decode base64 data and import
           const jsonString = atob(encodedData);

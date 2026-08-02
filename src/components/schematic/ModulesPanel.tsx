@@ -33,6 +33,7 @@ import {
   Typography,
 } from '@mui/material';
 import { SwapHoriz as SwapIcon } from '@mui/icons-material';
+import { slugOf } from '../../model/librarySearch';
 // Notifications only — the design model itself flows through src/document
 // (the same exception PartLibrary uses).
 import { useAppStore } from '../../stores/appStore';
@@ -52,9 +53,6 @@ import {
   useSelectedPartId,
 } from '../../document';
 
-function shortName(id: string): string {
-  return id.split('.').pop()?.replace(/[_-]/g, ' ') ?? id;
-}
 
 function tClassColor(tClass: TemplateClass): 'default' | 'success' | 'secondary' {
   return tClass === 'fixed' ? 'default' : tClass === 'adaptive' ? 'success' : 'secondary';
@@ -65,7 +63,7 @@ function groupTagOf(part: DocPart): { instanceId: string; label: string } | null
   const instanceId = part.params.groupId;
   if (typeof instanceId !== 'string' || !instanceId) return null;
   const groupRef = part.params.groupRef;
-  const label = typeof groupRef === 'string' && groupRef ? shortName(groupRef) : 'group';
+  const label = typeof groupRef === 'string' && groupRef ? slugOf(groupRef) : 'group';
   return { instanceId, label };
 }
 
@@ -295,7 +293,7 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
                       </Stack>
                     }
                     secondary={
-                      `${lib?.name ?? shortName(part.libraryRef)} · ` +
+                      `${lib?.name ?? slugOf(part.libraryRef)} · ` +
                       `[${cell[0]}, ${cell[1]}, ${cell[2]}] · L${layerOf(part)}`
                     }
                     slotProps={{ secondary: { variant: 'caption', noWrap: true } }}

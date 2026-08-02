@@ -39,7 +39,8 @@ import {
 import { saveAs } from 'file-saver';
 import { useAppStore } from '../stores/appStore';
 import { exportDsnZip, importDsnFiles, unzipDsn } from '../model/dsn';
-import { redo, undo } from '../document';
+import { confirmReplaceDocument, redo, undo } from '../document';
+import { StorageChip } from './StorageChip';
 import { FeedbackDialog } from './FeedbackDialog';
 import { ImSwitchConfigWizard } from './ImSwitchConfigWizard';
 import { ImportOptilandDialog } from './library/ImportOptilandDialog';
@@ -157,6 +158,8 @@ export const Toolbar: React.FC = () => {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
+      // WP-105: a .dsn zip REPLACES the open design.
+      if (!confirmReplaceDocument(file.name)) return;
       try {
         const report = importDsnFiles(await unzipDsn(file));
         const details = [
@@ -344,6 +347,8 @@ openUC2 team via GitHub repository
   const handleImportFromUrl = async () => {
     const url = prompt('Enter URL to JSON layout file:');
     if (url) {
+      // WP-105: a bare prompt() that replaced the design without asking.
+      if (!confirmReplaceDocument('that layout')) return;
       const success = await importFromUrl(url);
       if (success) {
         alert('Layout imported successfully!');
@@ -518,6 +523,9 @@ openUC2 team via GitHub repository
             </Tooltip>
           )}
           {isEditorPage && <SyncChip />}
+          {/* WP-105: when the design was last written, and one click to the
+              full storage model. */}
+          {isEditorPage && <StorageChip />}
         </Box>
 
         <Divider 
@@ -572,7 +580,7 @@ openUC2 team via GitHub repository
             <Menu anchorEl={fileMenuAnchor} open={Boolean(fileMenuAnchor)} onClose={() => setFileMenuAnchor(null)}>
               <MenuItem onClick={() => { handleExport(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Save Layout As…</ListItemText>
+                <ListItemText>Export layout JSON…</ListItemText>
               </MenuItem>
               <MenuItem onClick={() => { handleImport(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><ImportIcon fontSize="small" /></ListItemIcon>
@@ -631,12 +639,12 @@ openUC2 team via GitHub repository
               <Divider />
               <MenuItem onClick={() => { handleSaveToGitHub(); setFileMenuAnchor(null); }}>
                 <ListItemIcon><GitHubIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Upload to Setup Browser</ListItemText>
+                <ListItemText>Publish to Setup Browser</ListItemText>
               </MenuItem>
               {remoteSourcePath && (
                 <MenuItem onClick={() => { handleOverwriteToGitHub(); setFileMenuAnchor(null); }}>
                   <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
-                  <ListItemText>Save (Overwrite) → {remoteSourcePath}</ListItemText>
+                  <ListItemText>Republish → {remoteSourcePath}</ListItemText>
                 </MenuItem>
               )}
             </Menu>

@@ -26,15 +26,23 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  Clear as ClearIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { GLYPH_COLORS } from '../schematic/colors';
 import type { DocCategory } from '../../document';
-import { fetchIndexComponent, useLibraryIndex, type IndexComponent } from '../../model/libraryIndex';
+import {
+  bumpLibraryIndex,
+  fetchIndexComponent,
+  useLibraryIndex,
+  type IndexComponent,
+} from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
 import { RECORD_CATEGORIES } from '../../model/componentRecord';
+import { displayNameOf, matchesQuery } from '../../model/librarySearch';
 
 /** Where a record was opened from — drives the editing-a-copy banner (WP-38). */
 export type RecordOrigin = 'index' | 'workspace';
@@ -72,10 +80,14 @@ function ComponentCard({
       )}
       <ListItemText
         primary={
+          /* WP-106: a readable name leads; the exact id stays underneath as
+             the disambiguator (derived names genuinely collide — flat_45
+             exists as both a component and a cube). */
           <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
             <CategoryDot category={category} />
-            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{id}</Typography>
-            <Typography variant="caption" color="text.secondary">@{version}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {displayNameOf(id)}
+            </Typography>
           </Stack>
         }
         secondary={
@@ -96,6 +108,12 @@ function ComponentCard({
                 {description}
               </Typography>
             )}
+            <Typography
+              variant="caption" color="text.disabled" component="span"
+              sx={{ width: '100%', fontFamily: 'monospace', fontSize: 10.5 }}
+            >
+              {id} · v{version}
+            </Typography>
           </Stack>
         }
         secondaryTypographyProps={{ component: 'div' }}
@@ -125,6 +143,8 @@ export function LibraryBrowser({
     if (showTab) setTab(showTab);
   }, [showTab]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  /** WP-106: the search this panel never had. */
+  const [query, setQuery] = useState('');
   const index = useLibraryIndex();
   const workspace = useWorkspaceLibrary();
   const [urlDraft, setUrlDraft] = useState<string | null>(null);
@@ -144,15 +164,40 @@ export function LibraryBrowser({
   };
 
   const indexComponents = useMemo(
-    () => index.components.filter(c => !categoryFilter || c.category === categoryFilter),
-    [index.components, categoryFilter],
+    () =>
+      index.components.filter(
+        c =>
+          (!categoryFilter || c.category === categoryFilter) &&
+          matchesQuery(query, {
+            id: c.id,
+            name: displayNameOf(c.id),
+            description: c.description,
+            category: c.category,
+            vendorName: c.vendor?.name,
+            mpn: c.vendor?.mpn,
+            tags: c.tags,
+          }),
+      ),
+    [index.components, categoryFilter, query],
   );
   const workspaceRecords = useMemo(
     () =>
-      Object.values(workspace.records).filter(
-        r => !categoryFilter || (r as { category?: string }).category === categoryFilter,
-      ),
-    [workspace.records, categoryFilter],
+      Object.values(workspace.records).filter(r => {
+        const rec = r as { category?: string; description?: string };
+        return (
+          (!categoryFilter || rec.category === categoryFilter) &&
+          matchesQuery(query, {
+            id: r.id,
+            name: displayNameOf(r.id),
+            description: rec.description,
+            category: rec.category,
+            vendorName: r.vendor?.name,
+            mpn: r.vendor?.mpn,
+            tags: r.tags,
+          })
+        );
+      }),
+    [workspace.records, categoryFilter, query],
   );
 
   const categories = RECORD_CATEGORIES.filter(c =>
@@ -181,6 +226,28 @@ export function LibraryBrowser({
           ? 'records published in the shared optikit-core library (the registry) — click to edit a copy'
           : 'your local drafts, stored in this browser — “Save to workspace library” puts records here'}
       </Typography>
+
+      <Box sx={{ px: 1, pt: 1 }}>
+        <TextField
+          size="small" fullWidth placeholder="search parts, vendors, part numbers…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+            endAdornment: query ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setQuery('')} aria-label="clear search">
+                  <ClearIcon fontSize="inherit" />
+                </IconButton>
+              </InputAdornment>
+            ) : undefined,
+          }}
+        />
+      </Box>
 
       <Stack direction="row" spacing={0.5} sx={{ p: 1, flexWrap: 'wrap', rowGap: 0.5 }}>
         {categories.map(c => (
@@ -270,7 +337,18 @@ export function LibraryBrowser({
             endAdornment: (
               <InputAdornment position="end">
                 <Tooltip title="reload index">
-                  <IconButton size="small" onClick={() => { index.setUrl(urlDraft ?? index.url); setUrlDraft(null); }}>
+                  {/* WP-105: setUrl with an UNCHANGED value is a no-op in
+                      useLibraryIndex, so the refresh button did nothing unless
+                      the URL had been edited. bumpLibraryIndex forces the
+                      refetch every mounted index hook is listening for. */}
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      if (urlDraft !== null && urlDraft !== index.url) index.setUrl(urlDraft);
+                      else bumpLibraryIndex();
+                      setUrlDraft(null);
+                    }}
+                  >
                     <RefreshIcon fontSize="inherit" />
                   </IconButton>
                 </Tooltip>

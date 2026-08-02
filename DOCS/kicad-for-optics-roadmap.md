@@ -653,16 +653,37 @@ loose → place on the grid → author optic ⊂ housing ⊂ cube):
   third parts-editor tab, "anatomy (the whole part)", which is the direct
   answer to *"when I open a part I would see the optical primitive, the way
   it's inside a housing, inside a cube"*.
-- **WP-105 — Where your work lives.** Sixteen localStorage keys, one blind 5 s
-  autosave, four stores that never persist, and three menu items called "Save"
-  that do not save the document. Rename, confirm-before-replace on all five
-  import doors (two fire silently on page load), undo brackets, a `savedAt`
-  chip, then a real document identity.
+- **WP-105 — Where your work lives** *(done, 2026-08-02)*. Sixteen localStorage
+  keys, one blind 5 s autosave, four stores that never persist, and three menu
+  items called "Save" that do not save the document — now "Export layout
+  JSON…", "Publish to Setup Browser", "Republish → …". One
+  `confirmReplaceDocument` guard now fronts **every** path that replaces the
+  open design (the `.dsn` zip, share links, "Import from URL", a published
+  setup, a community design, and the two URL parameters that fired silently on
+  page load from the router root — on any route, including the parts editor);
+  an empty document still replaces without ceremony. The `.dsn` import is one
+  undo step instead of ~5 per part, `clearAll` prunes the beam paths and fibers
+  it used to orphan, a deleted draft takes its IndexedDB mesh with it, the
+  index refresh button actually refreshes, and a mesh loaded against a
+  half-finished draft is keyed on the draft rather than discarded. A "saved
+  HH:MM:SS" chip in the toolbar opens a panel enumerating all nine stores with
+  what each one survives — the two "lost on reload" rows being the answer
+  people actually needed. The full document identity (id/name/remote path in
+  one blob) stays open; it is a storage migration and wants its own package.
 
-Tier 2 — *ergonomics that compound*: **WP-106** (parts search + one naming
-convention + list modules/housings), **WP-107** (the 45° glyph, the optic drawn
-inside the pseudo cube, honest mesh-status), **WP-108** (`review` ≠ `draft` —
-one boolean with four meanings badges a shipping €650 laser as a draft),
+Tier 2 — *ergonomics that compound*: **WP-106** *(done, 2026-08-02)* — the
+parts editor gained the search it never had, over a shared predicate that also
+fixes the schematic's (which matched `module.name` alone, so "thorlabs",
+"AC254" and "525" found nothing); separators normalise both ways, so "flat 45"
+finds `flat_45`. `shortName` existed in five copies and is now one
+`displayNameOf`/`slugOf` in a zero-import leaf module: rows lead with a
+readable name, keep the curated description, and keep the exact id in
+monospace underneath — never hidden, because derived names genuinely collide
+(`openuc2.cube.flat_45` and `openuc2.mirror.flat_45` both derive to "flat 45").
+Listing modules and housings alongside components is still open. Then
+**WP-107** (the 45° glyph, the optic drawn inside the pseudo cube, honest
+mesh-status), **WP-108** (`review` ≠ `draft` — one boolean with four meanings
+badges a shipping €650 laser as a draft),
 **WP-109** *(done, 2026-08-02)* — optikit-core library hygiene. The earlier
 lossy write was repaired by hand rather than reverted, so the genuinely new
 facts survived (`mount_angle_deg`, the `mechanics:` binding) while the curated

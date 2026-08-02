@@ -37,6 +37,7 @@ import {
   type LibraryPaletteEntry,
 } from '../../document/libraryPalette';
 import { useWorkspaceLibrary } from '../workspaceLibrary';
+import { slugOf } from '../librarySearch';
 
 // ── the session bundle registry ──────────────────────────────────────────────
 
@@ -218,7 +219,7 @@ export function registerBundleLibrary(
       entries.push({
         moduleId,
         componentId,
-        name: moduleId.split('.').pop()?.replace(/[_-]+/g, ' ') ?? moduleId,
+        name: slugOf(moduleId),
         description: String(mod.description ?? ''),
         category: docCategoryOfRecord(String(component?.category ?? mod.category ?? 'other')),
         templateClass:

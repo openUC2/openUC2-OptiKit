@@ -10,6 +10,7 @@ import type { DesignDecl } from '../../model/dsn';
 import type { IndexModule } from '../../model/libraryIndex';
 import { rawUrl } from '../../model/communityRepos';
 import type { CommunityRepo } from '../../model/communityRepos';
+import { slugOf } from '../../model/librarySearch';
 
 export interface GalleryDesign {
   id: string;
@@ -99,7 +100,7 @@ export function bomOf(decl: DesignDecl, modules: IndexModule[]): Bom {
       const price = (mod as { price?: number | null } | undefined)?.price ?? null;
       return {
         moduleId,
-        name: moduleId.split('.').pop()?.replace(/[_-]/g, ' ') ?? moduleId,
+        name: slugOf(moduleId),
         qty,
         unitPrice: typeof price === 'number' ? price : null,
         category: mod?.category ?? 'other',

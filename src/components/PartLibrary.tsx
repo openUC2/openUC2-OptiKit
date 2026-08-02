@@ -40,6 +40,7 @@ import {
   useDocParts,
 } from '../document';
 import type { DocCategory, PartMount } from '../document';
+import { matchesQuery } from '../model/librarySearch';
 
 /** WP-103: what each state means, for the palette badge's tooltip. */
 const MOUNT_TOOLTIP: Record<PartMount, string> = {
@@ -135,7 +136,17 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
   const visibleModules = modules.filter(m => !libraryEntryOf(m.id)?.paletteHidden);
 
   const filteredModules = visibleModules.filter(module => {
-    const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase());
+    // WP-106: the same predicate the parts editor uses. This used to match
+    // `module.name` alone, so "thorlabs", "AC254" or "525" — the things
+    // someone actually types when hunting for a part — found nothing.
+    const entry = libraryEntryOf(module.id);
+    const matchesSearch = matchesQuery(searchTerm, {
+      id: module.id,
+      name: module.name,
+      description: entry?.description ?? module.description,
+      category: String(categoryOf(module.id, module)),
+      vendorName: entry?.vendorName,
+    });
     const matchesGroup = selectedGroup === 'all' || module.group === selectedGroup;
     return matchesSearch && matchesGroup;
   });

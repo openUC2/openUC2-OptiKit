@@ -1,6 +1,17 @@
-# OpenUC2 OptiKit - 2D Grid Builder
+# OpenUC2 OptiKit — KiCad for optical setups
 
-A React-based 2D layered grid builder for arranging optical cube modules on precise 50mm × 50mm grids. This application allows users to design complex optical systems by placing, rotating, and layering optical components with snap-to-grid functionality.
+Design an optical instrument the way you design a circuit board: place parts,
+wire the beam paths, check the design, simulate the rays, then produce the
+thing. The editor is a **schematic** (optical parts and beam paths) plus an
+**assembly** (openUC2 cube modules on the 50/50/55 mm grid), over a shared
+`.dsn` document. Ray tracing, CAD generation and the part library live in the
+sibling engine repo, `../optikit-core`.
+
+> **New here? Read [`DOCS/GETTING-STARTED.md`](DOCS/GETTING-STARTED.md) first.**
+> It covers what this is, how to run both repos, the one idea you actually need
+> (a part is three linked records), and the traps that have each cost somebody a
+> day. The sections below are reference material, and some of them predate the
+> schematic/assembly split — treat the getting-started guide as the current map.
 
 ![OpenUC2 OptiKit Screenshot](https://github.com/user-attachments/assets/42914b8f-b1c5-4571-8e1a-9331490340ff)
 

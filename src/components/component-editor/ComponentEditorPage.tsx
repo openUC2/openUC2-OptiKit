@@ -67,6 +67,7 @@ import {
 } from '../../model/libraryIndex';
 import { saveLibraryRecords } from '../../api/coreClient';
 import { resolveLocalRecord, resolveRegistryRecord } from '../../model/openRecord';
+import { displayNameOf } from '../../model/librarySearch';
 import { bundleFiles, useBundleLibrary } from '../../model/dsn/bundleImport';
 import { LibraryBrowser, type RecordOrigin } from './LibraryBrowser';
 import { RecordForm } from './RecordForm';
@@ -304,14 +305,19 @@ export function ComponentEditorPage({
   }, [index.loading, index.url, deepLinked]);
 
   // Persist the bound mesh per record id so drafts survive a reload (WP-38).
+  // WP-105: keyed on the DRAFT's id, not on the validated record — a mesh
+  // loaded while the optics tab was still incomplete used to be dropped on
+  // the floor, which is exactly when someone is most likely to load one.
   useEffect(() => {
-    if (!record || !bindGlb || !bindMeshFile || meshStatus === 'loading') return;
-    void saveBindMesh(record.id, {
+    const meshKey = recordId(draft);
+    // An id still missing its name slug ("user.lens.") is not a key.
+    if (meshKey.endsWith('.') || !bindGlb || !bindMeshFile || meshStatus === 'loading') return;
+    void saveBindMesh(meshKey, {
       meshFile: bindMeshFile,
       glb: bindGlb,
       step: bindStep,
     }).catch(() => undefined);
-  }, [record, bindGlb, bindStep, bindMeshFile, meshStatus]);
+  }, [draft, bindGlb, bindStep, bindMeshFile, meshStatus]);
 
   const sidebarWidth = isMobile ? Math.min(340, window.innerWidth * 0.85) : 340;
 
@@ -339,9 +345,13 @@ export function ComponentEditorPage({
           <Box sx={{ flex: 1, overflow: 'auto', p: 2.5 }}>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ flex: 1 }}>
-                Parts editor
+                {/* WP-106: the part's name, with its exact id underneath —
+                    the header used to be the raw dotted id alone, which is
+                    how "user.lens.@0.1.0" read as a corrupted record rather
+                    than as an unnamed new one. */}
+                {draft.name ? displayNameOf(recordId(draft)) : 'Parts editor'}
                 <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1.5, fontFamily: 'monospace' }}>
-                  {recordId(draft)}@{draft.version}
+                  {draft.name ? `${recordId(draft)} · v${draft.version}` : 'new record — name it on the optics tab'}
                 </Typography>
               </Typography>
               <Button

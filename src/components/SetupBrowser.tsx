@@ -32,6 +32,7 @@ import {
 import { Add as AddIcon, Refresh as RefreshIcon, Edit as EditIcon, Delete as DeleteIcon, MoreVert as MoreVertIcon, Search as SearchIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
+import { confirmReplaceDocument } from '../document';
 
 interface SetupMetadata {
   name: string;
@@ -461,6 +462,8 @@ export const SetupBrowser: React.FC = () => {
   };
 
   const handleSetupClick = async (setup: SetupMetadata) => {
+    // WP-105: opening a published setup replaces the design in the editor.
+    if (!confirmReplaceDocument(setup.name || 'that setup')) return;
     try {
       // Load the setup into the editor
       const success = await importFromUrl(setup.url);

@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ComponentRecord } from './dsn/generated/library-component';
 import { bumpLibraryIndex } from './libraryIndex';
+import { deleteBindMesh } from './bindMeshStore';
 
 interface WorkspaceLibraryState {
   /** id → full record (latest saved version wins). */
@@ -33,14 +34,19 @@ export const useWorkspaceLibrary = create<WorkspaceLibraryState>()(
       },
       saveThumbnail: (id, dataUrl) =>
         set(s => ({ thumbnails: { ...s.thumbnails, [id]: dataUrl } })),
-      remove: id =>
+      remove: id => {
+        // WP-105: the bound STP/GLB lives in IndexedDB keyed by record id.
+        // Deleting the record without it left the mesh orphaned forever —
+        // invisible, unreachable, and counted against the storage quota.
+        void deleteBindMesh(id).catch(() => undefined);
         set(s => {
           const records = { ...s.records };
           const thumbnails = { ...s.thumbnails };
           delete records[id];
           delete thumbnails[id];
           return { records, thumbnails };
-        }),
+        });
+      },
       clear: () => set({ records: {}, thumbnails: {} }),
     }),
     { name: 'optikit-workspace-components' },

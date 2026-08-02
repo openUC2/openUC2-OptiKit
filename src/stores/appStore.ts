@@ -16,6 +16,8 @@ import { isLibraryModule } from '../document/libraryPalette';
 import { useDocumentStore } from '../document/documentStore';
 import { partFromLayoutEntry, rotationTripleOf } from '../document/legacyLayout';
 import { saveDocumentToStorage, loadDocumentFromStorage } from '../document/persistence';
+import { usePathsStore } from '../document/pathsStore';
+import { useFibersStore } from '../document/fibersStore';
 import type { DsnPart } from '../document/types';
 import type {
   AppState,
@@ -656,6 +658,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const doc = useDocumentStore.getState();
     doc.pushHistory(doc.snapshot());
     doc.replaceParts([]);
+    // WP-105: the netlist goes with the parts. Beam paths and fibers persist
+    // on their OWN localStorage keys, so clearing only the parts left them
+    // pointing at ids that no longer exist — invisible until something walked
+    // a chain and found nothing there.
+    usePathsStore.getState().clear();
+    useFibersStore.getState().clear();
     set({ annotations: [] });
     get().saveStateToStorage();
   },

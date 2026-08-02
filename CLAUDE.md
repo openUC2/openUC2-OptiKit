@@ -12,6 +12,9 @@ day-to-day workflow between the two repos, see `../optikit-core/DOCS/ARCHITECTUR
 `GO_INTEGRATION.md`, and `WORKING_WITH_FRONTEND.md`. This repo's own architecture
 walkthrough (what the editor can do, the layering, the conventions) is
 `DOCS/ARCHITECTURE.md`; `DOCS/CODEBASE-GUIDE.md` is the cross-repo file-by-file map.
+`DOCS/GETTING-STARTED.md` is the first-day orientation (what this is, running
+both repos, the record trio, the three part states, the known traps) — point
+new contributors there before anything else.
 
 ## We speak DSN — the one contract
 

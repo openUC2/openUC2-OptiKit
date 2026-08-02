@@ -12,6 +12,7 @@
 import { libraryEntryOf } from './libraryPalette';
 import type { TemplateClass } from './libraryPalette';
 import type { DocPart, Vec3 } from './types';
+import { slugOf } from '../model/librarySearch';
 
 export interface DocBomLine {
   libraryRef: string;
@@ -41,9 +42,6 @@ export interface DocBom {
   unpricedLines: number;
 }
 
-function shortName(id: string): string {
-  return id.split('.').pop()?.replace(/[_-]/g, ' ') ?? id;
-}
 
 /** Group the placed parts into BOM lines (qty-desc, then name). */
 export function buildDocBom(parts: DocPart[]): DocBom {
@@ -54,7 +52,7 @@ export function buildDocBom(parts: DocPart[]): DocBom {
       const entry = libraryEntryOf(part.libraryRef);
       line = {
         libraryRef: part.libraryRef,
-        name: entry?.name ?? shortName(part.libraryRef),
+        name: entry?.name ?? slugOf(part.libraryRef),
         category: entry?.category ?? part.category,
         namespace: part.libraryRef.includes('.')
           ? part.libraryRef.split('.', 1)[0]

@@ -2366,7 +2366,7 @@
           "type": "standard",
           "geometry": {
             "type": "StandardGeometry",
-            "radius": ".inf"
+            "radius": "inf"
           },
           "interaction_model": {
             "type": "refractive_reflective",
@@ -3137,7 +3137,7 @@
           "type": "standard",
           "geometry": {
             "type": "StandardGeometry",
-            "radius": ".inf"
+            "radius": "inf"
           },
           "interaction_model": {
             "type": "refractive_reflective",
@@ -3195,7 +3195,7 @@
           "type": "standard",
           "geometry": {
             "type": "StandardGeometry",
-            "radius": ".inf"
+            "radius": "inf"
           },
           "interaction_model": {
             "type": "refractive_reflective",

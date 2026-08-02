@@ -21,6 +21,25 @@ interface DocumentBlob {
   parts: DsnPart[];
 }
 
+/**
+ * WP-105: when the document was last written, as an epoch ms. The autosave is
+ * a blind 5-second interval, so without this nothing in the UI could answer
+ * "is my work saved?" — the single most common question the storage model
+ * provoked. Module-level rather than store state: `saveDocumentToStorage` is
+ * called from outside React, and a subscriber list is all the UI needs.
+ */
+let savedAtMs: number | null = null;
+const savedAtListeners = new Set<() => void>();
+
+export function documentSavedAt(): number | null {
+  return savedAtMs;
+}
+
+export function subscribeDocumentSaved(listener: () => void): () => void {
+  savedAtListeners.add(listener);
+  return () => savedAtListeners.delete(listener);
+}
+
 export function saveDocumentToStorage(): void {
   try {
     const blob: DocumentBlob = {
@@ -28,6 +47,8 @@ export function saveDocumentToStorage(): void {
       parts: useDocumentStore.getState().parts,
     };
     localStorage.setItem(DOCUMENT_KEY, JSON.stringify(blob));
+    savedAtMs = Date.now();
+    for (const listener of savedAtListeners) listener();
   } catch (error) {
     console.error('Failed to save the document:', error);
   }

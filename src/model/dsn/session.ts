@@ -7,6 +7,8 @@
 import {
   addFiber,
   addPart,
+  captureUndo,
+  commitUndo,
   categoryOf,
   entriesFromWorkspace,
   getSnapshot,
@@ -123,6 +125,13 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
       | string
       | undefined;
 
+  // WP-105: the WHOLE import is ONE undo step. Each placed part otherwise
+  // costs ~5 history entries (removePart + addPart + setPartOrientation +
+  // renamePart + setDofValue, each auto-pushing), so importing a 30-part
+  // setup blew the 50-step cap and Ctrl-Z became a slow-motion replay of the
+  // import instead of the way back out of it.
+  const undoToken = captureUndo();
+
   // Clear the current document (parts + paths).
   for (const part of listParts()) removePart(part.id);
   for (const path of listPaths()) usePathsStore.getState().removePath(path.name);
@@ -210,6 +219,8 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
   } else {
     useSourceDesignStore.getState().clear();
   }
+
+  commitUndo(undoToken);
 
   return {
     placed: Object.keys(idByKey).length,

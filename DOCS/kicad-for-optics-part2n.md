@@ -590,7 +590,7 @@ that. The greyed-out layers double as the to-do list for finishing the part.
 
 ---
 
-#### WP-105 — Where your work lives
+#### WP-105 — Where your work lives ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend)
@@ -662,7 +662,7 @@ thrown away, and puts a "saved at" clock where you can see it.
 
 ### Tier 2 — ergonomics that compound
 
-#### WP-106 — Parts: a search field, and one way to name things
+#### WP-106 — Parts: a search field, and one way to name things ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend; optional optikit-core phase 2)
@@ -945,9 +945,9 @@ WP-102 ✅ (non-destructive publish) ──┘  3D view is drawing ghost boxes
                 │
                 └─► WP-103 ✅ (three states) ─► WP-104 ✅ (anatomy view)
                         │
-                        └─► WP-105 (where work lives)
+                        └─► WP-105 ✅ (where work lives)
                                 │
-                                └─► WP-106, WP-107, WP-108 (any order)
+                                └─► WP-106 ✅, WP-107, WP-108 (any order)
 ```
 
 Tier 0 is four contained changes — two of them under ten lines — and it converts

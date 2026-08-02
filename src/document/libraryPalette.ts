@@ -32,6 +32,7 @@ import type {
 import type { SourcePort } from './sourceDesignStore';
 import type { AxisDir, Rot24 } from './rot24';
 import type { DocCategory } from './types';
+import { slugOf } from '../model/librarySearch';
 
 export type TemplateClass = 'fixed' | 'adaptive' | 'generative';
 
@@ -261,9 +262,10 @@ export function docCategoryOfRecord(category: string): DocCategory {
 
 // ── entry building ────────────────────────────────────────────────────────────
 
-function shortName(id: string): string {
-  return id.split('.').pop()?.replace(/[_-]/g, ' ') ?? id;
-}
+/** WP-106: one derivation, in src/model/librarySearch.ts — this was five
+ * near-identical copies (here, bom.ts, ModulesPanel, bundleImport, designData)
+ * that differed only in whether they collapsed repeated separators. */
+const shortName = slugOf;
 
 function indexPortsToSource(ports: IndexPort[] | undefined): SourcePort[] {
   return (ports ?? []).map(p => ({

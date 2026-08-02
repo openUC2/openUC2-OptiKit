@@ -16,6 +16,7 @@ import {
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
+import { confirmReplaceDocument } from '../document';
 
 interface SetupAnalysisData {
   filename: string;
@@ -197,6 +198,8 @@ export const CollectionView: React.FC = () => {
       }
       
       console.log('Loading setup from:', setupUrl);
+      // WP-105: opening a community design replaces the open one.
+      if (!confirmReplaceDocument(setup.filename || 'that design')) return;
       const success = await importFromUrl(setupUrl);
       
       if (success) {
