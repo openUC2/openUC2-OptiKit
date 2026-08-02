@@ -59,7 +59,13 @@ import {
   probeDesignFiles,
   t2ModuleRecord,
 } from './onePartDesign';
-import { cellMismatch, expectedDatumOf, insertFit, type WizardCtx } from './wizardTypes';
+import {
+  cellMismatch,
+  expectedDatumOf,
+  insertFit,
+  offCentreNote,
+  type WizardCtx,
+} from './wizardTypes';
 
 // ── shared bits ──────────────────────────────────────────────────────────────
 
@@ -699,10 +705,12 @@ export function CubeMesh({ ctx }: { ctx: WizardCtx }) {
   const meshSizeMm = useBindStore(s => s.meshSizeMm);
   const fitToCube = useBindStore(s => s.fitToCube);
   const meshBboxCenter = useBindStore(s => s.meshBboxCenter);
-  // WP-113.1: the WP-109 cell check runs HERE, at import — a mesh that does
-  // not measure a cell is the wrong file or the wrong units, and finding out
-  // in the wizard beats finding out when it renders on its side.
-  const mismatch = cellMismatch(meshSizeMm, meshBboxCenter);
+  // WP-113.1: the WP-109 cell check runs HERE, at import — a mesh that is no
+  // cell in any orientation is the wrong file or the wrong units, and finding
+  // out in the wizard beats finding out when it renders on its side. An
+  // off-centre origin is a fixable note, not a refusal.
+  const mismatch = cellMismatch(meshSizeMm);
+  const offCentre = offCentreNote(meshBboxCenter);
   return (
     <Stack spacing={1}>
       <Stack direction="row" spacing={1} alignItems="center">
@@ -720,6 +728,11 @@ export function CubeMesh({ ctx }: { ctx: WizardCtx }) {
       {mismatch && (
         <Alert severity="error">
           <Typography variant="caption">{mismatch}</Typography>
+        </Alert>
+      )}
+      {!mismatch && offCentre && (
+        <Alert severity="warning">
+          <Typography variant="caption">{offCentre}</Typography>
         </Alert>
       )}
       <MechanicsPanel

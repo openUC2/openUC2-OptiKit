@@ -27,7 +27,7 @@ import {
   NumbersWhereDoesItSit,
 } from './roadSteps';
 import { usePartWizard, type RoadId } from './wizardStore';
-import { expectedDatumOf, type RoadDef, type WizardCtx } from './wizardTypes';
+import { cellMismatch, expectedDatumOf, type RoadDef, type WizardCtx } from './wizardTypes';
 
 const firstBlockingError = (ctx: WizardCtx): string | null => {
   if (!ctx.draft.name) {
@@ -88,13 +88,13 @@ export const ROADS: Record<RoadId, RoadDef> = {
         Body: NumbersBuildIt,
       },
     ],
-    anatomy: (ctx, output) => ({
+    anatomy: (_ctx, output) => ({
       mount: 'cube',
       templateClass: usePartWizard.getState().holdClass as TemplateClass,
       templateId: output.ids[1] ?? null,
       moduleId: output.ids[2] ?? null,
     }),
-    resultNote: (ctx, output) =>
+    resultNote: (_ctx, output) =>
       output.componentOnly
         ? 'So far this is the optical component record alone — the holder dialog on the ' +
           '“build it” step writes the cube (template + module) when you accept a generated insert.'
@@ -199,8 +199,10 @@ export const ROADS: Record<RoadId, RoadDef> = {
         Body: CubeMesh,
         blocked: (_ctx, bind) => {
           if (!bind.glbBytes) return 'load the cube’s STEP or GLB first';
-          // WP-113.1: the cell check refuses HERE, not at validate time.
-          return cellMismatch(bind.meshSizeMm, bind.meshBboxCenter);
+          // WP-113.1: refuse HERE, not at validate time — but only for a mesh
+          // that is no cell in ANY orientation. An off-centre origin is advice
+          // (the step shows it, "fit to cube" fixes it), never a wall.
+          return cellMismatch(bind.meshSizeMm);
         },
       },
       {
