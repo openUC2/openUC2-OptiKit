@@ -221,12 +221,34 @@ describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () =
     expect(lens.eflMm).toBeCloseTo(50.169, 3);
   });
 
-  it('groups them apart as "<category> · unbound"', () => {
+  // WP-103: the palette groups by WHAT YOU CAN BUILD WITH IT. "unbound" was
+  // one bucket for two different problems — a bare optic needs a holder
+  // designed; a housed device only needs a cube around the housing it has.
+  it('groups a bare optic as "<category> · needs a holder"', () => {
     resetDocument();
   useAppStore.setState({ modules: [] });
     registerLibraryModules(entriesFromComponents([AC254], [], 'http://x'));
     const def = useAppStore.getState().modules.find(m => m.id === AC254.id);
-    expect(def?.group).toBe('lens · unbound');
+    expect(def?.group).toBe('lens · needs a holder');
+  });
+
+  it('groups a housed device apart from a bare one', () => {
+    resetDocument();
+  useAppStore.setState({ modules: [] });
+    registerLibraryModules(entriesFromComponents([AC254], [], 'http://x', [{
+      id: 'thorlabs.tpl.km05_housing',
+      version: '0.1.0',
+      kind: 'mechanical_template',
+      class: 'adaptive',
+      description: 'kinematic mount housing',
+      review: false,
+      component: { ref: 'thorlabs.lens.ac254-050-a@^0.1', resolved: '0.1.0',
+                   id: 'thorlabs.lens.ac254-050-a' },
+      dof: [],
+      assets: { thumbnail: null, glb: null, step: null },
+    }] as unknown as Parameters<typeof entriesFromComponents>[3]));
+    const def = useAppStore.getState().modules.find(m => m.id === AC254.id);
+    expect(def?.group).toBe('lens · housed, no cube');
   });
 
   it('joins a HOUSING onto its component: the mesh and DOFs travel (WP-67)', () => {
@@ -253,10 +275,16 @@ describe('entriesFromComponents (WP-60: unbound symbols become placeable)', () =
       }],
     );
     const lens = entries[0];
-    // Still cube-less (free placement, no grid claim) — but the housing's
-    // mesh and DOFs ride along instead of the hardcoded nulls.
+    // Still cube-less (free placement, δ unclamped) …
     expect(lens.unbound).toBe(true);
-    expect(lens.templateClass).toBeNull();
+    // … but WP-103: a joined housing makes this a HOUSED device, not a bare
+    // symbol. Carrying the housing's mesh and DOFs while reporting
+    // `templateClass: null` was the defect: state 2 ("optic in its own
+    // housing" — a laser body, this kinematic mount) rendered byte-identically
+    // to state 1 ("bare optic, needs a holder") everywhere in the UI.
+    expect(lens.mount).toBe('housed');
+    expect(lens.templateClass).toBe('adaptive');
+    expect(lens.templateId).toBe('thorlabs.tpl.km05_housing');
     expect(lens.glbUrl).toBe(
       'http://localhost:8010/v1/library/assets/templates/thorlabs.tpl.km05_housing/mount.glb',
     );

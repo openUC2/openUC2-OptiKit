@@ -175,12 +175,30 @@ export function SchematicPage() {
     });
   }, []);
 
+  /**
+   * WP-101: the ONE place the free-placement snap is decided. Parts with a
+   * mechanical template are pinned by their T-class inside `addPart`; this
+   * only governs template-less parts (unbound optics, workspace drafts), for
+   * which `snapGrid` is the only snap there is.
+   */
+  const snapFree = useCallback(
+    (p: Vec3): Vec3 =>
+      settings.snapGrid
+        ? [
+            Math.round(p[0] / UC2_GRID_MM[0]) * UC2_GRID_MM[0],
+            Math.round(p[1] / UC2_GRID_MM[1]) * UC2_GRID_MM[1],
+            p[2],
+          ]
+        : p,
+    [settings.snapGrid],
+  );
+
   const pasteClipboard = useCallback((at?: Vec3) => {
     const held = clipboardRef.current;
     if (!held) return;
     let target: Vec3;
     if (at) {
-      target = at;
+      target = snapFree(at);
     } else {
       held.pastes += 1;
       target = [
@@ -191,7 +209,7 @@ export function SchematicPage() {
     }
     const id = pastePart(held.clip, target);
     if (id) selectPart(id);
-  }, []);
+  }, [snapFree]);
 
   /** ERC marker click: frame the part without changing the view direction. */
   const zoomToPart = useCallback((partId: string) => {
@@ -439,14 +457,10 @@ export function SchematicPage() {
       const moduleId = e.dataTransfer.getData('moduleId');
       const hit = moduleId ? planeHitAt(e.clientX, e.clientY, e.currentTarget as HTMLElement) : null;
       if (!hit) return;
-      let [x, y] = hit;
-      if (settings.snapGrid) {
-        x = Math.round(x / UC2_GRID_MM[0]) * UC2_GRID_MM[0];
-        y = Math.round(y / UC2_GRID_MM[1]) * UC2_GRID_MM[1];
-      }
+      const [x, y] = snapFree(hit);
       addPart(moduleId, [x, y, settings.planeZMm]);
     },
-    [planeHitAt, settings.planeZMm, settings.snapGrid],
+    [planeHitAt, settings.planeZMm, snapFree],
   );
 
   // ── WP-78: right-click menu on a part (or the empty canvas) ────────────────
@@ -561,7 +575,10 @@ export function SchematicPage() {
                 border: '1px solid', borderColor: 'divider',
               }}
             >
-              <Tooltip title="Snap to 50 mm grid (S) — off by default in the schematic">
+              {/* WP-101: cube modules are pinned to their cell by their
+                  T-class on every add and every move, so this toggle only
+                  ever governs template-less parts. Say so. */}
+              <Tooltip title="Snap FREE parts to the 50 mm grid (S) — parts in a cube are always on the grid">
                 <ToggleButton
                   value="snapGrid"
                   selected={settings.snapGrid}

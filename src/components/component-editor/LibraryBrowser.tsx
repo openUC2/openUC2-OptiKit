@@ -8,7 +8,7 @@
  * "save to workspace" forks it locally, the dev write updates the library.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -31,10 +31,10 @@ import {
 } from '@mui/icons-material';
 import { GLYPH_COLORS } from '../schematic/colors';
 import type { DocCategory } from '../../document';
-import { assetsBaseUrl, useLibraryIndex, type IndexComponent } from '../../model/libraryIndex';
+import { fetchIndexComponent, useLibraryIndex, type IndexComponent } from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
-import { RECORD_CATEGORIES, recordFromYaml } from '../../model/componentRecord';
+import { RECORD_CATEGORIES } from '../../model/componentRecord';
 
 /** Where a record was opened from — drives the editing-a-copy banner (WP-38). */
 export type RecordOrigin = 'index' | 'workspace';
@@ -51,15 +51,18 @@ function CategoryDot({ category }: { category: string }) {
 
 function ComponentCard({
   id, version, category, description, vendorName, mpn, eflMm, review, thumbnail, onClick, onDelete,
+  selected = false,
 }: {
   id: string; version: string; category: string; description: string;
   vendorName: string; mpn: string; eflMm: number | null; review: boolean;
+  /** WP-100: the row a deep link opened. */
+  selected?: boolean;
   /** Data-URL snapshot of the bound geometry (WP-31), when one exists. */
   thumbnail?: string | null;
   onClick?: () => void; onDelete?: () => void;
 }) {
   return (
-    <ListItemButton onClick={onClick} sx={{ alignItems: 'flex-start', borderRadius: 1 }}>
+    <ListItemButton selected={selected} onClick={onClick} sx={{ alignItems: 'flex-start', borderRadius: 1 }}>
       {thumbnail && (
         <Box
           component="img" src={thumbnail} alt=""
@@ -108,10 +111,19 @@ function ComponentCard({
 
 export function LibraryBrowser({
   onOpenRecord,
+  showTab = null,
+  highlightId = null,
 }: {
   onOpenRecord: (record: ComponentRecord, origin: RecordOrigin) => void;
+  /** WP-100: follow a deep link to the tab that actually holds the record. */
+  showTab?: 'index' | 'workspace' | null;
+  /** WP-100: the row the deep link opened, marked as selected. */
+  highlightId?: string | null;
 }) {
   const [tab, setTab] = useState<'index' | 'workspace'>('index');
+  useEffect(() => {
+    if (showTab) setTab(showTab);
+  }, [showTab]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const index = useLibraryIndex();
   const workspace = useWorkspaceLibrary();
@@ -123,10 +135,9 @@ export function LibraryBrowser({
   const openIndexRecord = async (id: string) => {
     setOpenError(null);
     try {
-      const url = `${assetsBaseUrl(index.url)}/v1/library/assets/components/${id}/component.yml`;
-      const response = await fetch(url, { cache: 'no-cache' });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      onOpenRecord(recordFromYaml(await response.text()), 'index');
+      // WP-100: one shared fetch — this used to be a second, character-
+      // identical copy of the deep link's, with divergent error handling.
+      onOpenRecord(await fetchIndexComponent(id, index.url), 'index');
     } catch (err) {
       setOpenError(`could not fetch ${id}: ${String(err)}`);
     }
@@ -203,6 +214,7 @@ export function LibraryBrowser({
                   description={c.description}
                   vendorName={c.vendor?.name ?? ''} mpn={c.vendor?.mpn ?? ''}
                   eflMm={c.efl_mm} review={c.review}
+                  selected={c.id === highlightId}
                   onClick={() => void openIndexRecord(c.id)}
                 />
               ))}
@@ -228,6 +240,7 @@ export function LibraryBrowser({
                   eflMm={rec.effective_focal_length_mm ?? null}
                   review={Boolean(rec.review?.length)}
                   thumbnail={workspace.thumbnails[rec.id] ?? null}
+                  selected={rec.id === highlightId}
                   onClick={() => onOpenRecord(record, 'workspace')}
                   onDelete={() => workspace.remove(rec.id)}
                 />

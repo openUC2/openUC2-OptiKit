@@ -37,6 +37,7 @@ import * as THREE from 'three';
 // layout live in appStore until the .dsn document replaces it.
 import { useAppStore } from '../../stores/appStore';
 import {
+  MOUNT_LABEL,
   T_CLASS_LABEL,
   getPart,
   listParts,
@@ -46,6 +47,7 @@ import {
   useDocRevision,
   useSelectedPartId,
 } from '../../document';
+import type { PartMount } from '../../document';
 import { saveAs } from 'file-saver';
 import {
   CoreServiceError,
@@ -106,15 +108,21 @@ export function AssemblyPage() {
   // mounts useLibraryRegistration above — and WP-99 reads the canvas T-class
   // off the palette entry for exactly that reason.)
   const selectedTClass = selectedIndexModule?.template?.class ?? null;
-  // WP-60: bare component ids no module binds — sourced from the INDEX for
-  // the same reason as the T-class above.
-  const unboundIds = useMemo(() => {
-    const moduleIds = new Set(index.modules.map(m => m.id));
-    return new Set(
-      index.components.map(c => c.id).filter(id => !moduleIds.has(id)),
-    );
-  }, [index.modules, index.components]);
-  const selectedUnbound = Boolean(selected && unboundIds.has(selected.libraryRef));
+  // WP-103: "is this part in a cube?" now comes from the PALETTE ENTRY, the
+  // single place that knows. It used to be recomputed here from the index
+  // (a component id no module binds), which meant "unbound" said something
+  // different inside this one file than it did in the palette — so a
+  // workspace draft or a bundle part got the wrong card AND the wrong ghost.
+  const mountOf = useCallback(
+    (ref: string): PartMount => libraryEntryOf(ref)?.mount ?? 'cube',
+    [],
+  );
+  const unboundIds = useMemo(
+    () => new Set(parts.filter(p => mountOf(p.libraryRef) !== 'cube').map(p => p.libraryRef)),
+    [parts, mountOf],
+  );
+  const selectedMount = selected ? mountOf(selected.libraryRef) : 'cube';
+  const selectedUnbound = selectedMount !== 'cube';
   const selectedIndexComponent = selectedUnbound
     ? index.components.find(c => c.id === selected!.libraryRef)
     : undefined;
@@ -403,10 +411,16 @@ export function AssemblyPage() {
                         <Chip size="small" label={T_CLASS_LABEL[selectedTClass]}
                           sx={{ height: 16, fontSize: 10, fontWeight: 700 }} />
                       )}
-                      {/* WP-60: a bare symbol — no mechanics at all */}
+                      {/* WP-103: which of the three states, in plain words. */}
                       {selectedUnbound && (
-                        <Tooltip title="an optical primitive with no mechanics yet — place it, then generate a holder (WP-61)">
-                          <Chip size="small" label="UNBOUND" color="info" variant="outlined"
+                        <Tooltip title={
+                          selectedMount === 'housed'
+                            ? 'the optic has its own housing but no cube yet — generate a cube around it to put it on the grid'
+                            : 'an optical primitive with no mechanics at all — generate a holder (T3) to build it'
+                        }>
+                          <Chip size="small" label={MOUNT_LABEL[selectedMount]}
+                            color={selectedMount === 'housed' ? 'info' : 'warning'}
+                            variant="outlined"
                             sx={{ height: 16, fontSize: 10, fontWeight: 700 }} />
                         </Tooltip>
                       )}
@@ -446,8 +460,14 @@ export function AssemblyPage() {
                           </IconButton>
                         </Tooltip>
                       </Stack>
+                      {/* WP-103: this used to say "floats freely, claims no
+                          grid cell", which is simply false — addPart assigns a
+                          cell and quick-place counts it as occupied. What IS
+                          true is that no T-rule pins it inside that cell. */}
                       <Typography variant="caption" sx={{ display: 'block' }}>
-                        ▣ no mechanics bound — floats freely, claims no grid cell
+                        ▣ {selectedMount === 'housed'
+                          ? 'its own housing, no cube — moves in continuous mm inside its cell'
+                          : 'no mechanics bound — moves in continuous mm inside its cell'}
                       </Typography>
                       {selectedIndexComponent?.vendor?.name && (
                         <Typography variant="caption" sx={{ display: 'block' }}>

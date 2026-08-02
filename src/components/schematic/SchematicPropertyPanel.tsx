@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { GenerateHolderDialog } from '../assembly/GenerateHolderDialog';
+import { PartAnatomy } from '../inspector/PartAnatomy';
 import { runUnbind } from './unbindAction';
 import { parseDecimal } from '../../utils/parseDecimal';
 import { PartOpticsSection } from '../inspector/PartOpticsSection';
@@ -51,6 +52,7 @@ import {
   groupNameOf,
   isAdhocGroup,
   renameGroup,
+  getPart,
   isSourceOn,
   setActiveWavelengthUm,
   setSourceOn,
@@ -168,6 +170,8 @@ function PartProperties({ part }: { part: DocPart }) {
   // WP-26: send a DOF value to a device as a firmware command.
   const [deviceUrl, setDeviceUrlState] = useState(getDeviceUrl());
   const [actNote, setActNote] = useState<string | null>(null);
+  /** WP-101: why a typed X/Y/Z did not land where it was typed. */
+  const [poseNote, setPoseNote] = useState<string | null>(null);
   // WP-76: "generate a holder…" for an unbound primitive, right where the
   // ray diagram told the user where the optic belongs (was Assembly-only).
   const [holderOpen, setHolderOpen] = useState(false);
@@ -196,6 +200,21 @@ function PartProperties({ part }: { part: DocPart }) {
     const next = [...pos] as Vec3;
     next[axis] = v;
     withUndoStep(() => movePartWorld(part.id, next));
+    // WP-101: the T-class may well override what was typed (a T1 part holds
+    // the cell centre, a T2 part keeps only its DOF component). Saying so
+    // beats a field that silently springs back to a different number.
+    const landed = getPart(part.id)?.worldPose.positionMm;
+    if (landed && Math.abs(landed[axis] - v) > 1e-6) {
+      setPoseNote(
+        `${'XYZ'[axis]} = ${landed[axis].toFixed(2)} — ${
+          isT1
+            ? 'a T1 part holds its cube pose; move it a whole cell instead'
+            : "clamped onto the template's declared DOF axis and range"
+        }`,
+      );
+    } else {
+      setPoseNote(null);
+    }
   };
 
   return (
@@ -299,6 +318,11 @@ function PartProperties({ part }: { part: DocPart }) {
         <NumberField label="Y" value={pos[1]} onCommit={setAxis(1)} />
         <NumberField label="Z" value={pos[2]} onCommit={setAxis(2)} />
       </Stack>
+      {poseNote && (
+        <Typography variant="caption" color="warning.main">
+          {poseNote}
+        </Typography>
+      )}
 
       <Typography variant="caption" color="text.secondary">
         Orientation (°) — fine tilts about the part's local axes (WP-28)
@@ -655,29 +679,29 @@ function PartProperties({ part }: { part: DocPart }) {
           onClose={() => setHolderOpen(false)}
         />
       )}
-      {/* WP-51.1 (collapsed form): the module trio behind this part — the
-          full composition card with assets/electronics lives in the assembly
-          panel; here just the two records with their deep links. */}
-      <Typography variant="caption" color="text.secondary">
+      {/* WP-104: the anatomy — optic ⊂ housing ⊂ cube — replacing the
+          collapsed "◐ id · ▣ class" one-liner, which named the trio without
+          ever showing how the three fit together. */}
+      <Divider textAlign="left" sx={{ mt: 0.5 }}>
+        <Typography variant="caption" color="text.secondary">anatomy</Typography>
+      </Divider>
+      <PartAnatomy
+        compact
+        category={part.category}
+        mount={lib?.mount ?? 'cube'}
+        templateClass={lib?.templateClass ?? null}
+        componentId={lib?.componentId ?? null}
+        templateId={lib?.templateId ?? null}
+        moduleId={lib?.mount === 'cube' ? part.libraryRef : null}
+        onOpenComponent={
+          lib?.componentId
+            ? () => navigate(`/configurator/components?open=${encodeURIComponent(lib.componentId!)}`)
+            : undefined
+        }
+      />
+      <Typography variant="caption" color="text.secondary" noWrap>
         library: {part.libraryRef}
       </Typography>
-      {lib?.componentId && (
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }} noWrap>
-            ◐ {lib.componentId} · ▣ {lib.templateClass ? T_CLASS_LABEL[lib.templateClass] : 'no template'}
-          </Typography>
-          <Tooltip title="open in the component editor">
-            <IconButton
-              size="small"
-              onClick={() =>
-                navigate(`/configurator/components?open=${encodeURIComponent(lib.componentId!)}`)
-              }
-            >
-              <EditIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      )}
     </Stack>
   );
 }

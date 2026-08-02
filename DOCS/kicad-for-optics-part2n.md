@@ -181,7 +181,7 @@ everything else.
 
 ### Tier 0 — stop the app lying (do these first, in this order)
 
-#### WP-99 — The assembly draws the mesh you attached
+#### WP-99 — The assembly draws the mesh you attached ✅ *(done, 2026-08-01)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend only)
@@ -265,7 +265,7 @@ the library and every mesh a community `.dsn` brings with it.
 
 ---
 
-#### WP-100 — Open the part you actually clicked
+#### WP-100 — Open the part you actually clicked ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend only)
@@ -342,7 +342,7 @@ corrupted version of your part.
 
 ---
 
-#### WP-101 — A dropped part lands where you dropped it
+#### WP-101 — A dropped part lands where you dropped it ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend only)
@@ -396,7 +396,7 @@ landing crooked and quietly straightening themselves the moment you touch them.
 
 ---
 
-#### WP-102 — Publishing to the library must not destroy records
+#### WP-102 — Publishing to the library must not destroy records ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repos: openUC2-OptiKit + optikit-core)
@@ -471,7 +471,7 @@ while the service is running.
 
 ### Tier 1 — the mental model
 
-#### WP-103 — Three states, said out loud
+#### WP-103 — Three states, said out loud ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend; optionally a small optikit-core index add)
@@ -539,7 +539,7 @@ palette and draws the cube around the parts that have one.
 
 ---
 
-#### WP-104 — The anatomy view: optic → housing → cube
+#### WP-104 — The anatomy view: optic → housing → cube ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend; depends on WP-103's discriminator)
@@ -854,7 +854,7 @@ where the part came from, and whether anything about it is still unconfirmed.
 
 ---
 
-#### WP-109 — One mirror cube, not three (optikit-core library hygiene)
+#### WP-109 — One mirror cube, not three (optikit-core library hygiene) ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: optikit-core, library data only)
@@ -936,14 +936,14 @@ check so the next Inventor export is validated instead of trusted.
 ## 3. Build order
 
 ```
-WP-99  (assembly draws meshes)      ──┐  all four are independent;
-WP-100 (deep link opens the part)   ──┤  99 first, because judging any of
-WP-101 (drop lands on grid)         ──┤  the rest is impossible while the
-WP-102 (non-destructive publish)    ──┘  3D view is drawing ghost boxes
+WP-99  ✅ (assembly draws meshes)   ──┐  all four are independent;
+WP-100 ✅ (deep link opens the part)──┤  99 first, because judging any of
+WP-101 ✅ (drop lands on grid)      ──┤  the rest is impossible while the
+WP-102 ✅ (non-destructive publish) ──┘  3D view is drawing ghost boxes
         │
-        └─► WP-109 (library hygiene — needs 102's merge to be safe)
+        └─► WP-109 ✅ (library hygiene — needed 102's merge to be safe)
                 │
-                └─► WP-103 (three states) ─► WP-104 (anatomy view)
+                └─► WP-103 ✅ (three states) ─► WP-104 ✅ (anatomy view)
                         │
                         └─► WP-105 (where work lives)
                                 │

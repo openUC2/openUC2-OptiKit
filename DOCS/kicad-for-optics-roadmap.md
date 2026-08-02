@@ -584,35 +584,75 @@ Tier 0 — *stop the app lying* (contained, two of them under ten lines):
   DOFs, same cause, which kills every T2 handle) from the palette registry,
   reorder the ladder so a mesh wins, and give the four ghost branches distinct
   labels so this is self-diagnosing next time. ✅ *(done, 2026-08-01)*
-- **WP-100 — Open the part you clicked.** The `?open=` deep link resolves ids
-  through the published registry only and swallows the 404 twice, leaving a
-  blank new record on screen that looks like a corrupted version of your part.
-  Resolve workspace → bundle → registry → index-summary, and never present a
-  blank draft as the requested record.
-- **WP-101 — A dropped part lands where you dropped it.** `addPart` skips
-  `constrainOffsetToTemplate`; the "snap" users see on first drag is the T1
-  constraint firing late. Same bug in paste and in the inspector's numeric
-  fields; the `snapGrid` toggle is mislabelled.
-- **WP-102 — Publishing to the library must not destroy records.** The write is
-  a wholesale replace from a draft that never reads `tags`/`docs`/`review`; it
-  has already destroyed curated data in the working tree. Merge before adding
-  any easier write button. Plus: `app.py:1140`'s `setdefault` makes the
-  documented read-only-in-containers promise false, and with `CORS: *` and no
-  auth, any page can POST YAML into a running user's library.
+- **WP-100 — Open the part you clicked** *(done, 2026-08-02)*. The `?open=`
+  deep link resolved ids through the published registry only and swallowed the
+  404 twice, leaving a blank new record on screen that looks like a corrupted
+  version of your part. The chain is now workspace → the bundle's retained
+  YAML → registry → **index summary** (lossy, and labelled as such — which is
+  what makes deep links work offline, where the snapshot ships an index but no
+  `component.yml` files). A failure is an Alert above the tabs, never a silent
+  blank. The resolution is a pure module (`src/model/openRecord.ts`) so it is
+  testable without a DOM; the sidebar follows the link to the right tab and
+  highlights the row; `resolveMesh` gained a bundle probe so a zip-imported
+  part shows its own CAD; and the two divergent copies of the asset fetch are
+  now one `fetchIndexComponent`.
+- **WP-101 — A dropped part lands where you dropped it** *(done, 2026-08-02)*.
+  `addPart` skipped `constrainOffsetToTemplate`, so a drop kept up to
+  ±25/±25/±27.5 mm of sub-cell residual and the first pointer move of a drag
+  silently zeroed it — the "lands anywhere, then snaps" report. The add path
+  now applies the same T-class contract as the move path, with an
+  `{exact: true}` opt-out that the `.dsn` importer passes so an imported pose
+  is still reproduced verbatim. Paste-here and drop share one `snapFree`
+  helper; the inspector says *why* a typed X/Y/Z did not land where it was
+  typed instead of springing back silently; and `snapGrid` is relabelled
+  "snap FREE parts" — it never governed cube modules.
+- **WP-102 — Publishing to the library must not destroy records**
+  *(done, 2026-08-02)*. A write is now a MERGE into the record as opened
+  (`mergeIntoRecord` / `mergeYamlRecord`): everything the form authors wins,
+  everything it has no field for — `tags`, `docs`, `review`, `mechanics`, and
+  any key a newer schema added under `extra="allow"` — survives. It covers the
+  template and module halves too (the bind flow authors those from scratch,
+  which is how a curated template lost its `glb-url` and a module its
+  `price`), by fetching what is on disk before writing. The optics tab finally
+  has the write button its banner always named, behind a confirm that lists
+  the top-level keys that will change and warns when a retyped id would FORK
+  rather than update. The disabled-write tooltip now names the real blocker
+  (almost always "author at least one datum first") instead of describing the
+  service gate. Core side: `app.py`'s `os.environ.setdefault(...)` ran BEFORE
+  the env read, so the checkout probe was dead code and writes were enabled
+  unconditionally — in containers too, contradicting the docstring. With
+  `CORS: *` and no auth that let any page a user visits POST arbitrary YAML
+  into their library. Fixed, with a test that a non-checkout deployment
+  answers 403.
 
 Tier 1 — *the mental model* (the user's own words: library → T1 in a cube → T2/T3
 loose → place on the grid → author optic ⊂ housing ⊂ cube):
 
-- **WP-103 — Three states, said out loud.** optikit-core ships `components`,
-  `housings` and `modules` as three index sections *precisely* so the frontend
-  can tell them apart; the frontend flattens them into `templateClass|null` +
-  `unbound`, where `null` means three different things. Introduce a real `mount`
-  discriminator, segment the palette by it, and draw the cube envelope around
-  parts that have one.
-- **WP-104 — The anatomy view.** One `PartAnatomy` component (palette hover,
-  schematic inspector, third parts-editor tab) drawing optic → housing → cube
-  with each layer labelled, clickable, and greyed when absent — the greyed
-  layers *are* the authoring to-do list.
+- **WP-103 — Three states, said out loud** *(done, 2026-08-02)*. optikit-core
+  ships `components`, `housings` and `modules` as three index sections
+  *precisely* so the frontend can tell them apart; the frontend flattened them
+  into `templateClass|null` + `unbound`, where `null` meant three different
+  things and a laser in its own body was byte-identical to a bare lens.
+  `LibraryPaletteEntry` now carries a real `mount: 'cube' | 'housed' | 'bare'`
+  plus `templateId`, set by all four producers (index modules, index
+  components + housings, workspace drafts, bundle modules). The palette groups
+  and badges by it in plain words ("in a cube" / "housed · no cube" / "needs a
+  holder" — never "UNBOUND"); the assembly reads the discriminator instead of
+  recomputing a *different* "unbound" from the index inside one file; and the
+  WP-98b hollow-entry repair now runs on bare and workspace entries too. The
+  schematic draws the cube envelope around **every** part that lives in a cube
+  — it used to fire for `fixed` only, so a T2 insert and a T3 module rendered
+  as naked glyphs — with T3 dashed, because that cube does not exist yet. Two
+  committed assertions encoded the old defect and were updated.
+- **WP-104 — The anatomy view** *(done, 2026-08-02)*. `PartAnatomy` draws
+  optic ⊂ housing ⊂ cube as one figure with each layer named by its record id,
+  clickable, and **greyed with the reason when it does not exist** — which
+  makes the drawing double as the authoring to-do list ("no housing yet —
+  generate a holder (T3), or attach existing CAD"). Mounted in the schematic
+  inspector (replacing the collapsed `◐ id · ▣ class` one-liner) and as a
+  third parts-editor tab, "anatomy (the whole part)", which is the direct
+  answer to *"when I open a part I would see the optical primitive, the way
+  it's inside a housing, inside a cube"*.
 - **WP-105 — Where your work lives.** Sixteen localStorage keys, one blind 5 s
   autosave, four stores that never persist, and three menu items called "Save"
   that do not save the document. Rename, confirm-before-replace on all five
@@ -623,9 +663,26 @@ Tier 2 — *ergonomics that compound*: **WP-106** (parts search + one naming
 convention + list modules/housings), **WP-107** (the 45° glyph, the optic drawn
 inside the pseudo cube, honest mesh-status), **WP-108** (`review` ≠ `draft` —
 one boolean with four meanings badges a shipping €650 laser as a draft),
-**WP-109** (optikit-core library hygiene: one mirror cube instead of three, a
-`step:` that points at a `.glb`, and a `library validate` check for the two
-undeclared mesh conventions).
+**WP-109** *(done, 2026-08-02)* — optikit-core library hygiene. The earlier
+lossy write was repaired by hand rather than reverted, so the genuinely new
+facts survived (`mount_angle_deg`, the `mechanics:` binding) while the curated
+`tags`, `docs`, `review` and `price: 50.0` came back. The consolidation was
+**narrower than the package assumed**: `openuc2.cube.mirror_1x1` is referenced
+by the curated `miniframe_brightfield` group and four test files, so it stays —
+only the brand-new duplicate pair (`cube.flat_45` + `tpl.flat_45`, a second
+copy of the same 347 KB GLB, referenced by nothing) was archived, leaving two
+mirror cubes that mean different things: the real Inventor TH1 cube and the
+WP-19 placeholder plate. `openuc2.tpl.mirror_1x1` went to 0.2.0 with a real
+55 mm envelope, an insert frame (its `verify-t1` pass was previously vacuous),
+no `step:` naming a `.glb`, and no dead `mesh-offset`. The durable half is a
+new `library validate` check (`library/mesh.py`, stdlib-only glTF bbox): a mesh
+that cannot fit its declared envelope in any orientation is an ERROR (wrong
+units, wrong file), one that fits only after permuting axes is a WARNING naming
+the wrapper-node convention split, and a `provenance: whole-module` mesh must
+actually measure its cell. Three true positives today, zero false alarms.
+`bindRecord` no longer re-emits the defects: `step:` only for a real
+`.step`/`.stp`, the envelope from the measured mesh box (55 mm fallback, not
+50), and `mesh-offset` only when the mesh was actually moved.
 
 Deliberately **not** done this round: emitting `template:` in the exported
 `.dsn` (schema-invalid today), a `mesh-frame` record field (validate the

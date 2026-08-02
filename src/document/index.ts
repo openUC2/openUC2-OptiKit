@@ -68,6 +68,8 @@ export {
   entriesFromComponents,
   entriesFromIndex,
   entriesFromWorkspace,
+  MOUNT_LABEL,
+  MOUNT_SECTION,
   libraryEntryOf,
   listLibraryEntries,
   registerLibraryModules,
@@ -78,7 +80,7 @@ export {
   listLibraryGroups,
   templateClassOf,
 } from './libraryPalette';
-export type { InterfaceKind, LibraryDof, LibraryGroupEntry, LibraryPaletteEntry, TemplateClass } from './libraryPalette';
+export type { InterfaceKind, LibraryDof, LibraryGroupEntry, LibraryPaletteEntry, PartMount, TemplateClass } from './libraryPalette';
 export {
   DOC_PARAMS_KEY,
   docPosToThree,

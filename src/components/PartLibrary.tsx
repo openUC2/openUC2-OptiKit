@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useAppStore } from '../stores/appStore';
 import {
+  MOUNT_LABEL,
   T_CLASS_LABEL,
   UC2_GRID_MM,
   addGroup,
@@ -38,7 +39,14 @@ import {
   templateClassOf,
   useDocParts,
 } from '../document';
-import type { DocCategory } from '../document';
+import type { DocCategory, PartMount } from '../document';
+
+/** WP-103: what each state means, for the palette badge's tooltip. */
+const MOUNT_TOOLTIP: Record<PartMount, string> = {
+  cube: 'a cube module — place it on the grid as-is',
+  housed: 'the optic sits in its own housing (a laser body, a kinematic mount) but not in a cube yet — place it freely, or generate a cube around it',
+  bare: 'an optical primitive with no mechanics at all — place it to design with, then generate a holder (T3) to build it',
+};
 import { AddCommunityRepoDialog } from './library/AddCommunityRepoDialog';
 import { useLibraryRegistration } from '../model/useLibraryRegistration';
 import { GlyphThumb } from './schematic/GlyphThumb';
@@ -182,6 +190,7 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
     // T-class badge (WP-34): registry modules always have one; CSV parts get
     // a best-effort class where a library record with the same id exists.
     const tClass = templateClassOf(module.id);
+    const mount = libraryEntryOf(module.id)?.mount ?? 'cube';
     return (
       <Card
         key={module.id}
@@ -295,12 +304,15 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
               {module.name}
             </Typography>
             
-            {libraryEntryOf(module.id)?.unbound && (
-              <Tooltip title="an optical primitive with no mechanics yet — place it, then generate a holder (WP-61)">
+            {/* WP-103: say which of the three states this part is in, in
+                words a user has a chance of reading. "UNBOUND" was our
+                jargon, and it covered two genuinely different things. */}
+            {mount !== 'cube' && (
+              <Tooltip title={MOUNT_TOOLTIP[mount]}>
                 <Chip
-                  label="UNBOUND"
+                  label={MOUNT_LABEL[mount]}
                   size="small"
-                  color="info"
+                  color={mount === 'housed' ? 'info' : 'warning'}
                   variant="outlined"
                   sx={{ height: 18, fontSize: '0.55rem', flexShrink: 0, fontWeight: 700 }}
                 />
@@ -346,6 +358,7 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
   const renderModuleRow = (module: ModuleDefinition) => {
     const entry = libraryEntryOf(module.id);
     const tClass = templateClassOf(module.id);
+    const rowMount = entry?.mount ?? 'cube';
     const facts = [
       String(categoryOf(module.id, module)),
       entry?.eflMm != null ? `EFL ${entry.eflMm.toFixed(0)} mm` : '',
@@ -388,9 +401,12 @@ export const PartLibrary: React.FC<{ opticalGlyphs?: boolean }> = ({
             {facts}
           </Typography>
         </Box>
-        {entry?.unbound && (
-          <Chip label="UNBOUND" size="small" color="info" variant="outlined"
-            sx={{ height: 16, fontSize: '0.5rem', flexShrink: 0, fontWeight: 700 }} />
+        {rowMount !== 'cube' && (
+          <Tooltip title={MOUNT_TOOLTIP[rowMount]}>
+            <Chip label={MOUNT_LABEL[rowMount]} size="small"
+              color={rowMount === 'housed' ? 'info' : 'warning'} variant="outlined"
+              sx={{ height: 16, fontSize: '0.5rem', flexShrink: 0, fontWeight: 700 }} />
+          </Tooltip>
         )}
         {tClass && (
           <Chip

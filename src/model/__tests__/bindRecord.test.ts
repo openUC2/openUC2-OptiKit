@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 import * as THREE from 'three';
 import {
   AXIS_SNAP_WARN_DEG,
@@ -399,5 +400,73 @@ describe('placed-optic Euler editing (WP-41 follow-up)', () => {
     const e1 = quatToEulerDeg(q1);
     expect(e1.x).toBeCloseTo(30, 3);
     expect(e1.z).toBeCloseTo(45, 3);
+  });
+});
+
+describe('the emitted template is honest about its mesh (WP-109)', () => {
+  const parse = (files: Record<string, string | Uint8Array>, path: string) =>
+    parseYaml(files[path] as string) as Record<string, unknown>;
+
+  it('a dropped GLB does not become the record\'s STEP', () => {
+    // This is the defect that shipped: `step:` was written unconditionally
+    // from meshFile, so binding a .glb published a template whose STEP was a
+    // glTF — and the index then served gltf-binary bytes under assets.step.
+    const bound = bindToRecords({ ...laserInput(), meshFile: 'cube.glb' });
+    const tpl = parse(recordsToFiles(bound, 'cube.glb', {}), `templates/${bound.template.id}/template.yml`);
+    expect(tpl.step).toBeUndefined();
+    expect(tpl.glb).toBe('cube.glb');
+  });
+
+  it('a real STEP still declares both halves', () => {
+    const bound = bindToRecords(laserInput());
+    const tpl = parse(
+      recordsToFiles(bound, 'laser-housing.step', {}),
+      `templates/${bound.template.id}/template.yml`,
+    );
+    expect(tpl.step).toBe('laser-housing.step');
+    expect(tpl.glb).toBe('laser-housing.glb');
+  });
+
+  it('declares the MEASURED envelope when the viewport has one', () => {
+    // `library validate` (WP-109) checks the mesh against this number, so a
+    // guessed 50/50/50 is a guaranteed disagreement for every real cube.
+    const bound = bindToRecords({ ...laserInput(), envelopeMm: [49.8, 49.8, 54.4] });
+    const tpl = parse(
+      recordsToFiles(bound, 'laser-housing.step', {}),
+      `templates/${bound.template.id}/template.yml`,
+    );
+    expect(tpl.envelope).toEqual({ 'x-mm': 49.8, 'y-mm': 49.8, 'z-mm': 54.4 });
+  });
+
+  it('falls back to the real 55 mm cube pitch, not 50', () => {
+    const bound = bindToRecords(laserInput());
+    const tpl = parse(
+      recordsToFiles(bound, 'laser-housing.step', {}),
+      `templates/${bound.template.id}/template.yml`,
+    );
+    expect((tpl.envelope as Record<string, number>)['z-mm']).toBe(55);
+  });
+
+  it('omits mesh-offset when the mesh was never moved', () => {
+    // Nothing in either repo READS mesh-offset; a zero block on every record
+    // was pure noise that looked like a placement.
+    const bound = bindToRecords({
+      ...laserInput(),
+      meshTransform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
+    });
+    const tpl = parse(
+      recordsToFiles(bound, 'laser-housing.step', {}),
+      `templates/${bound.template.id}/template.yml`,
+    );
+    expect(tpl['mesh-offset']).toBeUndefined();
+  });
+
+  it('keeps mesh-offset when the mesh WAS moved', () => {
+    const bound = bindToRecords(laserInput()); // positionMm [0,0,-5]
+    const tpl = parse(
+      recordsToFiles(bound, 'laser-housing.step', {}),
+      `templates/${bound.template.id}/template.yml`,
+    );
+    expect(tpl['mesh-offset']).toMatchObject({ 'z-mm': -5 });
   });
 });

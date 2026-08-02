@@ -218,6 +218,13 @@ export interface BindInput {
   templateClass: 'fixed' | 'adaptive' | 'generative';
   meshFile: string; // e.g. "laser-housing.step" (source of truth)
   meshTransform: MeshTransform;
+  /**
+   * WP-109: the mesh's measured bounding box in mm. `library validate` checks
+   * a template's mesh against the envelope it declares, so a guessed envelope
+   * is a guaranteed disagreement — pass the real one when the viewport has
+   * loaded the geometry.
+   */
+  envelopeMm?: [number, number, number];
   datums: BindDatum[];
   description?: string;
   /**
@@ -433,7 +440,12 @@ export function bindToRecords(input: BindInput): BoundRecords {
     }
   }
 
-  const t = input.meshTransform;
+  // WP-109: only a REAL .step/.stp is the mechanical source of truth. This
+  // used to write `step: <meshFile>` unconditionally, so dropping a .glb
+  // published a record whose `step:` named a glTF — and the index then served
+  // gltf-binary bytes under `assets.step` (it happened, to
+  // openuc2.tpl.mirror_1x1).
+  const isStep = /\.(step|stp)$/i.test(input.meshFile);
   const template: Record<string, unknown> = {
     kind: 'mechanical_template',
     id: templateId,
@@ -441,21 +453,44 @@ export function bindToRecords(input: BindInput): BoundRecords {
     class: input.templateClass,
     description: `mount for ${componentId} (bound from ${input.meshFile})`,
     tags: ['bound'],
-    envelope: { 'x-mm': 50, 'y-mm': 50, 'z-mm': 50 },
-    // STEP = mechanical source of truth; GLB = derived render copy.
-    step: input.meshFile,
+    // WP-109: the cube's real z pitch is 55 mm, not 50 — a hardcoded 50/50/50
+    // envelope makes `library validate`'s mesh check disagree with every
+    // whole-cube export. The caller passes the measured box when it has one.
+    envelope: input.envelopeMm
+      ? {
+          'x-mm': round3(input.envelopeMm[0]),
+          'y-mm': round3(input.envelopeMm[1]),
+          'z-mm': round3(input.envelopeMm[2]),
+        }
+      : { 'x-mm': 50, 'y-mm': 50, 'z-mm': 55 },
+    ...(isStep ? { step: input.meshFile } : {}),
     glb: input.meshFile.replace(/\.(step|stp)$/i, '.glb'),
-    'mesh-offset': {
-      'x-mm': round3(t.positionMm[0]),
-      'y-mm': round3(t.positionMm[1]),
-      'z-mm': round3(t.positionMm[2]),
-      'rot-deg': { x: round3(t.rotationDeg[0]), y: round3(t.rotationDeg[1]), z: round3(t.rotationDeg[2]) },
-    },
     optical_ports: Object.fromEntries(
       Object.entries(ports).map(([name, port]) => [name, port]),
     ),
     footprint_grid: [1, 1, 1],
   };
+  // WP-109: `mesh-offset` was written by this function and read by NOTHING in
+  // either repo — the bind gizmo's placement was silently discarded as far as
+  // rendering went. Emit it only when it is non-zero, so a record that says it
+  // is offset is at least saying something true, and an untouched mesh does
+  // not carry a dead block.
+  const t = input.meshTransform;
+  const moved =
+    t.positionMm.some(v => Math.abs(v) > 1e-6) ||
+    t.rotationDeg.some(v => Math.abs(v) > 1e-6);
+  if (moved) {
+    template['mesh-offset'] = {
+      'x-mm': round3(t.positionMm[0]),
+      'y-mm': round3(t.positionMm[1]),
+      'z-mm': round3(t.positionMm[2]),
+      'rot-deg': {
+        x: round3(t.rotationDeg[0]),
+        y: round3(t.rotationDeg[1]),
+        z: round3(t.rotationDeg[2]),
+      },
+    };
+  }
 
   // WP-41: the whole module IS the mesh. Mark it, and promote the placed
   // optic frames to the template's declared insert frames so verify-t1

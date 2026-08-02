@@ -223,6 +223,11 @@ export function registerBundleLibrary(
         category: docCategoryOfRecord(String(component?.category ?? mod.category ?? 'other')),
         templateClass:
           (tplRecord.class as LibraryPaletteEntry['templateClass']) ?? null,
+        // WP-103: a bundle module carries a cube_module record, so it IS a
+        // cube — a zip that ships a footprint_grid is a placeable cube even
+        // before its records reach anyone's registry.
+        mount: 'cube' as const,
+        templateId,
         states: [],
         dofs: [],
         footprintGrid: footprint,

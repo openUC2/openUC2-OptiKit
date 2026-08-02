@@ -57,9 +57,14 @@ import {
   type DatumKind,
 } from '../../model/bindRecord';
 import type { Vec3 } from '../../document';
-import { paraxialEflMm, recordToYaml, type RecordDraft } from '../../model/componentRecord';
+import {
+  mergeYamlRecord,
+  paraxialEflMm,
+  recordToYaml,
+  type RecordDraft,
+} from '../../model/componentRecord';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
-import { bumpLibraryIndex, useLibraryIndex } from '../../model/libraryIndex';
+import { assetsBaseUrl, bumpLibraryIndex, useLibraryIndex } from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
 import { zipDsn } from '../../model/dsn/io';
 import { GenerateDraftHolderDialog } from '../component-editor/GenerateDraftHolderDialog';
@@ -201,13 +206,16 @@ export function MechanicsPanel({
       templateClass: store.templateClass,
       meshFile: store.meshFile || 'part.step',
       meshTransform: store.transform,
+      // WP-109: the measured box, so the record's envelope is true.
+      envelopeMm: store.meshSizeMm ?? undefined,
       datums: store.datums,
       existingComponent: existing,
       wholeModule: store.wholeModule,
       housingOnly: store.housingOnly,
     });
   }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
-      store.meshFile, store.transform, store.datums, store.wholeModule, store.housingOnly]);
+      store.meshFile, store.transform, store.meshSizeMm, store.datums, store.wholeModule,
+      store.housingOnly]);
 
   const pairFiles = () => {
     if (!bound) return null;
@@ -264,9 +272,24 @@ export function MechanicsPanel({
     try {
       const records: string[] = [];
       const assets: Record<string, Uint8Array> = {};
+      // WP-102: the template and module halves are authored from scratch by
+      // `bindToRecords`, so writing them verbatim over published files is how
+      // a curated template lost its `glb-url` and a module its `price` and
+      // `docs`. Fetch what is on disk and merge into it. A 404 (the record is
+      // new) just writes the authored version.
+      const base = assetsBaseUrl(index.url);
+      const published = async (path: string): Promise<string | null> => {
+        try {
+          const res = await fetch(`${base}/v1/library/assets/${path}`, { cache: 'no-cache' });
+          return res.ok ? await res.text() : null;
+        } catch {
+          return null;
+        }
+      };
       for (const [path, content] of Object.entries(files)) {
-        if (typeof content === 'string') records.push(content);
-        else assets[path] = content;
+        if (typeof content === 'string') {
+          records.push(mergeYamlRecord(await published(path), content));
+        } else assets[path] = content;
       }
       const result = await saveLibraryRecords(records, assets);
       // WP-34: the registry index is rebuilt per request — bumping makes the
@@ -740,7 +763,21 @@ export function MechanicsPanel({
           onClick={() => void download()}>
           {store.housingOnly ? 'Download part records (zip)' : 'Download record pair (PR zip)'}
         </Button>
-        <Tooltip title="dev fast path — on by default when the service runs from a checkout">
+        {/* WP-102: say WHY it is disabled. The old text ("dev fast path — on
+            by default when the service runs from a checkout") described the
+            service gate, while the real blocker is almost always the datum
+            count — and opening a record clears the datums. */}
+        <Tooltip
+          title={
+            !draft.name
+              ? 'name the record first (optics tab → name/id slug)'
+              : store.datums.length === 0
+                ? 'author at least one datum first: load a mesh, switch the viewport to datum mode, and click the surface'
+                : bound && bound.errors.length > 0
+                  ? bound.errors.join(' · ')
+                  : 'writes component + template + module (and their assets) into ../optikit-core/library'
+          }
+        >
           <span>
             <Button variant="outlined" color="warning" startIcon={<DevWriteIcon />}
               disabled={!bound || bound.errors.length > 0 || store.busy}

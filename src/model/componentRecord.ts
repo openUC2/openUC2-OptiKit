@@ -612,6 +612,85 @@ export function draftToRecord(draft: RecordDraft): ComponentRecord {
   return record as unknown as ComponentRecord;
 }
 
+/**
+ * WP-102: keys that belong to the RECORD's curation, not to this form.
+ *
+ * `draftToRecord` authors a record from scratch — it has no field for any of
+ * these, so writing its output over an existing file DELETES them. That is
+ * not hypothetical: a "write into ../optikit-core/library" replaced
+ * `tags: [mirror, mirror/flat, mirror/single-sided]` with `[authored]`, and on
+ * other records destroyed `docs`, `review`, `price` and `glb-url`.
+ */
+const CURATION_KEYS = new Set(['tags', 'docs', 'review', 'thumbnail', 'mechanics']);
+
+/**
+ * WP-102: fold an authored draft back into the record it was opened from, so a
+ * write is an EDIT and not a replacement. Everything the form authors wins;
+ * everything it has no field for — curation keys above, plus any key the
+ * schema's `extra="allow"` let a future version add — survives from `base`.
+ *
+ * `base` is null for a brand-new record, in which case there is nothing to
+ * preserve and the authored record stands as-is.
+ *
+ * Caveat worth knowing: this protects TOP-LEVEL keys. Unknown keys INSIDE an
+ * Optiland surface still do not survive the draft round-trip (SurfaceDraft is
+ * a structured form, not a passthrough) — `changedRecordKeys` will report
+ * `optics` as changed so the confirm step can say so.
+ */
+export function mergeIntoRecord(
+  base: ComponentRecord | null,
+  next: ComponentRecord,
+): ComponentRecord {
+  if (!base) return next;
+  const from = base as unknown as Json;
+  const merged: Json = { ...from };
+  for (const [key, value] of Object.entries(next as unknown as Json)) {
+    // A curated value the form cannot express is never overwritten.
+    if (CURATION_KEYS.has(key) && from[key] !== undefined) continue;
+    merged[key] = value;
+  }
+  // The optics block is authored wholesale, but keep sub-keys the form has no
+  // field for (e.g. `passthrough` on a mechanical-only record).
+  const baseOptics = from.optics as Json | undefined;
+  const nextOptics = (next as unknown as Json).optics as Json | undefined;
+  if (baseOptics && nextOptics) merged.optics = { ...baseOptics, ...nextOptics };
+  return merged as unknown as ComponentRecord;
+}
+
+/**
+ * WP-102: the same merge for ANY record kind, as YAML text — the template and
+ * module halves of the bind flow are authored from scratch too, and that is
+ * how a curated template lost its `glb-url` and a module its `price` and
+ * `docs`. `baseYaml` null (the record does not exist yet) writes `nextYaml`.
+ */
+export function mergeYamlRecord(baseYaml: string | null, nextYaml: string): string {
+  if (!baseYaml) return nextYaml;
+  let base: Json;
+  try {
+    base = parse(baseYaml) as Json;
+  } catch {
+    return nextYaml; // unparseable on disk — do not block the write
+  }
+  if (!base || typeof base !== 'object') return nextYaml;
+  const next = parse(nextYaml) as Json;
+  const merged: Json = { ...base };
+  for (const [key, value] of Object.entries(next)) {
+    if (CURATION_KEYS.has(key) && base[key] !== undefined) continue;
+    merged[key] = value;
+  }
+  return stringify(merged, { indent: 2, lineWidth: 100, aliasDuplicateObjects: false });
+}
+
+/** WP-102: top-level keys whose value differs — what a write would change. */
+export function changedRecordKeys(base: ComponentRecord, next: ComponentRecord): string[] {
+  const a = base as unknown as Json;
+  const b = next as unknown as Json;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys]
+    .filter(k => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null))
+    .sort();
+}
+
 export function recordToYaml(record: ComponentRecord): string {
   return stringify(record, { indent: 2, lineWidth: 100, aliasDuplicateObjects: false });
 }

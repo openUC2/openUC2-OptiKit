@@ -19,6 +19,10 @@ import {
   Alert,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   Paper,
   Stack,
@@ -33,24 +37,37 @@ import {
   ExpandMore as ExpandMoreIcon,
   FileUpload as ImportIcon,
   NoteAdd as NewIcon,
+  Publish as PublishIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import {
   defaultDraft,
   derivedPortWarnings,
+  changedRecordKeys,
   draftFromRecord,
-  recordFromYaml,
   draftToRecord,
+  mergeIntoRecord,
   recordId,
   recordToYaml,
   validateDraft,
   type RecordDraft,
 } from '../../model/componentRecord';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
+import { docCategoryOfRecord } from '../../document';
+import type { PartMount, TemplateClass } from '../../document';
+import { PartAnatomy } from '../inspector/PartAnatomy';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
 import { loadBindMesh, saveBindMesh } from '../../model/bindMeshStore';
-import { assetsBaseUrl, useLibraryIndex } from '../../model/libraryIndex';
+import {
+  assetsBaseUrl,
+  bumpLibraryIndex,
+  fetchIndexComponent,
+  useLibraryIndex,
+} from '../../model/libraryIndex';
+import { saveLibraryRecords } from '../../api/coreClient';
+import { resolveLocalRecord, resolveRegistryRecord } from '../../model/openRecord';
+import { bundleFiles, useBundleLibrary } from '../../model/dsn/bundleImport';
 import { LibraryBrowser, type RecordOrigin } from './LibraryBrowser';
 import { RecordForm } from './RecordForm';
 import { GlyphPreview } from './GlyphPreview';
@@ -68,7 +85,7 @@ export function ComponentEditorPage({
 }) {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
-  const [tab, setTab] = useState<'optics' | 'mechanics'>(initialTab);
+  const [tab, setTab] = useState<'optics' | 'mechanics' | 'anatomy'>(initialTab);
   const [draft, setDraft] = useState<RecordDraft>(() => defaultDraft('lens'));
   const saveRecord = useWorkspaceLibrary(s => s.save);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
@@ -78,6 +95,14 @@ export function ComponentEditorPage({
     { origin: RecordOrigin; id: string; version: string } | null
   >(null);
   const [meshStatus, setMeshStatus] = useState<MeshStatus>(null);
+  /** WP-100: why a `?open=` link did not produce the record it named. */
+  const [openError, setOpenError] = useState<string | null>(null);
+  /** WP-100: which sidebar tab holds the record the deep link opened. */
+  const [deepLinkTab, setDeepLinkTab] = useState<'index' | 'workspace' | null>(null);
+  /** WP-102: the record AS OPENED — the base a write merges into. */
+  const [openedRecord, setOpenedRecord] = useState<ComponentRecord | null>(null);
+  const [confirmWrite, setConfirmWrite] = useState(false);
+  const [writeBusy, setWriteBusy] = useState(false);
   const index = useLibraryIndex();
   const bindGlb = useBindStore(s => s.glbBytes);
   const bindStep = useBindStore(s => s.stepBytes);
@@ -86,11 +111,50 @@ export function ComponentEditorPage({
   const errors = useMemo(() => validateDraft(draft), [draft]);
   // WP-40: authored port directions cross-checked against the surfaces.
   const directionWarnings = useMemo(() => derivedPortWarnings(draft), [draft]);
-  const record = useMemo(
+  const authored = useMemo(
     () => (errors.length === 0 ? draftToRecord(draft) : null),
     [draft, errors],
   );
+  // WP-102: what a WRITE would actually produce. `draftToRecord` authors a
+  // record from scratch, so writing it verbatim over the file it was opened
+  // from deletes every key this form has no field for (tags, docs, review,
+  // mechanics, and anything a newer schema added). Fold it back into the
+  // record we opened instead — an edit, not a replacement.
+  const record = useMemo(
+    () => (authored ? mergeIntoRecord(openedRecord, authored) : null),
+    [authored, openedRecord],
+  );
   const yaml = useMemo(() => (record ? recordToYaml(record) : ''), [record]);
+  /** WP-102: the id was retyped — a write would FORK, not update. */
+  const idDrift = Boolean(openedFrom && record && record.id !== openedFrom.id);
+  /** WP-102: top-level keys a write into the library would change. */
+  const changedKeys = useMemo(
+    () => (openedRecord && record ? changedRecordKeys(openedRecord, record) : []),
+    [openedRecord, record],
+  );
+
+  /**
+   * WP-104: which of the three layers this draft actually has. The editor
+   * knows its own optics; the housing and the cube come from what the library
+   * already binds to this component id (a published module, a WP-67 housing)
+   * or from the draft's own `mechanics:` reference.
+   */
+  const anatomy = useMemo(() => {
+    const cid = errors.length === 0 ? recordId(draft) : null;
+    const module = cid
+      ? index.modules.find(m => (m.component?.ref ?? '').split('@')[0] === cid)
+      : undefined;
+    const housing = cid ? index.housings.find(h => h.component.id === cid) : undefined;
+    const templateId =
+      module?.template?.id ?? housing?.id ?? (draft.mechanicsTemplate || null);
+    const mount: PartMount = module ? 'cube' : templateId ? 'housed' : 'bare';
+    return {
+      mount,
+      templateId,
+      moduleId: module?.id ?? null,
+      templateClass: (module?.template?.class ?? housing?.class ?? null) as TemplateClass | null,
+    };
+  }, [draft, errors, index.modules, index.housings]);
 
   const download = () => {
     if (!record) return;
@@ -105,6 +169,29 @@ export function ComponentEditorPage({
     setTimeout(() => setSavedFlash(null), 2500);
   };
 
+  /** WP-102: publish to the shared library — behind an explicit confirm that
+   * names what changes, because this overwrites a file other people share. */
+  const writeToLibrary = async () => {
+    if (!record) return;
+    setWriteBusy(true);
+    try {
+      await saveLibraryRecords([recordToYaml(record)]);
+      bumpLibraryIndex();
+      setOpenedRecord(record);
+      setSavedFlash(`${record.id} → ../optikit-core/library`);
+      setTimeout(() => setSavedFlash(null), 3500);
+      setConfirmWrite(false);
+    } catch (e) {
+      setOpenError(
+        `write failed: ${e instanceof Error ? e.message : String(e)} — is the core service ` +
+          `running from a checkout (POST /v1/library/save)?`,
+      );
+      setConfirmWrite(false);
+    } finally {
+      setWriteBusy(false);
+    }
+  };
+
   /** WP-38: the mechanics tab follows the record. Priority: a locally bound
    * mesh (IndexedDB, survives reloads) → the registry's published template
    * assets (via the module that references this component) → honest "none". */
@@ -117,6 +204,24 @@ export function ComponentEditorPage({
         bind.loadMesh(local.meshFile, local.glb, local.step);
         setMeshStatus('loaded');
         return;
+      }
+      // WP-100: a bundle-imported part is in neither IndexedDB nor the index,
+      // but the zip retained its template mesh — use it, or the mechanics tab
+      // says "no STP bound" about a part that shipped its own CAD.
+      const bundled = useBundleLibrary
+        .getState()
+        .entries.find(e => e.componentId === recordId);
+      if (bundled) {
+        const files = bundleFiles();
+        const meshPath = Object.keys(files).find(
+          p => p.startsWith('library/templates/') && p.endsWith('.glb'),
+        );
+        const bytes = meshPath ? files[meshPath] : undefined;
+        if (bytes instanceof Uint8Array) {
+          bind.loadMesh(meshPath!.split('/').pop() ?? 'model.glb', bytes, null);
+          setMeshStatus('loaded');
+          return;
+        }
       }
       const module = index.modules.find(m =>
         m.component?.ref?.startsWith(`${recordId}@`),
@@ -149,6 +254,9 @@ export function ComponentEditorPage({
   const openRecord = (rec: ComponentRecord, origin: RecordOrigin) => {
     setDraft(draftFromRecord(rec));
     setOpenedFrom({ origin, id: rec.id, version: rec.version });
+    // WP-102: hold the record verbatim — a later write merges into THIS, not
+    // into whatever the form can reconstruct.
+    setOpenedRecord(rec);
     void resolveMesh(rec.id);
   };
 
@@ -161,19 +269,39 @@ export function ComponentEditorPage({
   useEffect(() => {
     if (deepLinked) return;
     const id = new URLSearchParams(window.location.search).get('open');
-    if (!id || index.loading) return;
+    if (!id) return;
+
+    // WP-100: local first (workspace drafts, then a bundle's retained YAML),
+    // registry second. A local hit must claim `deepLinked` immediately — the
+    // effect re-fires whenever `index.loading` flips, and every workspace
+    // save bumps the index, which would let the registry branch clobber the
+    // record we just opened.
+    const local = resolveLocalRecord(id, {
+      workspaceRecords: useWorkspaceLibrary.getState().records,
+      bundleFiles: bundleFiles(),
+    });
+    if (local) {
+      setDeepLinked(true);
+      setDeepLinkTab(local.tab);
+      openRecord(local.record, local.origin);
+      return;
+    }
+    // Only the registry branch needs the index — defer until it has loaded.
+    if (index.loading) return;
     setDeepLinked(true);
     void (async () => {
-      try {
-        const url = `${assetsBaseUrl(index.url)}/v1/library/assets/components/${id}/component.yml`;
-        const response = await fetch(url, { cache: 'no-cache' });
-        if (response.ok) openRecord(recordFromYaml(await response.text()), 'index');
-      } catch {
-        /* stay on the blank draft if the record can't be fetched */
+      const resolved = await resolveRegistryRecord(id, {
+        indexComponents: index.components,
+        fetchRecord: rid => fetchIndexComponent(rid, index.url),
+      });
+      if (resolved.record) {
+        setDeepLinkTab(resolved.tab);
+        openRecord(resolved.record, resolved.origin);
       }
+      setOpenError(resolved.warning);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index.loading, deepLinked]);
+  }, [index.loading, index.url, deepLinked]);
 
   // Persist the bound mesh per record id so drafts survive a reload (WP-38).
   useEffect(() => {
@@ -200,7 +328,11 @@ export function ComponentEditorPage({
               },
             }}
           >
-            <LibraryBrowser onOpenRecord={openRecord} />
+            <LibraryBrowser
+              onOpenRecord={openRecord}
+              showTab={deepLinkTab}
+              highlightId={openedFrom?.id ?? null}
+            />
           </Drawer>
 
           {/* center: one identity, two halves (WP-33) */}
@@ -217,6 +349,8 @@ export function ComponentEditorPage({
                 onClick={() => {
                   setDraft(defaultDraft(draft.category));
                   setOpenedFrom(null);
+                  setOpenedRecord(null);
+                  setOpenError(null);
                   setMeshStatus(null);
                   useBindStore.getState().clear();
                 }}
@@ -241,6 +375,71 @@ export function ComponentEditorPage({
             <ImportVendorDialog open={importOpen} onClose={() => setImportOpen(false)} />
             <ImportOptilandDialog open={optilandOpen} onClose={() => setOptilandOpen(false)} />
 
+            {/* WP-102: publishing overwrites a file the whole library shares.
+                Say exactly what changes before doing it. */}
+            <Dialog open={confirmWrite} onClose={() => setConfirmWrite(false)} maxWidth="sm" fullWidth>
+              <DialogTitle>Write into ../optikit-core/library</DialogTitle>
+              <DialogContent>
+                <Typography variant="body2" sx={{ mb: 1.5 }}>
+                  This writes <b>{record?.id}</b>@{record?.version} into the shared library on
+                  disk. The core service picks it up on the next index fetch — no rebuild, no
+                  restart.
+                </Typography>
+                {idDrift && (
+                  <Alert severity="warning" sx={{ mb: 1.5 }}>
+                    The id changed since this record was opened: this will CREATE{' '}
+                    <b>{record?.id}</b> and leave <b>{openedFrom?.id}</b> untouched. Bump the
+                    version instead if you meant to update the original.
+                  </Alert>
+                )}
+                {openedRecord ? (
+                  changedKeys.length > 0 ? (
+                    <>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        fields that will change:
+                      </Typography>
+                      {changedKeys.map(k => (
+                        <Typography key={k} variant="caption" sx={{ display: 'block', fontFamily: 'monospace' }}>
+                          • {k}
+                        </Typography>
+                      ))}
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                        Everything else on the record — tags, docs, review notes, the mechanics
+                        binding, any key this form has no field for — is preserved. Note that
+                        YAML comments are not: the file is rewritten.
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Nothing has changed — writing is a no-op.
+                    </Typography>
+                  )
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    This id is not in the library yet, so a NEW record file is created.
+                  </Typography>
+                )}
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setConfirmWrite(false)}>cancel</Button>
+                <Button
+                  variant="contained" color="secondary" disabled={writeBusy}
+                  onClick={() => void writeToLibrary()}
+                >
+                  {writeBusy ? 'writing…' : 'write'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* WP-100: a deep link that could not produce its record says so
+                — above the tabs, so it is visible on both halves. Never let a
+                blank NEW draft masquerade as the part the user clicked. */}
+            {openError && (
+              <Alert severity="warning" sx={{ mb: 1.5 }} onClose={() => setOpenError(null)}>
+                {openError}
+              </Alert>
+            )}
+
             {/* WP-38: published records open as editable copies. */}
             {openedFrom?.origin === 'index' && (
               <Alert severity="info" sx={{ mb: 1.5 }}>
@@ -254,7 +453,45 @@ export function ComponentEditorPage({
             <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, minHeight: 36 }}>
               <Tab value="optics" label="optics (symbol)" sx={{ minHeight: 36 }} />
               <Tab value="mechanics" label="mechanics (housing)" sx={{ minHeight: 36 }} />
+              {/* WP-104: the whole part, not either half of it. */}
+              <Tab value="anatomy" label="anatomy (the whole part)" sx={{ minHeight: 36 }} />
             </Tabs>
+
+            {tab === 'anatomy' && (
+              <Stack spacing={2} sx={{ maxWidth: 620, mb: 4 }}>
+                <Typography variant="body2" color="text.secondary">
+                  A part is three records: the <b>optic</b> (what it does to light), the{' '}
+                  <b>housing</b> that holds it, and the <b>cube module</b> that binds the two so
+                  it can be placed on the grid. A greyed layer does not exist yet — that is the
+                  work still to do on this part.
+                </Typography>
+                <PartAnatomy
+                  category={docCategoryOfRecord(draft.category)}
+                  mount={anatomy.mount}
+                  templateClass={anatomy.templateClass}
+                  componentId={errors.length === 0 ? recordId(draft) : null}
+                  templateId={anatomy.templateId}
+                  moduleId={anatomy.moduleId}
+                />
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                  <Button size="small" variant="outlined" onClick={() => setTab('optics')}>
+                    edit the optic
+                  </Button>
+                  <Button size="small" variant="outlined" onClick={() => setTab('mechanics')}>
+                    {anatomy.mount === 'bare'
+                      ? 'give it a housing…'
+                      : 'edit the housing'}
+                  </Button>
+                </Stack>
+                {anatomy.mount !== 'cube' && (
+                  <Alert severity="info">
+                    {anatomy.mount === 'housed'
+                      ? 'This part has its own housing but no cube yet — the mechanics tab can package it as a cube module so it reaches the 50 mm grid.'
+                      : 'This part has no mechanics at all. It can be placed and simulated as a bare optic, but it cannot be built until a holder is generated (mechanics tab → generate a holder).'}
+                  </Alert>
+                )}
+              </Stack>
+            )}
 
             {tab === 'optics' && (
               <>
@@ -282,11 +519,11 @@ export function ComponentEditorPage({
                 )}
                 {savedFlash && (
                   <Alert severity="success" sx={{ mt: 2 }}>
-                    saved {savedFlash} to the workspace library
+                    saved {savedFlash}
                   </Alert>
                 )}
 
-                <Stack direction="row" spacing={1.5} sx={{ mt: 2.5, mb: 4 }}>
+                <Stack direction="row" spacing={1.5} sx={{ mt: 2.5, mb: 4 }} flexWrap="wrap" useFlexGap>
                   <Button
                     variant="contained" startIcon={<DownloadIcon />} disabled={!record}
                     onClick={download}
@@ -299,6 +536,18 @@ export function ComponentEditorPage({
                   >
                     Save to workspace library
                   </Button>
+                  {/* WP-102: the action the banner has always named, now that
+                      a write is a merge. Hidden when the service is
+                      unreachable — an offline/static build cannot publish. */}
+                  {!index.error && (
+                    <Button
+                      variant="outlined" color="secondary" startIcon={<PublishIcon />}
+                      disabled={!record}
+                      onClick={() => setConfirmWrite(true)}
+                    >
+                      Write into ../optikit-core/library
+                    </Button>
+                  )}
                 </Stack>
               </>
             )}

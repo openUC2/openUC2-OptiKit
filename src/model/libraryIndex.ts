@@ -16,6 +16,8 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { getCoreUrl } from '../api/coreClient';
+import { recordFromYaml } from './componentRecord';
+import type { ComponentRecord } from './dsn/generated/library-component';
 
 export interface IndexComponent {
   id: string;
@@ -207,6 +209,72 @@ export function assetsBaseUrl(indexUrl: string): string {
 export function setIndexUrl(url: string): void {
   if (url && url !== DEFAULT_INDEX_URL) localStorage.setItem(URL_STORAGE_KEY, url);
   else localStorage.removeItem(URL_STORAGE_KEY);
+}
+
+/**
+ * WP-100: fetch a PUBLISHED record in full. The index card carries metadata
+ * only, so the record itself comes from the registry's asset endpoint. One
+ * copy, because the two that existed (the sidebar's and the deep link's) had
+ * drifted into different error handling — one reported, one swallowed.
+ * Throws on a non-2xx; callers decide what to do about it.
+ */
+export async function fetchIndexComponent(
+  id: string,
+  indexUrl: string,
+): Promise<ComponentRecord> {
+  const url = `${assetsBaseUrl(indexUrl)}/v1/library/assets/components/${id}/component.yml`;
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${url}`);
+  return recordFromYaml(await response.text());
+}
+
+/**
+ * WP-100: a LOSSY record reconstructed from the index summary — the last
+ * resort when the full YAML cannot be fetched (offline, or a registry that
+ * serves an index but no assets). It carries the physics (surfaces, ports,
+ * EFL, emission lines) and drops everything the summary never had: docs,
+ * review notes, `mechanics`, YAML comments, unknown keys. Callers MUST label
+ * it as reconstructed — saving it over the original would silently truncate.
+ */
+export function recordFromIndexComponent(c: IndexComponent): ComponentRecord {
+  const ports = c.ports ?? [];
+  // The index resolves each port to local mm; rebuild one datum frame per
+  // distinct z so the draft's frame/port structure round-trips.
+  const zs = [...new Set(ports.map(p => p.position_mm[2]))].sort((a, b) => a - b);
+  const frameName = (z: number): string =>
+    z === 0 ? 'optical' : zs.length === 2 ? 'exit' : `frame_${z}mm`;
+  const frames: Record<string, { 'z-mm': number }> = {};
+  for (const z of zs.length > 0 ? zs : [0]) frames[frameName(z)] = { 'z-mm': z };
+  return {
+    kind: 'optical_component',
+    id: c.id,
+    version: c.version,
+    category: c.category,
+    description: c.description,
+    tags: c.tags,
+    vendor: c.vendor,
+    effective_focal_length_mm: c.efl_mm,
+    optics: {
+      frames,
+      ports: Object.fromEntries(
+        ports.map(p => [
+          p.name,
+          {
+            frame: frameName(p.position_mm[2]),
+            direction: p.direction,
+            ...(p.after_surface !== null ? { 'after-surface': p.after_surface } : {}),
+            ...(p.coupling ? { coupling: p.coupling } : {}),
+          },
+        ]),
+      ),
+      ...(c.fragment_surfaces && c.fragment_surfaces.length > 0
+        ? { fragment: { surfaces: c.fragment_surfaces } }
+        : {}),
+    },
+    ...(c.wavelengths_um && c.wavelengths_um.length > 0
+      ? { source: { wavelengths_um: c.wavelengths_um } }
+      : {}),
+  } as ComponentRecord;
 }
 
 // ── refresh signal (WP-34) ────────────────────────────────────────────────────

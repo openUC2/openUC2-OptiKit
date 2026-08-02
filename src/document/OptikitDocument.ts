@@ -144,10 +144,19 @@ export function getSnapshot(): DocSnapshot {
 
 // ── commands ──────────────────────────────────────────────────────────────────
 
-/** Place a new part; returns the new part id (or null if the module is unknown). */
+/**
+ * Place a new part; returns the new part id (or null if the module is unknown).
+ *
+ * `opts.exact` keeps the residual verbatim — for importers that must reproduce
+ * a document's pose byte-for-byte. Everything else goes through the same
+ * T-class constraint the MOVE path uses (WP-101): before, a drop kept the full
+ * sub-cell residual and the first pointer move of a drag silently zeroed it,
+ * which read as "parts land anywhere, then snap when I touch them".
+ */
 export function addPart(
   libraryRef: string,
   positionMm: Vec3,
+  opts?: { exact?: boolean },
 ): string | null {
   const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
   if (!def) return null;
@@ -170,6 +179,10 @@ export function addPart(
     dofValues: {},
     params,
   };
+  // WP-101: same pose contract as movePartWorld. `constrainOffsetToTemplate`
+  // is pure over the part (libraryEntryOf is a map lookup, worldPoseOfPart is
+  // a pure function), so it works on a part that is not inserted yet.
+  if (!opts?.exact) part.offsetMm = constrainOffsetToTemplate(part, part.offsetMm);
   autoPush();
   useDocumentStore.getState().insertPart(part);
   // A module record may carry a one-shot placement notice (safety warnings).

@@ -148,7 +148,11 @@ export function importDsnFiles(files: DsnFiles): ImportReport {
         `'${part.key}': unknown library ref '${part.libraryRef}' — placed as '${moduleId}'`,
       );
     }
-    const id = addPart(moduleId, part.positionMm);
+    // WP-101: an import reproduces the document's pose verbatim. Without the
+    // opt-out, a substituted ref (unknown refs fall back to the first module
+    // of the category, usually a T1 cube) would snap the part to a cell
+    // centre and silently rewrite the design being imported.
+    const id = addPart(moduleId, part.positionMm, { exact: true });
     if (!id) {
       skipped.push(part.key);
       continue;

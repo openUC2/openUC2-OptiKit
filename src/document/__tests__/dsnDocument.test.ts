@@ -55,10 +55,17 @@ const LENS: IndexModule = {
   electronics: null,
 } as unknown as IndexModule;
 
+/** WP-101: the same lens in a FIXED (T1) cube — 27 of 33 served modules are. */
+const FIXED: IndexModule = {
+  ...LENS,
+  id: 'openuc2.cube.lens_fixed_1x1',
+  template: { ...LENS.template, class: 'fixed' },
+} as unknown as IndexModule;
+
 beforeEach(() => {
   resetDocument();
   useAppStore.setState({ modules: [] });
-  registerLibraryModules(entriesFromIndex([LENS], 'http://x'));
+  registerLibraryModules(entriesFromIndex([LENS, FIXED], 'http://x'));
 });
 
 describe('the stored part IS the .dsn spelling', () => {
@@ -76,6 +83,28 @@ describe('the stored part IS the .dsn spelling', () => {
     expect(Object.keys(part)).not.toContain('rotation');
     expect(Object.keys(part)).not.toContain('position');
     expect(part.params).not.toHaveProperty('__doc');
+  });
+
+  // WP-101: the add path used to keep the full sub-cell residual while the
+  // MOVE path constrained it, so a dropped T1 cube landed off-grid and the
+  // first pointer move of a drag silently straightened it.
+  it('a T1 drop lands on the cell centre, like a T1 drag does', () => {
+    const id = addPart(FIXED.id, [105, -50, 55])!;
+    const part = getPart(id)!;
+    expect(part.gridPose.cell).toEqual([2, -1, 1]);
+    expect(part.gridPose.offsetMm).toEqual([0, 0, 0]);
+    expect(part.worldPose.positionMm[0]).toBeCloseTo(100);
+    expect(part.worldPose.positionMm[1]).toBeCloseTo(-50);
+    expect(part.worldPose.positionMm[2]).toBeCloseTo(55);
+    // And a drag to the same spot agrees — the two paths no longer disagree.
+    movePartWorld(id, [105, -50, 55]);
+    expect(getPart(id)!.gridPose.offsetMm).toEqual([0, 0, 0]);
+  });
+
+  it('{exact} keeps an imported pose verbatim', () => {
+    const id = addPart(FIXED.id, [105, -50, 55], { exact: true })!;
+    expect(getPart(id)!.gridPose.offsetMm[0]).toBeCloseTo(5);
+    expect(getPart(id)!.worldPose.positionMm[0]).toBeCloseTo(105);
   });
 
   it('resolves the world pose as p = S·cell + δ', () => {

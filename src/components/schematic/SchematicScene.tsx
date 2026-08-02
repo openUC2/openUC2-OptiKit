@@ -125,6 +125,9 @@ function SchematicPart({
   // Mechanical template class (WP-34): T1 draws its cube envelope, T2 its
   // DOF travel axes.
   const tClass = templateClassOf(part.libraryRef);
+  // WP-103: is this part in a cube at all? (T-class only says WHICH KIND of
+  // cube — it is null for a bare optic AND for a housed device.)
+  const mount = libraryEntryOf(part.libraryRef)?.mount ?? 'cube';
   const dofAxes = useMemo(() => {
     if (tClass !== 'adaptive') return [];
     const lib = libraryEntryOf(part.libraryRef);
@@ -363,9 +366,13 @@ function SchematicPart({
         <YawRing part={part} snap={settings.snapYaw} setOrbitEnabled={setOrbitEnabled} />
       )}
 
-      {/* T1 fixed template (WP-34): the part is locked to its cube — draw the
-          cube envelope as a ghost outline instead of pretending δ is free. */}
-      {tClass === 'fixed' && (
+      {/* WP-103: EVERY part that lives in a cube is drawn inside its cube —
+          "in case of T1, we should actually have it inside an openUC2 cube".
+          This used to fire for `fixed` only, so a T2 insert and a T3 module
+          were drawn as naked glyphs floating on the grid, indistinguishable
+          from a bare optic. A generated (T3) cube is dashed-faint: it does
+          not exist yet, and δ inside it is NOT locked. */}
+      {mount === 'cube' && (
         <lineSegments raycast={NO_RAYCAST}>
           <edgesGeometry
             args={[new THREE.BoxGeometry(UC2_GRID_MM[0], UC2_GRID_MM[2], UC2_GRID_MM[1])]}
@@ -373,7 +380,9 @@ function SchematicPart({
           <lineBasicMaterial
             color={selected ? '#FFAA00' : colors.gridSection}
             transparent
-            opacity={selected ? 0.8 : dimmed ? 0.12 : 0.35}
+            opacity={
+              selected ? 0.8 : dimmed ? 0.12 : tClass === 'generative' ? 0.18 : 0.35
+            }
           />
         </lineSegments>
       )}

@@ -35,6 +35,22 @@ import type { DocCategory } from './types';
 
 export type TemplateClass = 'fixed' | 'adaptive' | 'generative';
 
+/** WP-103: the three states a part can be in — see `LibraryPaletteEntry.mount`. */
+export type PartMount = 'cube' | 'housed' | 'bare';
+
+/** WP-103: plain words for the palette. Never "UNBOUND" — that is our word. */
+export const MOUNT_LABEL: Record<PartMount, string> = {
+  cube: 'in a cube',
+  housed: 'housed · no cube',
+  bare: 'needs a holder',
+};
+
+export const MOUNT_SECTION: Record<PartMount, string> = {
+  cube: 'Cubes · ready to place',
+  housed: 'Housed devices · no cube yet',
+  bare: 'Bare optics · need a holder',
+};
+
 export interface LibraryDof {
   name: string;
   kind: string;
@@ -61,6 +77,26 @@ export interface LibraryPaletteEntry {
   category: DocCategory;
   /** null = unclassified (workspace components without a template). */
   templateClass: TemplateClass | null;
+  /**
+   * WP-103: WHICH OF THE THREE STATES this part is in — the distinction the
+   * user reasons in ("some parts are already in a cube; some are loose"), and
+   * the one optikit-core already ships as three separate index sections
+   * (`modules` / `housings` / `components`).
+   *
+   *   'cube'   — a cube module: an optic in an openUC2 cube, ready to place.
+   *              `templateClass` says T1 fixed / T2 adaptive / T3 generated.
+   *   'housed' — an optic in its OWN housing (a laser body, a kinematic
+   *              mount) with no cube yet — WP-67's housing-without-a-cube.
+   *   'bare'   — a symbol with no mechanics at all: it needs a holder before
+   *              it can be built.
+   *
+   * Before this, all three were encoded in `templateClass: … | null` plus
+   * `unbound: boolean`, where `null` meant three different things and a
+   * housed device was byte-identical to a bare symbol everywhere in the UI.
+   */
+  mount: PartMount;
+  /** WP-103: the mechanical_template / housing record backing this part. */
+  templateId: string | null;
   /** T1 discrete configuration states (WP-34 amendment). */
   states: string[];
   /** T2 degrees of freedom. */
@@ -314,6 +350,9 @@ function entryFromIndexModule(
     description: mod.description,
     category: docCategoryOfRecord(mod.category),
     templateClass: mod.template?.class ?? null,
+    // WP-103: a module IS a cube — that is what a cube_module record means.
+    mount: 'cube' as const,
+    templateId: mod.template?.id ?? null,
     states: mod.template?.states ?? [],
     dofs: (mod.template?.dof ?? []).map(d => ({
       name: d.name,
@@ -398,6 +437,9 @@ export function entriesFromWorkspace(
     description: record.description ?? '',
     category: docCategoryOfRecord(record.category),
     templateClass: null,
+    // WP-103: a local draft has optics and no mechanics — bare, by definition.
+    mount: 'bare' as const,
+    templateId: (record as { mechanics?: { template?: string } }).mechanics?.template ?? null,
     states: [],
     dofs: [],
     footprintGrid: [1, 1, 1],
@@ -469,7 +511,14 @@ export function entriesFromComponents(
       name: shortName(component.id),
       description: component.description,
       category: docCategoryOfRecord(component.category),
-      templateClass: null,
+      // WP-103: a joined housing gives the part its own mechanics — it is a
+      // HOUSED device, not a bare symbol. This used to hard-code null/true
+      // even when the housing's mesh and DOFs had already been joined below,
+      // which is why "laser in a laser body" looked identical to "a bare
+      // lens" everywhere in the UI.
+      templateClass: housing?.class ?? null,
+      mount: (housing ? 'housed' : 'bare') as PartMount,
+      templateId: housing?.id ?? null,
       states: [],
       // WP-67: a housing's DOFs (a kinematic mount's tip/tilt) ride along so
       // the property panel offers them even without a cube.
@@ -584,8 +633,12 @@ export const LIBRARY_GROUP = 'Library';
 /** Palette group for a registry part (WP-43): category + namespace, so the
  * palette's group filter reads "mirror · openuc2", "lens · thorlabs", …. */
 function paletteGroup(entry: LibraryPaletteEntry): string {
-  // WP-60: bare symbols group apart from their cube-module siblings.
-  if (entry.unbound) return `${entry.category} · unbound`;
+  // WP-103: group by WHAT YOU CAN BUILD WITH IT first — a ready cube, a
+  // housed device that still needs one, or a bare optic that needs a holder.
+  // (WP-60 grouped bare symbols apart already; this splits 'housed' out of
+  // that bucket, because the two are not the same problem to solve.)
+  if (entry.mount === 'bare') return `${entry.category} · needs a holder`;
+  if (entry.mount === 'housed') return `${entry.category} · housed, no cube`;
   const namespace = entry.moduleId.split('.')[0] || 'user';
   return `${entry.category} · ${namespace}`;
 }

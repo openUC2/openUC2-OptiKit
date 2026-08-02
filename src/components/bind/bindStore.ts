@@ -49,6 +49,8 @@ interface BindState {
   /** Bbox center of the loaded mesh in doc mm (reported by the scene), for
    * the "fit to cube" snap. */
   meshBboxCenter: Vec3 | null;
+  /** WP-109: the loaded mesh's measured size in doc mm (x, y, z). */
+  meshSizeMm: Vec3 | null;
   /** The optic instance (datum id) the placement gizmo drives, or null. */
   selectedOpticId: string | null;
   /** Placement gizmo mode in optics mode: move the optic or ROTATE it onto
@@ -69,7 +71,7 @@ interface BindState {
   setOpticTilt: (id: string, deg: number) => void;
   toggleWholeModule: () => void;
   setHousingOnly: (on: boolean) => void;
-  reportMeshBbox: (centerMm: Vec3) => void;
+  reportMeshBbox: (centerMm: Vec3, sizeMm?: Vec3) => void;
   /** Center the mesh in the 50 mm cube (WP-41 bbox-fit). */
   fitToCube: () => void;
   selectOptic: (id: string | null) => void;
@@ -120,6 +122,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   wholeModule: false,
   housingOnly: false,
   meshBboxCenter: null,
+  meshSizeMm: null,
   selectedOpticId: null,
   opticsGizmoMode: 'translate',
 
@@ -131,6 +134,7 @@ export const useBindStore = create<BindState>((set, get) => ({
       datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null,
+      meshSizeMm: null,
       selectedOpticId: null,
       error: null,
     }),
@@ -151,7 +155,8 @@ export const useBindStore = create<BindState>((set, get) => ({
     housingOnly,
     wholeModule: housingOnly ? false : s.wholeModule,
   })),
-  reportMeshBbox: meshBboxCenter => set({ meshBboxCenter }),
+  reportMeshBbox: (meshBboxCenter, meshSizeMm) =>
+    set(meshSizeMm ? { meshBboxCenter, meshSizeMm } : { meshBboxCenter }),
   fitToCube: () => {
     const c = get().meshBboxCenter;
     if (!c) return;
@@ -210,7 +215,7 @@ export const useBindStore = create<BindState>((set, get) => ({
     set({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
-      meshBboxCenter: null, selectedOpticId: null, error: null,
+      meshBboxCenter: null, meshSizeMm: null, selectedOpticId: null, error: null,
       wholeModule: false, housingOnly: false,
     }),
 }));

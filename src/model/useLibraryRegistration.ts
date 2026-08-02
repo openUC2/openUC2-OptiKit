@@ -125,7 +125,12 @@ export function useLibraryRegistration() {
       merged.modules,
       assetsBase,
       libraryIndex.housings,
-    ).filter(e => !registryIds.has(e.moduleId) && !workspaceIds.has(e.moduleId));
+    )
+      .filter(e => !registryIds.has(e.moduleId) && !workspaceIds.has(e.moduleId))
+      // WP-103: the WP-98b hollow-entry repair used to run on registry
+      // entries only, so a BARE optic never got its gaps filled — exactly the
+      // parts most likely to be half-published.
+      .map(e => enrichEntry(e, libraryIndex.components, workspaceRecords, bundleByModule));
     // WP-98: bundle modules come LAST — a zip can never shadow the registry
     // or the user's own drafts.
     const known = new Set([

@@ -146,10 +146,16 @@ function PartMesh() {
       gltf => {
         setScene(gltf.scene);
         // WP-41: report the mesh bbox center (doc mm) for the fit-to-cube snap.
+        // WP-109: and its SIZE, so the emitted template declares the envelope
+        // the mesh actually has instead of a guessed 50/50/55 — `library
+        // validate` checks the two against each other now.
         const box = new THREE.Box3().setFromObject(gltf.scene);
         if (!box.isEmpty()) {
           const c = box.getCenter(new THREE.Vector3());
-          useBindStore.getState().reportMeshBbox(threeToDoc(c));
+          const s = box.getSize(new THREE.Vector3());
+          useBindStore.getState().reportMeshBbox(threeToDoc(c), [
+            Math.abs(s.x), Math.abs(s.z), Math.abs(s.y),
+          ]);
         }
       },
       err => {
