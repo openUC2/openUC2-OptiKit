@@ -247,8 +247,12 @@ export function registerBundleLibrary(
         vendorName:
           (component?.vendor as { name?: string } | undefined)?.name || null,
         priceEur: typeof mod.price === 'number' ? mod.price : null,
-        review: true, // a bundle part is a draft by definition
-        source: 'workspace',
+        // WP-108: a bundle part is not a draft BY DEFINITION — where it came
+        // from is `source`, and whether anything about it is unconfirmed is
+        // the record's own review list. Hardcoding true conflated the two.
+        review: Array.isArray(mod.review) && mod.review.length > 0,
+        reviewNotes: (Array.isArray(mod.review) ? mod.review : []).map(String),
+        source: 'bundle',
         unbound: false,
         fragmentSurfaces:
           ((component?.optics as { fragment?: { surfaces?: Record<string, unknown>[] } })

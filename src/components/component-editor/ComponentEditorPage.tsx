@@ -47,6 +47,7 @@ import {
   changedRecordKeys,
   draftFromRecord,
   draftToRecord,
+  foldDegOfDraft,
   mergeIntoRecord,
   recordId,
   recordToYaml,
@@ -231,17 +232,30 @@ export function ComponentEditorPage({
       if (glbPath) {
         const base = assetsBaseUrl(index.url);
         const abs = (p: string) => (p.startsWith('http') ? p : `${base}${p}`);
-        const glbRes = await fetch(abs(glbPath), { cache: 'no-cache' });
-        if (!glbRes.ok) throw new Error(`${glbRes.status} for ${glbPath}`);
-        const glb = new Uint8Array(await glbRes.arrayBuffer());
-        let step: Uint8Array | null = null;
-        const stepPath = module?.assets?.step;
-        if (stepPath) {
-          const stepRes = await fetch(abs(stepPath), { cache: 'no-cache' });
-          if (stepRes.ok) step = new Uint8Array(await stepRes.arrayBuffer());
+        const glbUrl = abs(glbPath);
+        // WP-107: a record that HAS a published mesh but cannot deliver it is
+        // a different story from one that has none — report which, and where
+        // we looked, instead of "no STP bound to this record yet".
+        try {
+          const glbRes = await fetch(glbUrl, { cache: 'no-cache' });
+          if (!glbRes.ok) throw new Error(`${glbRes.status} ${glbRes.statusText}`);
+          const glb = new Uint8Array(await glbRes.arrayBuffer());
+          let step: Uint8Array | null = null;
+          const stepPath = module?.assets?.step;
+          if (stepPath) {
+            const stepRes = await fetch(abs(stepPath), { cache: 'no-cache' });
+            if (stepRes.ok) step = new Uint8Array(await stepRes.arrayBuffer());
+          }
+          bind.loadMesh(glbPath.split('/').pop() ?? 'model.glb', glb, step);
+          setMeshStatus('loaded');
+        } catch (err) {
+          bind.clear();
+          setMeshStatus({
+            kind: 'error',
+            reason: err instanceof Error ? err.message : String(err),
+            url: glbUrl,
+          });
         }
-        bind.loadMesh(glbPath.split('/').pop() ?? 'model.glb', glb, step);
-        setMeshStatus('loaded');
         return;
       }
       bind.clear();
@@ -583,6 +597,7 @@ export function ComponentEditorPage({
             <GlyphPreview
               category={draft.category === 'electronics' || draft.category === 'mechanics' ? 'other' : draft.category}
               label={draft.name || draft.category}
+              foldDeg={foldDegOfDraft(draft)}
             />
 
             <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>

@@ -128,7 +128,14 @@ export interface LibraryPaletteEntry {
   priceEur: number | null;
   /** WP-50: record still carries review flags (drafts marked in the BOM). */
   review: boolean;
-  source: 'registry' | 'workspace';
+  /** WP-108: WHAT is unconfirmed, so the badge can say it. A bare boolean
+   * could not tell "placeholder CAD, do not print" from "confirm the glass
+   * name", which is why a curated, priced, shipping part read as a draft. */
+  reviewNotes?: string[];
+  /** WP-108: where this entry came from — the shared registry, a draft in
+   * this browser, or an imported .dsn bundle. Three sources, three meanings;
+   * the BOM used to collapse the last two into the word "draft". */
+  source: 'registry' | 'workspace' | 'bundle';
   /** WP-60: a published symbol NO module binds — an optical primitive with no
    * mechanics yet. Places freely (no cube, no grid claim) until a holder is
    * generated around it (WP-61). */
@@ -385,6 +392,7 @@ function entryFromIndexModule(
     vendorName: mod.component?.vendor?.name || null,
     priceEur: typeof mod.price === 'number' ? mod.price : null,
     review: mod.review,
+    reviewNotes: mod.review_notes ?? [],
     source: 'registry',
     unbound: false,
     fragmentSurfaces: [],

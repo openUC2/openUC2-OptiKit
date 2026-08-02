@@ -58,7 +58,13 @@ function draftToElement(
       return {
         ...base,
         type: 'mirror',
-        params: { aperture, angle: mirrorAngleDeg ?? 45, reflectivity: 1 },
+        // WP-107: the engine's `angle` is the PLATE angle measured from the
+        // beam axis (`mirrorDir = rotate({1,0}, rotation - angle)`), not the
+        // mount angle from the normal — its own default is −45. Passing the
+        // record's mount angle straight through (+45) folded this sketch the
+        // OPPOSITE way from the schematic, which never sets `angle` at all
+        // and so used the −45 default. θ=45 → −45, θ=0 → −90 (retro).
+        params: { aperture, angle: (mirrorAngleDeg ?? 45) - 90, reflectivity: 1 },
       };
     case 'beamsplitter':
       return { ...base, type: 'beamsplitter', params: { aperture, splitRatio: 0.5, angle: 45 } };

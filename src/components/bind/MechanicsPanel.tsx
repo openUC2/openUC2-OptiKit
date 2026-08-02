@@ -125,7 +125,19 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 }
 
 /** WP-38: how the open record's mesh resolution went (null = nothing opened). */
-export type MeshStatus = 'loading' | 'loaded' | 'none' | null;
+/**
+ * WP-38 mesh resolution, WP-107 honesty: 'none' means the registry has no
+ * mesh for this record; 'error' means it HAS one and we could not fetch it.
+ * Collapsing the two told users "no STP bound to this record yet" when the
+ * real problem was an unreachable service — which is how a registry outage
+ * looked like a missing record.
+ */
+export type MeshStatus =
+  | 'loading'
+  | 'loaded'
+  | 'none'
+  | { kind: 'error'; reason: string; url: string }
+  | null;
 
 export function MechanicsPanel({
   draft,
@@ -546,6 +558,19 @@ export function MechanicsPanel({
             sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)' }}
           >
             no STP bound to this record yet — load one or bind it in the workbench
+          </Alert>
+        )}
+        {/* WP-107: the record HAS a mesh; we could not get it. Say which. */}
+        {!store.glbBytes && typeof meshStatus === 'object' && meshStatus !== null && (
+          <Alert
+            severity="warning"
+            sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', maxWidth: '90%' }}
+          >
+            this record has a published mesh, but it could not be fetched
+            ({meshStatus.reason}) — the registry may be unreachable.
+            <Typography variant="caption" sx={{ display: 'block', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              {meshStatus.url}
+            </Typography>
           </Alert>
         )}
         {!store.glbBytes && meshStatus === null && (

@@ -193,8 +193,20 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
                 <TableCell sx={{ px: 0.5 }}>{line.qty}×</TableCell>
                 <TableCell sx={{ px: 0.5 }}>
                   {line.name}
+                  {/* WP-108: provenance and review are different questions. */}
+                  {line.provenance !== 'registry' && (
+                    <Chip
+                      size="small" variant="outlined"
+                      color={line.provenance === 'workspace' ? 'info' : 'secondary'}
+                      label={line.provenance === 'workspace' ? 'my draft' : 'bundle'}
+                      sx={{ ml: 0.5, height: 16 }}
+                    />
+                  )}
                   {line.review && (
-                    <Chip size="small" label="draft" variant="outlined" sx={{ ml: 0.5, height: 16 }} />
+                    <Tooltip title={line.reviewNotes.join(' · ') || 'unresolved review note'}>
+                      <Chip size="small" label="⚠" variant="outlined" color="warning"
+                        sx={{ ml: 0.5, height: 16 }} />
+                    </Tooltip>
                   )}
                 </TableCell>
                 <TableCell sx={{ px: 0.5 }} align="right">

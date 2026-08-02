@@ -153,7 +153,24 @@ describe('registerBundleLibrary (WP-98)', () => {
     expect(entry.category).toBe('lens');
     expect(entry.eflMm).toBe(50);
     expect(entry.fragmentSurfaces).toHaveLength(2);
+    // WP-108: "where it came from" is `source`; "is anything about it
+    // unconfirmed" is the record's own review list. This used to hardcode
+    // `review: true` ("a bundle part is a draft by definition"), which is how
+    // one boolean ended up meaning four different things — and how a curated,
+    // priced, shipping laser got badged as a draft in the BOM.
+    expect(entry.source).toBe('bundle');
+    expect(entry.review).toBe(false); // this fixture's module.yml has no review:
+    expect(entry.reviewNotes).toEqual([]);
+  });
+
+  it('a bundle record that DOES carry a review note keeps it', () => {
+    const files = bundle();
+    files['library/modules/user.cube.demo_lens_50/module.yml'] =
+      `${MODULE_YML}\nreview:\n  - placeholder CAD, do not print\n`;
+    registerBundleLibrary(files);
+    const [entry] = useBundleLibrary.getState().entries;
     expect(entry.review).toBe(true);
+    expect(entry.reviewNotes).toEqual(['placeholder CAD, do not print']);
   });
 
   it('resolves the record docs from the zip itself', () => {

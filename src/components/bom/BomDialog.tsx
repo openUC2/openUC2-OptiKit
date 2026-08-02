@@ -157,9 +157,35 @@ export function BomDialog({ open, onClose }: { open: boolean; onClose: () => voi
                         <Chip size="small" label={T_CLASS_LABEL[line.tClass]}
                           sx={{ height: 16, fontSize: 10 }} />
                       )}
+                      {/* WP-108: two independent facts, two chips. One
+                          boolean labelled "draft" meant four different things
+                          and badged a curated, priced, shipping laser as a
+                          draft — so people learned to ignore it. */}
+                      {line.provenance !== 'registry' && (
+                        <Tooltip
+                          title={
+                            line.provenance === 'workspace'
+                              ? 'a record you authored — it lives in this browser only, so nobody else can order this part yet'
+                              : 'this part came in with an imported .dsn bundle — its records travel with the design, not with the shared library'
+                          }
+                        >
+                          <Chip
+                            size="small" variant="outlined"
+                            color={line.provenance === 'workspace' ? 'info' : 'secondary'}
+                            label={line.provenance === 'workspace' ? 'my draft' : 'from this bundle'}
+                            sx={{ height: 16, fontSize: 10 }}
+                          />
+                        </Tooltip>
+                      )}
                       {line.review && (
-                        <Tooltip title="the record still carries review flags">
-                          <Chip size="small" color="warning" label="draft"
+                        <Tooltip
+                          title={
+                            line.reviewNotes.length > 0
+                              ? line.reviewNotes.join(' · ')
+                              : 'the record carries an unresolved review note'
+                          }
+                        >
+                          <Chip size="small" color="warning" variant="outlined" label="⚠ unconfirmed"
                             sx={{ height: 16, fontSize: 10 }} />
                         </Tooltip>
                       )}

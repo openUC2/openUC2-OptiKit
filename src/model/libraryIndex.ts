@@ -123,6 +123,9 @@ export interface IndexModule {
   repo?: string;
   repoRef?: string;
   review: boolean;
+  /** WP-108: the review notes themselves, prefixed with the record they came
+   * from — what makes the badge actionable instead of decorative. */
+  review_notes?: string[];
   component: {
     ref: string;
     resolved: string | null;

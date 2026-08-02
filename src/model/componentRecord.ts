@@ -17,6 +17,8 @@
 import { parse, stringify } from 'yaml';
 import type { ComponentRecord } from './dsn/generated/library-component';
 import type { DocCategory } from '../document';
+import type { SourcePort } from '../document/sourceDesignStore';
+import { beamAxesOfPorts } from '../components/schematic/ports';
 
 /**
  * Record categories = the schematic's optical categories plus the
@@ -38,6 +40,9 @@ export const RECORD_CATEGORIES: RecordCategory[] = [
   'mechanics',
   'other',
 ];
+
+/** WP-107: categories whose `mount angle` describes a beam FOLD. */
+const MIRROR_FAMILY: RecordCategory[] = ['mirror', 'beamsplitter', 'dichroic'];
 
 /** Categories whose records normally carry no surface fragment. */
 export const FRAGMENTLESS_CATEGORIES: RecordCategory[] = ['source', 'detector', 'sample'];
@@ -360,7 +365,7 @@ export function surfaceProfiles(surfaces: SurfaceDraft[], samples = 24): Surface
 
 // ── derived directions (WP-40: surfaces are the truth) ───────────────────────
 
-const PORT_AXIS_VECTORS: Record<string, [number, number, number]> = {
+export const PORT_AXIS_VECTORS: Record<string, [number, number, number]> = {
   '+x': [1, 0, 0], '-x': [-1, 0, 0],
   '+y': [0, 1, 0], '-y': [0, -1, 0],
   '+z': [0, 0, 1], '-z': [0, 0, -1],
@@ -374,6 +379,35 @@ export function derivedReflectedDir(mountAngleDeg: number): [number, number, num
 }
 
 /**
+ * WP-107: the fold angle a DRAFT implies, by the same rule the schematic
+ * canvas uses on a placed part — the angle between the entry port and the
+ * most-deviating exit port. A 45° fold mirror yields 90°, a retro mirror
+ * 180°, a straight-through lens null.
+ *
+ * The parts editor's glyph preview had no way to ask this, so it fell back to
+ * `foldDeg ?? 180` and drew every mirror as a disc square to the beam — while
+ * the canvas, three metres away in the same app, drew it correctly at 45°.
+ *
+ * The mount-angle fallback covers a mirror record that declares only its
+ * entry port: θ=45 → 90, θ=30 → 120, θ=0 → 180 (retro), matching
+ * `derivedReflectedDir`.
+ */
+export function foldDegOfDraft(draft: RecordDraft): number | null {
+  const ports: SourcePort[] = draft.ports.map(p => ({
+    name: p.name,
+    direction: p.direction,
+    positionMm: [0, 0, 0],
+    afterSurface: p.afterSurface,
+  }));
+  const fold = beamAxesOfPorts(ports).foldDeg;
+  if (fold !== null) return fold;
+  if (MIRROR_FAMILY.includes(draft.category) && draft.mirrorAngleDeg !== null) {
+    return 180 - 2 * draft.mirrorAngleDeg;
+  }
+  return null;
+}
+
+/**
  * Cross-check the authored port directions against what the surfaces imply
  * (WP-40 — the frontend mirror of optikit-core's `check_port_directions`).
  * A mirror record whose `mount angle` says 30° while the `reflected` port
@@ -381,7 +415,7 @@ export function derivedReflectedDir(mountAngleDeg: number): [number, number, num
  * geometry, not a second source of truth.
  */
 export function derivedPortWarnings(draft: RecordDraft): string[] {
-  const mirrorFamily = ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category);
+  const mirrorFamily = MIRROR_FAMILY.includes(draft.category);
   if (!mirrorFamily || draft.mirrorAngleDeg === null) return [];
   if (!draft.surfaces.some(s => s.reflective)) return [];
   const implied = derivedReflectedDir(draft.mirrorAngleDeg);

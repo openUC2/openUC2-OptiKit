@@ -19,6 +19,7 @@ import * as THREE from 'three';
 import type { Vec3 } from '../../document';
 import { datumToCube } from '../../model/bindRecord';
 import {
+  PORT_AXIS_VECTORS,
   maxSemiApertureMm,
   surfaceProfiles,
   type RecordDraft,
@@ -110,11 +111,19 @@ export function OpticGlyph({
   surfaces,
   diameterMm = null,
   galvoTiltDeg = 0,
+  mountAngleDeg = 0,
 }: {
   category: string;
   surfaces: RecordDraft['surfaces'];
   diameterMm?: number | null;
   galvoTiltDeg?: number;
+  /**
+   * WP-107: the record's own fold angle. The mirror plate was drawn square to
+   * the beam and tilted only by the galvo slider (default 0), so a 45° fold
+   * mirror rendered as a disc facing the beam — the one thing a fold mirror
+   * never is. Default 0 keeps hand-placed optics where the user put them.
+   */
+  mountAngleDeg?: number;
 }) {
   const semi = diameterMm ? diameterMm / 2 : maxSemiApertureMm(surfaces);
   const isMirror = ['mirror', 'beamsplitter', 'dichroic'].includes(category);
@@ -137,13 +146,16 @@ export function OpticGlyph({
   }, [hasGlass, surfaces]);
 
   // Galvo: tilt the mirror normal about local x; the reflected arm swings 2θ.
+  // WP-107: the record's mount angle is the BASE tilt; the galvo slider is a
+  // delta on top of it, so the reflection law below keeps producing the exit
+  // arrow for free and the slider still means "swing it by θ".
   const { normal, reflected } = useMemo(() => {
-    const theta = (galvoTiltDeg * Math.PI) / 180;
+    const theta = ((galvoTiltDeg + mountAngleDeg) * Math.PI) / 180;
     const n = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), theta);
     const beam = new THREE.Vector3(0, -1, 0);
     const r = beam.clone().sub(n.clone().multiplyScalar(2 * beam.dot(n)));
     return { normal: n, reflected: r };
-  }, [galvoTiltDeg]);
+  }, [galvoTiltDeg, mountAngleDeg]);
 
   return (
     <group>
@@ -209,9 +221,22 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
     const datum =
       datums.find(d => !d.quaternion && ANCHOR_KINDS.includes(d.kind)) ??
       datums.find(d => !d.quaternion) ?? null;
-    if (!datum) return null;
-    return datumToCube(datum, transform);
-  }, [datums, transform]);
+    if (datum) return datumToCube(datum, transform);
+    // WP-107: with no datum, draw the optic from the RECORD — at its entry
+    // frame, facing its entry port. Every optical primitive here used to be
+    // gated on `datums`, and opening a record CLEARS them, so the mechanics
+    // tab showed an empty cube for a record that fully describes its optic.
+    // Render-only: this never enters `store.datums`, because a datum is
+    // authored data that `bindToRecords` would publish.
+    const entry = draft.ports.find(p => /^(front|sensor|in|plane)$/.test(p.name))
+      ?? draft.ports[0];
+    if (!entry) return null;
+    const frame = draft.frames.find(f => f.name === entry.frame);
+    return {
+      pointMm: [0, 0, frame?.zMm ?? 0] as [number, number, number],
+      direction: PORT_AXIS_VECTORS[entry.direction] ?? ([0, 0, -1] as [number, number, number]),
+    };
+  }, [datums, transform, draft.ports, draft.frames]);
 
   const quat = useMemo(() => {
     const d = new THREE.Vector3(...docToThree(anchor?.direction ?? [0, 1, 0]));
@@ -224,7 +249,12 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
   if (!showOptics || !anchor) return null;
   return (
     <group position={docToThree(anchor.pointMm)} quaternion={quat}>
-      <OpticGlyph category={draft.category} surfaces={draft.surfaces} galvoTiltDeg={galvoTiltDeg} />
+      <OpticGlyph
+        category={draft.category}
+        surfaces={draft.surfaces}
+        galvoTiltDeg={galvoTiltDeg}
+        mountAngleDeg={draft.mirrorAngleDeg ?? 0}
+      />
     </group>
   );
 }

@@ -30,8 +30,16 @@ export interface DocBomLine {
   /** Part ids matching `cells` index-for-index — the cross-probe handles. */
   partIds: string[];
   unitPriceEur: number | null;
-  /** The record still carries review flags — a draft, price it cautiously. */
+  /**
+   * WP-108: WHERE the part came from — 'registry' (the shared library),
+   * 'workspace' (a draft in this browser) or 'bundle' (an imported .dsn).
+   * This is what the old "draft" badge was mistaken for.
+   */
+  provenance: 'registry' | 'workspace' | 'bundle';
+  /** The record carries unresolved review notes — orthogonal to provenance. */
   review: boolean;
+  /** WP-108: what those notes actually say. */
+  reviewNotes: string[];
 }
 
 export interface DocBom {
@@ -63,7 +71,9 @@ export function buildDocBom(parts: DocPart[]): DocBom {
         cells: [],
         partIds: [],
         unitPriceEur: entry?.priceEur ?? null,
+        provenance: entry?.source ?? 'registry',
         review: entry?.review ?? false,
+        reviewNotes: entry?.reviewNotes ?? [],
       };
       byRef.set(part.libraryRef, line);
     }

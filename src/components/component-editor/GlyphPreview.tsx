@@ -8,7 +8,21 @@ import type { DocCategory } from '../../document';
 import { SchematicGlyph, OpticalAxisArrow } from '../schematic/glyphs';
 import { PreviewCanvas } from '../common/PreviewCanvas';
 
-export function GlyphPreview({ category, label }: { category: DocCategory; label: string }) {
+export function GlyphPreview({
+  category,
+  label,
+  foldDeg = null,
+}: {
+  category: DocCategory;
+  label: string;
+  /**
+   * WP-107: the beam fold this record implies, from its ports. Without it
+   * `SchematicGlyph` falls back to `foldDeg ?? 180` — plateAngle(180) is a
+   * zero rotation — so every mirror drew as a disc square to the beam while
+   * the schematic canvas, given the same record, drew it at 45°.
+   */
+  foldDeg?: number | null;
+}) {
   return (
     <PreviewCanvas
       camera={{ position: [45, 35, 55], fov: 40 }}
@@ -16,8 +30,8 @@ export function GlyphPreview({ category, label }: { category: DocCategory; label
     >
       <ambientLight intensity={0.7} />
       <directionalLight position={[60, 80, 40]} intensity={1.1} />
-      <SchematicGlyph category={category} label={label} />
-      <OpticalAxisArrow />
+      <SchematicGlyph category={category} label={label} foldDeg={foldDeg} />
+      <OpticalAxisArrow foldDeg={foldDeg} />
       <OrbitControls enablePan={false} minDistance={40} maxDistance={140} />
     </PreviewCanvas>
   );

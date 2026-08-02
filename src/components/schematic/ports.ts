@@ -146,8 +146,16 @@ export interface BeamAxes {
  * DOF tilts its exit arm live — the dof value θ swings the reflected beam by
  * 2θ about the fold-plane normal, in the glyph, the pins and the 2D preview.
  */
-export function beamAxesOf(part: DocPart): BeamAxes {
-  const ports = recordPortsOf(part);
+/**
+ * WP-107: the ports→axes core, WITHOUT the placed-part DOF swing — so the
+ * parts editor (which has a draft, not a placed part) can derive the same
+ * fold the canvas draws. Everything here is a pure function of the record's
+ * ports; `beamAxesOf` adds the live rotation-DOF swing on top.
+ *
+ * This existed only inside `beamAxesOf`, which is why the editor's glyph
+ * preview drew every mirror square to the beam: it had no way to ask.
+ */
+export function beamAxesOfPorts(ports: SourcePort[]): BeamAxes {
   const entryPort = entryPortOf(ports);
   const entry = beamDirOf(entryPort);
 
@@ -163,6 +171,16 @@ export function beamAxesOf(part: DocPart): BeamAxes {
       exit = dir;
     }
   }
+  if (foldDeg === null || foldDeg < 1e-3) return { entry, exit: null, foldDeg: null };
+  return { entry, exit, foldDeg };
+}
+
+export function beamAxesOf(part: DocPart): BeamAxes {
+  const ports = recordPortsOf(part);
+  const base = beamAxesOfPorts(ports);
+  const entry = base.entry;
+  let exit = base.exit;
+  let foldDeg = base.foldDeg;
 
   // Galvo/actuated mirror: each rotation DOF's value θ swings the exit arm by
   // 2θ about the fold-plane normal (WP-40 groundwork; WP-42 sums every
