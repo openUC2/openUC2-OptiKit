@@ -81,9 +81,10 @@ export const ROADS: Record<RoadId, RoadDef> = {
         key: 'build',
         label: 'build it',
         help:
-          'The service builds the physical insert around your prescription. Today that is the ' +
-          'printable two-half holder (T3); the Inventor-machined insert arrives with the ' +
-          'bridge (WP-111) and will use the position you chose two steps ago.',
+          'The service builds the physical insert around your prescription, at the position ' +
+          'you chose two steps ago. “Adjustable along the beam” goes through the Inventor ' +
+          'bridge (a machinable insert parameterized from the prescription); with no bridge ' +
+          'reachable, the fx changeset and the printable T3 holder are the working fallbacks.',
         Body: NumbersBuildIt,
       },
     ],
