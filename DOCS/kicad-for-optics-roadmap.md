@@ -681,9 +681,16 @@ readable name, keep the curated description, and keep the exact id in
 monospace underneath — never hidden, because derived names genuinely collide
 (`openuc2.cube.flat_45` and `openuc2.mirror.flat_45` both derive to "flat 45").
 Listing modules and housings alongside components is still open. Then
-**WP-107** (the 45° glyph, the optic drawn inside the pseudo cube, honest
-mesh-status), **WP-108** (`review` ≠ `draft` — one boolean with four meanings
-badges a shipping €650 laser as a draft),
+**WP-107** *(done, 2026-08-02)* — the parts-editor preview never received the
+fold angle, so a 45° mirror drew as a disc square to the beam while the
+schematic canvas (which computes `foldDeg` from the record ports) tilted it
+correctly; `foldDegOfDraft` now derives it from the draft's own ports and both
+previews agree. **WP-108** *(done, 2026-08-02)* — `review` ≠ `draft`: one
+boolean with four producers and four meanings badged a shipping €650 laser as
+a draft. The palette entry now carries `reviewNotes` (WHAT is unconfirmed, so
+the badge can say it) and a three-valued `source` (`registry` | `workspace` |
+`bundle`), and the BOM shows provenance and review as the two separate facts
+they always were.
 **WP-109** *(done, 2026-08-02)* — optikit-core library hygiene. The earlier
 lossy write was repaired by hand rather than reverted, so the genuinely new
 facts survived (`mount_angle_deg`, the `mechanics:` binding) while the curated
@@ -709,6 +716,59 @@ Deliberately **not** done this round: emitting `template:` in the exported
 `.dsn` (schema-invalid today), a `mesh-frame` record field (validate the
 ambiguity away instead), and hiding record ids behind display names (they
 collide).
+
+### Round-15 additions (2026-08-02) — three roads into the library · WP-110…WP-113
+
+Full prompts in **`kicad-for-optics-part2o.md`**. Source: driving
+`/configurator/components` after round 14 and finding that the machinery is all
+present but the *route through it* is not — *"it is all inside the frontend
+already, but very confusing."* Almost nothing here is new capability; it is
+re-composition behind a question the user can answer.
+
+The diagnosis: the parts editor splits by **which half of the record** you are
+editing (optics tab / mechanics tab), while the user is thinking about **what
+kind of thing they have**. Those two axes are orthogonal, which is why the
+editor reads as requiring prior knowledge. Three roads exist in the code today
+— `MechanicsPanel`'s three mount modes are literally them ("insert in a cube" /
+"housing only (no cube)" / "whole cube module") — but nothing routes anyone to
+the right one.
+
+- **WP-110 — "New part…": one door, three roads.** A dialog that asks *what do
+  you have?* (numbers · a device's CAD · an Inventor cube · a vendor file) and
+  routes to the matching wizard, plus the shared `PartWizard` shell: named
+  steps with real help text, WP-104's anatomy drawing as the "what you'll get"
+  panel and progress indicator, "open the full editor" as the escape hatch on
+  every step, and one terminal step naming the three destinations. Persists the
+  in-progress wizard (WP-105 flagged the parts-editor draft as one of four
+  stores holding real work that never persists). The tabs stay as the expert
+  view for editing an existing record.
+- **WP-111 — Wizard A · an optic in a cube.** Prescription → placement w.r.t.
+  the cube origin (draggable, typeable, or optimiser-chosen via `/v1/optimize`)
+  → "fixed" or "adjustable along the beam" → `POST /v1/generate`, whose T2
+  branch drives the Inventor bridge and returns `.stp`/`.glb`. The one real
+  backend gap in the round: that branch needs `files` + `component` — a placed
+  design — so the wizard must synthesize a one-part design rather than the
+  endpoint growing a params-only side door. No bridge is a typed outcome
+  (503/502) with the fx-changeset and T3 fallbacks, not an error.
+- **WP-112 — Wizard B · a device in its own housing.** STEP in → per-category
+  optics → **align the optics to the mechanics** (pick the reflective plane /
+  front vertex / emission aperture, confirm the axis with the beam drawn live)
+  → a WP-103 `housed` part: real mesh, no cube. This is the state the
+  datamodel, the palette and the assembly all support and that has two library
+  parts, because nothing made one easy to author. Cheapest of the three —
+  everything exists except the explanation — so it goes first and validates the
+  shell.
+- **WP-113 — Wizard C · an Inventor cube you already have.** Whole-cube mesh in
+  (WP-109's mesh check runs at import, not after publish) → datums, extracted
+  automatically from a marker-stamped export → what optic is inside and where
+  its surface sits → **`verify_t1` surfaced as a service endpoint** and run
+  before publish, with `W_NO_INSERT_FRAME` shown rather than swallowed: a
+  template with no `frames:` makes verify-t1's "OK" vacuous, which is exactly
+  how a wrong record shipped in WP-109.
+
+Build order: **110 → 112 → 113 → 111**. WP-111 last because it is the only road
+whose happy path needs an Inventor machine in the loop, and its fallback must
+be proven first.
 
 ### Phase 7 — After the MVP: community, accounts, UX *(explicitly last)*
 

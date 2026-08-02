@@ -733,7 +733,7 @@ keep the exact id underneath, so nothing becomes ambiguous.
 
 ---
 
-#### WP-107 — The 45° is visible everywhere it is true
+#### WP-107 — The 45° is visible everywhere it is true ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repo: openUC2-OptiKit, frontend)
@@ -809,7 +809,7 @@ the sketch and the schematic finally agree with each other.
 
 ---
 
-#### WP-108 — "draft" should mean draft
+#### WP-108 — "draft" should mean draft ✅ *(done, 2026-08-02)*
 
 ```
 PROMPT (repos: openUC2-OptiKit + optikit-core)
@@ -947,7 +947,7 @@ WP-102 ✅ (non-destructive publish) ──┘  3D view is drawing ghost boxes
                         │
                         └─► WP-105 ✅ (where work lives)
                                 │
-                                └─► WP-106 ✅, WP-107, WP-108 (any order)
+                                └─► WP-106 ✅, WP-107 ✅, WP-108 ✅ (any order)
 ```
 
 Tier 0 is four contained changes — two of them under ten lines — and it converts
@@ -965,5 +965,12 @@ the precondition for the Tier 1 model work being worth doing.
   institutionalises it (WP-109.4).
 - **Hiding record ids behind display names.** Derived names collide in the real
   library; the id stays on every row (WP-106.4).
-- **WP-97 (review lifecycle)** stays proposed — but WP-108 is its data-model
-  prerequisite and should land first.
+- **WP-97 (review lifecycle)** stays proposed — WP-108 landed its data-model
+  prerequisite (`reviewNotes` on the entry, provenance split out of `review`),
+  so the remaining work is the design-level review panel and gating the
+  outward-facing exits.
+
+**Continued in `kicad-for-optics-part2o.md`** (round 15, WP-110…113): the
+authoring flow itself — one "what do you have?" door and three specialized
+wizards, because the tabs split by *which half of the record* while the user is
+thinking about *what kind of thing they have*.
