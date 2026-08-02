@@ -114,3 +114,18 @@ export function cellMismatch(
   }
   return null;
 }
+
+/** WP-111.5: a generated INSERT must FIT inside one cell (any orientation).
+ * A returned mesh that cannot is a bridge misconfiguration — much cheaper to
+ * catch here than in the assembly. */
+export function insertFit(sizeMm: [number, number, number] | null): string | null {
+  if (!sizeMm) return null;
+  const m = [...sizeMm].sort((a, b) => a - b);
+  const c = [...UC2_CELL_MM].sort((a, b) => a - b);
+  if (m.every((v, i) => v <= c[i] + CELL_TOL_MM)) return null;
+  return (
+    `the returned insert measures ${sizeMm.map(v => v.toFixed(1)).join(' × ')} mm, which does ` +
+    `not fit a 50 × 50 × 55 mm cell in any orientation — a bridge misconfiguration ` +
+    '(wrong units or wrong master model), not a part to publish'
+  );
+}

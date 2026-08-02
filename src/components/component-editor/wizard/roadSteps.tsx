@@ -11,32 +11,55 @@ import {
   Box,
   Button,
   Chip,
+  MenuItem,
+  Slider,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import { OrbitControls, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
+import { saveAs } from 'file-saver';
+import { stringify as stringifyYaml } from 'yaml';
 import {
   PORT_AXIS_VECTORS,
   derivedPortWarnings,
   foldDegOfDraft,
   paraxialEflMm,
+  recordToYaml,
 } from '../../../model/componentRecord';
+import { useLibraryIndex } from '../../../model/libraryIndex';
+import { publishRecordFiles } from '../../../model/publishLibrary';
+import { zipDsn } from '../../../model/dsn/io';
+import { OpticGlyph } from '../../bind/OpticsOverlay';
+import { PreviewCanvas } from '../../common/PreviewCanvas';
 import { DecimalField } from '../../common/DecimalField';
 import { MechanicsPanel } from '../../bind/MechanicsPanel';
 
 import { useBindStore } from '../../bind/bindStore';
 import {
   CoreServiceError,
+  base64ToBytes,
+  generateTemplate,
   importGlb,
+  optimizeDesign,
   verifyProposedT1,
+  type GenerateResponse,
   type VerifyT1Response,
 } from '../../../api/coreClient';
 import { GenerateDraftHolderDialog } from '../GenerateDraftHolderDialog';
 import { RecordForm } from '../RecordForm';
 import { usePartWizard } from './wizardStore';
 import { buildWizardOutput } from './wizardOutput';
-import { cellMismatch, expectedDatumOf, type WizardCtx } from './wizardTypes';
+import {
+  fxChangesetJson,
+  onePartDesignFiles,
+  probeDesignFiles,
+  t2ModuleRecord,
+} from './onePartDesign';
+import { cellMismatch, expectedDatumOf, insertFit, type WizardCtx } from './wizardTypes';
 
 // ── shared bits ──────────────────────────────────────────────────────────────
 
@@ -107,21 +130,115 @@ export function NumbersWhatIsIt({ ctx }: { ctx: WizardCtx }) {
   );
 }
 
-export function NumbersWhereDoesItSit() {
+/** WP-111.2: ONE 50 × 50 × 55 cell with the optic inside it, and the number
+ * that matters — the front-vertex offset from the CUBE ORIGIN along the
+ * optical axis. Slider + typed field + "find the best position". */
+export function NumbersWhereDoesItSit({ ctx }: { ctx: WizardCtx }) {
   const vertexOffsetMm = usePartWizard(s => s.vertexOffsetMm);
   const setVertexOffsetMm = usePartWizard(s => s.setVertexOffsetMm);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [merit, setMerit] = useState<{ before: number; after: number; at: number } | null>(null);
+
+  const findBest = async () => {
+    if (!ctx.record) return;
+    setBusy(true);
+    setError(null);
+    setMerit(null);
+    try {
+      const probe = probeDesignFiles(
+        ctx.record,
+        { vertexOffsetMm, holdClass: 'adaptive', dzRangeMm: [-27.5, 27.5] },
+        ctx.draft.sourceWavelengthsUm[0] ?? 0.532,
+      );
+      const res = await optimizeDesign(probe.files, probe.path, [probe.dofKey]);
+      const v = res.dof_values[probe.dofKey];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        const rounded = Math.round(v * 100) / 100;
+        setVertexOffsetMm(rounded);
+        setMerit({
+          before: res.merit.rms_spot_before_mm,
+          after: res.merit.rms_spot_after_mm,
+          at: rounded,
+        });
+      }
+    } catch (err) {
+      setError(err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <Stack spacing={1.5} sx={{ maxWidth: 560 }}>
-      <DecimalField
-        size="small"
-        label="front vertex offset from the cube origin, along the optical axis (mm)"
-        value={vertexOffsetMm}
-        onValue={v => setVertexOffsetMm(v ?? 0)}
-        sx={{ maxWidth: 420 }}
-      />
+    <Stack spacing={1.5} sx={{ maxWidth: 640 }}>
+      <Box sx={{ height: 240, borderRadius: 1, overflow: 'hidden' }}>
+        <PreviewCanvas camera={{ position: [80, 45, 80], fov: 38 }}>
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[60, 100, 50]} intensity={1.0} />
+          {/* the cell — 55 mm along the optical (vertical) axis */}
+          <mesh>
+            <boxGeometry args={[50, 55, 50]} />
+            <meshBasicMaterial color="#4a90d9" wireframe transparent opacity={0.35} />
+          </mesh>
+          {/* the beam through the cell */}
+          <mesh rotation={[0, 0, 0]}>
+            <cylinderGeometry args={[0.35, 0.35, 55, 8]} />
+            <meshBasicMaterial color="#39c07f" transparent opacity={0.5} />
+          </mesh>
+          <group position={[0, vertexOffsetMm, 0]}>
+            <OpticGlyph
+              category={ctx.draft.category}
+              surfaces={ctx.draft.surfaces}
+              mountAngleDeg={ctx.draft.mirrorAngleDeg ?? 0}
+            />
+          </group>
+          <OrbitControls enablePan={false} minDistance={60} maxDistance={220} />
+        </PreviewCanvas>
+      </Box>
+      <Stack direction="row" spacing={2} alignItems="center">
+        <Slider
+          size="small"
+          min={-27.5}
+          max={27.5}
+          step={0.1}
+          value={vertexOffsetMm}
+          onChange={(_, v) => setVertexOffsetMm(v as number)}
+          valueLabelDisplay="auto"
+          valueLabelFormat={v => `${v} mm`}
+          sx={{ flex: 1, maxWidth: 300 }}
+        />
+        <DecimalField
+          size="small"
+          label="front vertex offset (mm)"
+          value={vertexOffsetMm}
+          onValue={v => setVertexOffsetMm(v ?? 0)}
+          sx={{ width: 180 }}
+        />
+        <Button size="small" variant="outlined" disabled={busy || !ctx.record} onClick={() => void findBest()}>
+          {busy ? 'optimising…' : 'find the best position'}
+        </Button>
+      </Stack>
+      {merit && (
+        <Alert severity="success" onClose={() => setMerit(null)}>
+          <Typography variant="caption">
+            optimised for <b>RMS spot at the exit face</b>: {merit.before.toFixed(4)} mm →{' '}
+            {merit.after.toFixed(4)} mm at an offset of {merit.at} mm. It is written into the
+            field above — override it if the design needs the focal plane somewhere else; an
+            optimiser result you cannot argue with is a black box.
+          </Typography>
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="warning" onClose={() => setError(null)}>
+          <Typography variant="caption">
+            the optimiser could not run ({error}) — position the optic by hand; 0 mm (front
+            vertex at the cube centre) is the safe default.
+          </Typography>
+        </Alert>
+      )}
       <Typography variant="caption" color="text.secondary">
-        0 mm = the front vertex sits at the cube centre — the default every generated holder
-        assumes today. Positive values move the optic toward the beam exit.
+        0 mm = the front vertex sits at the cube centre — what every generated holder assumes
+        today. Positive values move the optic toward the beam exit.
       </Typography>
     </Stack>
   );
@@ -183,26 +300,315 @@ export function NumbersHowIsItHeld() {
   );
 }
 
+/** Render one returned-GLB artifact and report its measured bbox up. */
+function BuiltGlbPreview({
+  url,
+  onSize,
+}: {
+  url: string;
+  onSize: (size: [number, number, number]) => void;
+}) {
+  const { scene } = useGLTF(url);
+  useEffect(() => {
+    const box = new THREE.Box3().setFromObject(scene);
+    const s = new THREE.Vector3();
+    box.getSize(s);
+    onSize([s.x, s.y, s.z]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene]);
+  return <primitive object={scene} />;
+}
+
+/** WP-111.4/5: BUILD IT — the T2 branch of /v1/generate over the synthesized
+ * one-part design, review the returned mesh against the cell, then write the
+ * trio. No bridge is a TYPED outcome with two fallbacks: the fx-changeset
+ * download, and the printable T3 holder. */
 export function NumbersBuildIt({ ctx }: { ctx: WizardCtx }) {
   const [holderOpen, setHolderOpen] = useState(false);
+  const holdClass = usePartWizard(s => s.holdClass);
+  const dzRangeMm = usePartWizard(s => s.dzRangeMm);
+  const vertexOffsetMm = usePartWizard(s => s.vertexOffsetMm);
+  const index = useLibraryIndex();
+  const [busy, setBusy] = useState(false);
+  const [bridgeless, setBridgeless] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<GenerateResponse | null>(null);
+  const [builtSize, setBuiltSize] = useState<[number, number, number] | null>(null);
+  const [written, setWritten] = useState<string | null>(null);
+
+  // The master inserts the bridge can parameterize: adaptive templates known
+  // to the index (via the modules that bind them).
+  const adaptiveTemplates = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const m of index.modules) {
+      if (m.template?.class === 'adaptive' && m.template.id) {
+        out.set(m.template.id, m.template.resolved ?? '1.0.0');
+      }
+    }
+    return [...out.entries()];
+  }, [index.modules]);
+  const [templateId, setTemplateId] = useState('');
+  useEffect(() => {
+    if (templateId || adaptiveTemplates.length === 0) return;
+    const preferred = adaptiveTemplates.find(([id]) => id.includes('lens_insert'));
+    setTemplateId((preferred ?? adaptiveTemplates[0])[0]);
+  }, [adaptiveTemplates, templateId]);
+
+  const opts = { vertexOffsetMm, holdClass, dzRangeMm };
+  const glbUrl = useMemo(() => {
+    const b64 = result?.artifacts['model.glb'];
+    if (!b64) return null;
+    return URL.createObjectURL(
+      new Blob([base64ToBytes(b64) as BlobPart], { type: 'model/gltf-binary' }),
+    );
+  }, [result]);
+  useEffect(
+    () => () => {
+      if (glbUrl) {
+        URL.revokeObjectURL(glbUrl);
+        useGLTF.clear(glbUrl);
+      }
+    },
+    [glbUrl],
+  );
+  const fitWarning = insertFit(builtSize);
+
+  const build = async () => {
+    if (!ctx.record || !templateId) return;
+    setBusy(true);
+    setError(null);
+    setBridgeless(null);
+    setResult(null);
+    setBuiltSize(null);
+    try {
+      const design = onePartDesignFiles(ctx.record, opts);
+      setResult(
+        await generateTemplate({
+          templateId,
+          files: design.files,
+          component: design.component,
+        }),
+      );
+    } catch (err) {
+      if (
+        err instanceof CoreServiceError &&
+        (err.code === 'E_NO_BRIDGE' || err.code === 'E_BRIDGE_UNREACHABLE')
+      ) {
+        // A typed outcome, not an error: the machine is not there.
+        setBridgeless(`${err.code}: ${err.message}`);
+      } else {
+        setError(err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadFx = () => {
+    if (!ctx.record) return;
+    const blob = new Blob([fxChangesetJson(ctx.record, templateId || null, opts)], {
+      type: 'application/json',
+    });
+    saveAs(blob, 'optikit-fx.json');
+  };
+
+  /** Accept: component + module (the master template is REFERENCED, not
+   * rewritten — its record already lives in the library). */
+  const acceptFiles = () => {
+    if (!ctx.record) return null;
+    const version = adaptiveTemplates.find(([id]) => id === templateId)?.[1] ?? '1.0.0';
+    const module = t2ModuleRecord(ctx.record, templateId, version);
+    return {
+      files: {
+        [`components/${ctx.record.id}/component.yml`]: recordToYaml(ctx.record),
+        [`modules/${module.id as string}/module.yml`]: stringifyYaml(module),
+      },
+      moduleId: module.id as string,
+    };
+  };
+
+  const acceptPublish = async () => {
+    const m = acceptFiles();
+    if (!m) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await publishRecordFiles(m.files, index.url);
+      setWritten(`${m.moduleId} written (${res.written.length} file(s)) — place it from the palette`);
+    } catch (err) {
+      setError(err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const acceptDownload = async () => {
+    const m = acceptFiles();
+    if (!m || !result) return;
+    const files: Record<string, string | Uint8Array> = { ...m.files };
+    for (const [name, b64] of Object.entries(result.artifacts)) {
+      files[`out/${result.template_id}/${result.key}/${name}`] = base64ToBytes(b64);
+    }
+    const blob = await zipDsn(files, `${m.moduleId}-records`);
+    saveAs(blob, `${m.moduleId}-records.zip`);
+    setWritten(`${m.moduleId} records + build artifacts downloaded`);
+  };
+
+  if (holdClass !== 'adaptive') {
+    return (
+      <Stack spacing={1.5} sx={{ maxWidth: 640 }}>
+        <Alert severity="info">
+          <Typography variant="caption">
+            A FIXED insert has no knob for the bridge to parameterize — the working build for
+            “fixed in place” is the printable T3 holder below (boolean-carved from the
+            prescription at the position you chose), or a manual Inventor design via the
+            WP-84 round trip. Pick “adjustable along the beam” one step back if you wanted the
+            machinable T2 insert.
+          </Typography>
+        </Alert>
+        <Button
+          variant="contained"
+          disabled={!ctx.record || ctx.draft.surfaces.length === 0}
+          onClick={() => setHolderOpen(true)}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          generate a printable holder… (T3)
+        </Button>
+        {ctx.record && (
+          <GenerateDraftHolderDialog
+            draft={ctx.draft}
+            record={ctx.record}
+            open={holderOpen}
+            onClose={() => setHolderOpen(false)}
+          />
+        )}
+      </Stack>
+    );
+  }
+
   return (
-    <Stack spacing={1.5} sx={{ maxWidth: 620 }}>
-      <Alert severity="info">
-        <Typography variant="caption">
-          The Inventor-bridge build (a machinable insert parameterized from this prescription)
-          lands with WP-111 — it needs a placed one-part design and a reachable bridge. The
-          printable T3 holder below is the working road today: a two-half insert boolean-carved
-          from the prescription, generated by the service.
-        </Typography>
-      </Alert>
-      <Button
-        variant="contained"
-        disabled={!ctx.record || ctx.draft.surfaces.length === 0}
-        onClick={() => setHolderOpen(true)}
-        sx={{ alignSelf: 'flex-start' }}
-      >
-        generate a printable holder… (T3)
-      </Button>
+    <Stack spacing={1.5} sx={{ maxWidth: 680 }}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <TextField
+          select
+          size="small"
+          label="master insert (adaptive template)"
+          value={templateId}
+          onChange={e => setTemplateId(e.target.value)}
+          sx={{ minWidth: 260 }}
+          disabled={adaptiveTemplates.length === 0}
+          helperText={
+            adaptiveTemplates.length === 0
+              ? 'no adaptive template in the library index — the bridge needs a master insert to parameterize'
+              : undefined
+          }
+        >
+          {adaptiveTemplates.map(([id, version]) => (
+            <MenuItem key={id} value={id}>
+              {id}@{version}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Button
+          variant="contained"
+          disabled={busy || !ctx.record || !templateId}
+          onClick={() => void build()}
+        >
+          {busy ? 'building…' : 'build the insert (Inventor bridge)'}
+        </Button>
+      </Stack>
+      <Typography variant="caption" color="text.secondary">
+        The wizard synthesizes a one-part design (your prescription, the position from two
+        steps back as the dz value, the travel range you declared) and hands it to the bridge
+        — the exact contract the assembly’s “regenerate insert” uses.
+      </Typography>
+
+      {bridgeless && (
+        <Alert severity="warning">
+          <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+            no Inventor machine is reachable ({bridgeless.split(':')[0]}) — two working roads:
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            1 · take the fx changeset to the Inventor machine and apply it there
+            (apply_fx_params.py); 2 · print a T3 holder instead — the same four answers, a
+            printable part today, the machinable insert when the bridge is back.
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Button size="small" variant="outlined" onClick={downloadFx}>
+              download optikit-fx.json
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => setHolderOpen(true)}>
+              generate a printable holder… (T3)
+            </Button>
+          </Stack>
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>{error}</Typography>
+        </Alert>
+      )}
+
+      {result && (
+        <>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <Chip size="small" label={`key ${result.key}`} sx={{ fontFamily: 'monospace' }} />
+            <Chip
+              size="small"
+              label={result.regenerated ? 'regenerated via the bridge' : 'cache hit'}
+              color={result.regenerated ? 'default' : 'success'}
+            />
+            {builtSize && (
+              <Chip
+                size="small"
+                color={fitWarning ? 'error' : 'success'}
+                label={`measured ${builtSize.map(v => v.toFixed(1)).join(' × ')} mm`}
+              />
+            )}
+            {Object.keys(result.artifacts).map(name => (
+              <Chip key={name} size="small" variant="outlined" label={name} />
+            ))}
+          </Stack>
+          {fitWarning && (
+            <Alert severity="error">
+              <Typography variant="caption">{fitWarning}</Typography>
+            </Alert>
+          )}
+          {glbUrl && (
+            <Box sx={{ height: 220, borderRadius: 1, overflow: 'hidden' }}>
+              <PreviewCanvas camera={{ position: [70, 55, 70], fov: 40 }}>
+                <ambientLight intensity={0.8} />
+                <directionalLight position={[80, 120, 60]} intensity={1.1} />
+                {/* the cell outline the insert must live inside */}
+                <mesh>
+                  <boxGeometry args={[50, 55, 50]} />
+                  <meshBasicMaterial color="#4a90d9" wireframe transparent opacity={0.3} />
+                </mesh>
+                <BuiltGlbPreview url={glbUrl} onSize={setBuiltSize} />
+                <OrbitControls enableDamping />
+              </PreviewCanvas>
+            </Box>
+          )}
+          {written && <Alert severity="success">{written}</Alert>}
+          <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <Button
+              variant="contained"
+              disabled={busy || Boolean(fitWarning)}
+              onClick={() => void acceptPublish()}
+            >
+              accept · write component + module into the library
+            </Button>
+            <Button variant="outlined" disabled={busy} onClick={() => void acceptDownload()}>
+              accept · download records + artifacts
+            </Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            The module binds your prescription to the master insert ({templateId}) — the
+            template record itself is referenced, not rewritten. The build artifacts live in
+            the service’s out/ tree (and in the download).
+          </Typography>
+        </>
+      )}
       {ctx.record && (
         <GenerateDraftHolderDialog
           draft={ctx.draft}
@@ -211,11 +617,6 @@ export function NumbersBuildIt({ ctx }: { ctx: WizardCtx }) {
           onClose={() => setHolderOpen(false)}
         />
       )}
-      <Typography variant="caption" color="text.secondary">
-        Accepting the holder writes the full trio (component + template + module) through the
-        dialog itself — the final step then only needs to save the component record if you skip
-        the holder.
-      </Typography>
     </Stack>
   );
 }
