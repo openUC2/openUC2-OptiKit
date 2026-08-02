@@ -529,6 +529,36 @@ export async function drawLayout(
 
 const librarySaveSchema = z.object({ written: z.array(z.string()) });
 
+// WP-113: verify-t1 over a PROPOSED trio — records travel as YAML texts,
+// nothing is written. `level` is 'error' | 'warning' (verify.py's own words).
+const verifyT1Schema = z.object({
+  ok: z.boolean(),
+  module_id: z.string(),
+  findings: z.array(
+    z.object({ code: z.string(), level: z.string(), message: z.string() }),
+  ),
+});
+export type VerifyT1Response = z.infer<typeof verifyT1Schema>;
+
+/**
+ * WP-113: does the proposed trio's optical model agree with its mechanics?
+ * Mirrors the CLI's `library verify-t1`, over records that only exist in the
+ * wizard so far. W_NO_INSERT_FRAME in the findings means the OK is VACUOUS
+ * (no pose was ever compared) — callers must surface it, not swallow it.
+ */
+export function verifyProposedT1(
+  records: string[],
+  moduleId = '',
+  signal?: AbortSignal,
+): Promise<VerifyT1Response> {
+  return post(
+    '/v1/library/verify-t1',
+    { records, ...(moduleId ? { module_id: moduleId } : {}) },
+    verifyT1Schema,
+    signal,
+  );
+}
+
 /** Developer fast path: write records into the repo library (env-gated). */
 export function saveLibraryRecords(
   records: string[],

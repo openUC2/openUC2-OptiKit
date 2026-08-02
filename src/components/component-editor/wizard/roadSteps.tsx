@@ -5,7 +5,7 @@
  * in the panels. Only components are exported here (react-refresh rule).
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  PORT_AXIS_VECTORS,
   derivedPortWarnings,
   foldDegOfDraft,
   paraxialEflMm,
@@ -25,10 +26,17 @@ import { DecimalField } from '../../common/DecimalField';
 import { MechanicsPanel } from '../../bind/MechanicsPanel';
 
 import { useBindStore } from '../../bind/bindStore';
+import {
+  CoreServiceError,
+  importGlb,
+  verifyProposedT1,
+  type VerifyT1Response,
+} from '../../../api/coreClient';
 import { GenerateDraftHolderDialog } from '../GenerateDraftHolderDialog';
 import { RecordForm } from '../RecordForm';
 import { usePartWizard } from './wizardStore';
-import { expectedDatumOf, type WizardCtx } from './wizardTypes';
+import { buildWizardOutput } from './wizardOutput';
+import { cellMismatch, expectedDatumOf, type WizardCtx } from './wizardTypes';
 
 // ── shared bits ──────────────────────────────────────────────────────────────
 
@@ -290,12 +298,17 @@ export function CubeMesh({ ctx }: { ctx: WizardCtx }) {
   const meshSizeMm = useBindStore(s => s.meshSizeMm);
   const fitToCube = useBindStore(s => s.fitToCube);
   const meshBboxCenter = useBindStore(s => s.meshBboxCenter);
+  // WP-113.1: the WP-109 cell check runs HERE, at import — a mesh that does
+  // not measure a cell is the wrong file or the wrong units, and finding out
+  // in the wizard beats finding out when it renders on its side.
+  const mismatch = cellMismatch(meshSizeMm, meshBboxCenter);
   return (
     <Stack spacing={1}>
       <Stack direction="row" spacing={1} alignItems="center">
         {meshSizeMm && (
           <Chip
             size="small"
+            color={mismatch ? 'error' : 'success'}
             label={`measured: ${meshSizeMm.map(v => v.toFixed(1)).join(' × ')} mm — a cell is 50 × 50 × 55`}
           />
         )}
@@ -303,12 +316,249 @@ export function CubeMesh({ ctx }: { ctx: WizardCtx }) {
           fit to cube
         </Button>
       </Stack>
+      {mismatch && (
+        <Alert severity="error">
+          <Typography variant="caption">{mismatch}</Typography>
+        </Alert>
+      )}
       <MechanicsPanel
         draft={ctx.draft}
         record={ctx.record}
         onDraftChange={ctx.setDraft}
         embed={{ hideMountControls: true, hideExits: true }}
       />
+    </Stack>
+  );
+}
+
+/** WP-113.2: the datums step — marker-stamped exports extract them
+ * automatically through the SAME importer the CLI uses; the manual click
+ * road (DeviceAlign) stays underneath for unstamped files. */
+export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
+  const glbBytes = useBindStore(s => s.glbBytes);
+  const meshFile = useBindStore(s => s.meshFile);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [found, setFound] = useState<{
+    frames: [string, { x: number; y: number; z: number; apertureMm: number | null }][];
+    review: string[];
+    opticalFrame: string;
+    frontDirection: string;
+  } | null>(null);
+
+  const extract = async () => {
+    if (!glbBytes) return;
+    setBusy(true);
+    setError(null);
+    setFound(null);
+    try {
+      const res = await importGlb(meshFile || 'cube.glb', glbBytes, {
+        namespace: ctx.draft.namespace,
+      });
+      const optics = (res.component as {
+        optics?: {
+          frames?: Record<string, Record<string, unknown>>;
+          ports?: Record<string, { frame?: string; direction?: string }>;
+        };
+      }).optics;
+      const frames = Object.entries(optics?.frames ?? {}).map(
+        ([name, f]) =>
+          [
+            name,
+            {
+              x: Number(f['x-mm'] ?? 0),
+              y: Number(f['y-mm'] ?? 0),
+              z: Number(f['z-mm'] ?? 0),
+              apertureMm:
+                f['clear-aperture-mm'] != null ? Number(f['clear-aperture-mm']) : null,
+            },
+          ] as [string, { x: number; y: number; z: number; apertureMm: number | null }],
+      );
+      const front = optics?.ports?.front;
+      setFound({
+        frames,
+        review: res.review,
+        opticalFrame: front?.frame ?? frames[0]?.[0] ?? '',
+        frontDirection: front?.direction ?? '-z',
+      });
+    } catch (err) {
+      setError(err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = () => {
+    if (!found) return;
+    const expected = expectedDatumOf(ctx.draft.category);
+    useBindStore.setState({
+      datums: found.frames.map(([name, f], i) => ({
+        id: `marker-${i + 1}`,
+        name,
+        kind: name === found.opticalFrame ? expected.kind : ('custom' as const),
+        pointMm: [f.x, f.y, f.z] as [number, number, number],
+        direction: (PORT_AXIS_VECTORS[found.frontDirection] ?? [0, 0, -1]) as [
+          number, number, number,
+        ],
+        areaDiameterMm: f.apertureMm,
+      })),
+    });
+    setFound(null);
+  };
+
+  return (
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Button size="small" variant="outlined" disabled={!glbBytes || busy} onClick={() => void extract()}>
+          {busy ? 'reading markers…' : 'extract datum frames from the markers'}
+        </Button>
+        <Typography variant="caption" color="text.secondary">
+          for exports following the Inventor naming contract (PLN / AXIS / PT nodes) — an
+          unstamped file just reports what it guessed, and you click the datums instead.
+        </Typography>
+      </Stack>
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>{error}</Typography>
+        </Alert>
+      )}
+      {found && (
+        <Alert
+          severity={found.frames.length > 0 ? 'success' : 'warning'}
+          action={
+            found.frames.length > 0 ? (
+              <Button size="small" onClick={confirm}>use these</Button>
+            ) : undefined
+          }
+        >
+          <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+            {found.frames.length > 0
+              ? `found ${found.frames.length} datum frame(s):`
+              : 'no marker frames found in this export:'}
+          </Typography>
+          {found.frames.map(([name, f]) => (
+            <Typography key={name} variant="caption" sx={{ display: 'block', fontFamily: 'monospace' }}>
+              • {name} at ({f.x.toFixed(1)}, {f.y.toFixed(1)}, {f.z.toFixed(1)}) mm
+              {f.apertureMm !== null ? ` · Ø${f.apertureMm} mm` : ''}
+              {name === found.opticalFrame ? ` · beam ${found.frontDirection}` : ''}
+            </Typography>
+          ))}
+          {found.review.map((r, i) => (
+            <Typography key={i} variant="caption" sx={{ display: 'block' }}>
+              ⚠ {r}
+            </Typography>
+          ))}
+        </Alert>
+      )}
+      <DeviceAlign ctx={ctx} />
+    </Stack>
+  );
+}
+
+/** WP-113.4: verify BEFORE publish — do the optical model and the mechanics
+ * agree? Runs optikit-core's verify_t1 over the PROPOSED trio via the
+ * service; nothing has been written yet. */
+export function CubeVerify({ ctx }: { ctx: WizardCtx }) {
+  const bind = useBindStore();
+  const [result, setResult] = useState<VerifyT1Response | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const output = useMemo(
+    () => buildWizardOutput('cube', ctx.draft, ctx.record, bind),
+    [ctx.draft, ctx.record, bind],
+  );
+  const records = useMemo(
+    () =>
+      Object.entries(output.files)
+        .filter(([p, c]) => typeof c === 'string' && p.endsWith('.yml'))
+        .map(([, c]) => c as string),
+    [output.files],
+  );
+
+  const run = useCallback(async () => {
+    if (records.length < 3) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(await verifyProposedT1(records));
+    } catch (err) {
+      setError(err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [records]);
+
+  // Run once when the step opens with a complete trio.
+  useEffect(() => {
+    if (records.length >= 3 && result === null && !busy && !error) void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [records.length]);
+
+  const vacuous = result?.findings.some(f => f.code === 'W_NO_INSERT_FRAME') ?? false;
+
+  return (
+    <Stack spacing={1.5} sx={{ maxWidth: 680 }}>
+      {records.length < 3 && (
+        <Alert severity="warning">
+          <Typography variant="caption">
+            the trio is not complete yet — verify-t1 checks a module’s bound pair, so it needs
+            the component, the template and the module. Go back to the steps that are missing.
+          </Typography>
+        </Alert>
+      )}
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Button size="small" variant="outlined" disabled={busy || records.length < 3} onClick={() => void run()}>
+          {busy ? 'verifying…' : result ? 're-run verify-t1' : 'run verify-t1'}
+        </Button>
+        <Typography variant="caption" color="text.secondary">
+          compares the component’s optical frame against the template’s declared insert frame
+          (tolerance 0.05 mm).
+        </Typography>
+      </Stack>
+      {error && (
+        <Alert severity="warning" onClose={() => setError(null)}>
+          <Typography variant="caption">
+            verify-t1 could not run ({error}) — you can still publish, but nothing has checked
+            that the model and the metal agree.
+          </Typography>
+        </Alert>
+      )}
+      {result && (
+        <>
+          {result.ok && !vacuous && result.findings.length === 0 && (
+            <Alert severity="success">
+              <Typography variant="caption">
+                the optical model and the mechanics agree — every declared insert frame matches
+                the component’s pose within 0.05 mm.
+              </Typography>
+            </Alert>
+          )}
+          {vacuous && (
+            <Alert severity="warning">
+              <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                this OK is vacuous — the template declares no insert frames, so no pose was
+                ever compared.
+              </Typography>
+              <Typography variant="caption">
+                That is precisely how a wrong record ships. Stamp the PLN datum markers in the
+                Inventor export (or place datums on the previous step) so verify-t1 has
+                something to check.
+              </Typography>
+            </Alert>
+          )}
+          {result.findings
+            .filter(f => f.code !== 'W_NO_INSERT_FRAME')
+            .map((f, i) => (
+              <Alert key={i} severity={f.level === 'error' ? 'error' : 'warning'}>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                  {f.code}
+                </Typography>
+                <Typography variant="caption">{f.message}</Typography>
+              </Alert>
+            ))}
+        </>
+      )}
     </Stack>
   );
 }

@@ -15,7 +15,9 @@ import type { TemplateClass } from '../../../document';
 import { defaultDraft } from '../../../model/componentRecord';
 import { useBindStore } from '../../bind/bindStore';
 import {
+  CubeDatums,
   CubeMesh,
+  CubeVerify,
   DeviceAlign,
   DeviceMechanics,
   DeviceOptics,
@@ -194,18 +196,21 @@ export const ROADS: Record<RoadId, RoadDef> = {
           'disagrees, it is the wrong file or the wrong units, and finding out here beats ' +
           'finding out when it renders on its side.',
         Body: CubeMesh,
-        blocked: (_ctx, bind) =>
-          bind.glbBytes ? null : 'load the cube’s STEP or GLB first',
+        blocked: (_ctx, bind) => {
+          if (!bind.glbBytes) return 'load the cube’s STEP or GLB first';
+          // WP-113.1: the cell check refuses HERE, not at validate time.
+          return cellMismatch(bind.meshSizeMm, bind.meshBboxCenter);
+        },
       },
       {
         key: 'datums',
         label: 'the datums',
         help:
           'Where inside the cube does the optic act? If the export is marker-stamped (the ' +
-          'Inventor naming contract), the datum frames can be extracted automatically — ' +
-          'otherwise switch to datum mode and click the optical surface, exactly like the ' +
-          'housing road. The optic-placement mode (the gizmo) can also drop a primitive on a face.',
-        Body: DeviceAlign,
+          'Inventor naming contract), the datum frames extract automatically — confirm what ' +
+          'was found. Otherwise click the optical surface in datum mode, exactly like the ' +
+          'housing road.',
+        Body: CubeDatums,
         blocked: (ctx, bind) => {
           const expected = expectedDatumOf(ctx.draft.category);
           return bind.datums.length > 0
@@ -222,6 +227,16 @@ export const ROADS: Record<RoadId, RoadDef> = {
           'record you author here is what simulation traces when the module is placed.',
         Body: DeviceOptics,
         blocked: ctx => firstBlockingError(ctx),
+      },
+      {
+        key: 'verify',
+        label: 'verify before publish',
+        help:
+          'verify-t1 is the check that the optical model and the mechanics AGREE: the ' +
+          'component’s optical frame and the template’s declared insert frame must match ' +
+          'within 0.05 mm. It runs on the proposed records — nothing has been published yet, ' +
+          'so a disagreement costs a click here instead of a wrong part in someone’s design.',
+        Body: CubeVerify,
       },
     ],
     anatomy: (_ctx, output) => ({

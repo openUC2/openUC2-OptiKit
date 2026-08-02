@@ -25,6 +25,7 @@ export interface WizardBindView {
   glbBytes: Uint8Array | null;
   datums: { kind: string }[];
   meshSizeMm: [number, number, number] | null;
+  meshBboxCenter: [number, number, number] | null;
 }
 
 export interface WizardStepDef {
@@ -77,4 +78,39 @@ const EXPECTED_DATUM: Record<string, { kind: DatumKind; what: string }> = {
 
 export function expectedDatumOf(category: string): { kind: DatumKind; what: string } {
   return EXPECTED_DATUM[category] ?? { kind: 'custom', what: 'the optical surface' };
+}
+
+// ── WP-113: the cell-measure check, at import ────────────────────────────────
+
+/** UC2 cell + tolerance — mirrors optikit-core's library/mesh.py
+ * (UC2_CELL_MM / CELL_TOL_MM), which `library validate` enforces later:
+ * catching it in the wizard beats catching it when it renders on its side. */
+export const UC2_CELL_MM: [number, number, number] = [50, 50, 55];
+export const CELL_TOL_MM = 3.0;
+
+/** null = the mesh measures a cell; otherwise the sentence saying how it
+ * does not (wrong file, wrong units, or corner-origin export). */
+export function cellMismatch(
+  sizeMm: [number, number, number] | null,
+  centerMm: [number, number, number] | null,
+): string | null {
+  if (!sizeMm) return null;
+  const shown = sizeMm.map(v => v.toFixed(1)).join(' × ');
+  const off = UC2_CELL_MM.map((c, i) => Math.abs(sizeMm[i] - c));
+  if (Math.max(...off) > CELL_TOL_MM) {
+    // The one failure with no legitimate reading — often wrong units (m vs
+    // mm exports come in 1000× off) or an insert exported instead of the cube.
+    return (
+      `this mesh measures ${shown} mm, but a whole cube module must measure one ` +
+      `50 × 50 × 55 mm cell (±${CELL_TOL_MM} mm) — wrong file, or wrong units`
+    );
+  }
+  if (centerMm && Math.max(...centerMm.map(Math.abs)) > CELL_TOL_MM) {
+    return (
+      `the mesh is centred at (${centerMm.map(v => v.toFixed(1)).join(', ')}) mm, not on ` +
+      'the part origin — a corner-origin export places offset by half a cell. ' +
+      'Use “fit to cube” to centre it.'
+    );
+  }
+  return null;
 }
