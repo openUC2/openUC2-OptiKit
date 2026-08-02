@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
+  Button,
   Chip,
   IconButton,
   InputAdornment,
@@ -131,12 +132,16 @@ export function LibraryBrowser({
   onOpenRecord,
   showTab = null,
   highlightId = null,
+  onNewPart,
 }: {
   onOpenRecord: (record: ComponentRecord, origin: RecordOrigin) => void;
   /** WP-100: follow a deep link to the tab that actually holds the record. */
   showTab?: 'index' | 'workspace' | null;
   /** WP-100: the row the deep link opened, marked as selected. */
   highlightId?: string | null;
+  /** WP-110: opens the "what do you have?" door — the empty drafts tab is
+   * exactly the moment the question should be asked. */
+  onNewPart?: () => void;
 }) {
   const [tab, setTab] = useState<'index' | 'workspace'>('index');
   useEffect(() => {
@@ -314,9 +319,16 @@ export function LibraryBrowser({
               );
             })}
             {workspaceRecords.length === 0 && (
-              <Typography variant="caption" color="text.secondary" sx={{ p: 2, display: 'block' }}>
-                nothing saved yet — “Save to workspace library” keeps records here (user.*)
-              </Typography>
+              <Box sx={{ p: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  nothing saved yet — “Save to workspace library” keeps records here (user.*)
+                </Typography>
+                {onNewPart && (
+                  <Button size="small" variant="outlined" onClick={onNewPart}>
+                    new part…
+                  </Button>
+                )}
+              </Box>
             )}
           </List>
         )}

@@ -46,7 +46,7 @@ import {
   ControlCamera as OpticsPlaceIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
-import { CoreServiceError, convertStepToGlb, saveLibraryRecords } from '../../api/coreClient';
+import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
   bindToRecords,
   eulerDegToQuat,
@@ -58,14 +58,14 @@ import {
 } from '../../model/bindRecord';
 import type { Vec3 } from '../../document';
 import {
-  mergeYamlRecord,
   paraxialEflMm,
   recordToYaml,
   type RecordDraft,
 } from '../../model/componentRecord';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
-import { assetsBaseUrl, bumpLibraryIndex, useLibraryIndex } from '../../model/libraryIndex';
+import { useLibraryIndex } from '../../model/libraryIndex';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
+import { publishRecordFiles } from '../../model/publishLibrary';
 import { zipDsn } from '../../model/dsn/io';
 import { GenerateDraftHolderDialog } from '../component-editor/GenerateDraftHolderDialog';
 import { BindScene } from './BindScene';
@@ -139,11 +139,24 @@ export type MeshStatus =
   | { kind: 'error'; reason: string; url: string }
   | null;
 
+/** WP-110: which expert controls to hide when a wizard step MOUNTS this
+ * panel (route, don't duplicate — the wizard owns the mount mode and the
+ * exits, so their controls would contradict it). */
+export interface MechanicsEmbed {
+  /** The wizard's road fixes the mount mode and template class — hide their
+   * selects and the per-class route alerts. */
+  hideMountControls?: boolean;
+  /** The wizard's terminal step IS the exit — hide the record-pair section
+   * and the download/write/generate buttons. */
+  hideExits?: boolean;
+}
+
 export function MechanicsPanel({
   draft,
   record,
   meshStatus = null,
   onDraftChange,
+  embed,
 }: {
   draft: RecordDraft;
   /** The draft's validated component record (null while incomplete). */
@@ -151,6 +164,7 @@ export function MechanicsPanel({
   meshStatus?: MeshStatus;
   /** WP-90: the mechanics tab writes the draft's `mechanics:` reference. */
   onDraftChange?: (draft: RecordDraft) => void;
+  embed?: MechanicsEmbed;
 }) {
   const store = useBindStore();
   const saveThumbnail = useWorkspaceLibrary(s => s.saveThumbnail);
@@ -282,31 +296,10 @@ export function MechanicsPanel({
     if (!files) return;
     store.setBusy(true);
     try {
-      const records: string[] = [];
-      const assets: Record<string, Uint8Array> = {};
-      // WP-102: the template and module halves are authored from scratch by
-      // `bindToRecords`, so writing them verbatim over published files is how
-      // a curated template lost its `glb-url` and a module its `price` and
-      // `docs`. Fetch what is on disk and merge into it. A 404 (the record is
-      // new) just writes the authored version.
-      const base = assetsBaseUrl(index.url);
-      const published = async (path: string): Promise<string | null> => {
-        try {
-          const res = await fetch(`${base}/v1/library/assets/${path}`, { cache: 'no-cache' });
-          return res.ok ? await res.text() : null;
-        } catch {
-          return null;
-        }
-      };
-      for (const [path, content] of Object.entries(files)) {
-        if (typeof content === 'string') {
-          records.push(mergeYamlRecord(await published(path), content));
-        } else assets[path] = content;
-      }
-      const result = await saveLibraryRecords(records, assets);
-      // WP-34: the registry index is rebuilt per request — bumping makes the
-      // new part appear in the schematic palette without a manual reload.
-      bumpLibraryIndex();
+      // WP-102 merge-on-write, WP-110: shared with the wizard's terminal
+      // step (publishRecordFiles) — bumps the index so the new part appears
+      // in the schematic palette without a manual reload (WP-34).
+      const result = await publishRecordFiles(files, index.url);
       setFlash(`wrote ${result.written.length} file(s) into ../optikit-core/library`);
       setTimeout(() => setFlash(null), 5000);
     } catch (err) {
@@ -342,6 +335,7 @@ export function MechanicsPanel({
             cube (the default), the WHOLE cube module (WP-41), or a bare
             HOUSING with no cube at all — a Thorlabs laser body, a kinematic
             mount. A housing saves component + template only. */}
+        {!embed?.hideMountControls && (<>
         <TextField
           select size="small" label="mount" sx={{ width: 190 }}
           value={store.housingOnly ? 'housing' : store.wholeModule ? 'whole' : 'insert'}
@@ -366,11 +360,12 @@ export function MechanicsPanel({
           <MenuItem value="adaptive">T2 · adaptive</MenuItem>
           <MenuItem value="generative">T3 · generative</MenuItem>
         </TextField>
+        </>)}
       </Stack>
 
       {/* WP-90: the template-class ROUTE — each class leads to its real
           road instead of a dead record. T3's buttons live below (WP-77). */}
-      {store.templateClass === 'fixed' && (
+      {!embed?.hideMountControls && store.templateClass === 'fixed' && (
         <Alert severity="info" sx={{ py: 0 }}>
           <Typography variant="caption">
             T1 · fixed: attach an EXISTING Inventor cube (WP-84).{' '}
@@ -384,7 +379,7 @@ export function MechanicsPanel({
           </Typography>
         </Alert>
       )}
-      {store.templateClass === 'adaptive' && (
+      {!embed?.hideMountControls && store.templateClass === 'adaptive' && (
         <Alert severity="info" sx={{ py: 0 }}>
           <Typography variant="caption">
             T2 · adaptive: the Inventor MASTER INSERT road (WP-85) — the insert is
@@ -398,6 +393,7 @@ export function MechanicsPanel({
 
       {/* WP-90: `mechanics:` — a hand-authored record naming its housing
           template directly (the laser_488 case), no workbench round trip. */}
+      {!embed?.hideMountControls && (
       <Autocomplete
         freeSolo
         size="small"
@@ -414,6 +410,7 @@ export function MechanicsPanel({
           />
         )}
       />
+      )}
       {attachTemplateId && (
         <AttachInventorDialog
           templateId={attachTemplateId}
@@ -725,7 +722,8 @@ export function MechanicsPanel({
         )}
       </Stack>
 
-      {/* ── the pair ───────────────────────────────────────────────────── */}
+      {/* ── the pair (hidden when the wizard's terminal step is the exit) ── */}
+      {!embed?.hideExits && (<>
       <Divider>
         <Typography variant="overline">record pair</Typography>
       </Divider>
@@ -834,6 +832,7 @@ export function MechanicsPanel({
           </span>
         </Tooltip>
       </Stack>
+      </>)}
       {record && (
         <GenerateDraftHolderDialog
           draft={draft}

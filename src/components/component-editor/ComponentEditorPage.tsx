@@ -78,6 +78,10 @@ import { MechanicsPanel, type MeshStatus } from '../bind/MechanicsPanel';
 import { useBindStore } from '../bind/bindStore';
 import { ImportVendorDialog } from './ImportVendorDialog';
 import { ImportOptilandDialog } from '../library/ImportOptilandDialog';
+import { NewPartDialog } from './wizard/NewPartDialog';
+import { PartWizard } from './wizard/PartWizard';
+import { ROADS } from './wizard/roads';
+import { usePartWizard, WIZARD_MESH_KEY, type RoadId } from './wizard/wizardStore';
 
 export function ComponentEditorPage({
   initialTab = 'optics',
@@ -88,7 +92,17 @@ export function ComponentEditorPage({
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [tab, setTab] = useState<'optics' | 'mechanics' | 'anatomy'>(initialTab);
-  const [draft, setDraft] = useState<RecordDraft>(() => defaultDraft('lens'));
+  const [draft, setDraft] = useState<RecordDraft>(() => {
+    // WP-110.3: a persisted wizard session resumes with ITS draft — read at
+    // init, because the wizard's own mirror-to-store effect runs before any
+    // page effect could and would clobber the persisted draft with this
+    // default. A `?open=` deep link wins over the session.
+    const w = usePartWizard.getState();
+    if (w.road && w.draft && !new URLSearchParams(window.location.search).get('open')) {
+      return w.draft;
+    }
+    return defaultDraft('lens');
+  });
   const saveRecord = useWorkspaceLibrary(s => s.save);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   // WP-38: where the open record came from (drives the editing-a-copy banner)
@@ -281,6 +295,53 @@ export function ComponentEditorPage({
   const [importOpen, setImportOpen] = useState(false);
   // WP-87: the Optiland-setup wizard (also reachable from the File menu).
   const [optilandOpen, setOptilandOpen] = useState(false);
+  // WP-110: the door ("what do you have?") and the wizard behind it.
+  const [doorOpen, setDoorOpen] = useState(false);
+  const wizardRoad = usePartWizard(s => s.road);
+
+  /** WP-110: start a road — a fresh draft seeded for it, the bind store set
+   * to the road's mount mode, the persisted session begun. */
+  const startRoad = (road: RoadId) => {
+    const def = ROADS[road];
+    const seed = def.seed();
+    def.applyBindDefaults();
+    usePartWizard.getState().start(road, seed);
+    setDraft(seed);
+    setOpenedFrom(null);
+    setOpenedRecord(null);
+    setOpenError(null);
+    setMeshStatus(null);
+    setDoorOpen(false);
+  };
+
+  /** WP-110: the bare-form reset (the old "new" button; the expert escape). */
+  const blankForm = () => {
+    setDraft(defaultDraft(draft.category));
+    setOpenedFrom(null);
+    setOpenedRecord(null);
+    setOpenError(null);
+    setMeshStatus(null);
+    useBindStore.getState().clear();
+  };
+
+  // WP-110.3: a reload resumes the persisted wizard session — draft, step,
+  // bind state, and the mesh bytes from IndexedDB. A `?open=` deep link wins
+  // (the user asked for a specific record, not for their wizard).
+  const [wizardResumed, setWizardResumed] = useState(false);
+  useEffect(() => {
+    if (wizardResumed) return;
+    setWizardResumed(true);
+    const w = usePartWizard.getState();
+    if (!w.road) return;
+    if (new URLSearchParams(window.location.search).get('open')) return;
+    // (the draft itself was restored at state init — see useState above)
+    void (async () => {
+      const mesh = await loadBindMesh(WIZARD_MESH_KEY).catch(() => null);
+      // loadMesh resets datums/transform, so restore the snapshot AFTER it.
+      if (mesh) useBindStore.getState().loadMesh(mesh.meshFile, mesh.glb, mesh.step);
+      w.restoreBind();
+    })();
+  }, [wizardResumed]);
   useEffect(() => {
     if (deepLinked) return;
     const id = new URLSearchParams(window.location.search).get('open');
@@ -352,11 +413,38 @@ export function ComponentEditorPage({
               onOpenRecord={openRecord}
               showTab={deepLinkTab}
               highlightId={openedFrom?.id ?? null}
+              onNewPart={() => setDoorOpen(true)}
             />
           </Drawer>
 
-          {/* center: one identity, two halves (WP-33) */}
+          {/* center: one identity, two halves (WP-33) — or the WP-110 wizard */}
           <Box sx={{ flex: 1, overflow: 'auto', p: 2.5 }}>
+            {/* WP-110: the door + the importers are reachable from both views. */}
+            <NewPartDialog
+              open={doorOpen}
+              onClose={() => setDoorOpen(false)}
+              onPickRoad={startRoad}
+              onVendorImport={() => setImportOpen(true)}
+              onOptilandImport={() => setOptilandOpen(true)}
+              onBlankForm={blankForm}
+            />
+            {wizardRoad && (
+              <PartWizard
+                draft={draft}
+                setDraft={setDraft}
+                record={record}
+                errors={errors}
+                onExitToEditor={() => {
+                  // The draft is shared state — clearing the session simply
+                  // hands the same draft to the tabs.
+                  usePartWizard.getState().clear();
+                  setTab('optics');
+                }}
+                onFinished={() => setTab('optics')}
+              />
+            )}
+            {!wizardRoad && (
+            <>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ flex: 1 }}>
                 {/* WP-106: the part's name, with its exact id underneath —
@@ -368,18 +456,13 @@ export function ComponentEditorPage({
                   {draft.name ? `${recordId(draft)} · v${draft.version}` : 'new record — name it on the optics tab'}
                 </Typography>
               </Typography>
+              {/* WP-110: the door — "what do you have?" — replaces the bare
+                  "new" button; the blank form stays reachable inside it. */}
               <Button
-                size="small" startIcon={<NewIcon />}
-                onClick={() => {
-                  setDraft(defaultDraft(draft.category));
-                  setOpenedFrom(null);
-                  setOpenedRecord(null);
-                  setOpenError(null);
-                  setMeshStatus(null);
-                  useBindStore.getState().clear();
-                }}
+                size="small" variant="outlined" startIcon={<NewIcon />}
+                onClick={() => setDoorOpen(true)}
               >
-                new
+                new part…
               </Button>
               {/* WP-82: the CLI importers with a review step. */}
               <Button
@@ -583,14 +666,17 @@ export function ComponentEditorPage({
                 onDraftChange={setDraft}
               />
             )}
+            </>
+            )}
           </Box>
 
-          {/* right: preview */}
+          {/* right: preview — the wizard brings its own progress panel, so
+              this column yields its width to the road (WP-110) */}
           <Box
             sx={{
-              width: isMobile ? 0 : 360, flexShrink: 0, overflow: 'auto', p: 2,
+              width: isMobile || wizardRoad ? 0 : 360, flexShrink: 0, overflow: 'auto', p: 2,
               borderLeft: `1px solid ${muiTheme.palette.divider}`,
-              display: isMobile ? 'none' : 'block',
+              display: isMobile || wizardRoad ? 'none' : 'block',
             }}
           >
             <Typography variant="overline" color="text.secondary">schematic glyph</Typography>

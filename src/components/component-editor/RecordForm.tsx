@@ -71,13 +71,33 @@ function BandFields({
   );
 }
 
+/** WP-110: which blocks of the form to render. The wizard mounts THIS form
+ * inside its steps with the irrelevant blocks hidden — never a second copy
+ * of the fields. Default: everything (the tabs' expert view). */
+export interface RecordFormSections {
+  identity?: boolean;
+  vendor?: boolean;
+  categoryFields?: boolean;
+  surfaces?: boolean;
+  framesPorts?: boolean;
+}
+
 export function RecordForm({
   draft,
   onChange,
+  sections,
 }: {
   draft: RecordDraft;
   onChange: (draft: RecordDraft) => void;
+  sections?: RecordFormSections;
 }) {
+  const show = {
+    identity: sections?.identity ?? true,
+    vendor: sections?.vendor ?? true,
+    categoryFields: sections?.categoryFields ?? true,
+    surfaces: sections?.surfaces ?? true,
+    framesPorts: sections?.framesPorts ?? true,
+  };
   const set = (patch: Partial<RecordDraft>) => onChange({ ...draft, ...patch });
   const nonOptical = NONOPTICAL_CATEGORIES.includes(draft.category);
   const hasFragment = !nonOptical && !FRAGMENTLESS_CATEGORIES.includes(draft.category);
@@ -95,6 +115,7 @@ export function RecordForm({
   return (
     <Stack spacing={2.5}>
       {/* ── identity ─────────────────────────────────────────────────────── */}
+      {show.identity && (
       <Row>
         <TextField
           select size="small" label="category" value={draft.category}
@@ -140,10 +161,14 @@ export function RecordForm({
           onChange={e => set({ version: e.target.value })} sx={{ width: 100 }}
         />
       </Row>
+      )}
+      {show.identity && (
       <TextField
         size="small" label="description" value={draft.description} fullWidth
         onChange={e => set({ description: e.target.value })}
       />
+      )}
+      {show.vendor && (
       <Row>
         <TextField size="small" label="vendor" value={draft.vendorName}
           onChange={e => set({ vendorName: e.target.value })} sx={{ width: 140 }} />
@@ -152,9 +177,10 @@ export function RecordForm({
         <TextField size="small" label="vendor URL" value={draft.vendorUrl}
           onChange={e => set({ vendorUrl: e.target.value })} sx={{ flex: 1, minWidth: 180 }} />
       </Row>
+      )}
 
       {/* ── category-specific (WP-90: honest per-category fields) ────────── */}
-      {draft.category === 'mirror' && (
+      {show.categoryFields && draft.category === 'mirror' && (
         <>
           <Row>
             <DecimalField
@@ -176,7 +202,7 @@ export function RecordForm({
           </Typography>
         </>
       )}
-      {draft.category === 'dichroic' && (
+      {show.categoryFields && draft.category === 'dichroic' && (
         <Row>
           <BandFields
             label="reflect band µm"
@@ -186,7 +212,7 @@ export function RecordForm({
           />
         </Row>
       )}
-      {draft.category === 'filter' && (
+      {show.categoryFields && draft.category === 'filter' && (
         <Row>
           <BandFields
             label="transmit band µm"
@@ -196,7 +222,7 @@ export function RecordForm({
           />
         </Row>
       )}
-      {draft.category === 'source' && (
+      {show.categoryFields && draft.category === 'source' && (
         <Row>
           <TextField
             size="small" label="wavelengths µm (comma-sep)"
@@ -219,7 +245,7 @@ export function RecordForm({
           />
         </Row>
       )}
-      {draft.category === 'detector' && (
+      {show.categoryFields && draft.category === 'detector' && (
         <Row>
           <DecimalField
             size="small" label="sensor width mm"
@@ -243,7 +269,7 @@ export function RecordForm({
       )}
 
       {/* ── surfaces ─────────────────────────────────────────────────────── */}
-      {hasFragment && (
+      {show.surfaces && hasFragment && (
         <Box>
           <Divider sx={{ mb: 1 }}>
             <Typography variant="overline">optiland fragment (surfaces)</Typography>
@@ -258,7 +284,7 @@ export function RecordForm({
       )}
 
       {/* ── frames + ports: hidden for non-optical records (WP-30) ───────── */}
-      {!nonOptical && (
+      {show.framesPorts && !nonOptical && (
       <>
       <Box>
         <Divider sx={{ mb: 1 }}>
