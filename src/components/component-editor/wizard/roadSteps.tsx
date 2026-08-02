@@ -5,7 +5,7 @@
  * in the panels. Only components are exported here (react-refresh rule).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -23,11 +23,12 @@ import {
 } from '../../../model/componentRecord';
 import { DecimalField } from '../../common/DecimalField';
 import { MechanicsPanel } from '../../bind/MechanicsPanel';
+
 import { useBindStore } from '../../bind/bindStore';
 import { GenerateDraftHolderDialog } from '../GenerateDraftHolderDialog';
 import { RecordForm } from '../RecordForm';
 import { usePartWizard } from './wizardStore';
-import type { WizardCtx } from './wizardTypes';
+import { expectedDatumOf, type WizardCtx } from './wizardTypes';
 
 // ── shared bits ──────────────────────────────────────────────────────────────
 
@@ -249,13 +250,37 @@ export function DeviceOptics({ ctx }: { ctx: WizardCtx }) {
 }
 
 export function DeviceAlign({ ctx }: { ctx: WizardCtx }) {
+  const expected = expectedDatumOf(ctx.draft.category);
+  const datums = useBindStore(s => s.datums);
+  const isFold = ['mirror', 'beamsplitter', 'dichroic'].includes(ctx.draft.category);
+  // WP-112.3: the step opens READY to click — datum mode, the category's
+  // datum kind preselected, the optical overlay on so the beam renders live
+  // and a wrong axis is visibly wrong.
+  useEffect(() => {
+    useBindStore.setState({ mode: 'datum', nextKind: expected.kind, showOptics: true });
+  }, [expected.kind]);
   return (
-    <MechanicsPanel
-      draft={ctx.draft}
-      record={ctx.record}
-      onDraftChange={ctx.setDraft}
-      embed={{ hideMountControls: true, hideExits: true }}
-    />
+    <Stack spacing={1}>
+      <Alert severity={datums.length > 0 ? 'success' : 'info'}>
+        <Typography variant="caption">
+          {datums.length > 0
+            ? `${datums.length} datum${datums.length > 1 ? 's' : ''} placed — check the beam
+               overlay: the arrow must leave through the real ${expected.what}, then confirm
+               the direction on the datum row below the viewport.`
+            : `A datum is the point on the part the optical model is measured from. For a
+               ${ctx.draft.category}, click ${expected.what} — the viewport is already in
+               datum mode with “${expected.kind}” selected.`}
+          {isFold &&
+            ' The incoming and outgoing beam arms update live as the plane is picked — if the fold looks wrong here, it will be wrong in the schematic too.'}
+        </Typography>
+      </Alert>
+      <MechanicsPanel
+        draft={ctx.draft}
+        record={ctx.record}
+        onDraftChange={ctx.setDraft}
+        embed={{ hideMountControls: true, hideExits: true }}
+      />
+    </Stack>
   );
 }
 

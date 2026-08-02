@@ -137,6 +137,11 @@ export interface RecordDraft {
   mirrorAngleDeg: number | null;
   sourceWavelengthsUm: number[];
   sourceDivergenceDeg: number | null;
+  /** WP-112: 1/e² beam diameter at the emission aperture, mm — a typed
+   * SourceSpec field in optikit-core (not folklore). null = undeclared. */
+  sourceBeamDiameterMm: number | null;
+  /** WP-112/WP-74: emitted optical power, mW (feeds the photon budget). */
+  sourcePowerMw: number | null;
   detectorSensorMm: [number, number] | null;
   detectorPixelPitchUm: number | null;
   /**
@@ -187,6 +192,8 @@ export function defaultDraft(category: RecordCategory): RecordDraft {
     mirrorAngleDeg: null,
     sourceWavelengthsUm: [],
     sourceDivergenceDeg: null,
+    sourceBeamDiameterMm: null,
+    sourcePowerMw: null,
     detectorSensorMm: null,
     detectorPixelPitchUm: null,
     responseBandUm: null,
@@ -479,6 +486,13 @@ export function validateDraft(draft: RecordDraft): string[] {
       errors.push(`surface ${i}: rectangular aperture needs width > 0 and height > 0`);
     }
   });
+  // WP-112: source extras must be positive when declared.
+  if (draft.sourceBeamDiameterMm !== null && draft.sourceBeamDiameterMm <= 0) {
+    errors.push('beam diameter must be > 0 mm when declared');
+  }
+  if (draft.sourcePowerMw !== null && draft.sourcePowerMw <= 0) {
+    errors.push('optical power must be > 0 mW when declared');
+  }
   // WP-90/WP-74: a spectral band must be ordered (null = open-ended is fine).
   if (draft.responseBandUm) {
     const [lo, hi] = draft.responseBandUm;
@@ -630,6 +644,11 @@ export function draftToRecord(draft: RecordDraft): ComponentRecord {
     record.source = {
       wavelengths_um: draft.sourceWavelengthsUm,
       divergence_deg: draft.sourceDivergenceDeg ?? 0,
+      // WP-112: additive typed fields — omitted when undeclared.
+      ...(draft.sourceBeamDiameterMm !== null
+        ? { beam_diameter_mm: draft.sourceBeamDiameterMm }
+        : {}),
+      ...(draft.sourcePowerMw !== null ? { power_mw: draft.sourcePowerMw } : {}),
     };
   }
   if (draft.category === 'detector' && draft.detectorSensorMm) {
@@ -846,10 +865,17 @@ export function draftFromRecord(record: ComponentRecord): RecordDraft {
   }));
 
   if (typeof rec.mount_angle_deg === 'number') draft.mirrorAngleDeg = rec.mount_angle_deg;
-  const source = rec.source as { wavelengths_um?: number[]; divergence_deg?: number } | undefined;
+  const source = rec.source as {
+    wavelengths_um?: number[];
+    divergence_deg?: number;
+    beam_diameter_mm?: number;
+    power_mw?: number;
+  } | undefined;
   if (source) {
     draft.sourceWavelengthsUm = source.wavelengths_um ?? [];
     draft.sourceDivergenceDeg = source.divergence_deg ?? null;
+    draft.sourceBeamDiameterMm = source.beam_diameter_mm ?? null;
+    draft.sourcePowerMw = source.power_mw ?? null;
   }
   const detector = rec.detector as { sensor_mm?: [number, number]; pixel_pitch_um?: number } | undefined;
   if (detector?.sensor_mm) {

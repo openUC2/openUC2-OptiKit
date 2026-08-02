@@ -133,6 +133,8 @@ export function RecordForm({
               mirrorAngleDeg: fresh.mirrorAngleDeg,
               sourceWavelengthsUm: fresh.sourceWavelengthsUm,
               sourceDivergenceDeg: fresh.sourceDivergenceDeg,
+              sourceBeamDiameterMm: fresh.sourceBeamDiameterMm,
+              sourcePowerMw: fresh.sourcePowerMw,
               detectorSensorMm: fresh.detectorSensorMm,
               detectorPixelPitchUm: fresh.detectorPixelPitchUm,
               responseBandUm: fresh.responseBandUm,
@@ -243,6 +245,27 @@ export function RecordForm({
             onValue={v => set({ sourceDivergenceDeg: v })}
             sx={{ width: 180 }}
           />
+          {/* WP-112: the source-side optics a housed device needs. */}
+          <Tooltip title="1/e² beam diameter at the emission aperture — what the schematic draws and DRC_APERTURE checks against">
+            <span>
+              <DecimalField
+                size="small" label="beam Ø mm"
+                value={draft.sourceBeamDiameterMm}
+                onValue={v => set({ sourceBeamDiameterMm: v })}
+                sx={{ width: 110 }}
+              />
+            </span>
+          </Tooltip>
+          <Tooltip title="emitted optical power — feeds the photon budget (WP-74)">
+            <span>
+              <DecimalField
+                size="small" label="power mW"
+                value={draft.sourcePowerMw}
+                onValue={v => set({ sourcePowerMw: v })}
+                sx={{ width: 110 }}
+              />
+            </span>
+          </Tooltip>
         </Row>
       )}
       {show.categoryFields && draft.category === 'detector' && (

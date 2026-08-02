@@ -25,7 +25,7 @@ import {
   NumbersWhereDoesItSit,
 } from './roadSteps';
 import { usePartWizard, type RoadId } from './wizardStore';
-import type { RoadDef, WizardCtx } from './wizardTypes';
+import { expectedDatumOf, type RoadDef, type WizardCtx } from './wizardTypes';
 
 const firstBlockingError = (ctx: WizardCtx): string | null => {
   if (!ctx.draft.name) {
@@ -140,11 +140,21 @@ export const ROADS: Record<RoadId, RoadDef> = {
           'click the face where the optics live — a mirror’s reflective plane, a lens’s front ' +
           'vertex, a laser’s emission aperture — then confirm the beam direction on the datum row.',
         Body: DeviceAlign,
-        blocked: (ctx, bind) =>
-          bind.datums.length > 0
-            ? null
-            : 'no datum yet — the part has mechanics and optics, but nothing says where on the ' +
-              'mesh the optics live. Switch the viewport to datum mode and click the optical surface.',
+        blocked: (ctx, bind) => {
+          // WP-112.3: refuse with a sentence that names WHICH datum is
+          // missing — `bound` being null is the silent version of this rule.
+          const expected = expectedDatumOf(ctx.draft.category);
+          if (bind.datums.length === 0) {
+            return `nothing says where on the mesh the optics live — click ${expected.what} ` +
+              `in datum mode (the “${expected.kind}” kind is preselected)`;
+          }
+          if (!bind.datums.some(d => d.kind === expected.kind)) {
+            return `a ${ctx.draft.category} needs a “${expected.kind}” datum (${expected.what}) — ` +
+              `the placed datum${bind.datums.length > 1 ? 's are' : ' is'} ` +
+              `${bind.datums.map(d => `“${d.kind}”`).join(', ')}`;
+          }
+          return null;
+        },
       },
     ],
     anatomy: (_ctx, output) => ({
@@ -158,6 +168,12 @@ export const ROADS: Record<RoadId, RoadDef> = {
       'lets it place freely on the schematic with its real mesh. It is not yet buildable into ' +
       'a cube — “wrap it in a cube” is a later, deliberate step (generate a T3 holder around ' +
       'it, or the Inventor round trip).',
+    // WP-112.5: signposted, not done here — one click starts the optic-in-a-
+    // cube road with THIS part's optics prefilled.
+    signpost: {
+      label: 'wrap it in a cube… (start the cube-insert road with these optics)',
+      road: 'numbers',
+    },
   },
 
   cube: {
@@ -190,11 +206,13 @@ export const ROADS: Record<RoadId, RoadDef> = {
           'otherwise switch to datum mode and click the optical surface, exactly like the ' +
           'housing road. The optic-placement mode (the gizmo) can also drop a primitive on a face.',
         Body: DeviceAlign,
-        blocked: (_ctx, bind) =>
-          bind.datums.length > 0
+        blocked: (ctx, bind) => {
+          const expected = expectedDatumOf(ctx.draft.category);
+          return bind.datums.length > 0
             ? null
-            : 'no datum or placed optic yet — click the optical surface in datum mode, or add ' +
-              'an optic and place it on its face',
+            : `no datum or placed optic yet — click ${expected.what} in datum mode, or add ` +
+              'an optic and place it on its face';
+        },
       },
       {
         key: 'optics',

@@ -282,6 +282,26 @@ export function PartWizard({
                 </span>
               </Tooltip>
             </Stack>
+            {/* WP-112.5: what next — signposted, not done here. */}
+            {road.signpost && (
+              <>
+                <Divider sx={{ my: 0.5 }} />
+                <Button
+                  size="small" variant="text"
+                  sx={{ alignSelf: 'flex-start' }}
+                  onClick={() => {
+                    const target = ROADS[road.signpost!.road];
+                    target.applyBindDefaults();
+                    // The current draft carries over — its optics prefill
+                    // the next road; save above first if you want this
+                    // housing kept.
+                    usePartWizard.getState().start(target.id, draft);
+                  }}
+                >
+                  {road.signpost.label}
+                </Button>
+              </>
+            )}
           </Stack>
         )}
 

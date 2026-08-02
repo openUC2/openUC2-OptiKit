@@ -4,6 +4,7 @@
  */
 
 import type { PartMount, TemplateClass } from '../../../document';
+import type { DatumKind } from '../../../model/bindRecord';
 import type { RecordDraft } from '../../../model/componentRecord';
 import type { ComponentRecord } from '../../../model/dsn/generated/library-component';
 import type { RoadId } from './wizardStore';
@@ -57,4 +58,23 @@ export interface RoadDef {
   };
   /** Terminal-step sentence: what the produced records ARE. */
   resultNote: (ctx: WizardCtx, output: WizardOutput) => string;
+  /** WP-112.5: an optional "what next" button on the terminal step that
+   * starts ANOTHER road with the current draft carried over. */
+  signpost?: { label: string; road: RoadId };
+}
+
+/** WP-112: the datum the category's optics are measured from. */
+const EXPECTED_DATUM: Record<string, { kind: DatumKind; what: string }> = {
+  mirror: { kind: 'reflective', what: 'the reflective plane the beam folds at' },
+  beamsplitter: { kind: 'reflective', what: 'the splitting plane' },
+  dichroic: { kind: 'reflective', what: 'the dichroic coating plane' },
+  source: { kind: 'source', what: 'the emission aperture the beam leaves from' },
+  detector: { kind: 'sensor', what: 'the sensor plane' },
+  lens: { kind: 'front', what: 'the front vertex of the lens' },
+  filter: { kind: 'front', what: 'the front face' },
+  sample: { kind: 'front', what: 'the sample plane' },
+};
+
+export function expectedDatumOf(category: string): { kind: DatumKind; what: string } {
+  return EXPECTED_DATUM[category] ?? { kind: 'custom', what: 'the optical surface' };
 }
