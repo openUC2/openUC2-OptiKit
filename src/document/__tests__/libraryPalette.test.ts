@@ -15,7 +15,7 @@ import {
   type LibraryPaletteEntry,
 } from '../libraryPalette';
 import { rot24Matrix } from '../rot24';
-import { addPart, getPart, movePartWorld } from '../OptikitDocument';
+import { addPart, getPart, movePartWorld, renderInfoOf } from '../OptikitDocument';
 import { buildServiceDesign, listPartMechanics } from '../../model/dsn/serviceExport';
 import { useAppStore } from '../../stores/appStore';
 import { resetDocument } from '../documentStore';
@@ -323,6 +323,32 @@ describe('T-class movement contract (through the document facade)', () => {
     expect(templateClassOf('openuc2.cube.mirror_45')).toBe('fixed');
     expect(templateClassOf('openuc2.cube.lens_z')).toBe('adaptive');
     expect(templateClassOf('nonexistent')).toBeNull();
+  });
+
+  // WP-99: the assembly canvas used to take its T-class (and its DOFs) from
+  // the SERVICE EXPORT, which deliberately carries no `template:`/`dof:` block
+  // for a palette-placed part — so every part failed the class check, the
+  // "no template" ghost won, and `renderInfoOf().glbUrl` was unreachable dead
+  // code. This pins both halves: the export is legitimately blank, and the
+  // palette registry has the answer. AssemblyScene must read the palette.
+  it('the palette holds the T-class and DOFs the service export drops', () => {
+    const mirrorId = addPart('openuc2.cube.mirror_45', [0, 0, 0])!;
+    const lensId = addPart('openuc2.cube.lens_z', [50, 0, 0])!;
+    const mech = listPartMechanics();
+    const mirrorMech = mech.find(m => m.partId === mirrorId)!;
+    const lensMech = mech.find(m => m.partId === lensId)!;
+    // The export: no template block, no dof block — by design (an emitted
+    // `class: null` would violate TemplateSpec, and `dof:` next to
+    // `class: fixed` is E_T1_HAS_DOF).
+    expect(mirrorMech.templateClass).toBeNull();
+    expect(lensMech.templateClass).toBeNull();
+    expect(lensMech.translationDofs).toEqual([]);
+    // The palette: both facts present, plus the mesh that was never drawn.
+    expect(templateClassOf('openuc2.cube.mirror_45')).toBe('fixed');
+    expect(renderInfoOf('openuc2.cube.mirror_45').glbUrl).toBeTruthy();
+    const lensEntry = entries.find(e => e.moduleId === 'openuc2.cube.lens_z')!;
+    expect(lensEntry.dofs).toHaveLength(1);
+    expect(lensEntry.dofs[0]).toMatchObject({ name: 'dz', axis: 'z', range: [-7.5, 7.5] });
   });
 
   it('T1: intra-cube nudges snap back to the record pose (δ = 0)', () => {

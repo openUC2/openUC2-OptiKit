@@ -101,9 +101,10 @@ export function AssemblyPage() {
     'firmware-contract'?: string;
     'axis-map': { dof: string; 'can-object': number | string }[];
   } | null;
-  // WP-51.2: the T-class comes from the INDEX, not the palette entry — the
-  // assembly does not mount PartLibrary, so palette registration is absent
-  // here and an entry-derived chip would silently never render.
+  // WP-51.2: the T-class of the CHIP comes from the index. (The "palette
+  // registration is absent here" reason is stale since WP-92 — this page
+  // mounts useLibraryRegistration above — and WP-99 reads the canvas T-class
+  // off the palette entry for exactly that reason.)
   const selectedTClass = selectedIndexModule?.template?.class ?? null;
   // WP-60: bare component ids no module binds — sourced from the INDEX for
   // the same reason as the T-class above.

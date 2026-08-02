@@ -535,6 +535,17 @@ are **done** (this round); the third is scoped and unscheduled.
   modules; export is symmetric (workspace/bundle records the design uses
   travel in the zip → a self-contained SETUP bundle). Second community
   template added: `setups/demo-bench.dsn/` — a whole assembly in one zip.
+- **WP-98b — The E_NO_OPTICS chain** *(done, 2026-08-01)*. Field-found triple:
+  (1) a design must compile STANDALONE — neither the core compiler nor an app
+  that imported a `.dsn` resolves library refs into optics, so the template
+  designs now inline their fragments (and the demo record's physics was fixed:
+  it claimed f=50 with radii giving 32.9 mm and the pre-WP-63 `type: ideal`
+  material — now a ray-trace-verified singlet focusing one grid cell behind
+  its front vertex, EFL 47.54); (2) a HOLLOW registry module (indexed without
+  its component/template) is now enriched from the index components, workspace
+  drafts, or an imported bundle (`enrichEntry`) instead of simulating as
+  E_NO_OPTICS and rendering as a ghost; (3) `/v1/simulate` on a system with
+  no real surfaces answers 422 `E_EMPTY_SYSTEM` instead of a numpy traceback.
 - **WP-97 — The review lifecycle** *(proposed, Phase 3–4)*. `review:` notes
   exist on every record kind and reach the index and the palette chip, but
   they are a flat list of free-text strings with **no severity and no
@@ -551,6 +562,75 @@ are **done** (this round); the third is scoped and unscheduled.
   printing or ordering from it. Validation must stay permissive — a record
   that admits incompleteness is honest and must keep validating; this is
   about making the admission *visible at the moment it matters*.
+
+### Round-14 additions (2026-08-01) — the flow round · WP-99…WP-109
+
+Full prompts and evidence in **`kicad-for-optics-part2n.md`**. Source: a session
+driving the whole loop (import a community `.dsn` → open a part → author a
+mirror → attach Inventor CAD → place on the grid) and finding it "very confusing
+to navigate". Ten symptoms were traced to code and independently re-verified;
+**five turned out to be bugs, not missing features** — the flow is not only
+under-explained, it is currently lying in four places, and no mental model can
+survive that.
+
+Tier 0 — *stop the app lying* (contained, two of them under ten lines):
+
+- **WP-99 — The assembly draws the mesh you attached.** `AssemblyScene.tsx:382`
+  tests `templateClass === null` **before** it reaches `render.glbUrl`, and that
+  class is read off the exported service design, which never carries a
+  `template:` block for palette-placed parts. So no library GLB has ever
+  rendered for a palette part, WP-98's bundle mesh donation has never been
+  visible, and WP-67's housing meshes are swallowed. Take the T-class (and the
+  DOFs, same cause, which kills every T2 handle) from the palette registry,
+  reorder the ladder so a mesh wins, and give the four ghost branches distinct
+  labels so this is self-diagnosing next time. ✅ *(done, 2026-08-01)*
+- **WP-100 — Open the part you clicked.** The `?open=` deep link resolves ids
+  through the published registry only and swallows the 404 twice, leaving a
+  blank new record on screen that looks like a corrupted version of your part.
+  Resolve workspace → bundle → registry → index-summary, and never present a
+  blank draft as the requested record.
+- **WP-101 — A dropped part lands where you dropped it.** `addPart` skips
+  `constrainOffsetToTemplate`; the "snap" users see on first drag is the T1
+  constraint firing late. Same bug in paste and in the inspector's numeric
+  fields; the `snapGrid` toggle is mislabelled.
+- **WP-102 — Publishing to the library must not destroy records.** The write is
+  a wholesale replace from a draft that never reads `tags`/`docs`/`review`; it
+  has already destroyed curated data in the working tree. Merge before adding
+  any easier write button. Plus: `app.py:1140`'s `setdefault` makes the
+  documented read-only-in-containers promise false, and with `CORS: *` and no
+  auth, any page can POST YAML into a running user's library.
+
+Tier 1 — *the mental model* (the user's own words: library → T1 in a cube → T2/T3
+loose → place on the grid → author optic ⊂ housing ⊂ cube):
+
+- **WP-103 — Three states, said out loud.** optikit-core ships `components`,
+  `housings` and `modules` as three index sections *precisely* so the frontend
+  can tell them apart; the frontend flattens them into `templateClass|null` +
+  `unbound`, where `null` means three different things. Introduce a real `mount`
+  discriminator, segment the palette by it, and draw the cube envelope around
+  parts that have one.
+- **WP-104 — The anatomy view.** One `PartAnatomy` component (palette hover,
+  schematic inspector, third parts-editor tab) drawing optic → housing → cube
+  with each layer labelled, clickable, and greyed when absent — the greyed
+  layers *are* the authoring to-do list.
+- **WP-105 — Where your work lives.** Sixteen localStorage keys, one blind 5 s
+  autosave, four stores that never persist, and three menu items called "Save"
+  that do not save the document. Rename, confirm-before-replace on all five
+  import doors (two fire silently on page load), undo brackets, a `savedAt`
+  chip, then a real document identity.
+
+Tier 2 — *ergonomics that compound*: **WP-106** (parts search + one naming
+convention + list modules/housings), **WP-107** (the 45° glyph, the optic drawn
+inside the pseudo cube, honest mesh-status), **WP-108** (`review` ≠ `draft` —
+one boolean with four meanings badges a shipping €650 laser as a draft),
+**WP-109** (optikit-core library hygiene: one mirror cube instead of three, a
+`step:` that points at a `.glb`, and a `library validate` check for the two
+undeclared mesh conventions).
+
+Deliberately **not** done this round: emitting `template:` in the exported
+`.dsn` (schema-invalid today), a `mesh-frame` record field (validate the
+ambiguity away instead), and hiding record ids behind display names (they
+collide).
 
 ### Phase 7 — After the MVP: community, accounts, UX *(explicitly last)*
 

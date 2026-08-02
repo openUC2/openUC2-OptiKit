@@ -164,15 +164,21 @@ describe('registerBundleLibrary (WP-98)', () => {
     expect(entry.docs![0].text).toContain('assembly notes');
   });
 
-  it('never shadows an already-registered id', () => {
+  it('an already-registered id is warned about but still kept for gap-filling', () => {
+    // WP-98b: the registry record stays authoritative (the palette merge in
+    // useLibraryRegistration filters bundle entries by known ids), but the
+    // bundle entry IS retained so `enrichEntry` can donate mesh/docs/optics
+    // to a HOLLOW registry copy (module indexed without its component).
     const files = bundle();
     files['library/modules/openuc2.cube.laser/module.yml'] =
       MODULE_YML.replace('user.cube.demo_lens_50', 'openuc2.cube.laser');
     const result = registerBundleLibrary(files, {
       registeredIds: new Set(['openuc2.cube.laser']),
     });
-    expect(result.modules).toBe(1); // only the demo lens
+    expect(result.modules).toBe(2);
     expect(result.warnings.some(w => w.includes('already in the registry'))).toBe(true);
+    // Exactly one warning even if the zip carries the trio twice.
+    expect(result.warnings.filter(w => w.includes('already in the registry'))).toHaveLength(1);
   });
 });
 

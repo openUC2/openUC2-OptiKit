@@ -21,7 +21,7 @@ import {
   useGLTF,
 } from '@react-three/drei';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import type { DocPart, LayerAppearance, Vec3 } from '../../document';
+import type { DocPart, LayerAppearance, LibraryPaletteEntry, Vec3 } from '../../document';
 import {
   captureUndo,
   classifyPart,
@@ -30,6 +30,7 @@ import {
   interfaceKindOf,
   layerAppearance,
   layerRangeOf,
+  libraryEntryOf,
   renderInfoOf,
   rot24Matrix,
   selectPart,
@@ -58,6 +59,37 @@ const AXIS_VECTORS: Record<'x' | 'y' | 'z', Vec3> = {
   y: [0, 1, 0],
   z: [0, 0, 1],
 };
+
+/**
+ * WP-99: the same registry-first rule the body render uses, for the DOFs.
+ * The exported service design carries no `dof:` block for a palette-placed
+ * part, so `listPartMechanics` reports an empty list and every T2 insert
+ * handle went missing. The palette entry has the template's declared DOFs.
+ */
+function entryTranslationDofs(
+  partId: string,
+  entry: LibraryPaletteEntry | null | undefined,
+): TranslationDof[] {
+  if (!entry) return [];
+  const out: TranslationDof[] = [];
+  for (const dof of entry.dofs) {
+    if ((dof.kind ?? 'translation') !== 'translation') continue;
+    if (dof.axis !== 'x' && dof.axis !== 'y' && dof.axis !== 'z') continue;
+    if (!dof.range) continue;
+    out.push({
+      // `key` is only a React key and a reportClamp label — the dotted service
+      // key is not reachable without an export.
+      key: `${partId}.${dof.name}`,
+      name: dof.name,
+      axis: dof.axis,
+      range: dof.range,
+      unit: dof.unit || 'mm',
+      value: 0,
+      actuatable: Boolean(dof.actuatable),
+    });
+  }
+  return out;
+}
 
 // ── GLB / ghost geometry ─────────────────────────────────────────────────────
 
@@ -323,7 +355,14 @@ function AssemblyPart({
   const insertFoldDeg = useMemo(() => beamAxesOf(part).foldDeg, [part]);
   const render = renderInfoOf(part.libraryRef);
   const color = GLYPH_COLORS[part.category];
-  const templateClass = mechanics?.templateClass ?? null;
+  // WP-99: the T-class comes from the PALETTE registry, not from the exported
+  // service design. `bareComponentSpec` emits no `template:` block (WP-96's
+  // convert.ts), so `mechanics.templateClass` is null for every palette-placed
+  // part — which used to send them all down the "no template" ghost branch and
+  // made `render.glbUrl` unreachable. `mechanics` stays as the fallback for
+  // designs imported with a retained source YAML that DOES declare a template.
+  const entry = libraryEntryOf(part.libraryRef);
+  const templateClass = entry?.templateClass ?? mechanics?.templateClass ?? null;
   const partMarkers = markers.filter(m => m.partId === part.id);
   const locked = templateClass === 'fixed';
   // WP-92: a part with NO cube shell (unbound primitive or template-less
@@ -374,6 +413,17 @@ function AssemblyPart({
             dimmed={dimmed}
             interfaceKind={ifaceKind}
           />
+        ) : render.glbUrl ? (
+          // WP-99: a mesh always wins. This used to sit BELOW the two ghost
+          // branches, so a housed (WP-67) part never showed its housing and a
+          // palette-placed cube never showed its cube. Each fallback now says
+          // which one it is — the shared "no template" label is what made this
+          // bug take a full session to find.
+          <GLBErrorBoundary fallback={<GhostBox color={color} label="mesh failed" dimmed={dimmed} />}>
+            <Suspense fallback={<GhostBox color={color} label="loading…" dimmed={dimmed} />}>
+              <GLBModel url={render.glbUrl} offset={render.glbOffset} dimmed={dimmed} />
+            </Suspense>
+          </GLBErrorBoundary>
         ) : unbound ? (
           // WP-60: an optical primitive with no mechanics at all — drawn as a
           // fainter "not in a cube yet" ghost, distinct from the missing-
@@ -381,14 +431,8 @@ function AssemblyPart({
           <GhostBox color={color} label="UNBOUND" labelColor="#7bdcff" opacity={0.08} dimmed={dimmed} />
         ) : templateClass === null ? (
           <GhostBox color={color} dimmed={dimmed} />
-        ) : render.glbUrl ? (
-          <GLBErrorBoundary fallback={<GhostBox color={color} dimmed={dimmed} />}>
-            <Suspense fallback={<GhostBox color={color} dimmed={dimmed} />}>
-              <GLBModel url={render.glbUrl} offset={render.glbOffset} dimmed={dimmed} />
-            </Suspense>
-          </GLBErrorBoundary>
         ) : (
-          <GhostBox color={color} dimmed={dimmed} />
+          <GhostBox color={color} label="no mesh" dimmed={dimmed} />
         )}
         {(selected || hovered) && (
           <mesh>
@@ -574,8 +618,14 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
       {parts.map(part => {
         if (appearances.get(part.id) !== 'visible') return null;
         const mech = mechanicsById.get(part.id);
-        if (!mech || mech.templateClass === 'fixed') return null;
-        return mech.translationDofs.map(dof => (
+        const entry = libraryEntryOf(part.libraryRef);
+        const tClass = entry?.templateClass ?? mech?.templateClass ?? null;
+        if (tClass === 'fixed') return null;
+        // WP-99: registry DOFs when the export carries none (palette-placed).
+        const dofs = mech?.translationDofs.length
+          ? mech.translationDofs
+          : entryTranslationDofs(part.id, entry);
+        return dofs.map(dof => (
           <InsertHandle
             key={`${part.id}-${dof.key}`}
             part={part}

@@ -178,13 +178,27 @@ export function registerBundleLibrary(
   // Modules → session palette entries.
   const entries: LibraryPaletteEntry[] = [];
   const retained: DsnFiles = {};
+  const seenModules = new Set<string>();
+  const shadowWarned = new Set<string>();
   for (const { path, dir, id } of recordPaths(files, 'modules', /^module\.ya?ml$/)) {
     try {
       const mod = parse(text(files[path])) as Record<string, unknown>;
       const moduleId = String(mod.id ?? id);
+      // A zip may carry the same trio twice (repo library + a setup bundle's
+      // embedded copy) — first one wins, silently.
+      if (seenModules.has(moduleId)) continue;
+      seenModules.add(moduleId);
       if (registered.has(moduleId)) {
-        warnings.push(`${moduleId}: already in the registry — bundle copy ignored`);
-        continue;
+        if (!shadowWarned.has(moduleId)) {
+          shadowWarned.add(moduleId);
+          warnings.push(
+            `${moduleId}: already in the registry — the bundle's mesh/docs fill any gaps, ` +
+              'the registry record stays authoritative',
+          );
+        }
+        // Still register the bundle entry: the palette merge keeps the
+        // registry entry and uses this one only to fill its holes
+        // (enrichEntry) — a hollow registry module gets its optics back.
       }
       const componentId = String(mod.component ?? '').split('@')[0] || null;
       const templateId = String(mod.template ?? '').split('@')[0] || null;
