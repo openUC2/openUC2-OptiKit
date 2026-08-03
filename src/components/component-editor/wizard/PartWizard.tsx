@@ -49,6 +49,7 @@ import { publishRecordFiles } from '../../../model/publishLibrary';
 import { useWorkspaceLibrary } from '../../../model/workspaceLibrary';
 import { zipDsn } from '../../../model/dsn/io';
 import { PartAnatomy } from '../../inspector/PartAnatomy';
+import { MechanicsPanel } from '../../bind/MechanicsPanel';
 import { useBindStore } from '../../bind/bindStore';
 import { ROADS } from './roads';
 import type { WizardCtx } from './wizardTypes';
@@ -207,6 +208,24 @@ export function PartWizard({
             </Typography>
             <current.Body ctx={ctx} />
           </>
+        )}
+
+        {/* WP-114: ONE workbench for the whole road. Rendering it inside each
+            step body tore down and rebuilt the viewport on every "next" — and
+            in the 2×2 split that is four WebGL contexts destroyed and four
+            created per step, against a browser cap that evicts the oldest
+            (the blank, dead canvases). Mounted here it simply persists, which
+            is also what a user expects: the cube stays on screen while they
+            describe it. */}
+        {current?.viewport && (
+          <Box sx={{ mt: 2 }}>
+            <MechanicsPanel
+              draft={draft}
+              record={record}
+              onDraftChange={setDraft}
+              embed={{ hideMountControls: true, hideExits: true }}
+            />
+          </Box>
         )}
 
         {atTerminal && (

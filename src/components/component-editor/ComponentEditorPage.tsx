@@ -671,12 +671,18 @@ export function ComponentEditorPage({
           </Box>
 
           {/* right: preview — the wizard brings its own progress panel, so
-              this column yields its width to the road (WP-110) */}
+              this column yields its width to the road (WP-110).
+              WP-114: UNMOUNTED, not merely `display: none`. A hidden R3F
+              canvas keeps a live WebGL context; browsers cap those (~8–16)
+              and evict the oldest when the cap is hit, which is how the
+              quad-view workbench ended up with dead, blank canvases
+              ("THREE.WebGLRenderer: Context Lost"). A panel nobody can see
+              must not hold a context. */}
+          {!isMobile && !wizardRoad && (
           <Box
             sx={{
-              width: isMobile || wizardRoad ? 0 : 360, flexShrink: 0, overflow: 'auto', p: 2,
+              width: 360, flexShrink: 0, overflow: 'auto', p: 2,
               borderLeft: `1px solid ${muiTheme.palette.divider}`,
-              display: isMobile || wizardRoad ? 'none' : 'block',
             }}
           >
             <Typography variant="overline" color="text.secondary">schematic glyph</Typography>
@@ -712,6 +718,7 @@ export function ComponentEditorPage({
               </AccordionDetails>
             </Accordion>
           </Box>
+          )}
     </Box>
   );
 }

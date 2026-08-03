@@ -12,7 +12,7 @@
  *   - template + module from the mesh placement, datums and template class.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Autocomplete,
@@ -44,15 +44,18 @@ import {
   ViewInAr as CubeIcon,
   CenterFocusStrong as FitIcon,
   ControlCamera as OpticsPlaceIcon,
+  Deblur as MeshIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
   bindToRecords,
   eulerDegToQuat,
+  quatFromDirection,
   quatToEulerDeg,
   recordsToFiles,
   snapToAxis,
+  withBoundOptics,
   type BindAssets,
   type DatumKind,
 } from '../../model/bindRecord';
@@ -181,6 +184,15 @@ export function MechanicsPanel({
   const [attachOpen, setAttachOpen] = useState(false);
 
   const allowedKinds = KINDS_BY_CATEGORY[draft.category] ?? KINDS_BY_CATEGORY.other;
+  // WP-114: the pending datum kind must be one this category allows. The
+  // default is 'source', which a mirror does not offer — the select rendered
+  // BLANK and a click would have authored a 'source' datum on a mirror. It
+  // showed up once the wizard kept the viewport mounted across steps.
+  useEffect(() => {
+    if (!allowedKinds.includes(useBindStore.getState().nextKind)) {
+      useBindStore.getState().setNextKind(allowedKinds[0]);
+    }
+  }, [allowedKinds]);
   // WP-77: the live lensmaker number, without switching to the optics tab.
   // null (reflective stack / afocal / no surfaces) renders as "—".
   const eflMm = paraxialEflMm(draft.surfaces);
@@ -253,9 +265,13 @@ export function MechanicsPanel({
     };
     const files = recordsToFiles(bound, store.meshFile || 'part.step', assets);
     // The draft IS the component half of the pair (unless an existing
-    // library component was picked).
+    // library component was picked). WP-114: the draft's optics carry the
+    // workbench's frames/ports — writing the draft verbatim erased them and
+    // shipped a component whose frames the template contradicted.
     if (!store.existingComponentId && record) {
-      files[`components/${record.id}/component.yml`] = recordToYaml(record);
+      files[`components/${record.id}/component.yml`] = recordToYaml(
+        withBoundOptics(record as unknown as Record<string, unknown>, bound) as unknown as ComponentRecord,
+      );
       const dataUrl = thumb;
       if (dataUrl) saveThumbnail(record.id, dataUrl);
     }
@@ -511,9 +527,16 @@ export function MechanicsPanel({
               snap
             </ToggleButton>
           </Tooltip>
-          <Tooltip title="toggle the ghost 50 mm cube">
+          <Tooltip title="toggle the ghost 50 × 50 × 55 mm cell">
             <ToggleButton value="cube" size="small" selected={store.ghostCube} onChange={() => store.toggleGhostCube()}>
               <CubeIcon fontSize="small" />
+            </ToggleButton>
+          </Tooltip>
+          {/* WP-114: a whole-cube export hides the cell and the datums inside
+              it — hiding the mesh is how you see what you are authoring. */}
+          <Tooltip title="show the loaded STP/GLB — turn it off to see the ghost cell and the datums inside a solid cube">
+            <ToggleButton value="mesh" size="small" selected={store.showMesh} onChange={() => store.toggleShowMesh()}>
+              <MeshIcon fontSize="small" />
             </ToggleButton>
           </Tooltip>
           <Tooltip title="linked 2×2 views: perspective + top/front/side">
@@ -672,14 +695,23 @@ export function MechanicsPanel({
                 />
               </Stack>
               {/* WP-41 follow-up: dial in the placed orientation by typing
-                  exact pitch/roll/yaw after the coarse gizmo drop. */}
-              {isPlaced && (
+                  exact pitch/roll/yaw after the coarse gizmo drop.
+                  WP-114: available on EVERY datum, not only gizmo-placed
+                  ones — a clicked datum had no way to be rotated at all, so
+                  a mirror was stuck at whatever angle the clicked face
+                  implied. Typing an angle promotes the datum to a placed
+                  optic (it gains a quaternion), which also gives it the
+                  rotate gizmo in the viewport. */}
+              {(
                 <Stack direction="row" spacing={0.5} alignItems="center">
                   <Typography variant="caption" color="text.secondary" sx={{ width: 34 }}>
                     rot°
                   </Typography>
                   {(['x', 'y', 'z'] as const).map(axis => {
-                    const euler = quatToEulerDeg(datum.quaternion ?? [0, 0, 0, 1]);
+                    // WP-114: a clicked datum has no quaternion yet — seed it from
+                    // the direction it was clicked at, so typing an angle nudges the
+                    // optic from where it is instead of snapping it to +y.
+                    const euler = quatToEulerDeg(datum.quaternion ?? quatFromDirection(datum.direction));
                     const label = axis === 'x' ? 'pitch' : axis === 'y' ? 'roll' : 'yaw';
                     return (
                       <DecimalField

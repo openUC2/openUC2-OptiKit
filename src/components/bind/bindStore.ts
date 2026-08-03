@@ -36,6 +36,10 @@ interface BindState {
   orthoFlip: Record<OrthoView, boolean>;
   /** Draw the optical model at the datum poses (WP-40). */
   showOptics: boolean;
+  /** WP-114: draw the loaded STP/GLB. Off reveals the ghost cell and the
+   * datums INSIDE a whole-cube export, which is otherwise opaque — the
+   * reason "toggle ghost cube" looked like it did nothing. */
+  showMesh: boolean;
   /** Galvo groundwork (WP-40): mirror-normal tilt, °; the arm swings by 2θ. */
   galvoTiltDeg: number;
   /** WP-42: per-placed-mirror actuation tilt (° about its own pivot), keyed by
@@ -67,6 +71,7 @@ interface BindState {
   setTemplateClass: (c: 'fixed' | 'adaptive' | 'generative') => void;
   setExistingComponentId: (id: string) => void;
   toggleShowOptics: () => void;
+  toggleShowMesh: () => void;
   setGalvoTiltDeg: (deg: number) => void;
   setOpticTilt: (id: string, deg: number) => void;
   toggleWholeModule: () => void;
@@ -117,6 +122,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   templateClass: 'fixed',
   existingComponentId: '',
   showOptics: true,
+  showMesh: true,
   galvoTiltDeg: 0,
   opticTilt: {},
   wholeModule: false,
@@ -131,6 +137,7 @@ export const useBindStore = create<BindState>((set, get) => ({
       meshFile,
       glbBytes,
       stepBytes,
+      showMesh: true,
       datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null,
@@ -146,6 +153,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   setTemplateClass: templateClass => set({ templateClass }),
   setExistingComponentId: existingComponentId => set({ existingComponentId }),
   toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
+  toggleShowMesh: () => set(s => ({ showMesh: !s.showMesh })),
   setGalvoTiltDeg: galvoTiltDeg => set({ galvoTiltDeg }),
   setOpticTilt: (id, deg) => set(s => ({ opticTilt: { ...s.opticTilt, [id]: deg } })),
   toggleWholeModule: () => set(s => ({ wholeModule: !s.wholeModule, housingOnly: false })),
@@ -216,6 +224,6 @@ export const useBindStore = create<BindState>((set, get) => ({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null, meshSizeMm: null, selectedOpticId: null, error: null,
-      wholeModule: false, housingOnly: false,
+      wholeModule: false, housingOnly: false, showMesh: true,
     }),
 }));

@@ -36,7 +36,6 @@ import { zipDsn } from '../../../model/dsn/io';
 import { OpticGlyph } from '../../bind/OpticsOverlay';
 import { PreviewCanvas } from '../../common/PreviewCanvas';
 import { DecimalField } from '../../common/DecimalField';
-import { MechanicsPanel } from '../../bind/MechanicsPanel';
 
 import { useBindStore } from '../../bind/bindStore';
 import {
@@ -629,24 +628,15 @@ export function NumbersBuildIt({ ctx }: { ctx: WizardCtx }) {
 
 // ── road B · "I have a CAD file of a device" (WP-112) ────────────────────────
 
-export function DeviceMechanics({ ctx }: { ctx: WizardCtx }) {
+export function DeviceMechanics() {
   const meshSizeMm = useBindStore(s => s.meshSizeMm);
+  if (!meshSizeMm) return null;
   return (
-    <Stack spacing={1}>
-      {meshSizeMm && (
-        <Chip
-          size="small"
-          sx={{ alignSelf: 'flex-start' }}
-          label={`measured bounding box: ${meshSizeMm.map(v => v.toFixed(1)).join(' × ')} mm`}
-        />
-      )}
-      <MechanicsPanel
-        draft={ctx.draft}
-        record={ctx.record}
-        onDraftChange={ctx.setDraft}
-        embed={{ hideMountControls: true, hideExits: true }}
-      />
-    </Stack>
+    <Chip
+      size="small"
+      sx={{ alignSelf: 'flex-start' }}
+      label={`measured bounding box: ${meshSizeMm.map(v => v.toFixed(1)).join(' × ')} mm`}
+    />
   );
 }
 
@@ -689,19 +679,13 @@ export function DeviceAlign({ ctx }: { ctx: WizardCtx }) {
             ' The incoming and outgoing beam arms update live as the plane is picked — if the fold looks wrong here, it will be wrong in the schematic too.'}
         </Typography>
       </Alert>
-      <MechanicsPanel
-        draft={ctx.draft}
-        record={ctx.record}
-        onDraftChange={ctx.setDraft}
-        embed={{ hideMountControls: true, hideExits: true }}
-      />
     </Stack>
   );
 }
 
 // ── road C · "I have an Inventor cube" (WP-113) ──────────────────────────────
 
-export function CubeMesh({ ctx }: { ctx: WizardCtx }) {
+export function CubeMesh() {
   const meshSizeMm = useBindStore(s => s.meshSizeMm);
   const fitToCube = useBindStore(s => s.fitToCube);
   const meshBboxCenter = useBindStore(s => s.meshBboxCenter);
@@ -735,12 +719,6 @@ export function CubeMesh({ ctx }: { ctx: WizardCtx }) {
           <Typography variant="caption">{offCentre}</Typography>
         </Alert>
       )}
-      <MechanicsPanel
-        draft={ctx.draft}
-        record={ctx.record}
-        onDraftChange={ctx.setDraft}
-        embed={{ hideMountControls: true, hideExits: true }}
-      />
     </Stack>
   );
 }

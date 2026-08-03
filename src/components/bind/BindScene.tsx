@@ -64,12 +64,16 @@ const KIND_COLORS: Record<string, string> = {
   custom: '#e478ff',
 };
 
+/** The 1x1 cell. WP-114: 50 x 50 x 55 mm in DOC axes (CLAUDE.md / UC2_GRID_MM)
+ * — three-space is y-up, so the 55 mm z pitch is the y extent here. It was
+ * drawn as a 50 cube, which is why it vanished inside a real whole-cube mesh
+ * and the toggle looked dead. */
 function GhostCube() {
-  const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(50, 50, 50)), []);
+  const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(50, 55, 50)), []);
   return (
     <group>
       <mesh raycast={NO_RAYCAST}>
-        <boxGeometry args={[50, 50, 50]} />
+        <boxGeometry args={[50, 55, 50]} />
         <meshStandardMaterial color="#4aa3ff" transparent opacity={0.08} depthWrite={false} />
       </mesh>
       <lineSegments geometry={edges} raycast={NO_RAYCAST}>
@@ -125,10 +129,15 @@ function PartMesh() {
   const transform = useBindStore(s => s.transform);
   const mode = useBindStore(s => s.mode);
   const snap = useBindStore(s => s.snap);
+  const showMesh = useBindStore(s => s.showMesh);
   const setTransform = useBindStore(s => s.setTransform);
   const addDatum = useBindStore(s => s.addDatum);
   const groupRef = useRef<THREE.Group>(null);
   const [scene, setScene] = useState<THREE.Group | null>(null);
+  // WP-114: where the pointer went down, so an ORBIT DRAG that happens to end
+  // on the part is not mistaken for a datum click (datum mode now leaves the
+  // camera free — see Viewport).
+  const downAt = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!glbBytes) {
@@ -178,8 +187,19 @@ function PartMesh() {
     return q;
   }, [transform.rotationDeg]);
 
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    downAt.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+  };
+
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (mode !== 'datum' || !e.face || !groupRef.current) return;
+    // A drag is a camera move, not an authoring click.
+    const from = downAt.current;
+    downAt.current = null;
+    if (from) {
+      const moved = Math.hypot(e.nativeEvent.clientX - from.x, e.nativeEvent.clientY - from.y);
+      if (moved > 4) return;
+    }
     e.stopPropagation();
     // Convert the world hit into the PART frame (WP-31): datums belong to
     // the mesh and follow it through later transforms.
@@ -197,7 +217,7 @@ function PartMesh() {
     setTransform(threePoseToMeshTransform(g.position, g.quaternion));
   };
 
-  if (!scene) return null;
+  if (!scene || !showMesh) return null;
   // WP-33 bug fix: the gizmo must attach to OUR group via the explicit
   // `object` prop. As a child of <TransformControls> the controls attach to
   // their own internal wrapper group instead — drags moved that throwaway
@@ -211,6 +231,7 @@ function PartMesh() {
         ref={groupRef}
         position={docToThree(transform.positionMm)}
         quaternion={quaternion}
+        onPointerDown={onPointerDown}
         onClick={onClick}
       >
         <primitive object={scene} />
@@ -376,7 +397,6 @@ const ORTHO_POSES: Record<OrthoView, { normal: [number, number, number]; flipped
 };
 
 function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDraft }) {
-  const mode = useBindStore(s => s.mode);
   const flip = useBindStore(s => (ortho ? s.orthoFlip[ortho] : false));
   const pose = ortho ? ORTHO_POSES[ortho] : null;
   // Resolved outside the Canvas (MUI context doesn't cross R3F).
@@ -401,11 +421,14 @@ function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDra
           far={10000}
         />
       )}
+      {/* WP-114: datum mode used to DISABLE the camera, so the only way to
+          reach a face was the fixed ortho views — "we cannot move the glb
+          freely". The camera stays live; PartMesh ignores a click that
+          travelled more than a few pixels, so orbiting never drops a datum. */}
       <OrbitControls
         makeDefault
         enableDamping
         dampingFactor={0.12}
-        enabled={mode !== 'datum'}
         enableRotate={!ortho}
       />
       <SceneContent colors={colors} draft={draft} />

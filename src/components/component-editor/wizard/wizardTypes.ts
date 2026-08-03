@@ -35,6 +35,13 @@ export interface WizardStepDef {
    * is the point, so it gets room. */
   help: string;
   Body: React.ComponentType<{ ctx: WizardCtx }>;
+  /**
+   * WP-114: this step shows the bind workbench viewport. The SHELL renders
+   * it, once, so it survives every step transition within a road — each
+   * mount/unmount of the 2x2 split view creates and destroys FOUR WebGL
+   * contexts, and browsers cap live contexts and evict the oldest.
+   */
+  viewport?: boolean;
   /** null = may advance; otherwise the sentence saying what is missing. */
   blocked?: (ctx: WizardCtx, bind: WizardBindView) => string | null;
 }

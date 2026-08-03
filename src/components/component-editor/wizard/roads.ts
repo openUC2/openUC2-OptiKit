@@ -113,6 +113,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
     steps: [
       {
         key: 'mechanics',
+        viewport: true,
         label: 'the mechanics',
         help:
           'Drop the STEP (or GLB) of the device — a kinematic mount, a laser body, a camera. ' +
@@ -126,6 +127,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       },
       {
         key: 'optics',
+        viewport: true,
         label: 'the optics',
         help:
           'What does this device do to light? Pick the category and fill the fields that ' +
@@ -136,6 +138,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       },
       {
         key: 'align',
+        viewport: true,
         label: 'align the optics to the mechanics',
         help:
           'This step makes it ONE part instead of two unrelated files. A datum is the point on ' +
@@ -190,6 +193,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
     steps: [
       {
         key: 'mesh',
+        viewport: true,
         label: 'the cube',
         help:
           'Drop the Inventor export (STEP or GLB) of the WHOLE cube — cube body, insert, optic, ' +
@@ -206,13 +210,26 @@ export const ROADS: Record<RoadId, RoadDef> = {
         },
       },
       {
+        key: 'optics',
+        viewport: true,
+        label: 'the optics',
+        help:
+          'What is inside this cube? Declare it FIRST — the category decides which datum ' +
+          'the next step asks for (a mirror wants its reflective plane, a lens its front ' +
+          'vertex), what the side panel previews, and what simulation traces once the ' +
+          'module is placed.',
+        Body: DeviceOptics,
+        blocked: ctx => firstBlockingError(ctx),
+      },
+      {
         key: 'datums',
+        viewport: true,
         label: 'the datums',
         help:
-          'Where inside the cube does the optic act? If the export is marker-stamped (the ' +
-          'Inventor naming contract), the datum frames extract automatically — confirm what ' +
-          'was found. Otherwise click the optical surface in datum mode, exactly like the ' +
-          'housing road.',
+          'Now that the cube knows what optic it holds: where inside it does that optic ' +
+          'act? If the export is marker-stamped (the Inventor naming contract), the datum ' +
+          'frames extract automatically — confirm what was found. Otherwise click the ' +
+          'optical surface in datum mode, exactly like the housing road.',
         Body: CubeDatums,
         blocked: (ctx, bind) => {
           const expected = expectedDatumOf(ctx.draft.category);
@@ -221,15 +238,6 @@ export const ROADS: Record<RoadId, RoadDef> = {
             : `no datum or placed optic yet — click ${expected.what} in datum mode, or add ` +
               'an optic and place it on its face';
         },
-      },
-      {
-        key: 'optics',
-        label: 'the optics',
-        help:
-          'What is inside this cube — the same per-category form as the other roads. The ' +
-          'record you author here is what simulation traces when the module is placed.',
-        Body: DeviceOptics,
-        blocked: ctx => firstBlockingError(ctx),
       },
       {
         key: 'verify',

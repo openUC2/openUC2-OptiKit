@@ -153,6 +153,25 @@ export function eulerDegToQuat(d: {
   return [round6(q.x), round6(q.y), round6(q.z), round6(q.w)];
 }
 
+/**
+ * WP-114: the part-frame orientation quaternion that puts the optic's local
+ * optical axis (+y) along `direction`.
+ *
+ * A CLICKED datum states its orientation as a bare direction; a PLACED one as
+ * a quaternion. Seeding the quaternion from the direction is what makes
+ * "type a pitch/roll/yaw on a clicked datum" continuous instead of a jump —
+ * the optic starts exactly where the clicked face put it.
+ */
+export function quatFromDirection(direction: Vec3): [number, number, number, number] {
+  const d = new THREE.Vector3(...direction);
+  if (d.lengthSq() < 1e-12) return [0, 0, 0, 1];
+  const q = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    d.normalize(),
+  );
+  return [round6(q.x), round6(q.y), round6(q.z), round6(q.w)];
+}
+
 /** The optic's local optical axis (+y) in the cube frame — a placed mirror's
  * surface normal (WP-41). */
 function cubeNormalOf(datum: BindDatum, t: MeshTransform): THREE.Vector3 {
@@ -387,11 +406,18 @@ export function bindToRecords(input: BindInput): BoundRecords {
     }
     frames[name] = frame;
 
-    // A placed mirror emits BOTH beam endpoints derived from its surface
-    // normal (WP-41 + WP-40 reflection law): a +x-incoming beam reflects off
-    // the placed normal, so the schematic folds accordingly. Everything else
-    // keeps the single datum port.
-    if (datum.kind === 'reflective' && datum.quaternion) {
+    // A mirror emits BOTH beam endpoints derived from its surface normal
+    // (WP-41 + WP-40 reflection law): a +x-incoming beam reflects off the
+    // normal, so the schematic folds accordingly. Everything else keeps the
+    // single datum port.
+    //
+    // WP-114: this used to require `datum.quaternion`, i.e. a GIZMO-PLACED
+    // optic. A datum authored by CLICKING the reflective face — the road the
+    // cube wizard actually teaches — fell through to the single-port branch,
+    // so the fold was never recorded and the mirror rendered unfolded in the
+    // assembly. `cubeNormalOf` already falls back to the datum direction, so
+    // both roads describe the same mirror.
+    if (datum.kind === 'reflective') {
       const n = cubeNormalOf(datum, input.meshTransform).normalize();
       const incoming = new THREE.Vector3(1, 0, 0); // canonical cube optical axis
       const reflected = incoming.clone().sub(n.clone().multiplyScalar(2 * incoming.dot(n)));
@@ -499,7 +525,16 @@ export function bindToRecords(input: BindInput): BoundRecords {
   if (input.wholeModule) {
     template.provenance = 'whole-module';
     const insertFrames: Record<string, unknown> = {};
-    for (const name of opticFrameNames.length ? opticFrameNames : Object.keys(ports)) {
+    // WP-114: fall back to the frames the PORTS actually reference, not to
+    // the port NAMES. A mirror's ports are 'front'/'reflected' but both hang
+    // off the single datum frame, so keying by port name found only 'front'
+    // and missed the frame entirely when the names diverged — leaving
+    // `frames:` empty, which is what made verify-t1's OK vacuous
+    // (W_NO_INSERT_FRAME: it passes without ever comparing a pose).
+    const portFrameNames = Object.values(ports).map(
+      p => (p as { frame?: string }).frame ?? '',
+    );
+    for (const name of opticFrameNames.length ? opticFrameNames : portFrameNames) {
       if (frames[name]) insertFrames[name] = frames[name];
     }
     if (Object.keys(insertFrames).length > 0) template.frames = insertFrames;
@@ -533,6 +568,48 @@ export function bindToRecords(input: BindInput): BoundRecords {
   };
 
   return { component, template, module, warnings, errors };
+}
+
+/**
+ * WP-114 — the component record as it must actually ship: the DRAFT's optics
+ * (what it does to light — the fragment, the materials, the mount angle) with
+ * the WORKBENCH's frames and ports (where on the mesh it sits, and how the
+ * beam enters and leaves).
+ *
+ * Both halves are needed and neither is a superset. The bind flow used to
+ * build a datum-derived stub component and then have the caller overwrite it
+ * wholesale with `recordToYaml(draft)` — so the template declared frames
+ * named after the datums while the shipped component still declared only
+ * `optical` at z=0. That is the E_POSE_MISMATCH verify-t1 reports
+ * ("template holds frame 'front' but component declares no such datum
+ * frame"), and it is why a mirror's authored orientation never reached any
+ * record and the part rendered unfolded in the assembly.
+ *
+ * `bound.component` is null when the pair binds an EXISTING library
+ * component; then there is nothing to merge and the draft stands as authored.
+ */
+export function withBoundOptics(
+  record: Record<string, unknown>,
+  bound: BoundRecords,
+): Record<string, unknown> {
+  const stub = bound.component;
+  if (!stub) return record;
+  const stubOptics = (stub.optics ?? {}) as Record<string, unknown>;
+  const frames = stubOptics.frames as Record<string, unknown> | undefined;
+  const ports = stubOptics.ports as Record<string, unknown> | undefined;
+  // No authored datums (frames is just the reserved `optical` origin, no
+  // ports) — the draft already says everything true about this part.
+  if (!ports || Object.keys(ports).length === 0) return record;
+  const draftOptics = (record.optics ?? {}) as Record<string, unknown>;
+  return {
+    ...record,
+    optics: {
+      ...draftOptics,
+      // The mesh is the authority on WHERE; the draft on WHAT.
+      ...(frames ? { frames } : {}),
+      ports,
+    },
+  };
 }
 
 /** ±Infinity → .inf survives the yaml stringifier via a replacer pass. */

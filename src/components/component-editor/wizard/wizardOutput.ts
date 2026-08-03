@@ -10,6 +10,7 @@
 import {
   bindToRecords,
   recordsToFiles,
+  withBoundOptics,
   type BindDatum,
   type MeshTransform,
 } from '../../../model/bindRecord';
@@ -89,7 +90,13 @@ export function buildWizardOutput(
     glb: bind.glbBytes,
     thumbnailPng: null,
   });
-  files[`components/${record.id}/component.yml`] = recordToYaml(record);
+  // WP-114: the draft's optics with the workbench's frames/ports folded in.
+  // Writing `recordToYaml(record)` verbatim here erased the datum-derived
+  // frames the TEMPLATE declares, which is exactly the E_POSE_MISMATCH
+  // verify-t1 reports on the last step of this very road.
+  files[`components/${record.id}/component.yml`] = recordToYaml(
+    withBoundOptics(record as unknown as Record<string, unknown>, bound) as unknown as ComponentRecord,
+  );
   const ids = [
     record.id,
     bound.template.id as string,
