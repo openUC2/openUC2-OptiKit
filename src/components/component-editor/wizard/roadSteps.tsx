@@ -19,10 +19,10 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { Line, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { saveAs } from 'file-saver';
-import { stringify as stringifyYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import {
   derivedPortWarnings,
   foldDegOfDraft,
@@ -37,7 +37,7 @@ import { PreviewCanvas } from '../../common/PreviewCanvas';
 import { DecimalField } from '../../common/DecimalField';
 
 import { useBindStore } from '../../bind/bindStore';
-import { IDENTITY_INSERT_POSE } from '../../../model/bindRecord';
+import { IDENTITY_INSERT_POSE, posePoint } from '../../../model/bindRecord';
 import {
   CoreServiceError,
   base64ToBytes,
@@ -861,6 +861,78 @@ export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
   );
 }
 
+/** WP-119: one compared frame pair — the component's optical frame carried
+ * through the insert-pose (F2→F3) vs the template's declared frame. */
+interface FramePair {
+  name: string;
+  /** pose ∘ component frame, F3 mm. */
+  comp: [number, number, number];
+  /** template frame, F3 mm. */
+  tpl: [number, number, number];
+  deltaMm: number;
+}
+
+const docToThreeV = (v: [number, number, number]): [number, number, number] => [v[0], v[2], -v[1]];
+
+/** WP-119: the two triads verify-t1 compares, drawn — agreement merges in
+ * green, disagreement is a red arrow you can read without any text. */
+function VerifyFramesScene({ pairs, vacuous }: { pairs: FramePair[]; vacuous: boolean }) {
+  return (
+    <Box sx={{ height: 220, borderRadius: 1, overflow: 'hidden' }}>
+      <PreviewCanvas camera={{ position: [70, 50, 70], fov: 40 }}>
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[60, 100, 50]} intensity={1.0} />
+        {/* the cell (F3, drawn in viewer axes: 55 mm pitch vertical) */}
+        <mesh>
+          <boxGeometry args={[50, 55, 50]} />
+          <meshBasicMaterial color="#4a90d9" wireframe transparent opacity={0.25} />
+        </mesh>
+        {vacuous && (
+          // absence you can see: where the template frame SHOULD be
+          <mesh>
+            <boxGeometry args={[14, 14, 14]} />
+            <meshBasicMaterial color="#e0a030" wireframe transparent opacity={0.9} />
+          </mesh>
+        )}
+        {pairs.map(pair => {
+          const ok = pair.deltaMm <= 0.05;
+          const c = docToThreeV(pair.comp);
+          const t = docToThreeV(pair.tpl);
+          return (
+            <group key={pair.name}>
+              {/* component frame through the pose */}
+              <group position={c}>
+                <axesHelper args={[10]} />
+                <mesh>
+                  <sphereGeometry args={[1.4, 16, 12]} />
+                  <meshBasicMaterial color={ok ? '#2f9e6e' : '#3d7dd8'} />
+                </mesh>
+              </group>
+              {/* template's declared frame */}
+              <group position={t}>
+                <mesh>
+                  <sphereGeometry args={[2.2, 16, 12]} />
+                  <meshBasicMaterial
+                    color={ok ? '#2f9e6e' : '#d1495b'}
+                    transparent
+                    opacity={ok ? 0.55 : 0.85}
+                    wireframe
+                  />
+                </mesh>
+              </group>
+              {/* the delta arrow — red when it matters */}
+              {!ok && (
+                <Line points={[c, t]} color="#d1495b" lineWidth={3} />
+              )}
+            </group>
+          );
+        })}
+        <OrbitControls enablePan={false} minDistance={50} maxDistance={200} />
+      </PreviewCanvas>
+    </Box>
+  );
+}
+
 /** WP-113.4: verify BEFORE publish — do the optical model and the mechanics
  * agree? Runs optikit-core's verify_t1 over the PROPOSED trio via the
  * service; nothing has been written yet. */
@@ -903,6 +975,70 @@ export function CubeVerify({ ctx }: { ctx: WizardCtx }) {
 
   const vacuous = result?.findings.some(f => f.code === 'W_NO_INSERT_FRAME') ?? false;
 
+  // WP-119: recompute the compared positions from the EMITTED records —
+  // the same arithmetic verify-t1 runs, so the drawing and the findings
+  // cannot disagree.
+  const pairs = useMemo<FramePair[]>(() => {
+    const yml = Object.entries(output.files).filter(
+      ([p, c]) => typeof c === 'string' && p.endsWith('.yml'),
+    );
+    const comp = yml.find(([p]) => p.includes('components/'));
+    const tpl = yml.find(([p]) => p.includes('templates/'));
+    if (!comp || !tpl) return [];
+    try {
+      const compDoc = parseYaml(comp[1] as string) as {
+        optics?: { frames?: Record<string, Record<string, number>> };
+      };
+      const tplDoc = parseYaml(tpl[1] as string) as {
+        frames?: Record<string, Record<string, number>>;
+        'insert-pose'?: {
+          rotation?: { grid?: { z?: string; x?: string }; 'offset-deg'?: Record<string, number> };
+          translation?: { 'offset-mm'?: Record<string, number> };
+        };
+      };
+      const ip = tplDoc['insert-pose'];
+      const pose = ip
+        ? {
+            rot24: {
+              z: (ip.rotation?.grid?.z ?? '+z') as '+z',
+              x: (ip.rotation?.grid?.x ?? '+x') as '+x',
+            },
+            offsetDeg: [
+              ip.rotation?.['offset-deg']?.x ?? 0,
+              ip.rotation?.['offset-deg']?.y ?? 0,
+              ip.rotation?.['offset-deg']?.z ?? 0,
+            ] as [number, number, number],
+            offsetMm: [
+              ip.translation?.['offset-mm']?.x ?? 0,
+              ip.translation?.['offset-mm']?.y ?? 0,
+              ip.translation?.['offset-mm']?.z ?? 0,
+            ] as [number, number, number],
+          }
+        : { ...IDENTITY_INSERT_POSE };
+      return Object.entries(tplDoc.frames ?? {}).map(([name, tf]) => {
+        const cf = compDoc.optics?.frames?.[name] ?? {};
+        const posed = posePoint(pose, [
+          cf['x-mm'] ?? 0,
+          cf['y-mm'] ?? 0,
+          cf['z-mm'] ?? 0,
+        ]);
+        const tplPos: [number, number, number] = [
+          tf['x-mm'] ?? 0,
+          tf['y-mm'] ?? 0,
+          tf['z-mm'] ?? 0,
+        ];
+        const deltaMm = Math.hypot(
+          posed[0] - tplPos[0],
+          posed[1] - tplPos[1],
+          posed[2] - tplPos[2],
+        );
+        return { name, comp: posed as [number, number, number], tpl: tplPos, deltaMm };
+      });
+    } catch {
+      return [];
+    }
+  }, [output.files]);
+
   return (
     <Stack spacing={1.5} sx={{ maxWidth: 680 }}>
       {records.length < 3 && (
@@ -929,6 +1065,26 @@ export function CubeVerify({ ctx }: { ctx: WizardCtx }) {
             that the model and the metal agree.
           </Typography>
         </Alert>
+      )}
+      {(pairs.length > 0 || vacuous) && (
+        <>
+          <VerifyFramesScene pairs={pairs} vacuous={vacuous} />
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            {pairs.map(pair => (
+              <Chip
+                key={pair.name}
+                size="small"
+                color={pair.deltaMm <= 0.05 ? 'success' : 'error'}
+                variant="outlined"
+                label={`${pair.name}: Δ ${pair.deltaMm.toFixed(3)} mm`}
+              />
+            ))}
+            {vacuous && (
+              <Chip size="small" color="warning" variant="outlined"
+                label="no template frame to compare — the dashed box is the absence" />
+            )}
+          </Stack>
+        </>
       )}
       {result && (
         <>
