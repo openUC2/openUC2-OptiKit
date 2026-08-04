@@ -65,8 +65,13 @@ interface BindState {
   /** Bbox center of the loaded mesh in doc mm (reported by the scene), for
    * the "fit to cube" snap. */
   meshBboxCenter: Vec3 | null;
-  /** WP-109: the loaded mesh's measured size in doc mm (x, y, z). */
+  /** WP-109/WP-120: the loaded mesh's measured size in FILE-NATIVE axes
+   * (F3), matching optikit-core's glb_bounding_box exactly. */
   meshSizeMm: Vec3 | null;
+  /** WP-120: which frame the loaded mesh is authored in — 'record' when an
+   * Rx(±90°) wrapper node was detected (the pre-rotated exports), 'cube'
+   * otherwise. Emitted as the template's mesh-frame declaration. */
+  meshFrameDetected: 'cube' | 'record' | null;
   /** The optic instance (datum id) the placement gizmo drives, or null. */
   selectedOpticId: string | null;
   /** Placement gizmo mode in optics mode: move the optic or ROTATE it onto
@@ -150,6 +155,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   housingOnly: false,
   meshBboxCenter: null,
   meshSizeMm: null,
+  meshFrameDetected: null,
   selectedOpticId: null,
   opticsGizmoMode: 'translate',
 
@@ -163,6 +169,7 @@ export const useBindStore = create<BindState>((set, get) => ({
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null,
       meshSizeMm: null,
+      meshFrameDetected: null,
       selectedOpticId: null,
       error: null,
     }),
@@ -214,9 +221,10 @@ export const useBindStore = create<BindState>((set, get) => ({
   fitToCube: () => {
     const c = get().meshBboxCenter;
     if (!c) return;
-    // Center the module's bbox on the cube origin (translation only — the
-    // whole export is already at cube scale/orientation from Inventor).
-    set({ transform: { positionMm: [-c[0], -c[1], -c[2]], rotationDeg: [0, 0, 0] } });
+    // Center the module's bbox on the cube origin (translation only). The
+    // centre is FILE-NATIVE (WP-120); the doc-frame translation p must
+    // satisfy docToThree(p) = (-cx, -cy, -cz), i.e. p = (-cx, cz, -cy).
+    set({ transform: { positionMm: [-c[0], c[2], -c[1]], rotationDeg: [0, 0, 0] } });
   },
   selectOptic: selectedOpticId => set({ selectedOpticId }),
   setOpticsGizmoMode: opticsGizmoMode => set({ opticsGizmoMode }),
@@ -269,7 +277,7 @@ export const useBindStore = create<BindState>((set, get) => ({
     set({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
-      meshBboxCenter: null, meshSizeMm: null, selectedOpticId: null, error: null,
+      meshBboxCenter: null, meshSizeMm: null, meshFrameDetected: null, selectedOpticId: null, error: null,
       wholeModule: false, housingOnly: false, showMesh: true, insertPose: null,
       hideCubeHalves: false,
     }),

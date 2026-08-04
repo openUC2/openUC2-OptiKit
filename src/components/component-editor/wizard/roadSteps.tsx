@@ -59,6 +59,7 @@ import {
   t2ModuleRecord,
 } from './onePartDesign';
 import {
+  axesPermutedNote,
   cellMismatch,
   expectedDatumOf,
   insertFit,
@@ -694,6 +695,7 @@ export function CubeMesh() {
   // out in the wizard beats finding out when it renders on its side. An
   // off-centre origin is a fixable note, not a refusal.
   const mismatch = cellMismatch(meshSizeMm);
+  const permuted = axesPermutedNote(meshSizeMm);
   const offCentre = offCentreNote(meshBboxCenter);
   return (
     <Stack spacing={1}>
@@ -712,6 +714,11 @@ export function CubeMesh() {
       {mismatch && (
         <Alert severity="error">
           <Typography variant="caption">{mismatch}</Typography>
+        </Alert>
+      )}
+      {!mismatch && permuted && (
+        <Alert severity="warning">
+          <Typography variant="caption">{permuted}</Typography>
         </Alert>
       )}
       {!mismatch && offCentre && (

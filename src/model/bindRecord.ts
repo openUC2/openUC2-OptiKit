@@ -322,6 +322,10 @@ export interface BindInput {
    * cube can be generated around it later (T3) or exported for Inventor.
    */
   housingOnly?: boolean;
+  /** WP-120: which frame the mesh is authored in ('cube' | 'record'),
+   * detected at load — declared on the template so `library validate`'s
+   * axes check stops guessing between the two shipping conventions. */
+  meshFrame?: 'cube' | 'record' | null;
   /**
    * WP-116: the F2→F3 pose. When present, the template's frames are
    * insert-pose ∘ recordFrames and the datums are ignored — the pose IS the
@@ -525,6 +529,7 @@ export function bindToRecords(input: BindInput): BoundRecords {
       : { 'x-mm': 50, 'y-mm': 50, 'z-mm': 55 },
     ...(isStep ? { step: input.meshFile } : {}),
     glb: input.meshFile.replace(/\.(step|stp)$/i, '.glb'),
+    ...(input.meshFrame ? { 'mesh-frame': input.meshFrame } : {}),
     optical_ports: Object.fromEntries(
       Object.entries(ports).map(([name, port]) => [name, port]),
     ),

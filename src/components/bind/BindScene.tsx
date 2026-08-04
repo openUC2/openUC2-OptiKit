@@ -168,9 +168,29 @@ function PartMesh() {
         if (!box.isEmpty()) {
           const c = box.getCenter(new THREE.Vector3());
           const s = box.getSize(new THREE.Vector3());
-          useBindStore.getState().reportMeshBbox(threeToDoc(c), [
-            Math.abs(s.x), Math.abs(s.z), Math.abs(s.y),
-          ]);
+          // WP-120: FILE-NATIVE axes — exactly what optikit-core's
+          // glb_bounding_box measures. The old [s.x, s.z, s.y] viewer swap
+          // made the frontend and `library validate` disagree about which
+          // axis carries the 55 mm (49.8 × 54.4 × 49.8 here vs
+          // 49.8 × 49.8 × 54.4 there) and shipped swapped envelopes.
+          useBindStore.getState().reportMeshBbox(
+            [c.x, c.y, c.z],
+            [Math.abs(s.x), Math.abs(s.y), Math.abs(s.z)],
+          );
+          // WP-120: the two glTF conventions (mesh.py's W_MESH_AXES_PERMUTED)
+          // — older exports carry an Rx(±90°) wrapper node that pre-rotates
+          // the cube-frame content. Detect it so the emitted template can
+          // DECLARE its mesh-frame instead of leaving validate guessing.
+          let wrapper = false;
+          for (const child of gltf.scene.children) {
+            const e = new THREE.Euler().setFromQuaternion(child.quaternion, 'XYZ');
+            if (
+              Math.abs(Math.abs(THREE.MathUtils.radToDeg(e.x)) - 90) < 1 &&
+              Math.abs(THREE.MathUtils.radToDeg(e.y)) < 1 &&
+              Math.abs(THREE.MathUtils.radToDeg(e.z)) < 1
+            ) wrapper = true;
+          }
+          useBindStore.setState({ meshFrameDetected: wrapper ? 'record' : 'cube' });
         }
       },
       err => {

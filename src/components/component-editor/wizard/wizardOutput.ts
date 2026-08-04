@@ -33,6 +33,8 @@ export interface WizardBindState {
   meshSizeMm: Vec3 | null;
   /** WP-116: the F2→F3 pose the cube road authors. */
   insertPose?: InsertPose | null;
+  /** WP-120: the detected mesh frame, declared on the template. */
+  meshFrameDetected?: 'cube' | 'record' | null;
 }
 
 export interface WizardOutput {
@@ -89,6 +91,7 @@ export function buildWizardOutput(
     existingComponent: null,
     wholeModule: bind.wholeModule,
     housingOnly: bind.housingOnly,
+    meshFrame: bind.meshFrameDetected ?? null,
     // WP-116: the F2 side verbatim; the pose does the transforming.
     insertPose: bind.insertPose ?? null,
     recordFrames: Object.fromEntries(

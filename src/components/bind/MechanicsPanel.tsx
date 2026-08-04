@@ -268,6 +268,7 @@ export function MechanicsPanel({
       existingComponent: existing,
       wholeModule: store.wholeModule,
       housingOnly: store.housingOnly,
+      meshFrame: store.meshFrameDetected,
       // WP-116: the F2 side, verbatim from the draft — the pose transforms it.
       insertPose: store.insertPose,
       recordFrames: Object.fromEntries(
@@ -282,7 +283,7 @@ export function MechanicsPanel({
     });
   }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
       store.meshFile, store.transform, store.meshSizeMm, store.datums, store.wholeModule,
-      store.housingOnly, store.insertPose]);
+      store.housingOnly, store.insertPose, store.meshFrameDetected]);
 
   const pairFiles = () => {
     if (!bound) return null;
