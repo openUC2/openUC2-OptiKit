@@ -17,7 +17,13 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Vec3 } from '../../document';
-import { datumToCube, poseDirection, posePoint } from '../../model/bindRecord';
+import {
+  datumToCube,
+  docQuatToThree,
+  insertPoseMatrix,
+  posePoint,
+  threeQuatToDoc,
+} from '../../model/bindRecord';
 import {
   PORT_AXIS_VECTORS,
   maxSemiApertureMm,
@@ -127,6 +133,11 @@ export function OpticGlyph({
 }) {
   const semi = diameterMm ? diameterMm / 2 : maxSemiApertureMm(surfaces);
   const isMirror = ['mirror', 'beamsplitter', 'dichroic'].includes(category);
+  // WP-121: the reflective surface's rectangular clear aperture, when declared.
+  const mirrorRect =
+    surfaces.find(su => su.reflective)?.apertureRectMm ??
+    surfaces[0]?.apertureRectMm ??
+    null;
   const isDetector = category === 'detector';
   const isSource = category === 'source';
   const hasGlass = !isMirror && !isDetector && !isSource && surfaces.length > 0;
@@ -174,7 +185,14 @@ export function OpticGlyph({
           quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal)}
         >
           <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={NO_RAYCAST}>
-            <circleGeometry args={[semi, 48]} />
+            {/* WP-121: a beam-fold mirror is often RECTANGULAR (WP-90's
+                apertureRectMm) — draw the plate the record declares instead
+                of always a disc. */}
+            {mirrorRect ? (
+              <planeGeometry args={[mirrorRect[0], mirrorRect[1]]} />
+            ) : (
+              <circleGeometry args={[semi, 48]} />
+            )}
             <meshStandardMaterial
               color={PLANE_COLOR} transparent opacity={0.4}
               side={THREE.DoubleSide} depthWrite={false}
@@ -227,9 +245,14 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
       if (!entryPort) return null;
       const entryFrame = draft.frames.find(f => f.name === entryPort.frame);
       const dir = PORT_AXIS_VECTORS[entryPort.direction] ?? ([0, 0, -1] as [number, number, number]);
+      // WP-121: direction stays UNPOSED — the quat below composes the full
+      // pose rotation on top, so residual roll about the beam axis reaches
+      // the glyph too (direction-only alignment silently dropped it, which
+      // is why "the mirror seems to lack the ability to rotate along one
+      // axis").
       return {
         pointMm: posePoint(insertPose, [0, 0, entryFrame?.zMm ?? 0]),
-        direction: poseDirection(insertPose, dir),
+        direction: dir,
       };
     }
     const datum =
@@ -254,11 +277,17 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
 
   const quat = useMemo(() => {
     const d = new THREE.Vector3(...docToThree(anchor?.direction ?? [0, 1, 0]));
-    return new THREE.Quaternion().setFromUnitVectors(
+    const base = new THREE.Quaternion().setFromUnitVectors(
       new THREE.Vector3(0, 1, 0),
       d.lengthSq() > 0 ? d.normalize() : new THREE.Vector3(0, 1, 0),
     );
-  }, [anchor?.direction]);
+    if (!insertPose) return base;
+    // WP-121: the FULL pose — doc-frame rotation conjugated into three
+    // space and composed onto the base alignment: QB·R·QB⁻¹ · q₀. At the
+    // identity pose this reduces to q₀, so nothing jumps.
+    const rPose = new THREE.Quaternion().setFromRotationMatrix(insertPoseMatrix(insertPose));
+    return docQuatToThree(rPose.multiply(threeQuatToDoc(base)));
+  }, [anchor?.direction, insertPose]);
 
   if (!showOptics || !anchor) return null;
   return (

@@ -688,7 +688,6 @@ export function DeviceAlign({ ctx }: { ctx: WizardCtx }) {
 
 export function CubeMesh() {
   const meshSizeMm = useBindStore(s => s.meshSizeMm);
-  const fitToCube = useBindStore(s => s.fitToCube);
   const meshBboxCenter = useBindStore(s => s.meshBboxCenter);
   // WP-113.1: the WP-109 cell check runs HERE, at import — a mesh that is no
   // cell in any orientation is the wrong file or the wrong units, and finding
@@ -707,9 +706,7 @@ export function CubeMesh() {
             label={`measured: ${meshSizeMm.map(v => v.toFixed(1)).join(' × ')} mm — a cell is 50 × 50 × 55`}
           />
         )}
-        <Button size="small" variant="outlined" disabled={!meshBboxCenter} onClick={fitToCube}>
-          fit to cube
-        </Button>
+        {/* WP-121: fit-to-cube lives ONCE, in the panel's mount row. */}
       </Stack>
       {mismatch && (
         <Alert severity="error">
