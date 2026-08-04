@@ -48,7 +48,7 @@ import { GLBErrorBoundary } from '../../three/GLBErrorBoundary';
 import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExport';
 import type { Marker } from '../schematic/MarkerList';
 import { useAssemblyStore } from './assemblyStore';
-import { KernelRays3D } from './KernelRays3D';
+import { KernelRays3D } from '../common/KernelRays3D';
 import { useSceneColors } from '../../theme/sceneColors';
 
 const NO_RAYCAST = () => null;

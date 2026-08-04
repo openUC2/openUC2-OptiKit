@@ -37,9 +37,11 @@ import {
   UC2_GRID_MM,
 } from '../../document';
 import type { UndoToken } from '../../document';
+import { useKernelStore } from '../../kernel/kernelStore';
 import { wavelengthToColor } from '../../utils/sceneBuilder';
 import { AuthoritativeRays } from './AuthoritativeRays';
 import { AuthoredSymbol } from './AuthoredSymbol';
+import { KernelRays3D } from '../common/KernelRays3D';
 import { useAuthoredSymbol } from './symbolAsset';
 import { EscapeRays } from './EscapeRays';
 import { FIBER_COLOR, GLYPH_COLORS, sourceTint } from './colors';
@@ -697,6 +699,10 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
   // The approximate 2D preview yields to fresh authoritative rays and
   // reappears when the document changes under them (WP-15).
   const simFreshness = useSimFreshness();
+  // EMB-G3: while the kernel holds a settled trace, IT is the live preview —
+  // the real 3D ray distribution, not the in-plane 2D fan. The legacy engine
+  // stays only as the fallback with no kernel trace (service down, first load).
+  const kernelHasTrace = useKernelStore(s => (s.kernel.segments?.length ?? 0) > 0);
 
   // WP-65: per-part layer appearance. Hidden layers unmount (no raycast),
   // dimmed layers render faint and non-interactive.
@@ -795,7 +801,15 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
 
       <PathLines parts={parts} paths={paths} draft={chainDraft} visibleIds={visibleIds} />
       <FiberLines parts={parts} fibers={fibers} visibleIds={visibleIds} />
-      {settings.showRays && simFreshness !== 'fresh' && (
+      {/* Lifted like the legacy overlay so in-plane beams (three.y == the
+          working plane) never z-fight the grid; 0.8 mm is invisible at
+          schematic scale. */}
+      {settings.showRays && kernelHasTrace && (
+        <group position={[0, 0.8, 0]}>
+          <KernelRays3D />
+        </group>
+      )}
+      {settings.showRays && !kernelHasTrace && simFreshness !== 'fresh' && (
         <RayOverlay planeZMm={settings.planeZMm} enabled />
       )}
       <AuthoritativeRays />
