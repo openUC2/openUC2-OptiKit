@@ -12,6 +12,7 @@ export {
   commitUndo,
   getPart,
   getSnapshot,
+  listDsnParts,
   listParts,
   listPaths,
   movePartGrid,

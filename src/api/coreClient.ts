@@ -200,6 +200,57 @@ const compileSchema = z.object({
 });
 export type CompileResponse = z.infer<typeof compileSchema>;
 
+/** A `/v1/scene3` finding (decision 6.14): diagnostic, rendered beside the
+ * scene — never instead of it. `context` names the component or source. */
+const scene3FindingSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  severity: z.string().default('error'),
+  context: z.string().optional(),
+});
+export type Scene3Finding = z.infer<typeof scene3FindingSchema>;
+
+/**
+ * /v1/scene3 (EMB-G2): the materialized Scene3 (`.ocanvas` v2) document and
+ * its manifest are opaque here — the scene goes to the kernel worker verbatim
+ * (rule 12); the manifest's component → object-id map arms the tier-2 pose
+ * fast path (kernelLoop.ts).
+ */
+const scene3Schema = z.object({
+  scene: z.unknown(),
+  manifest: z.unknown(),
+  warnings: z.array(z.string()).default([]),
+  findings: z.array(scene3FindingSchema).default([]),
+});
+export type Scene3Response = z.infer<typeof scene3Schema>;
+
+/** Numerical sampling override for /v1/scene3 (§9.5) — rendering policy,
+ * never part of the physical emission model. */
+export interface TraceQuality {
+  spatial_samples?: number;
+  angular_samples?: number;
+  seed?: number;
+}
+
+/** Materialize the design into a kernel Scene3. Intent findings (E_NO_TARGET,
+ * …) arrive beside the scene (decision 6.14); only physical errors 422. */
+export function materializeScene3(
+  files: DsnFiles,
+  opts: { path?: string; traceQuality?: TraceQuality } = {},
+  signal?: AbortSignal,
+): Promise<Scene3Response> {
+  return post(
+    '/v1/scene3',
+    {
+      files,
+      ...(opts.path ? { path: opts.path } : {}),
+      ...(opts.traceQuality ? { trace_quality: opts.traceQuality } : {}),
+    },
+    scene3Schema,
+    signal,
+  );
+}
+
 /** WP-35 T2: the Inventor-side fx changeset the service derives from the
  * optimized dof values (fx user-parameter name == dof name). */
 const fxChangeSchema = z.object({

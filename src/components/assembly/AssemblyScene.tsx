@@ -48,6 +48,7 @@ import { GLBErrorBoundary } from '../../three/GLBErrorBoundary';
 import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExport';
 import type { Marker } from '../schematic/MarkerList';
 import { useAssemblyStore } from './assemblyStore';
+import { KernelRays3D } from './KernelRays3D';
 import { useSceneColors } from '../../theme/sceneColors';
 
 const NO_RAYCAST = () => null;
@@ -633,6 +634,8 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
           />
         ));
       })}
+
+      <KernelRays3D />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
         <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
