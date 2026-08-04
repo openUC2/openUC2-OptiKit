@@ -160,6 +160,8 @@ export interface IndexModule {
     step: string | null;
     /** WP-48: authored schematic symbol (SVG), when the component ships one. */
     symbol?: string | null;
+    /** WP-123: 'cube' | 'record' | '' — which frame the GLB content speaks. */
+    mesh_frame?: string;
   };
   ports?: IndexPort[];
   electronics: unknown | null;

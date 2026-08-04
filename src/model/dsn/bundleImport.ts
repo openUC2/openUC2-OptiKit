@@ -234,6 +234,7 @@ export function registerBundleLibrary(
         footprintGrid: footprint,
         thumbnailUrl: null,
         glbUrl: template?.glbUrl ?? null,
+        meshFrame: String(tplRecord['mesh-frame'] ?? ''),
         ports: component ? recordPortsToSource(component) : [],
         eflMm:
           typeof component?.effective_focal_length_mm === 'number'

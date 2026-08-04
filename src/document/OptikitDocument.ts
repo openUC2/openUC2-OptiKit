@@ -628,12 +628,14 @@ export function redo(): void {
 export interface PartRenderInfo {
   glbUrl?: string;
   glbOffset?: [number, number, number];
+  /** WP-123: which frame the GLB content speaks ('cube' | 'record' | ''). */
+  meshFrame?: string;
 }
 
 /** Presentation assets for a library ref (GLB model), for the assembly view. */
 export function renderInfoOf(libraryRef: string): PartRenderInfo {
   const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
-  return { glbUrl: def?.glbUrl, glbOffset: def?.glbOffset };
+  return { glbUrl: def?.glbUrl, glbOffset: def?.glbOffset, meshFrame: def?.meshFrame };
 }
 
 // ── React subscriptions ───────────────────────────────────────────────────────

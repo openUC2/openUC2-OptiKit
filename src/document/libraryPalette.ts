@@ -106,6 +106,10 @@ export interface LibraryPaletteEntry {
   /** Absolute URLs, resolved against the core service origin. */
   thumbnailUrl: string | null;
   glbUrl: string | null;
+  /** WP-123: which frame the GLB content speaks — 'cube' (F3, z = pins,
+   * needs the doc→viewer basis at render) or 'record' (pre-rotated wrapper
+   * exports, already y-up). '' = undeclared legacy (renderer detects). */
+  meshFrame: string;
   /** Record-style ports (local record axes, ±z = optical axis). */
   ports: SourcePort[];
   /** Effective focal length when meaningful — feeds the 2D ray preview. */
@@ -377,6 +381,7 @@ function entryFromIndexModule(
     footprintGrid: mod.footprint_grid ?? [1, 1, 1],
     thumbnailUrl: abs(mod.assets?.thumbnail),
     glbUrl: abs(mod.assets?.glb),
+    meshFrame: mod.assets?.mesh_frame ?? '',
     ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
@@ -455,6 +460,7 @@ export function entriesFromWorkspace(
     footprintGrid: [1, 1, 1],
     thumbnailUrl: thumbnails[record.id] ?? null,
     glbUrl: null,
+    meshFrame: '',
     ports: recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
@@ -548,6 +554,7 @@ export function entriesFromComponents(
       // WP-67: the housing mesh TRAVELS with the unbound part (this used to
       // hardcode null — a housed device rendered as a ghost).
       glbUrl: abs(housing?.assets.glb),
+      meshFrame: '',
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],
@@ -663,6 +670,7 @@ function toModuleDefinition(entry: LibraryPaletteEntry): ModuleDefinition {
     thumbnail: entry.thumbnailUrl ?? undefined,
     description: entry.description,
     glbUrl: entry.glbUrl ?? undefined,
+    meshFrame: entry.meshFrame,
     docCategory: entry.category,
   };
 }
