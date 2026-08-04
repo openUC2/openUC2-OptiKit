@@ -1,0 +1,1216 @@
+{
+  "node": "v24.12.0",
+  "wasmInitMs": 10.862,
+  "rows": [
+    {
+      "scene": "row3",
+      "lane": "legacy",
+      "rays": 16,
+      "medianMs": 0.014,
+      "p90Ms": 0.043,
+      "meanMs": 0.022,
+      "iters": 400,
+      "segments": 32
+    },
+    {
+      "scene": "row3",
+      "lane": "legacy",
+      "rays": 64,
+      "medianMs": 0.023,
+      "p90Ms": 0.035,
+      "meanMs": 0.029,
+      "iters": 400,
+      "segments": 128
+    },
+    {
+      "scene": "row3",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 0.091,
+      "p90Ms": 0.191,
+      "meanMs": 0.116,
+      "iters": 400,
+      "segments": 512
+    },
+    {
+      "scene": "row3",
+      "lane": "legacy",
+      "rays": 1024,
+      "medianMs": 0.391,
+      "p90Ms": 0.688,
+      "meanMs": 0.47,
+      "iters": 400,
+      "segments": 2048
+    },
+    {
+      "scene": "row3",
+      "lane": "legacy",
+      "rays": 4096,
+      "medianMs": 1.541,
+      "p90Ms": 2.308,
+      "meanMs": 1.746,
+      "iters": 201,
+      "segments": 8192
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-load",
+      "rays": 16,
+      "medianMs": 0.026,
+      "p90Ms": 0.038,
+      "meanMs": 0.029,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64",
+      "rays": 16,
+      "medianMs": 0.593,
+      "p90Ms": 0.658,
+      "meanMs": 0.619,
+      "iters": 400,
+      "segments": 64
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64-raw",
+      "rays": 16,
+      "medianMs": 0.146,
+      "p90Ms": 0.155,
+      "meanMs": 0.15,
+      "iters": 400,
+      "segments": 64
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f32",
+      "rays": 16,
+      "medianMs": 0.045,
+      "p90Ms": 0.067,
+      "meanMs": 0.053,
+      "iters": 400,
+      "segments": 64
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-drag",
+      "rays": 16,
+      "medianMs": 0.054,
+      "p90Ms": 0.056,
+      "meanMs": 0.052,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-load",
+      "rays": 64,
+      "medianMs": 0.019,
+      "p90Ms": 0.026,
+      "meanMs": 0.022,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64",
+      "rays": 64,
+      "medianMs": 1.899,
+      "p90Ms": 2.004,
+      "meanMs": 1.923,
+      "iters": 183,
+      "segments": 256
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64-raw",
+      "rays": 64,
+      "medianMs": 0.585,
+      "p90Ms": 0.612,
+      "meanMs": 0.594,
+      "iters": 400,
+      "segments": 256
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f32",
+      "rays": 64,
+      "medianMs": 0.164,
+      "p90Ms": 0.176,
+      "meanMs": 0.166,
+      "iters": 400,
+      "segments": 256
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-drag",
+      "rays": 64,
+      "medianMs": 0.208,
+      "p90Ms": 0.22,
+      "meanMs": 0.191,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.018,
+      "p90Ms": 0.019,
+      "meanMs": 0.02,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 7.156,
+      "p90Ms": 7.968,
+      "meanMs": 7.362,
+      "iters": 48,
+      "segments": 1024
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 2.332,
+      "p90Ms": 2.47,
+      "meanMs": 2.403,
+      "iters": 146,
+      "segments": 1024
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 0.652,
+      "p90Ms": 0.677,
+      "meanMs": 0.661,
+      "iters": 400,
+      "segments": 1024
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 0.828,
+      "p90Ms": 0.856,
+      "meanMs": 0.765,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-load",
+      "rays": 1024,
+      "medianMs": 0.018,
+      "p90Ms": 0.018,
+      "meanMs": 0.018,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64",
+      "rays": 1024,
+      "medianMs": 30.337,
+      "p90Ms": 32.055,
+      "meanMs": 31.022,
+      "iters": 12,
+      "segments": 4096
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64-raw",
+      "rays": 1024,
+      "medianMs": 9.922,
+      "p90Ms": 10.689,
+      "meanMs": 10.061,
+      "iters": 35,
+      "segments": 4096
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f32",
+      "rays": 1024,
+      "medianMs": 2.785,
+      "p90Ms": 3.543,
+      "meanMs": 2.97,
+      "iters": 119,
+      "segments": 4096
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-drag",
+      "rays": 1024,
+      "medianMs": 3.495,
+      "p90Ms": 3.731,
+      "meanMs": 3.276,
+      "iters": 107
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-load",
+      "rays": 4096,
+      "medianMs": 0.019,
+      "p90Ms": 0.031,
+      "meanMs": 0.023,
+      "iters": 400
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64",
+      "rays": 4096,
+      "medianMs": 127.308,
+      "p90Ms": 130.396,
+      "meanMs": 125.313,
+      "iters": 3,
+      "segments": 16384
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f64-raw",
+      "rays": 4096,
+      "medianMs": 39.759,
+      "p90Ms": 42.261,
+      "meanMs": 39.987,
+      "iters": 9,
+      "segments": 16384
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-f32",
+      "rays": 4096,
+      "medianMs": 11.186,
+      "p90Ms": 12.239,
+      "meanMs": 11.416,
+      "iters": 31,
+      "segments": 16384
+    },
+    {
+      "scene": "row3",
+      "lane": "kernel-drag",
+      "rays": 4096,
+      "medianMs": 13.941,
+      "p90Ms": 14.772,
+      "meanMs": 12.722,
+      "iters": 28
+    },
+    {
+      "scene": "fold",
+      "lane": "legacy",
+      "rays": 16,
+      "medianMs": 0.011,
+      "p90Ms": 0.049,
+      "meanMs": 0.02,
+      "iters": 400,
+      "segments": 32
+    },
+    {
+      "scene": "fold",
+      "lane": "legacy",
+      "rays": 64,
+      "medianMs": 0.033,
+      "p90Ms": 0.081,
+      "meanMs": 0.042,
+      "iters": 400,
+      "segments": 128
+    },
+    {
+      "scene": "fold",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 0.079,
+      "p90Ms": 0.124,
+      "meanMs": 0.099,
+      "iters": 400,
+      "segments": 512
+    },
+    {
+      "scene": "fold",
+      "lane": "legacy",
+      "rays": 1024,
+      "medianMs": 0.363,
+      "p90Ms": 0.641,
+      "meanMs": 0.444,
+      "iters": 400,
+      "segments": 2048
+    },
+    {
+      "scene": "fold",
+      "lane": "legacy",
+      "rays": 4096,
+      "medianMs": 1.702,
+      "p90Ms": 2.795,
+      "meanMs": 1.923,
+      "iters": 182,
+      "segments": 8192
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-load",
+      "rays": 16,
+      "medianMs": 0.007,
+      "p90Ms": 0.012,
+      "meanMs": 0.009,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64",
+      "rays": 16,
+      "medianMs": 0.182,
+      "p90Ms": 0.201,
+      "meanMs": 0.188,
+      "iters": 400,
+      "segments": 32
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64-raw",
+      "rays": 16,
+      "medianMs": 0.006,
+      "p90Ms": 0.006,
+      "meanMs": 0.006,
+      "iters": 400,
+      "segments": 32
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f32",
+      "rays": 16,
+      "medianMs": 0.004,
+      "p90Ms": 0.005,
+      "meanMs": 0.005,
+      "iters": 400,
+      "segments": 32
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-drag",
+      "rays": 16,
+      "medianMs": 0.005,
+      "p90Ms": 0.007,
+      "meanMs": 0.006,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-load",
+      "rays": 64,
+      "medianMs": 0.011,
+      "p90Ms": 0.012,
+      "meanMs": 0.011,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64",
+      "rays": 64,
+      "medianMs": 0.217,
+      "p90Ms": 0.33,
+      "meanMs": 0.251,
+      "iters": 400,
+      "segments": 128
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64-raw",
+      "rays": 64,
+      "medianMs": 0.018,
+      "p90Ms": 0.026,
+      "meanMs": 0.02,
+      "iters": 400,
+      "segments": 128
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f32",
+      "rays": 64,
+      "medianMs": 0.014,
+      "p90Ms": 0.015,
+      "meanMs": 0.016,
+      "iters": 400,
+      "segments": 128
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-drag",
+      "rays": 64,
+      "medianMs": 0.015,
+      "p90Ms": 0.016,
+      "meanMs": 0.016,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.007,
+      "p90Ms": 0.011,
+      "meanMs": 0.009,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 0.348,
+      "p90Ms": 0.544,
+      "meanMs": 0.395,
+      "iters": 400,
+      "segments": 512
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 0.07,
+      "p90Ms": 0.076,
+      "meanMs": 0.071,
+      "iters": 400,
+      "segments": 512
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 0.055,
+      "p90Ms": 0.057,
+      "meanMs": 0.056,
+      "iters": 400,
+      "segments": 512
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 0.056,
+      "p90Ms": 0.063,
+      "meanMs": 0.059,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-load",
+      "rays": 1024,
+      "medianMs": 0.007,
+      "p90Ms": 0.011,
+      "meanMs": 0.009,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64",
+      "rays": 1024,
+      "medianMs": 0.846,
+      "p90Ms": 0.969,
+      "meanMs": 0.892,
+      "iters": 393,
+      "segments": 2048
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64-raw",
+      "rays": 1024,
+      "medianMs": 0.272,
+      "p90Ms": 0.325,
+      "meanMs": 0.285,
+      "iters": 400,
+      "segments": 2048
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f32",
+      "rays": 1024,
+      "medianMs": 0.214,
+      "p90Ms": 0.234,
+      "meanMs": 0.235,
+      "iters": 400,
+      "segments": 2048
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-drag",
+      "rays": 1024,
+      "medianMs": 0.217,
+      "p90Ms": 0.248,
+      "meanMs": 0.225,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-load",
+      "rays": 4096,
+      "medianMs": 0.011,
+      "p90Ms": 0.011,
+      "meanMs": 0.01,
+      "iters": 400
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64",
+      "rays": 4096,
+      "medianMs": 2.911,
+      "p90Ms": 3.287,
+      "meanMs": 3.083,
+      "iters": 114,
+      "segments": 8192
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f64-raw",
+      "rays": 4096,
+      "medianMs": 1.053,
+      "p90Ms": 1.289,
+      "meanMs": 1.14,
+      "iters": 307,
+      "segments": 8192
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-f32",
+      "rays": 4096,
+      "medianMs": 0.83,
+      "p90Ms": 1.017,
+      "meanMs": 0.909,
+      "iters": 385,
+      "segments": 8192
+    },
+    {
+      "scene": "fold",
+      "lane": "kernel-drag",
+      "rays": 4096,
+      "medianMs": 0.838,
+      "p90Ms": 0.971,
+      "meanMs": 0.9,
+      "iters": 389
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy",
+      "rays": 16,
+      "medianMs": 0.012,
+      "p90Ms": 0.046,
+      "meanMs": 0.036,
+      "iters": 400,
+      "segments": 16
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy",
+      "rays": 64,
+      "medianMs": 0.033,
+      "p90Ms": 0.051,
+      "meanMs": 0.039,
+      "iters": 400,
+      "segments": 64
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 0.108,
+      "p90Ms": 0.257,
+      "meanMs": 0.135,
+      "iters": 400,
+      "segments": 256
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy",
+      "rays": 1024,
+      "medianMs": 0.448,
+      "p90Ms": 0.774,
+      "meanMs": 0.503,
+      "iters": 400,
+      "segments": 1024
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy",
+      "rays": 4096,
+      "medianMs": 1.695,
+      "p90Ms": 2.779,
+      "meanMs": 1.908,
+      "iters": 184,
+      "segments": 4096
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy-nobp",
+      "rays": 16,
+      "medianMs": 0.013,
+      "p90Ms": 0.037,
+      "meanMs": 0.019,
+      "iters": 400,
+      "segments": 48
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy-nobp",
+      "rays": 64,
+      "medianMs": 0.053,
+      "p90Ms": 0.093,
+      "meanMs": 0.067,
+      "iters": 400,
+      "segments": 192
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy-nobp",
+      "rays": 256,
+      "medianMs": 0.232,
+      "p90Ms": 0.328,
+      "meanMs": 0.257,
+      "iters": 400,
+      "segments": 768
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy-nobp",
+      "rays": 1024,
+      "medianMs": 0.943,
+      "p90Ms": 1.555,
+      "meanMs": 1.083,
+      "iters": 325,
+      "segments": 3072
+    },
+    {
+      "scene": "epi",
+      "lane": "legacy-nobp",
+      "rays": 4096,
+      "medianMs": 4.746,
+      "p90Ms": 5.775,
+      "meanMs": 4.751,
+      "iters": 74,
+      "segments": 12288
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-load",
+      "rays": 16,
+      "medianMs": 0.032,
+      "p90Ms": 0.055,
+      "meanMs": 0.038,
+      "iters": 400
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64",
+      "rays": 16,
+      "medianMs": 6.624,
+      "p90Ms": 7.021,
+      "meanMs": 6.757,
+      "iters": 52,
+      "segments": 768
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64-raw",
+      "rays": 16,
+      "medianMs": 2.147,
+      "p90Ms": 2.267,
+      "meanMs": 2.188,
+      "iters": 160,
+      "segments": 768
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f32",
+      "rays": 16,
+      "medianMs": 0.598,
+      "p90Ms": 0.727,
+      "meanMs": 0.627,
+      "iters": 400,
+      "segments": 624
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-drag",
+      "rays": 16,
+      "medianMs": 0.599,
+      "p90Ms": 0.63,
+      "meanMs": 0.611,
+      "iters": 400
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-load",
+      "rays": 64,
+      "medianMs": 0.032,
+      "p90Ms": 0.055,
+      "meanMs": 0.039,
+      "iters": 400
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64",
+      "rays": 64,
+      "medianMs": 25.98,
+      "p90Ms": 26.563,
+      "meanMs": 26.166,
+      "iters": 14,
+      "segments": 3072
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64-raw",
+      "rays": 64,
+      "medianMs": 8.713,
+      "p90Ms": 9.008,
+      "meanMs": 8.791,
+      "iters": 40,
+      "segments": 3072
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f32",
+      "rays": 64,
+      "medianMs": 2.229,
+      "p90Ms": 2.391,
+      "meanMs": 2.263,
+      "iters": 155,
+      "segments": 2496
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-drag",
+      "rays": 64,
+      "medianMs": 2.231,
+      "p90Ms": 2.743,
+      "meanMs": 2.363,
+      "iters": 149
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.033,
+      "p90Ms": 0.054,
+      "meanMs": 0.04,
+      "iters": 400
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 103.685,
+      "p90Ms": 105.095,
+      "meanMs": 103.729,
+      "iters": 4,
+      "segments": 12288
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 35.377,
+      "p90Ms": 36.211,
+      "meanMs": 35.308,
+      "iters": 10,
+      "segments": 12288
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 9.496,
+      "p90Ms": 10.037,
+      "meanMs": 9.61,
+      "iters": 37,
+      "segments": 9984
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 9.466,
+      "p90Ms": 10.196,
+      "meanMs": 9.672,
+      "iters": 37
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-load",
+      "rays": 1024,
+      "medianMs": 0.032,
+      "p90Ms": 0.053,
+      "meanMs": 0.037,
+      "iters": 400
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64",
+      "rays": 1024,
+      "medianMs": 419.561,
+      "p90Ms": 422.512,
+      "meanMs": 419.738,
+      "iters": 3,
+      "segments": 49152
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64-raw",
+      "rays": 1024,
+      "medianMs": 139.236,
+      "p90Ms": 141.378,
+      "meanMs": 139.769,
+      "iters": 3,
+      "segments": 49152
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f32",
+      "rays": 1024,
+      "medianMs": 39.813,
+      "p90Ms": 40.619,
+      "meanMs": 38.39,
+      "iters": 10,
+      "segments": 39936
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-drag",
+      "rays": 1024,
+      "medianMs": 38.133,
+      "p90Ms": 41.706,
+      "meanMs": 38.004,
+      "iters": 10
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-load",
+      "rays": 4096,
+      "medianMs": 0.033,
+      "p90Ms": 0.053,
+      "meanMs": 0.04,
+      "iters": 400
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64",
+      "rays": 4096,
+      "medianMs": 1724.694,
+      "p90Ms": 1819.811,
+      "meanMs": 1741.583,
+      "iters": 3,
+      "segments": 196608
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f64-raw",
+      "rays": 4096,
+      "medianMs": 576.11,
+      "p90Ms": 638.609,
+      "meanMs": 596.094,
+      "iters": 3,
+      "segments": 196608
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-f32",
+      "rays": 4096,
+      "medianMs": 144.183,
+      "p90Ms": 144.761,
+      "meanMs": 143.6,
+      "iters": 3,
+      "segments": 159744
+    },
+    {
+      "scene": "epi",
+      "lane": "kernel-drag",
+      "rays": 4096,
+      "medianMs": 143.706,
+      "p90Ms": 144.138,
+      "meanMs": 143.792,
+      "iters": 3
+    },
+    {
+      "scene": "scale01",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 0.093,
+      "p90Ms": 0.282,
+      "meanMs": 0.129,
+      "iters": 400,
+      "segments": 512
+    },
+    {
+      "scene": "scale01",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.017,
+      "p90Ms": 0.027,
+      "meanMs": 0.02,
+      "iters": 400
+    },
+    {
+      "scene": "scale01",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 8.145,
+      "p90Ms": 9.031,
+      "meanMs": 8.28,
+      "iters": 43,
+      "segments": 1024
+    },
+    {
+      "scene": "scale01",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 2.684,
+      "p90Ms": 2.906,
+      "meanMs": 2.723,
+      "iters": 129,
+      "segments": 1024
+    },
+    {
+      "scene": "scale01",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 0.706,
+      "p90Ms": 0.766,
+      "meanMs": 0.721,
+      "iters": 400,
+      "segments": 1024
+    },
+    {
+      "scene": "scale01",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 0.894,
+      "p90Ms": 0.955,
+      "meanMs": 0.833,
+      "iters": 400
+    },
+    {
+      "scene": "scale02",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 0.177,
+      "p90Ms": 0.404,
+      "meanMs": 0.225,
+      "iters": 400,
+      "segments": 768
+    },
+    {
+      "scene": "scale02",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.029,
+      "p90Ms": 0.037,
+      "meanMs": 0.031,
+      "iters": 400
+    },
+    {
+      "scene": "scale02",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 23.009,
+      "p90Ms": 23.331,
+      "meanMs": 22.986,
+      "iters": 16,
+      "segments": 1792
+    },
+    {
+      "scene": "scale02",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 7.754,
+      "p90Ms": 8.395,
+      "meanMs": 7.887,
+      "iters": 45,
+      "segments": 1792
+    },
+    {
+      "scene": "scale02",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 2.367,
+      "p90Ms": 2.514,
+      "meanMs": 2.409,
+      "iters": 146,
+      "segments": 1792
+    },
+    {
+      "scene": "scale02",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 2.71,
+      "p90Ms": 2.855,
+      "meanMs": 2.601,
+      "iters": 135
+    },
+    {
+      "scene": "scale04",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 0.354,
+      "p90Ms": 0.673,
+      "meanMs": 0.427,
+      "iters": 400,
+      "segments": 1280
+    },
+    {
+      "scene": "scale04",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.05,
+      "p90Ms": 0.058,
+      "meanMs": 0.054,
+      "iters": 400
+    },
+    {
+      "scene": "scale04",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 77.91,
+      "p90Ms": 78.299,
+      "meanMs": 77.503,
+      "iters": 5,
+      "segments": 3328
+    },
+    {
+      "scene": "scale04",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 25.878,
+      "p90Ms": 27.594,
+      "meanMs": 26.194,
+      "iters": 14,
+      "segments": 3328
+    },
+    {
+      "scene": "scale04",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 8.671,
+      "p90Ms": 8.89,
+      "meanMs": 8.726,
+      "iters": 41,
+      "segments": 3328
+    },
+    {
+      "scene": "scale04",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 9.416,
+      "p90Ms": 9.872,
+      "meanMs": 9.243,
+      "iters": 38
+    },
+    {
+      "scene": "scale08",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 1.033,
+      "p90Ms": 1.503,
+      "meanMs": 1.129,
+      "iters": 310,
+      "segments": 2304
+    },
+    {
+      "scene": "scale08",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.094,
+      "p90Ms": 0.15,
+      "meanMs": 0.104,
+      "iters": 400
+    },
+    {
+      "scene": "scale08",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 283.334,
+      "p90Ms": 288.57,
+      "meanMs": 284.139,
+      "iters": 3,
+      "segments": 6400
+    },
+    {
+      "scene": "scale08",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 96.679,
+      "p90Ms": 97.117,
+      "meanMs": 96.014,
+      "iters": 4,
+      "segments": 6400
+    },
+    {
+      "scene": "scale08",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 34.581,
+      "p90Ms": 34.806,
+      "meanMs": 34.645,
+      "iters": 11,
+      "segments": 6400
+    },
+    {
+      "scene": "scale08",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 36.364,
+      "p90Ms": 39.24,
+      "meanMs": 36.168,
+      "iters": 10
+    },
+    {
+      "scene": "scale16",
+      "lane": "legacy",
+      "rays": 256,
+      "medianMs": 3.684,
+      "p90Ms": 5.368,
+      "meanMs": 3.92,
+      "iters": 90,
+      "segments": 4352
+    },
+    {
+      "scene": "scale16",
+      "lane": "kernel-load",
+      "rays": 256,
+      "medianMs": 0.182,
+      "p90Ms": 0.224,
+      "meanMs": 0.195,
+      "iters": 400
+    },
+    {
+      "scene": "scale16",
+      "lane": "kernel-f64",
+      "rays": 256,
+      "medianMs": 684.968,
+      "p90Ms": 686.64,
+      "meanMs": 685.423,
+      "iters": 3,
+      "segments": 6400
+    },
+    {
+      "scene": "scale16",
+      "lane": "kernel-f64-raw",
+      "rays": 256,
+      "medianMs": 229.928,
+      "p90Ms": 231.058,
+      "meanMs": 229.421,
+      "iters": 3,
+      "segments": 6400
+    },
+    {
+      "scene": "scale16",
+      "lane": "kernel-f32",
+      "rays": 256,
+      "medianMs": 90.217,
+      "p90Ms": 90.225,
+      "meanMs": 89.876,
+      "iters": 4,
+      "segments": 8192
+    },
+    {
+      "scene": "scale16",
+      "lane": "kernel-drag",
+      "rays": 256,
+      "medianMs": 89.296,
+      "p90Ms": 90.231,
+      "meanMs": 86.92,
+      "iters": 5
+    }
+  ]
+}

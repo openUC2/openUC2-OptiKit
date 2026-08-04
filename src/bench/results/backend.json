@@ -1,0 +1,305 @@
+{
+  "scene3": {
+    "epi": {
+      "median_ms": 4.408,
+      "p90_ms": 4.893,
+      "mean_ms": 5.803,
+      "iters": 25,
+      "counts": {
+        "bodies": 3,
+        "surfaces": 1,
+        "apertures": 4,
+        "sources": 2,
+        "detectors": 2
+      },
+      "warnings": 8,
+      "findings": []
+    },
+    "fold": {
+      "median_ms": 2.957,
+      "p90_ms": 3.387,
+      "mean_ms": 3.025,
+      "iters": 25,
+      "counts": {
+        "bodies": 0,
+        "surfaces": 1,
+        "apertures": 0,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 2,
+      "findings": []
+    },
+    "row3": {
+      "median_ms": 3.199,
+      "p90_ms": 3.517,
+      "mean_ms": 3.242,
+      "iters": 25,
+      "counts": {
+        "bodies": 2,
+        "surfaces": 0,
+        "apertures": 2,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 2,
+      "findings": []
+    },
+    "scale01": {
+      "median_ms": 3.243,
+      "p90_ms": 3.739,
+      "mean_ms": 3.377,
+      "iters": 25,
+      "counts": {
+        "bodies": 2,
+        "surfaces": 0,
+        "apertures": 2,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 1,
+      "findings": [
+        "E_NO_TARGET"
+      ]
+    },
+    "scale02": {
+      "median_ms": 3.467,
+      "p90_ms": 3.743,
+      "mean_ms": 3.551,
+      "iters": 25,
+      "counts": {
+        "bodies": 4,
+        "surfaces": 0,
+        "apertures": 4,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 1,
+      "findings": [
+        "E_NO_TARGET"
+      ]
+    },
+    "scale04": {
+      "median_ms": 4.208,
+      "p90_ms": 5.566,
+      "mean_ms": 4.559,
+      "iters": 25,
+      "counts": {
+        "bodies": 8,
+        "surfaces": 0,
+        "apertures": 8,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 1,
+      "findings": [
+        "E_NO_TARGET"
+      ]
+    },
+    "scale08": {
+      "median_ms": 5.593,
+      "p90_ms": 6.171,
+      "mean_ms": 5.768,
+      "iters": 25,
+      "counts": {
+        "bodies": 16,
+        "surfaces": 0,
+        "apertures": 16,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 1,
+      "findings": [
+        "E_NO_TARGET"
+      ]
+    },
+    "scale16": {
+      "median_ms": 9.621,
+      "p90_ms": 10.579,
+      "mean_ms": 11.751,
+      "iters": 25,
+      "counts": {
+        "bodies": 32,
+        "surfaces": 0,
+        "apertures": 32,
+        "sources": 1,
+        "detectors": 1
+      },
+      "warnings": 1,
+      "findings": [
+        "E_NO_TARGET"
+      ]
+    }
+  },
+  "simulate": [
+    {
+      "scene": "epi",
+      "path": "from-laser-488nm-l1",
+      "num_rays": 16,
+      "median_ms": 9.695,
+      "p90_ms": 9.842,
+      "mean_ms": 9.687,
+      "iters": 12,
+      "polylines": 16,
+      "points": 78
+    },
+    {
+      "scene": "epi",
+      "path": "from-laser-488nm-l1",
+      "num_rays": 64,
+      "median_ms": 10.899,
+      "p90_ms": 11.077,
+      "mean_ms": 10.951,
+      "iters": 12,
+      "polylines": 64,
+      "points": 314
+    },
+    {
+      "scene": "epi",
+      "path": "from-laser-488nm-l1",
+      "num_rays": 256,
+      "median_ms": 16.371,
+      "p90_ms": 16.94,
+      "mean_ms": 19.995,
+      "iters": 12,
+      "polylines": 256,
+      "points": 1260
+    },
+    {
+      "scene": "epi",
+      "path": "from-laser-488nm-l1",
+      "num_rays": 1024,
+      "median_ms": 37.228,
+      "p90_ms": 38.144,
+      "mean_ms": 37.3,
+      "iters": 12,
+      "polylines": 1024,
+      "points": 5042
+    },
+    {
+      "scene": "epi",
+      "path": "from-laser-488nm-l1",
+      "num_rays": 4096,
+      "median_ms": 130.565,
+      "p90_ms": 173.567,
+      "mean_ms": 145.634,
+      "iters": 12,
+      "polylines": 4096,
+      "points": 20166
+    },
+    {
+      "scene": "fold",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 16,
+      "median_ms": 4.022,
+      "p90_ms": 4.487,
+      "mean_ms": 4.141,
+      "iters": 12,
+      "polylines": 16,
+      "points": 32
+    },
+    {
+      "scene": "fold",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 64,
+      "median_ms": 4.615,
+      "p90_ms": 5.287,
+      "mean_ms": 4.772,
+      "iters": 12,
+      "polylines": 64,
+      "points": 128
+    },
+    {
+      "scene": "fold",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 256,
+      "median_ms": 7.029,
+      "p90_ms": 7.453,
+      "mean_ms": 7.136,
+      "iters": 12,
+      "polylines": 256,
+      "points": 512
+    },
+    {
+      "scene": "fold",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 1024,
+      "median_ms": 15.746,
+      "p90_ms": 16.428,
+      "mean_ms": 16.052,
+      "iters": 12,
+      "polylines": 1024,
+      "points": 2048
+    },
+    {
+      "scene": "fold",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 4096,
+      "median_ms": 52.687,
+      "p90_ms": 54.506,
+      "mean_ms": 55.976,
+      "iters": 12,
+      "polylines": 4096,
+      "points": 8192
+    },
+    {
+      "scene": "row3",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 16,
+      "median_ms": 13.013,
+      "p90_ms": 13.45,
+      "mean_ms": 13.006,
+      "iters": 12,
+      "polylines": 16,
+      "points": 64
+    },
+    {
+      "scene": "row3",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 64,
+      "median_ms": 15.339,
+      "p90_ms": 16.21,
+      "mean_ms": 15.204,
+      "iters": 12,
+      "polylines": 64,
+      "points": 256
+    },
+    {
+      "scene": "row3",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 256,
+      "median_ms": 19.097,
+      "p90_ms": 19.765,
+      "mean_ms": 19.122,
+      "iters": 12,
+      "polylines": 256,
+      "points": 1024
+    },
+    {
+      "scene": "row3",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 1024,
+      "median_ms": 38.644,
+      "p90_ms": 43.818,
+      "mean_ms": 41.126,
+      "iters": 12,
+      "polylines": 1024,
+      "points": 4096
+    },
+    {
+      "scene": "row3",
+      "path": "from-laser-488nm-a1",
+      "num_rays": 4096,
+      "median_ms": 126.502,
+      "p90_ms": 158.705,
+      "mean_ms": 133.158,
+      "iters": 12,
+      "polylines": 4096,
+      "points": 16384
+    }
+  ],
+  "env": {
+    "python": "3.12.12",
+    "optiland": "0.6.0"
+  }
+}
