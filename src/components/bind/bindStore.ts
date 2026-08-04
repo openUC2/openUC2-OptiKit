@@ -48,6 +48,10 @@ interface BindState {
   /** WP-116: the F2→F3 insert pose being authored (null = legacy datum
    * road). The wizard's cube road seeds identity on entry. */
   insertPose: InsertPose | null;
+  /** WP-117: hide only the CUBE HALVES (the `PRT - CUBHLF` nodes of the
+   * Inventor naming contract) so the INSERT is visible in place — the cube
+   * is fixed, the insert is what the pose rotates. */
+  hideCubeHalves: boolean;
   /** Galvo groundwork (WP-40): mirror-normal tilt, °; the arm swings by 2θ. */
   galvoTiltDeg: number;
   /** WP-42: per-placed-mirror actuation tilt (° about its own pivot), keyed by
@@ -81,6 +85,7 @@ interface BindState {
   toggleShowOptics: () => void;
   toggleShowMesh: () => void;
   setInsertPose: (pose: InsertPose | null) => void;
+  toggleHideCubeHalves: () => void;
   /** Compose a 90° world-axis step onto the insert pose and re-snap to the
    * nearest of the 24 (residual preserved through the decomposition). */
   rotateInsert90: (axis: 'x' | 'y' | 'z', sign: 1 | -1) => void;
@@ -138,6 +143,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   showOptics: true,
   showMesh: true,
   insertPose: null,
+  hideCubeHalves: false,
   galvoTiltDeg: 0,
   opticTilt: {},
   wholeModule: false,
@@ -170,6 +176,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
   toggleShowMesh: () => set(s => ({ showMesh: !s.showMesh })),
   setInsertPose: insertPose => set({ insertPose }),
+  toggleHideCubeHalves: () => set(s => ({ hideCubeHalves: !s.hideCubeHalves })),
   rotateInsert90: (axis, sign) => {
     const pose = get().insertPose;
     if (!pose) return;
@@ -179,11 +186,15 @@ export const useBindStore = create<BindState>((set, get) => ({
     );
     const composed = step.multiply(insertPoseMatrix(pose));
     const d = decomposeRot24(composed);
+    // A 90° step composed onto a discrete pose is exactly discrete again —
+    // round the decomposition's float dust away (±3e-15 rendered as
+    // "-3.50835…e-15" in a clipped field reads like a real tilt).
+    const clean = (v: number) => Math.round(v * 1e3) / 1e3 || 0;
     set({
       insertPose: {
         ...pose,
         rot24: d.rot24,
-        offsetDeg: [d.offsetDeg.x, d.offsetDeg.y, d.offsetDeg.z],
+        offsetDeg: [clean(d.offsetDeg.x), clean(d.offsetDeg.y), clean(d.offsetDeg.z)],
       },
     });
   },
@@ -260,5 +271,6 @@ export const useBindStore = create<BindState>((set, get) => ({
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null, meshSizeMm: null, selectedOpticId: null, error: null,
       wholeModule: false, housingOnly: false, showMesh: true, insertPose: null,
+      hideCubeHalves: false,
     }),
 }));

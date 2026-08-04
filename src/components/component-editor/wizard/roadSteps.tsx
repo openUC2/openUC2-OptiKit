@@ -91,8 +91,8 @@ export function DerivedPortsSummary({ ctx }: { ctx: WizardCtx }) {
         {efl !== null && <Chip size="small" label={`EFL ≈ ${efl.toFixed(1)} mm`} />}
       </Stack>
       <Typography variant="caption" color="text.secondary">
-        derived from the surfaces and the category — the wizard writes these ports for you;
-        the full editor can change them later.
+        derived from the surfaces and the category, in the RECORD frame (+z = optical axis)
+        — where the optic points inside the cube is the pose step’s job, not this one’s.
       </Typography>
       {warnings.map((w, i) => (
         <Alert key={i} severity="warning" sx={{ mt: 1 }}>

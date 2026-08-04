@@ -124,12 +124,18 @@ function DatumPin({ datum, transform }: { datum: BindDatum; transform: MeshTrans
   );
 }
 
+/** WP-117: the Inventor naming contract calls the cube body's two halves
+ * `PRT - <n> - CUBHLF... ` — everything else in the export is the INSERT.
+ * Hiding only the halves shows the insert in place. */
+const CUBE_HALF_RE = /CUBHLF/i;
+
 function PartMesh() {
   const glbBytes = useBindStore(s => s.glbBytes);
   const transform = useBindStore(s => s.transform);
   const mode = useBindStore(s => s.mode);
   const snap = useBindStore(s => s.snap);
   const showMesh = useBindStore(s => s.showMesh);
+  const hideCubeHalves = useBindStore(s => s.hideCubeHalves);
   const setTransform = useBindStore(s => s.setTransform);
   const addDatum = useBindStore(s => s.addDatum);
   const groupRef = useRef<THREE.Group>(null);
@@ -228,6 +234,14 @@ function PartMesh() {
     if (!g) return;
     setTransform(threePoseToMeshTransform(g.position, g.quaternion));
   };
+
+  // Toggle the cube halves without reloading — the insert stays visible.
+  useEffect(() => {
+    if (!scene) return;
+    scene.traverse(node => {
+      if (CUBE_HALF_RE.test(node.name)) node.visible = !hideCubeHalves;
+    });
+  }, [scene, hideCubeHalves]);
 
   if (!scene || !showMesh) return null;
   // WP-33 bug fix: the gizmo must attach to OUR group via the explicit

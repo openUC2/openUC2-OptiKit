@@ -46,6 +46,7 @@ import {
   ControlCamera as OpticsPlaceIcon,
   Deblur as MeshIcon,
   GpsFixed as PoseIcon,
+  Filter1 as InsertOnlyIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
@@ -153,6 +154,16 @@ export interface MechanicsEmbed {
   /** The wizard's terminal step IS the exit — hide the record-pair section
    * and the download/write/generate buttons. */
   hideExits?: boolean;
+  /** WP-117: step scoping — every visible control must act on the STEP's
+   * question. Defaults are all-true (the expert tab shows everything). */
+  showFitToCube?: boolean;
+  /** Datum tools: the datum/optics modes, kind select, add-optic, the list. */
+  showDatumTools?: boolean;
+  /** The insert-pose panel + pose mode (WP-116). */
+  showPoseTools?: boolean;
+  /** The optical overlay — off on steps where nothing optical is declared
+   * yet (the round-16 "phantom 45° mirror in an empty cube"). */
+  showOverlay?: boolean;
 }
 
 export function MechanicsPanel({
@@ -171,6 +182,12 @@ export function MechanicsPanel({
   embed?: MechanicsEmbed;
 }) {
   const store = useBindStore();
+  const show = {
+    fitToCube: embed?.showFitToCube ?? true,
+    datumTools: embed?.showDatumTools ?? true,
+    poseTools: embed?.showPoseTools ?? true,
+    overlay: embed?.showOverlay ?? true,
+  };
   const saveThumbnail = useWorkspaceLibrary(s => s.saveThumbnail);
   const workspaceRecords = useWorkspaceLibrary(s => s.records);
   const index = useLibraryIndex();
@@ -447,26 +464,32 @@ export function MechanicsPanel({
         />
       )}
 
-      {store.wholeModule && (
+      {store.wholeModule && (show.fitToCube || show.datumTools) && (
         <Stack direction="row" spacing={1} alignItems="center">
-          <Button
-            size="small" variant="outlined" startIcon={<FitIcon />}
-            disabled={!store.meshBboxCenter} onClick={() => store.fitToCube()}
-          >
-            fit to cube
-          </Button>
-          <Typography variant="caption" color="text.secondary">
-            then place the optical primitive on its face:
-          </Typography>
-          <TextField
-            select size="small" label="add optic" value=""
-            onChange={e => e.target.value && store.addOptic(e.target.value as DatumKind)}
-            sx={{ width: 140 }}
-          >
-            {DATUM_KINDS.filter(k => allowedKinds.includes(k.value)).map(k => (
-              <MenuItem key={k.value} value={k.value}>+ {k.label}</MenuItem>
-            ))}
-          </TextField>
+          {show.fitToCube && (
+            <Button
+              size="small" variant="outlined" startIcon={<FitIcon />}
+              disabled={!store.meshBboxCenter} onClick={() => store.fitToCube()}
+            >
+              fit to cube
+            </Button>
+          )}
+          {show.datumTools && (
+            <>
+              <Typography variant="caption" color="text.secondary">
+                then place the optical primitive on its face:
+              </Typography>
+              <TextField
+                select size="small" label="add optic" value=""
+                onChange={e => e.target.value && store.addOptic(e.target.value as DatumKind)}
+                sx={{ width: 140 }}
+              >
+                {DATUM_KINDS.filter(k => allowedKinds.includes(k.value)).map(k => (
+                  <MenuItem key={k.value} value={k.value}>+ {k.label}</MenuItem>
+                ))}
+              </TextField>
+            </>
+          )}
         </Stack>
       )}
 
@@ -476,7 +499,7 @@ export function MechanicsPanel({
 
       {/* ── the workbench scene ─────────────────────────────────────────── */}
       <Box id="bind-scene" sx={{ position: 'relative', height: '46vh', minHeight: 320, borderRadius: 1, overflow: 'hidden' }}>
-        <BindScene draft={draft} />
+        <BindScene draft={show.overlay ? draft : undefined} />
         <Stack
           direction="row" spacing={1} alignItems="center"
           sx={{
@@ -495,19 +518,21 @@ export function MechanicsPanel({
             <ToggleButton value="rotate">
               <Tooltip title="rotate the part"><RotateIcon fontSize="small" /></Tooltip>
             </ToggleButton>
+            {show.datumTools && (
             <ToggleButton value="datum">
               <Tooltip title="datum mode: click the part surface to author an optical datum">
                 <DatumIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
-            {store.insertPose && (
+            )}
+            {show.poseTools && store.insertPose && (
               <ToggleButton value="pose">
                 <Tooltip title="pose mode (WP-116): click the optical surface to set the record frame's ORIGIN in the cube — rotation comes from the 90° steppers below">
                   <PoseIcon fontSize="small" />
                 </Tooltip>
               </ToggleButton>
             )}
-            {store.wholeModule && (
+            {show.datumTools && store.wholeModule && (
               <ToggleButton value="optics">
                 <Tooltip title="place mode: drag the selected optical primitive onto its face">
                   <OpticsPlaceIcon fontSize="small" />
@@ -530,7 +555,7 @@ export function MechanicsPanel({
               </ToggleButton>
             </ToggleButtonGroup>
           )}
-          {store.mode === 'datum' && (
+          {show.datumTools && store.mode === 'datum' && (
             <TextField
               select size="small" label="datum kind" value={store.nextKind}
               onChange={e => store.setNextKind(e.target.value as DatumKind)}
@@ -558,6 +583,18 @@ export function MechanicsPanel({
               <MeshIcon fontSize="small" />
             </ToggleButton>
           </Tooltip>
+          {/* WP-117: the cube is fixed; the insert is what the pose rotates.
+              Hiding only the PRT-CUBHLF halves shows the insert in place. */}
+          {store.wholeModule && (
+            <Tooltip title="hide the cube halves (the PRT-CUBHLF nodes) — see the INSERT in place">
+              <ToggleButton
+                value="halves" size="small" selected={store.hideCubeHalves}
+                onChange={() => store.toggleHideCubeHalves()}
+              >
+                <InsertOnlyIcon fontSize="small" />
+              </ToggleButton>
+            </Tooltip>
+          )}
           <Tooltip title="linked 2×2 views: perspective + top/front/side">
             <ToggleButton value="quad" size="small" selected={store.quadView} onChange={() => store.toggleQuadView()}>
               <QuadViewIcon fontSize="small" />
@@ -571,7 +608,7 @@ export function MechanicsPanel({
               <OpticsIcon fontSize="small" />
             </ToggleButton>
           </Tooltip>
-          {store.showOptics && ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category) && (
+          {show.overlay && store.showOptics && ['mirror', 'beamsplitter', 'dichroic'].includes(draft.category) && (
             <Tooltip title="galvo groundwork: tilt the mirror normal by θ — the reflected arm swings by 2θ">
               <Slider
                 size="small" min={-30} max={30} step={1}
@@ -631,7 +668,7 @@ export function MechanicsPanel({
       </Typography>
 
       {/* ── insert pose (WP-116): where the record frame sits in the cube ── */}
-      {store.insertPose && (
+      {show.poseTools && store.insertPose && (
         <>
           <Divider>
             <Typography variant="overline">insert pose · record → cube</Typography>
@@ -702,7 +739,8 @@ export function MechanicsPanel({
         </>
       )}
 
-      {/* ── datums ─────────────────────────────────────────────────────── */}
+      {/* ── datums (hidden on steps that do not ask about them, WP-117) ── */}
+      {show.datumTools && (<>
       <Divider>
         <Typography variant="overline">optical datums ({store.datums.length})</Typography>
       </Divider>
@@ -844,6 +882,8 @@ export function MechanicsPanel({
           </Typography>
         )}
       </Stack>
+
+      </>)}
 
       {/* ── the pair (hidden when the wizard's terminal step is the exit) ── */}
       {!embed?.hideExits && (<>

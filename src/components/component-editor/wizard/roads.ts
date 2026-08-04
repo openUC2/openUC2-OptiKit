@@ -114,6 +114,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'mechanics',
         viewport: true,
+        tools: { showDatumTools: false, showPoseTools: false, showOverlay: false },
         label: 'the mechanics',
         help:
           'Drop the STEP (or GLB) of the device — a kinematic mount, a laser body, a camera. ' +
@@ -128,6 +129,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'optics',
         viewport: true,
+        tools: { showFitToCube: false, showDatumTools: false, showPoseTools: false, showOverlay: false },
         label: 'the optics',
         help:
           'What does this device do to light? Pick the category and fill the fields that ' +
@@ -139,6 +141,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'align',
         viewport: true,
+        tools: { showFitToCube: false, showPoseTools: false },
         label: 'align the optics to the mechanics',
         help:
           'This step makes it ONE part instead of two unrelated files. A datum is the point on ' +
@@ -194,6 +197,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'mesh',
         viewport: true,
+        tools: { showDatumTools: false, showPoseTools: false, showOverlay: false },
         label: 'the cube',
         help:
           'Drop the Inventor export (STEP or GLB) of the WHOLE cube — cube body, insert, optic, ' +
@@ -212,6 +216,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'optics',
         viewport: true,
+        tools: { showFitToCube: false, showDatumTools: false, showPoseTools: false, showOverlay: false },
         label: 'the optics',
         help:
           'What is inside this cube? Declare it FIRST — the category decides which datum ' +
@@ -224,6 +229,7 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'datums',
         viewport: true,
+        tools: { showFitToCube: false, showDatumTools: false },
         label: 'the pose',
         help:
           'Where does the record frame sit inside the cube? Click the optical surface to ' +

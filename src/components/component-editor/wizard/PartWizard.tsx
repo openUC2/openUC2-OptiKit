@@ -223,7 +223,7 @@ export function PartWizard({
               draft={draft}
               record={record}
               onDraftChange={setDraft}
-              embed={{ hideMountControls: true, hideExits: true }}
+              embed={{ hideMountControls: true, hideExits: true, ...current.tools }}
             />
           </Box>
         )}

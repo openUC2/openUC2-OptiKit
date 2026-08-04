@@ -42,6 +42,14 @@ export interface WizardStepDef {
    * contexts, and browsers cap live contexts and evict the oldest.
    */
   viewport?: boolean;
+  /** WP-117: which viewport tool groups THIS step shows (merged into the
+   * MechanicsPanel embed). Unset = the panel's defaults. */
+  tools?: {
+    showFitToCube?: boolean;
+    showDatumTools?: boolean;
+    showPoseTools?: boolean;
+    showOverlay?: boolean;
+  };
   /** null = may advance; otherwise the sentence saying what is missing. */
   blocked?: (ctx: WizardCtx, bind: WizardBindView) => string | null;
 }
