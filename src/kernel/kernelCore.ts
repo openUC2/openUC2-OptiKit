@@ -18,6 +18,12 @@ export class KernelCore {
 
   constructor(canvas: Canvas) {
     this.canvas = canvas;
+    // Ghost tracing is removed from the openUC2 embedding (product decision
+    // 2026-08-04): stray-light analysis is not this editor's job, and ghost
+    // branches only multiply preview work. The vendored Canvas already
+    // defaults ghosts off; this call pins the contract against a future
+    // default change. The segment-flags ghost bit therefore never sets.
+    this.canvas.setGhosts(false);
   }
 
   handle(req: KernelRequest): KernelResponse {
@@ -30,7 +36,10 @@ export class KernelCore {
         case 'traceWorld': {
           // Settled f64 trace: the picture plus the first-detector readout
           // (EMB-E). The f64 result JSON is the only displayed-number source.
+          // The readout serialization is ~2/3 of the settled cost (src/bench),
+          // so the loop requests it only while the detector panel is open.
           const buffer = this.canvas.traceWorld3D();
+          if (req.readout === false) return { id: req.id, type: 'segments', buffer };
           const resultJson = this.canvas.firstDetectorResultJSON();
           const detector =
             resultJson && resultJson !== 'null'

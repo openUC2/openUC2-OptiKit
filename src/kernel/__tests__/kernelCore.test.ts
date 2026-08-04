@@ -99,6 +99,25 @@ describe('kernel round-trip (EMB-B)', () => {
     if (res.type !== 'segments') return;
     expect(res.detector).toBeUndefined();
   });
+
+  it('readout: false skips the detector readout, same segments', () => {
+    const res = core.handle({ id: 7, type: 'traceWorld', readout: false });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    expect(res.detector).toBeUndefined();
+    expect(res.buffer.length / SEGMENT_FLOATS).toBe(EXPECTED_SEGMENTS);
+  });
+
+  it('never emits ghost segments (ghosts pinned off for the openUC2 kernel)', () => {
+    // The achromat is uncoated glass: with ghosts on, Fresnel back-reflections
+    // would branch at every surface. The constructor pins setGhosts(false).
+    const res = core.handle({ id: 8, type: 'traceWorld' });
+    if (res.type !== 'segments') throw new Error('trace failed');
+    for (let i = 0; i < res.buffer.length / SEGMENT_FLOATS; i++) {
+      const flags = res.buffer[i * SEGMENT_FLOATS + 10];
+      expect(flags & 4, `segment ${i} carries the ghost bit`).toBe(0);
+    }
+  });
 });
 
 describe('tier-2 transformTrace (EMB-F / CV-C)', () => {

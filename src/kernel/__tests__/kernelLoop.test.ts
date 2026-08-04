@@ -67,6 +67,28 @@ describe('KernelLoop', () => {
     }
   });
 
+  it('readout provider gates the settled trace readout', async () => {
+    const readoutArgs: boolean[] = [];
+    let panelOpen = false;
+    const { loop, results } = harness({
+      traceWorld: (readout: boolean) => {
+        readoutArgs.push(readout);
+        return Promise.resolve({
+          segments: new Float32Array(11),
+          detector: readout ? { resultJson: '{"hits":1}', hits: new Float32Array([5, 5, 0]) } : null,
+        });
+      },
+      readout: () => panelOpen,
+    });
+
+    await loop.flush(); // panel closed: settle without readout
+    panelOpen = true;
+    await loop.flush(); // panel open (the wirer flushes on tab open)
+    expect(readoutArgs).toEqual([false, true]);
+    expect(results[0].detector).toBeNull();
+    expect(results[1].detector).not.toBeNull();
+  });
+
   it('never renders a stale response (newest issued wins)', async () => {
     const calls: Array<ReturnType<typeof deferred<Scene3Response>>> = [];
     const { loop, results, errors } = harness({

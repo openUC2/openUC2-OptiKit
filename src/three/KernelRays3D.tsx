@@ -16,8 +16,6 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { optikitToThree } from '../document/frames';
 import { forEachSegment, segmentCount } from '../kernel/segments';
 
-const GHOST_DIM = 0.35;
-
 export function KernelRays3D() {
   const segments = useSimulationStore(s => s.kernel.segments);
   const busy = useSimulationStore(s => s.kernel.busy);
@@ -34,8 +32,7 @@ export function KernelRays3D() {
       const b = optikitToThree([seg.bx, seg.by, seg.bz]);
       positions[o] = a[0]; positions[o + 1] = a[1]; positions[o + 2] = a[2];
       positions[o + 3] = b[0]; positions[o + 4] = b[1]; positions[o + 5] = b[2];
-      const dim = seg.ghost ? GHOST_DIM : 1;
-      const r = seg.r * dim, g = seg.g * dim, bl = seg.b * dim;
+      const { r, g, b: bl } = seg;
       colors[o] = r; colors[o + 1] = g; colors[o + 2] = bl;
       colors[o + 3] = r; colors[o + 4] = g; colors[o + 5] = bl;
     });

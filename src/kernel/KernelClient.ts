@@ -69,9 +69,10 @@ export class KernelClient {
     return res.type === 'sceneLoaded' ? res.report : '';
   }
 
-  /** Settled f64 world-frame trace: segments plus the detector readout. */
-  async traceWorld(): Promise<WorldTrace> {
-    const res = await this.request({ type: 'traceWorld' });
+  /** Settled f64 world-frame trace: segments plus the detector readout.
+   * `readout: false` skips the readout serialization (panel closed). */
+  async traceWorld(readout = true): Promise<WorldTrace> {
+    const res = await this.request({ type: 'traceWorld', readout });
     if (res.type !== 'segments') return { segments: new Float32Array(0), detector: null };
     return { segments: res.buffer, detector: res.detector ?? null };
   }

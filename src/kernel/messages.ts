@@ -17,7 +17,11 @@ export interface TransformBatch {
 
 export type KernelRequest =
   | { id: number; type: 'loadScene'; sceneJson: string }
-  | { id: number; type: 'traceWorld' }
+  /** Settled f64 trace. `readout: false` skips the detector readout
+   * (`firstDetectorResultJSON` + hits serialization — about two thirds of the
+   * settled-trace cost, measured in src/bench): the loop sends it only while
+   * the detector panel is open. Omitted = true. */
+  | { id: number; type: 'traceWorld'; readout?: boolean }
   | { id: number; type: 'traceWorldFast' }
   /** Tier-2 pose fast path (EMB-F): apply the batches to the loaded scene and
    * f32-retrace in one round trip. An unknown id or malformed delta answers
@@ -40,5 +44,7 @@ export type KernelResponse =
   | { id: number; type: 'error'; message: string };
 
 /** Floats per segment in a `segments` buffer (integration spec 18.7):
- * `[ax, ay, az, bx, by, bz, r, g, b, flux, flags]`, world mm. */
+ * `[ax, ay, az, bx, by, bz, r, g, b, flux, flags]`, world mm. Flags bit1 =
+ * TIR; bit2 (ghost) is never set here — the openUC2 kernel traces with ghosts
+ * off (pinned in KernelCore's constructor, 2026-08-04). */
 export const SEGMENT_FLOATS = 11;

@@ -1,7 +1,8 @@
 /**
  * Decoding helpers for the kernel's world-frame segment buffer:
  * 11 floats per segment `[ax, ay, az, bx, by, bz, r, g, b, flux, flags]`,
- * world mm, linear-light color, flags bit1 = TIR, bit2 = ghost (spec 18.7).
+ * world mm, linear-light color, flags bit1 = TIR (spec 18.7; the ghost bit
+ * never sets — ghost tracing is off for the openUC2 kernel, see KernelCore).
  * The buffer is render-only: no displayed number may be derived from it.
  */
 
@@ -13,7 +14,6 @@ export interface KernelSegment {
   r: number; g: number; b: number;
   flux: number;
   tir: boolean;
-  ghost: boolean;
 }
 
 export function segmentCount(buffer: Float32Array | null): number {
@@ -35,7 +35,6 @@ export function forEachSegment(
         r: buffer[o + 6], g: buffer[o + 7], b: buffer[o + 8],
         flux: buffer[o + 9],
         tir: (flags & 2) !== 0,
-        ghost: (flags & 4) !== 0,
       },
       i,
     );

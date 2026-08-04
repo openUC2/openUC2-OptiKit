@@ -51,7 +51,10 @@ export function startKernelSimulation(): () => void {
         spatial_samples: useSimulationStore.getState().config.maxRays,
       }),
     loadScene: json => getKernelClient().loadScene(json),
-    traceWorld: () => getKernelClient().traceWorld(),
+    traceWorld: readout => getKernelClient().traceWorld(readout),
+    // The detector readout costs ~2/3 of a settled trace (src/bench); pay it
+    // only while the simulation right-tab (the panel's home) is showing.
+    readout: () => useAppStore.getState().activeRightTab === 'simulation',
     transformTrace: batches => getKernelClient().transformTrace(batches),
     onResult: result => useSimulationStore.getState().setKernelResult(result),
     onPreview: segments => useSimulationStore.getState().setKernelPreview(segments),
@@ -98,6 +101,17 @@ export function startKernelSimulation(): () => void {
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     const sim = useSimulationStore.getState();
     if (sim.engine !== 'kernel' || !sim.config.enabled || !sim.config.autoRun) return;
+    // Opening the simulation tab when the settled trace skipped its readout
+    // (panel was closed): one fresh pass fetches the numbers.
+    if (
+      state.activeRightTab === 'simulation' &&
+      prevState.activeRightTab !== 'simulation' &&
+      sim.kernel.requestId > 0 &&
+      sim.kernel.detector === null &&
+      sim.kernel.detectorCount > 0
+    ) {
+      void loop.flush();
+    }
     if (state.placedModules === prevState.placedModules) return;
     if (isPoseOnly(prevState.placedModules, state.placedModules)) {
       loop.posePreview(currentPoses(state.placedModules));

@@ -61,7 +61,13 @@ export interface KernelLoopDeps {
   build: () => KernelBuildOutput | null | Promise<KernelBuildOutput | null>;
   scene3: (designYaml: string) => Promise<Scene3Response>;
   loadScene: (sceneJson: string) => Promise<string>;
-  traceWorld: () => Promise<WorldTraceResult>;
+  /** Settled f64 trace; `readout` says whether to serialize the detector
+   * readout (only worth paying while the detector panel is open). */
+  traceWorld: (readout: boolean) => Promise<WorldTraceResult>;
+  /** Whether the settled trace should carry the detector readout right now.
+   * Absent = always. When it flips true later (panel opened), the wirer calls
+   * `flush()` to fetch the readout for the already-settled scene. */
+  readout?: () => boolean;
   /** Tier-2 (EMB-F): apply pose deltas to the loaded scene + f32 retrace.
    * Absent = no fast path; every edit takes tier 1. */
   transformTrace?: (batches: TransformBatch[]) => Promise<Float32Array>;
@@ -217,7 +223,7 @@ export class KernelLoop {
         if (id !== this.issued || this.disposed) return;
         const t1 = now();
         await this.deps.loadScene(JSON.stringify(response.scene));
-        const { segments, detector } = await this.deps.traceWorld();
+        const { segments, detector } = await this.deps.traceWorld(this.deps.readout?.() ?? true);
         const traceMs = now() - t1;
         if (id !== this.issued || this.disposed) return;
         // The worker now holds THIS scene: rebase the tier-2 fast path on its
