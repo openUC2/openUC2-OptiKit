@@ -60,13 +60,14 @@ import type { PartMount, TemplateClass } from '../../document';
 import { PartAnatomy } from '../inspector/PartAnatomy';
 import type { ComponentRecord } from '../../model/dsn/generated/library-component';
 import { loadBindMesh, saveBindMesh } from '../../model/bindMeshStore';
+import { parse as parseYaml } from 'yaml';
 import {
   assetsBaseUrl,
   bumpLibraryIndex,
   fetchIndexComponent,
   useLibraryIndex,
 } from '../../model/libraryIndex';
-import { saveLibraryRecords } from '../../api/coreClient';
+import { saveLibraryRecords, verifyProposedT1 } from '../../api/coreClient';
 import { resolveLocalRecord, resolveRegistryRecord } from '../../model/openRecord';
 import { displayNameOf } from '../../model/librarySearch';
 import { bundleFiles, useBundleLibrary } from '../../model/dsn/bundleImport';
@@ -111,6 +112,9 @@ export function ComponentEditorPage({
     { origin: RecordOrigin; id: string; version: string } | null
   >(null);
   const [meshStatus, setMeshStatus] = useState<MeshStatus>(null);
+  /** WP-118: a VERIFIED published binding opens locked (the user's answer:
+   * freeze only certified trios; editing stays one explicit click away). */
+  const [bindingLocked, setBindingLocked] = useState(false);
   /** WP-100: why a `?open=` link did not produce the record it named. */
   const [openError, setOpenError] = useState<string | null>(null);
   /** WP-100: which sidebar tab holds the record the deep link opened. */
@@ -287,6 +291,73 @@ export function ComponentEditorPage({
     // into whatever the form can reconstruct.
     setOpenedRecord(rec);
     void resolveMesh(rec.id);
+    void rehydrateBinding(rec.id);
+  };
+
+  /**
+   * WP-118: reopening a bound part RESTORES the binding instead of showing
+   * an empty workbench — the template's insert-pose comes back into the
+   * pose tools, and a trio that passes verify-t1 opens read-only.
+   */
+  const rehydrateBinding = async (recordId: string) => {
+    setBindingLocked(false);
+    const moduleEntry = index.modules.find(
+      m => (m.component?.ref ?? '').split('@')[0] === recordId,
+    );
+    const housing = index.housings.find(h => h.component.id === recordId);
+    const tplId = moduleEntry?.template?.id ?? housing?.id ?? null;
+    if (!tplId) return;
+    try {
+      const base = assetsBaseUrl(index.url);
+      const res = await fetch(`${base}/v1/library/assets/templates/${tplId}/template.yml`, {
+        cache: 'no-cache',
+      });
+      if (!res.ok) return;
+      const tpl = parseYaml(await res.text()) as {
+        provenance?: string;
+        class?: string;
+        'insert-pose'?: {
+          rotation?: { grid?: { z?: string; x?: string }; 'offset-deg'?: Record<string, number> };
+          translation?: { 'offset-mm'?: Record<string, number> };
+        };
+      };
+      const ip = tpl['insert-pose'];
+      if (ip) {
+        const od = ip.rotation?.['offset-deg'] ?? {};
+        const om = ip.translation?.['offset-mm'] ?? {};
+        useBindStore.setState({
+          insertPose: {
+            rot24: {
+              z: (ip.rotation?.grid?.z ?? '+z') as '+z',
+              x: (ip.rotation?.grid?.x ?? '+x') as '+x',
+            },
+            offsetDeg: [od.x ?? 0, od.y ?? 0, od.z ?? 0],
+            offsetMm: [om.x ?? 0, om.y ?? 0, om.z ?? 0],
+          },
+        });
+      }
+      if (tpl.provenance === 'whole-module') {
+        useBindStore.setState({ wholeModule: true, housingOnly: false });
+      }
+      // Freeze only what verify-t1 CERTIFIES (the round-16 answer) — a
+      // failing or unverifiable pair stays editable.
+      if (moduleEntry?.id) {
+        const v = await verifyProposedT1([], moduleEntry.id);
+        setBindingLocked(v.ok);
+      }
+    } catch {
+      setBindingLocked(false);
+    }
+  };
+
+  /** WP-118: the explicit unlock — bumps the draft's patch version so the
+   * edit is a new revision, not a silent overwrite. */
+  const unlockBinding = () => {
+    setBindingLocked(false);
+    const parts = draft.version.split('.').map(Number);
+    if (parts.length === 3 && parts.every(n => Number.isFinite(n))) {
+      setDraft({ ...draft, version: `${parts[0]}.${parts[1]}.${parts[2] + 1}` });
+    }
   };
 
   // WP-37: deep link — the assembly links an insert to `?open=<componentId>`.
@@ -306,6 +377,7 @@ export function ComponentEditorPage({
     const seed = def.seed();
     def.applyBindDefaults();
     usePartWizard.getState().start(road, seed);
+    setBindingLocked(false);
     setDraft(seed);
     setOpenedFrom(null);
     setOpenedRecord(null);
@@ -316,6 +388,7 @@ export function ComponentEditorPage({
 
   /** WP-110: the bare-form reset (the old "new" button; the expert escape). */
   const blankForm = () => {
+    setBindingLocked(false);
     setDraft(defaultDraft(draft.category));
     setOpenedFrom(null);
     setOpenedRecord(null);
@@ -664,6 +737,16 @@ export function ComponentEditorPage({
                 record={record}
                 meshStatus={meshStatus}
                 onDraftChange={setDraft}
+                locked={
+                  bindingLocked
+                    ? {
+                        reason:
+                          'this pair passed verify-t1 — the optical model and the mechanics ' +
+                          'agree, so the binding opens read-only. Editing bumps the version.',
+                        onUnlock: unlockBinding,
+                      }
+                    : null
+                }
               />
             )}
             </>

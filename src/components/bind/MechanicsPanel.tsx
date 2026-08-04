@@ -172,6 +172,7 @@ export function MechanicsPanel({
   meshStatus = null,
   onDraftChange,
   embed,
+  locked = null,
 }: {
   draft: RecordDraft;
   /** The draft's validated component record (null while incomplete). */
@@ -180,6 +181,9 @@ export function MechanicsPanel({
   /** WP-90: the mechanics tab writes the draft's `mechanics:` reference. */
   onDraftChange?: (draft: RecordDraft) => void;
   embed?: MechanicsEmbed;
+  /** WP-118: a VERIFIED published binding opens read-only — viewport
+   * navigable, pose readable, nothing mutable — until explicitly unlocked. */
+  locked?: { reason: string; onUnlock: () => void } | null;
 }) {
   const store = useBindStore();
   const show = {
@@ -248,7 +252,8 @@ export function MechanicsPanel({
   // The record pair (WP-33): template/module reference — in priority order —
   // the picked existing component, the validating DRAFT, or the datum stub.
   const bound = useMemo(() => {
-    if (!draft.name || store.datums.length === 0) return null;
+    // WP-118: a pose IS a binding — datums are the legacy road's evidence.
+    if (!draft.name || (store.datums.length === 0 && !store.insertPose)) return null;
     const picked = componentOptions.find(([id]) => id === store.existingComponentId);
     const existing = picked
       ? { id: picked[0], version: picked[1] }
@@ -284,6 +289,16 @@ export function MechanicsPanel({
   }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
       store.meshFile, store.transform, store.meshSizeMm, store.datums, store.wholeModule,
       store.housingOnly, store.insertPose, store.meshFrameDetected]);
+
+  // WP-118: the write button's disabled reason, VISIBLE — a silently greyed
+  // button read as "cannot save, can still corrupt" in round 16.
+  const writeDisabledReason = !draft.name
+    ? 'name the record first (optics tab → name/id slug)'
+    : !bound
+      ? 'nothing to write yet — load a mesh and author the pose (or datums)'
+      : bound.errors.length > 0
+        ? bound.errors.join(' · ')
+        : null;
 
   const pairFiles = () => {
     if (!bound) return null;
@@ -356,6 +371,40 @@ export function MechanicsPanel({
       store.setBusy(false);
     }
   };
+
+  // WP-118: the frozen view — the binding as it is, nothing mutable. All
+  // hooks above have run, so this conditional return is order-safe.
+  if (locked) {
+    return (
+      <Stack spacing={1.5}>
+        <Alert
+          severity="info"
+          action={
+            <Button size="small" variant="outlined" onClick={locked.onUnlock}>
+              edit the binding…
+            </Button>
+          }
+        >
+          <Typography variant="caption">{locked.reason}</Typography>
+        </Alert>
+        <Box id="bind-scene" sx={{ position: 'relative', height: '46vh', minHeight: 320, borderRadius: 1, overflow: 'hidden' }}>
+          <BindScene draft={draft} />
+        </Box>
+        {store.insertPose && (
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <Chip size="small" color="primary" variant="outlined"
+              label={`optical axis → ${store.insertPose.rot24.z}`} />
+            <Chip size="small" variant="outlined"
+              label={`origin (${store.insertPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm`} />
+            {draft.ports.map(p => (
+              <Chip key={p.name} size="small" variant="outlined"
+                label={`${p.name} faces ${String(asMountedDirection(store.insertPose!, p.direction))}`} />
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={1.5}>
@@ -955,15 +1004,7 @@ export function MechanicsPanel({
             service gate, while the real blocker is almost always the datum
             count — and opening a record clears the datums. */}
         <Tooltip
-          title={
-            !draft.name
-              ? 'name the record first (optics tab → name/id slug)'
-              : store.datums.length === 0
-                ? 'author at least one datum first: load a mesh, switch the viewport to datum mode, and click the surface'
-                : bound && bound.errors.length > 0
-                  ? bound.errors.join(' · ')
-                  : 'writes component + template + module (and their assets) into ../optikit-core/library'
-          }
+          title={writeDisabledReason ?? 'writes component + template + module (and their assets) into ../optikit-core/library'}
         >
           <span>
             <Button variant="outlined" color="warning" startIcon={<DevWriteIcon />}
@@ -997,6 +1038,11 @@ export function MechanicsPanel({
         </Tooltip>
       </Stack>
       </>)}
+      {writeDisabledReason && (
+        <Typography variant="caption" color="warning.main" sx={{ mt: -2, mb: 2 }}>
+          {writeDisabledReason}
+        </Typography>
+      )}
       {record && (
         <GenerateDraftHolderDialog
           draft={draft}
