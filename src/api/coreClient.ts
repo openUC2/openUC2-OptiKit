@@ -230,6 +230,8 @@ export interface TraceQuality {
   spatial_samples?: number;
   angular_samples?: number;
   seed?: number;
+  /** Kernel sampling sequence (§6.10). */
+  sequence?: 'Grid' | 'Stratified' | 'Sobol';
 }
 
 /** Materialize the design into a kernel Scene3. Intent findings (E_NO_TARGET,

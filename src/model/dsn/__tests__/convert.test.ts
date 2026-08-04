@@ -180,6 +180,31 @@ describe('palette optics enrichment (WP-32)', () => {
     expect(frames.front['clear-aperture-mm']).toBe(12.7);
   });
 
+  it('a registry part with template DOFs exports dof declarations (drag parity)', () => {
+    // Without `dof:` in the design, apply_dof_values ignores the part's
+    // instantiation.dof_values in BOTH engines — a dragged T2 insert would
+    // write numbers nothing reads.
+    registerLibraryModules(entriesFromIndex([{
+      id: 'bound.lens.zstage', version: '0.1.0', kind: 'cube_module', description: '',
+      tags: [], category: 'lens', thumbnail: null, footprint_grid: [1, 1, 1], review: false,
+      component: { ref: 'c@^0.1', resolved: '0.1.0', vendor: null, efl_mm: 50 },
+      template: {
+        ref: 't@^0.1', resolved: '0.1.0', class: 'adaptive', actuatable: true,
+        dof: [{ name: 'dz', kind: 'translation', axis: 'z', unit: 'mm',
+                range: [-5, 5], actuatable: true }],
+      },
+      assets: { thumbnail: null, glb: null, step: null },
+      ports: [],
+      electronics: null,
+    }], 'http://x'));
+    const comp = componentOf(
+      part({ id: 'z', ref: 'Z', category: 'lens', libraryRef: 'bound.lens.zstage' }),
+    );
+    expect(comp.dof).toEqual([
+      { name: 'dz', kind: 'translation', axis: 'z', range: [-5, 5], unit: 'mm', actuatable: true },
+    ]);
+  });
+
   it('filters export as passthrough; sources export their emit port', () => {
     const filter = componentOf(
       part({ id: 'f', ref: 'Filter', category: 'filter', libraryRef: 'filter-bandpass' }),

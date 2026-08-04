@@ -162,18 +162,45 @@ export function paletteOpticsOf(part: {
   } as NonNullable<CompSpec['optics']>;
 }
 
+/**
+ * The record's DOF declarations, as design `dof:` entries. Without them the
+ * engines IGNORE the part's `instantiation.dof_values` (`apply_dof_values`
+ * looks the name up in `comp.dof`) — a dragged T2 insert would write numbers
+ * nothing reads. The palette entry carries the record's declarations.
+ */
+function dofSpecsOf(part: DocPart): Record<string, unknown>[] {
+  const entry = libraryEntryOf(part.libraryRef);
+  // A fixed (T1) template with DOFs is the E_T1_HAS_DOF design error — a
+  // malformed registry row must not poison the export.
+  if (!entry || entry.templateClass === 'fixed') return [];
+  return entry.dofs
+    .filter(d => d.axis === 'x' || d.axis === 'y' || d.axis === 'z')
+    .map(d => ({
+      name: d.name,
+      kind: d.kind || 'translation',
+      axis: d.axis,
+      ...(d.range ? { range: [round6(d.range[0]), round6(d.range[1])] } : {}),
+      ...(d.unit ? { unit: d.unit } : {}),
+      ...(d.actuatable ? { actuatable: true } : {}),
+      ...(d.pivotFrame ? { 'pivot-frame': d.pivotFrame } : {}),
+      ...(typeof d.surface === 'number' ? { surface: d.surface } : {}),
+    }));
+}
+
 /** Component spec for a part with no retained source (palette placement). */
 export function bareComponentSpec(part: DocPart): CompSpec {
   // WP-47: runtime state of a source placement — a source that is off emits
   // nothing, and inference skips it, so the netlist matches the bench.
   const enabled = part.params.enabled !== false;
   const wavelengthUm = part.params.wavelengthUm;
+  const dof = dofSpecsOf(part);
   return {
     type: 'primitive',
     primitive: { type: 'glb', model: part.libraryRef },
     category: part.category,
     optics: paletteOpticsOf(part),
     pose: poseSpecOf(part),
+    ...(dof.length ? { dof: dof as CompSpec['dof'] } : {}),
     ...(enabled ? {} : { enabled: false }),
     ...(typeof wavelengthUm === 'number' && wavelengthUm > 0
       ? { 'wavelength-um': wavelengthUm }

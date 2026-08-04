@@ -18,21 +18,25 @@ import { getKernelClient } from './KernelClient';
 import { registerKernelTrigger } from './kernelBridge';
 import { KernelLoop } from './kernelLoop';
 import { useKernelStore } from './kernelStore';
-import type { WorldPose } from './pose';
+import type { DofAxisBinding, WorldPose } from './pose';
+import { poseWithDofTranslations } from './pose';
 
 let running: { loop: KernelLoop; dispose: () => void } | null = null;
 
-/** Fields whose change is a rigid move — the tier-2 fast path's domain. */
-const POSE_KEYS: ReadonlySet<string> = new Set(['cell', 'offsetMm', 'rot24', 'offsetDeg']);
+/** Fields whose change the tier-2 fast path can preview: rigid moves, and DOF
+ * values (an insert drag composes as a translation along the record axis). */
+const PREVIEW_KEYS: ReadonlySet<string> = new Set(
+  ['cell', 'offsetMm', 'rot24', 'offsetDeg', 'dofValues'],
+);
 
 /**
- * A pose-only edit keeps the part set (same ids, one-to-one) and changes
- * nothing but where parts sit. Compared on the RAW stored parts by field
- * reference: an edit that replaces any non-pose field (dofValues, params,
- * ref, …) forces tier 1 — the safe direction, since only rigid moves may skip
- * the re-materialization.
+ * A previewable edit keeps the part set (same ids, one-to-one) and changes
+ * nothing but where parts sit — pose fields or DOF values. Compared on the
+ * RAW stored parts by field reference: an edit that replaces any other field
+ * (params, ref, …) forces tier 1 — the safe direction, since only rigid
+ * motion may skip the re-materialization.
  */
-function isPoseOnly(prev: readonly DsnPart[], next: readonly DsnPart[]): boolean {
+function isPreviewableEdit(prev: readonly DsnPart[], next: readonly DsnPart[]): boolean {
   if (prev === next || prev.length !== next.length) return false;
   const before = new Map(prev.map(p => [p.id, p]));
   for (const part of next) {
@@ -41,7 +45,7 @@ function isPoseOnly(prev: readonly DsnPart[], next: readonly DsnPart[]): boolean
     if (b === part) continue;
     const keys = new Set([...Object.keys(b), ...Object.keys(part)]);
     for (const key of keys) {
-      if (POSE_KEYS.has(key)) continue;
+      if (PREVIEW_KEYS.has(key)) continue;
       const prevValue = (b as unknown as Record<string, unknown>)[key];
       const nextValue = (part as unknown as Record<string, unknown>)[key];
       if (prevValue !== nextValue) return false;
@@ -50,13 +54,33 @@ function isPoseOnly(prev: readonly DsnPart[], next: readonly DsnPart[]): boolean
   return true;
 }
 
+/** `comp.dof` entries of the exported design → axis bindings (the same
+ * declarations the backend's `apply_dof_values` reads). */
+function bindingsFrom(dof: unknown): DofAxisBinding[] {
+  if (!Array.isArray(dof)) return [];
+  const out: DofAxisBinding[] = [];
+  for (const entry of dof) {
+    const name = (entry as { name?: unknown }).name;
+    const axis = (entry as { axis?: unknown }).axis;
+    const kind = (entry as { kind?: unknown }).kind ?? 'translation';
+    if (typeof name === 'string' && (axis === 'x' || axis === 'y' || axis === 'z')) {
+      out.push({ name, axis, kind: typeof kind === 'string' ? kind : 'translation' });
+    }
+  }
+  return out;
+}
+
 export function startKernelSimulation(): () => void {
   if (running) return running.dispose;
 
-  /** partId → design component key of the LAST build. Pose-only edits cannot
-   * change keys (identity fields are non-pose), so drags between settles
-   * reuse it without re-running the exporter. */
+  /** partId → design component key of the LAST build. Previewable edits
+   * cannot change keys (identity fields force tier 1), so drags between
+   * settles reuse it without re-running the exporter. */
   let keyByPartIdAtBuild: Record<string, string> = {};
+  /** partId → DOF axis bindings of the LAST build — the drag fast path
+   * composes dof values along these axes (same declarations the backend
+   * applies at settle). */
+  let dofBindingsAtBuild = new Map<string, DofAxisBinding[]>();
 
   const loop = new KernelLoop({
     build: () => {
@@ -64,8 +88,16 @@ export function startKernelSimulation(): () => void {
       if (snap.parts.length === 0) return null;
       const { design, keyByPartId } = buildServiceDesign(snap);
       keyByPartIdAtBuild = keyByPartId;
+      const bindings = new Map<string, DofAxisBinding[]>();
       const poses = new Map<string, WorldPose>();
-      for (const part of snap.parts) poses.set(keyByPartId[part.id], part.worldPose);
+      for (const part of snap.parts) {
+        const key = keyByPartId[part.id];
+        bindings.set(part.id, bindingsFrom(design.components?.[key]?.dof));
+        // The tier-2 baseline must match what the scene applied server-side:
+        // document pose ∘ dof translations, both sides from the same design.
+        poses.set(key, poseWithDofTranslations(part.worldPose, part.dofs, bindings.get(part.id)));
+      }
+      dofBindingsAtBuild = bindings;
       return {
         yaml: serializeDesign(design),
         mapped: snap.parts.map(p => keyByPartId[p.id]),
@@ -73,14 +105,20 @@ export function startKernelSimulation(): () => void {
         poses,
       };
     },
-    // The "max rays" config drives the materializer's sampling policy: its
-    // value becomes spatial_samples (rays across the emitting aperture, §9.5).
-    // setConfig() already re-triggers a pass on change.
-    scene3: yaml =>
-      materializeScene3(
+    // The sampling config drives the materializer's rendering policy (§9.5):
+    // rays across the emitting aperture, directions per origin, and the
+    // sampling sequence. setConfig() already re-triggers a pass on change.
+    scene3: yaml => {
+      const { maxRays, angularSamples, sequence } = useKernelStore.getState().config;
+      return materializeScene3(
         { [DESIGN_DECL_FILE]: yaml },
-        { traceQuality: { spatial_samples: useKernelStore.getState().config.maxRays } },
-      ),
+        { traceQuality: {
+            spatial_samples: maxRays,
+            angular_samples: angularSamples,
+            sequence,
+          } },
+      );
+    },
     loadScene: json => getKernelClient().loadScene(json),
     traceWorld: readout => getKernelClient().traceWorld(readout),
     // The detector readout costs ~2/3 of a settled trace (donor src/bench);
@@ -95,19 +133,25 @@ export function startKernelSimulation(): () => void {
 
   registerKernelTrigger(() => loop.trigger());
 
-  /** World pose per design key — pose fields only, cheap per drag event. */
+  /** World pose per design key — pose fields + dof translations, cheap per
+   * drag event (no exporter run; bindings come from the last build). */
   const currentPoses = (): Map<string, WorldPose> => {
     const poses = new Map<string, WorldPose>();
     for (const part of getSnapshot().parts) {
       const key = keyByPartIdAtBuild[part.id];
-      if (key) poses.set(key, part.worldPose);
+      if (key) {
+        poses.set(
+          key,
+          poseWithDofTranslations(part.worldPose, part.dofs, dofBindingsAtBuild.get(part.id)),
+        );
+      }
     }
     return poses;
   };
 
   // Edits (place/move/rotate/delete, either view) re-enter the loop; the
   // 300 ms debounce inside KernelLoop coalesces a drag into one settled
-  // request. Pose-only edits ALSO take the tier-2 fast path (EMB-F): the
+  // request. Pose and DOF edits ALSO take the tier-2 fast path (EMB-F): the
   // loaded scene transforms and f32-retraces immediately, and the debounced
   // tier-1 pass reconciles with f64 + validation on settle. The revision
   // gate keeps selection/undo-stack churn from triggering traces.
@@ -122,7 +166,7 @@ export function startKernelSimulation(): () => void {
     lastParts = parts;
     const { config } = useKernelStore.getState();
     if (!config.enabled || !config.autoRun) return;
-    if (isPoseOnly(prevParts, parts)) loop.posePreview(currentPoses());
+    if (isPreviewableEdit(prevParts, parts)) loop.posePreview(currentPoses());
     loop.trigger();
   });
   // Patch cords are design state too (chain inference reads them) but bump no

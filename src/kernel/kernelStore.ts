@@ -14,6 +14,10 @@ import { triggerKernelPass } from './kernelBridge';
 import type { KernelPassResult } from './kernelLoop';
 import type { UnmappedPlacement } from './pose';
 
+/** Kernel sampling sequences (§6.10; the wire names of `SamplingSequence`). */
+export const KERNEL_SEQUENCES = ['Grid', 'Stratified', 'Sobol'] as const;
+export type KernelSequence = (typeof KERNEL_SEQUENCES)[number];
+
 export interface KernelConfig {
   /** Master switch: the loop ignores document edits while off. */
   enabled: boolean;
@@ -21,6 +25,12 @@ export interface KernelConfig {
   autoRun: boolean;
   /** Rays across each source's emitting aperture (spatial_samples, §9.5). */
   maxRays: number;
+  /** Directions sampled per origin (cone/Lambertian sources keep their
+   * 8-sample floor; collimated sources ignore extra directions). */
+  angularSamples: number;
+  /** Sampling sequence: Grid = centered strata, Stratified = jittered
+   * (seeded), Sobol = low-discrepancy. */
+  sequence: KernelSequence;
   /** Render the 3D ray overlay. */
   showRays: boolean;
 }
@@ -95,7 +105,14 @@ export const useKernelStore = create<KernelStore>((set, get) => ({
   // Enabled out of the box: the first-success scenario (spec 18.1) has rays
   // appear on placement with no further action. The worker and the first
   // service request still load lazily, on the first pass with parts placed.
-  config: { enabled: true, autoRun: true, maxRays: 64, showRays: true },
+  config: {
+    enabled: true,
+    autoRun: true,
+    maxRays: 64,
+    angularSamples: 1,
+    sequence: 'Grid',
+    showRays: true,
+  },
   panelOpen: false,
   kernel: defaultKernelState,
 
