@@ -45,17 +45,18 @@ import {
   CenterFocusStrong as FitIcon,
   ControlCamera as OpticsPlaceIcon,
   Deblur as MeshIcon,
+  GpsFixed as PoseIcon,
 } from '@mui/icons-material';
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
+  asMountedDirection,
   bindToRecords,
   eulerDegToQuat,
   quatFromDirection,
   quatToEulerDeg,
   recordsToFiles,
   snapToAxis,
-  withBoundOptics,
   type BindAssets,
   type DatumKind,
 } from '../../model/bindRecord';
@@ -250,10 +251,21 @@ export function MechanicsPanel({
       existingComponent: existing,
       wholeModule: store.wholeModule,
       housingOnly: store.housingOnly,
+      // WP-116: the F2 side, verbatim from the draft — the pose transforms it.
+      insertPose: store.insertPose,
+      recordFrames: Object.fromEntries(
+        draft.frames.map(f => [f.name, [0, 0, f.zMm] as [number, number, number]]),
+      ),
+      recordPorts: draft.ports.map(p => ({
+        name: p.name,
+        frame: p.frame,
+        direction: p.direction,
+        afterSurface: p.afterSurface,
+      })),
     });
   }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
       store.meshFile, store.transform, store.meshSizeMm, store.datums, store.wholeModule,
-      store.housingOnly]);
+      store.housingOnly, store.insertPose]);
 
   const pairFiles = () => {
     if (!bound) return null;
@@ -269,9 +281,9 @@ export function MechanicsPanel({
     // workbench's frames/ports — writing the draft verbatim erased them and
     // shipped a component whose frames the template contradicted.
     if (!store.existingComponentId && record) {
-      files[`components/${record.id}/component.yml`] = recordToYaml(
-        withBoundOptics(record as unknown as Record<string, unknown>, bound) as unknown as ComponentRecord,
-      );
+      // WP-116: the record ships VERBATIM — F2, exactly as authored. The
+      // template carries the pose and the posed frames.
+      files[`components/${record.id}/component.yml`] = recordToYaml(record);
       const dataUrl = thumb;
       if (dataUrl) saveThumbnail(record.id, dataUrl);
     }
@@ -488,6 +500,13 @@ export function MechanicsPanel({
                 <DatumIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
+            {store.insertPose && (
+              <ToggleButton value="pose">
+                <Tooltip title="pose mode (WP-116): click the optical surface to set the record frame's ORIGIN in the cube — rotation comes from the 90° steppers below">
+                  <PoseIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+            )}
             {store.wholeModule && (
               <ToggleButton value="optics">
                 <Tooltip title="place mode: drag the selected optical primitive onto its face">
@@ -610,6 +629,78 @@ export function MechanicsPanel({
           <span>EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}</span>
         </Tooltip>
       </Typography>
+
+      {/* ── insert pose (WP-116): where the record frame sits in the cube ── */}
+      {store.insertPose && (
+        <>
+          <Divider>
+            <Typography variant="overline">insert pose · record → cube</Typography>
+          </Divider>
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+              <Tooltip title="which cube axis the record's optical axis (+z) points along — one of the 24 discrete insert orientations">
+                <Chip size="small" color="primary" variant="outlined"
+                  label={`optical axis → ${store.insertPose.rot24.z}`} />
+              </Tooltip>
+              <Chip size="small" variant="outlined" label={`record +x → ${store.insertPose.rot24.x}`} />
+              <Typography variant="caption" color="text.secondary">rotate 90° about the cube's</Typography>
+              {(['x', 'y', 'z'] as const).map(axis => (
+                <Button key={axis} size="small" variant="outlined" sx={{ minWidth: 40, px: 0.5 }}
+                  onClick={() => store.rotateInsert90(axis, 1)}>
+                  {axis.toUpperCase()} ↻
+                </Button>
+              ))}
+            </Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ width: 110 }}>
+                frame origin (mm)
+              </Typography>
+              {(['x', 'y', 'z'] as const).map((axis, i) => (
+                <DecimalField
+                  key={axis} size="small" variant="standard" label={axis}
+                  value={store.insertPose!.offsetMm[i]}
+                  onValue={v => {
+                    const next = [...store.insertPose!.offsetMm] as Vec3;
+                    next[i] = v ?? 0;
+                    store.setInsertOffsetMm(next);
+                  }}
+                  slotProps={{ htmlInput: { style: { width: 56, fontSize: 12 } } }}
+                />
+              ))}
+              <Typography variant="caption" color="text.secondary" sx={{ width: 90, ml: 1 }}>
+                residual (°)
+              </Typography>
+              {(['x', 'y', 'z'] as const).map((axis, i) => (
+                <DecimalField
+                  key={axis} size="small" variant="standard" label={axis}
+                  value={store.insertPose!.offsetDeg[i]}
+                  onValue={v => {
+                    const next = [...store.insertPose!.offsetDeg] as Vec3;
+                    next[i] = v ?? 0;
+                    store.setInsertOffsetDeg(next);
+                  }}
+                  slotProps={{ htmlInput: { style: { width: 52, fontSize: 12 } } }}
+                />
+              ))}
+            </Stack>
+            {/* the as-mounted sentence — computed, never asked (WP-116) */}
+            {draft.ports.length > 0 && (
+              <Alert severity="info" sx={{ py: 0 }}>
+                <Typography variant="caption">
+                  as mounted:{' '}
+                  {draft.ports
+                    .map(p => {
+                      const d = asMountedDirection(store.insertPose!, p.direction);
+                      return `${p.name} faces ${Array.isArray(d) ? `[${d.join(', ')}]` : d}`;
+                    })
+                    .join(' · ')}
+                  {' — '}derived from the record's ports through the pose.
+                </Typography>
+              </Alert>
+            )}
+          </Stack>
+        </>
+      )}
 
       {/* ── datums ─────────────────────────────────────────────────────── */}
       <Divider>

@@ -1,28 +1,29 @@
 /**
- * Part-binding model (WP-19, reworked in WP-31): datums authored on a
- * mechanical part become library records.
+ * Part-binding model (WP-19/31, re-founded on the frame treaty in WP-116).
  *
- * A `BindDatum` is a point + direction (+ optional circular area) in the
- * PART frame — datums belong to the mesh, so moving or rotating the part
- * carries them along (the mechanical intuition; the STEP is the source of
- * truth). Cube-frame coordinates are derived: world = meshTransform ∘ datum.
- * The record mapping (in the CUBE frame, unchanged from WP-19):
+ * The treaty (DSN-CONTRACT §Frames): component optics speak the RECORD frame
+ * (F2, +z = optical axis) and ship VERBATIM — this module never derives
+ * optics from geometry clicks. What it authors is the F3 side of the trio:
  *
- * - each datum → one `optics.frames` entry (full x/y/z-mm offset);
- * - each datum → one `optics.ports` entry; schema-v0 port directions are
- *   axis-aligned (`+x` … `-z`), so the authored direction snaps to the
- *   nearest principal axis, warning when the deviation is real;
- * - the mesh placement transform → the template's `mesh-offset` extra;
- * - the records bind into component + template + module, mirroring the
- *   WP-8/WP-9 importer conventions so all roads into the library look alike.
- *   Binding to an EXISTING optical component (the KiCad symbol↔footprint
- *   association) skips the stub component: the module references the chosen
- *   component id and only template + module are emitted.
+ * - the template's `insert-pose` — the F2→F3 pose (rot24 grid map +
+ *   offset-deg residual + offset-mm), stating where the record frame sits
+ *   inside the cube;
+ * - the template's `frames:` — insert-pose ∘ the record's own frames, the
+ *   cube-frame positions verify-t1 compares;
+ * - the template's `optical_ports` — the record's ports as mounted
+ *   (pose-rotated directions);
+ * - template + module identity, envelope, assets — mirroring the WP-8/WP-9
+ *   importer conventions so all roads into the library look alike.
+ *
+ * The legacy datum road (housing binding, the expert tab) still turns
+ * clicked `BindDatum`s into template frame POSITIONS — but never into ports:
+ * a datum says WHERE, the record says WHAT.
  */
 
 import * as THREE from 'three';
 import { stringify } from 'yaml';
 import type { Vec3 } from '../document';
+import { rot24Matrix, type Rot24 } from '../document/rot24';
 import { offsetDegMatrix } from '../document';
 
 export type DatumKind = 'source' | 'sensor' | 'reflective' | 'front' | 'back' | 'custom';
@@ -172,11 +173,65 @@ export function quatFromDirection(direction: Vec3): [number, number, number, num
   return [round6(q.x), round6(q.y), round6(q.z), round6(q.w)];
 }
 
-/** The optic's local optical axis (+y) in the cube frame — a placed mirror's
- * surface normal (WP-41). */
-function cubeNormalOf(datum: BindDatum, t: MeshTransform): THREE.Vector3 {
-  if (!datum.quaternion) return new THREE.Vector3(...datumToCube(datum, t).direction);
-  return new THREE.Vector3(0, 1, 0).applyQuaternion(datumQuatToCubeQuat(datum.quaternion, t));
+// ── WP-116: the insert pose — F2 (record) → F3 (cube) ───────────────────────
+
+/** The F2→F3 pose (DSN-CONTRACT §Frames): where the record frame sits inside
+ * the cube. rot24 + extrinsic-ZXY residual + translation — the same spelling
+ * a design pose uses, because the insert-in-cube orientation IS one of the
+ * 24 discrete rotations plus residuals. */
+export interface InsertPose {
+  rot24: Rot24;
+  offsetDeg: Vec3;
+  offsetMm: Vec3;
+}
+
+export const IDENTITY_INSERT_POSE: InsertPose = {
+  rot24: { z: '+z', x: '+x' },
+  offsetDeg: [0, 0, 0],
+  offsetMm: [0, 0, 0],
+};
+
+/** R = R24 · ΔR (ΔR extrinsic ZXY from offset-deg), the contract's §3 rule. */
+export function insertPoseMatrix(pose: InsertPose): THREE.Matrix4 {
+  const residual = new THREE.Matrix4().makeRotationFromEuler(
+    new THREE.Euler(
+      THREE.MathUtils.degToRad(pose.offsetDeg[0]),
+      THREE.MathUtils.degToRad(pose.offsetDeg[1]),
+      THREE.MathUtils.degToRad(pose.offsetDeg[2]),
+      'ZXY',
+    ),
+  );
+  return rot24Matrix(pose.rot24).multiply(residual);
+}
+
+/** A record-frame (F2) point carried into the cube frame (F3). */
+export function posePoint(pose: InsertPose, pointMm: Vec3): Vec3 {
+  const v = new THREE.Vector3(...pointMm).applyMatrix4(insertPoseMatrix(pose));
+  return [v.x + pose.offsetMm[0], v.y + pose.offsetMm[1], v.z + pose.offsetMm[2]];
+}
+
+/** A record-frame (F2) direction carried into the cube frame (F3). */
+export function poseDirection(pose: InsertPose, dir: Vec3): Vec3 {
+  const v = new THREE.Vector3(...dir)
+    .applyMatrix4(new THREE.Matrix4().extractRotation(insertPoseMatrix(pose)))
+    .normalize();
+  return [v.x, v.y, v.z];
+}
+
+/** A record port, as mounted: its F2 direction through the pose, spelled as
+ * an axis literal when within snap tolerance (the WP-39 rule). */
+export function asMountedDirection(
+  pose: InsertPose,
+  direction: string | [number, number, number],
+): string | [number, number, number] {
+  const AXES_LOCAL: Record<string, Vec3> = {
+    '+x': [1, 0, 0], '-x': [-1, 0, 0], '+y': [0, 1, 0],
+    '-y': [0, -1, 0], '+z': [0, 0, 1], '-z': [0, 0, -1],
+  };
+  const v = Array.isArray(direction)
+    ? (direction as Vec3)
+    : (AXES_LOCAL[direction] ?? ([0, 0, 1] as Vec3));
+  return dirToPort(poseDirection(pose, v));
 }
 
 // Basis change doc↔three: doc(x, y, z) = three(x, −z, y), a −90° rotation
@@ -267,10 +322,26 @@ export interface BindInput {
    * cube can be generated around it later (T3) or exported for Inventor.
    */
   housingOnly?: boolean;
+  /**
+   * WP-116: the F2→F3 pose. When present, the template's frames are
+   * insert-pose ∘ recordFrames and the datums are ignored — the pose IS the
+   * binding. When absent, the legacy datum road applies (positions only).
+   */
+  insertPose?: InsertPose | null;
+  /** The record's own F2 frame origins (name → [x, y, z] mm). */
+  recordFrames?: Record<string, Vec3>;
+  /** The record's own F2 ports, shipped as-mounted on the template. */
+  recordPorts?: {
+    name: string;
+    frame: string;
+    direction: string | [number, number, number];
+    afterSurface: number | null;
+  }[];
 }
 
 export interface BoundRecords {
-  /** null when binding to an existing component (nothing to emit). */
+  /** ALWAYS null since WP-116 — the caller owns the component record (F2,
+   * verbatim). Kept in the shape so call sites read uniformly. */
   component: Record<string, unknown> | null;
   template: Record<string, unknown>;
   /** null for a housing (WP-67) — a housing is not cube-mounted, so no
@@ -360,111 +431,74 @@ export function bindToRecords(input: BindInput): BoundRecords {
   const templateId = `${input.namespace}.tpl.${input.name}`;
   const moduleId = `${input.namespace}.cube.${input.name}`;
 
-  const frames: Record<string, unknown> = { optical: { 'z-mm': 0.0 } };
-  const ports: Record<string, unknown> = {};
-  // Names of the frames that carry a placed optical primitive (WP-41): these
-  // become the template's declared insert frames in whole-module binding.
+  // ── frames + ports (WP-116: the treaty) ──────────────────────────────────
+  // Component optics are never derived here. This function authors the F3
+  // side: the template's frames and its as-mounted optical_ports.
+  const frames: Record<string, unknown> = {};
+  const pose = input.insertPose ?? null;
+  // Names of the frames that carry a placed optical primitive (WP-41 legacy
+  // gizmo road): these become the template's declared insert frames.
   const opticFrameNames: string[] = [];
-  // One reflective surface per placed mirror (WP-41 multi-mirror: a dual-axis
-  // galvo carries two, each its own fragment surface + frame).
-  const reflectiveDatums = input.datums.filter(d => d.kind === 'reflective');
-  const multiMirror = reflectiveDatums.length > 1;
-  input.datums.forEach((datum, i) => {
-    // Records speak the CUBE frame: part-frame datums travel through the
-    // mesh placement first (WP-31 — datums follow the part).
-    const cube = datumToCube(datum, input.meshTransform);
-    const snap = snapToAxis(cube.direction);
-    // WP-39: within tolerance the direction snaps to the axis literal; beyond
-    // it the TRUE continuous direction is kept as a unit vector — no more
-    // forced quantization of a 30° galvo mirror to the nearest cube axis.
-    let direction: string | [number, number, number] = snap.axis;
-    if (snap.deviationDeg > AXIS_SNAP_WARN_DEG) {
-      const len = Math.hypot(...cube.direction) || 1;
-      direction = [
-        round3(cube.direction[0] / len),
-        round3(cube.direction[1] / len),
-        round3(cube.direction[2] / len),
-      ];
+  if (pose) {
+    const recordFrames = Object.entries(input.recordFrames ?? {});
+    for (const [name, p] of recordFrames) {
+      const posed = posePoint(pose, p);
+      frames[name] = {
+        'x-mm': round3(posed[0]),
+        'y-mm': round3(posed[1]),
+        'z-mm': round3(posed[2]),
+      };
+    }
+    if (recordFrames.length === 0) {
       warnings.push(
-        `datum '${datum.name}' points ${snap.deviationDeg.toFixed(1)}° off the ${snap.axis} ` +
-          'axis — kept the continuous direction (vector ports need schema-v0.1; ' +
-          '`library validate` will warn until ratified)',
+        'the record declares no frames — the template has nothing to hold and ' +
+          'verify-t1 will be vacuous',
       );
     }
-    // One name serves as both the frame and the port; 'optical' is reserved
-    // for the part origin, and empty names fall back to the kind default.
-    let name = datum.name || defaultPortName(datum.kind, i);
-    if (name === 'optical' || name in frames) name = `${name}-${i}`;
-    const frame: Record<string, number | number[]> = {};
-    if (cube.pointMm[0]) frame['x-mm'] = round3(cube.pointMm[0]);
-    if (cube.pointMm[1]) frame['y-mm'] = round3(cube.pointMm[1]);
-    frame['z-mm'] = round3(cube.pointMm[2]);
-    // WP-41: a gizmo-placed optic carries its full orientation onto the frame.
-    if (datum.quaternion) {
-      frame.rotation = datumQuatToCube(datum.quaternion, input.meshTransform);
-      opticFrameNames.push(name);
+  } else {
+    // Legacy datum road (housing binding, expert tab): clicked datums give
+    // the F3 positions directly. They say WHERE — never what the beam does.
+    frames.optical = { 'z-mm': 0.0 };
+    input.datums.forEach((datum, i) => {
+      let name = datum.name || defaultPortName(datum.kind, i);
+      if (name === 'optical' || name in frames) name = `${name}-${i}`;
+      const cube = datumToCube(datum, input.meshTransform);
+      const frame: Record<string, number | number[]> = {};
+      if (cube.pointMm[0]) frame['x-mm'] = round3(cube.pointMm[0]);
+      if (cube.pointMm[1]) frame['y-mm'] = round3(cube.pointMm[1]);
+      frame['z-mm'] = round3(cube.pointMm[2]);
+      // WP-41: a gizmo-placed optic carries its full orientation.
+      if (datum.quaternion) {
+        frame.rotation = datumQuatToCube(datum.quaternion, input.meshTransform);
+        opticFrameNames.push(name);
+      }
+      frames[name] = frame;
+    });
+    if (input.datums.length === 0) {
+      warnings.push(
+        'no datums authored — the template declares no insert frames, so ' +
+          'verify-t1 will be vacuous',
+      );
     }
-    frames[name] = frame;
-
-    // A mirror emits BOTH beam endpoints derived from its surface normal
-    // (WP-41 + WP-40 reflection law): a +x-incoming beam reflects off the
-    // normal, so the schematic folds accordingly. Everything else keeps the
-    // single datum port.
-    //
-    // WP-114: this used to require `datum.quaternion`, i.e. a GIZMO-PLACED
-    // optic. A datum authored by CLICKING the reflective face — the road the
-    // cube wizard actually teaches — fell through to the single-port branch,
-    // so the fold was never recorded and the mirror rendered unfolded in the
-    // assembly. `cubeNormalOf` already falls back to the datum direction, so
-    // both roads describe the same mirror.
-    if (datum.kind === 'reflective') {
-      const n = cubeNormalOf(datum, input.meshTransform).normalize();
-      const incoming = new THREE.Vector3(1, 0, 0); // canonical cube optical axis
-      const reflected = incoming.clone().sub(n.clone().multiplyScalar(2 * incoming.dot(n)));
-      const surfaceIdx = reflectiveDatums.indexOf(datum);
-      const entryName = multiMirror ? `${name}-in` : 'front';
-      const exitName = multiMirror ? `${name}-refl` : 'reflected';
-      ports[entryName] = {
-        frame: name,
-        direction: dirToPort([-incoming.x, -incoming.y, -incoming.z]),
-      };
-      ports[exitName] = {
-        frame: name,
-        direction: dirToPort([reflected.x, reflected.y, reflected.z]),
-        'after-surface': surfaceIdx,
-      };
-    } else {
-      ports[name] = { frame: name, direction };
-    }
-  });
-  if (input.datums.length === 0) {
-    warnings.push('no datums authored — the record has no ports; chaining will not work');
   }
 
-  let component: Record<string, unknown> | null = null;
-  if (!input.existingComponent) {
-    component = {
-      kind: 'optical_component',
-      id: componentId,
-      version: '0.1.0',
-      category: input.category,
-      description: input.description ?? `${input.name} (bound in the part-binding workbench)`,
-      tags: ['bound'],
-      optics: { frames, ports },
+  // Ports: the RECORD's ports, as mounted. The click→ports derivation (the
+  // reflection law against a hardcoded +x beam) is gone — the fold belongs
+  // to the optics model, stated once, on the record.
+  const ports: Record<string, unknown> = {};
+  for (const port of input.recordPorts ?? []) {
+    ports[port.name] = {
+      frame: port.frame,
+      direction: pose ? asMountedDirection(pose, port.direction) : port.direction,
+      ...(port.afterSurface != null ? { 'after-surface': port.afterSurface } : {}),
     };
-    // One reflective flat-fold surface per placed mirror (WP-8 convention;
-    // WP-41: a dual-axis galvo carries two, indexed by the reflected ports'
-    // after-surface).
-    if (reflectiveDatums.length > 0) {
-      (component.optics as Record<string, unknown>).fragment = {
-        surfaces: reflectiveDatums.map(() => ({
-          type: 'standard',
-          geometry: { type: 'StandardGeometry', radius: Infinity, conic: 0 },
-          interaction_model: { type: 'refractive_reflective', is_reflective: true },
-        })),
-      };
-    }
   }
+  if ((input.recordPorts ?? []).length === 0) {
+    warnings.push('the record declares no ports — chaining will not work');
+  }
+
+  // WP-116: no stub component, ever — the caller ships the record verbatim.
+  const component: Record<string, unknown> | null = null;
 
   // WP-109: only a REAL .step/.stp is the mechanical source of truth. This
   // used to write `step: <meshFile>` unconditionally, so dropping a .glb
@@ -496,25 +530,43 @@ export function bindToRecords(input: BindInput): BoundRecords {
     ),
     footprint_grid: [1, 1, 1],
   };
-  // WP-109: `mesh-offset` was written by this function and read by NOTHING in
-  // either repo — the bind gizmo's placement was silently discarded as far as
-  // rendering went. Emit it only when it is non-zero, so a record that says it
-  // is offset is at least saying something true, and an untouched mesh does
-  // not carry a dead block.
+  // WP-116: the mesh transform is VIEW alignment only. A rotation cannot
+  // ship — the cube frame IS the reference (rotate the INSERT POSE instead)
+  // — and `mesh-offset` (WP-109's write-only field) is retired: round 16
+  // proved a user can pour real alignment work into a field nothing reads.
   const t = input.meshTransform;
-  const moved =
-    t.positionMm.some(v => Math.abs(v) > 1e-6) ||
-    t.rotationDeg.some(v => Math.abs(v) > 1e-6);
-  if (moved) {
-    template['mesh-offset'] = {
-      'x-mm': round3(t.positionMm[0]),
-      'y-mm': round3(t.positionMm[1]),
-      'z-mm': round3(t.positionMm[2]),
-      'rot-deg': {
-        x: round3(t.rotationDeg[0]),
-        y: round3(t.rotationDeg[1]),
-        z: round3(t.rotationDeg[2]),
+  if (t.rotationDeg.some(v => Math.abs(v) > 1e-6)) {
+    errors.push(
+      'the mesh is rotated in the viewport — that rotation is recorded nowhere. ' +
+        'The cube frame is the reference: leave the mesh as exported and rotate ' +
+        'the insert pose instead (or re-export the file in the cube frame).',
+    );
+  }
+  if (t.positionMm.some(v => Math.abs(v) > 1e-6)) {
+    warnings.push(
+      'the mesh is translated in the viewport — view alignment only, nothing is ' +
+        'recorded. Re-export centred on the cube origin, or `library validate` ' +
+        'will flag the offset.',
+    );
+  }
+
+  // WP-116: the F2→F3 pose, spelled exactly like a design pose (§3).
+  if (pose) {
+    const offDeg: Record<string, number> = {};
+    (['x', 'y', 'z'] as const).forEach((axis, i) => {
+      if (Math.abs(pose.offsetDeg[i]) > 1e-9) offDeg[axis] = round3(pose.offsetDeg[i]);
+    });
+    const offMm: Record<string, number> = {};
+    (['x', 'y', 'z'] as const).forEach((axis, i) => {
+      if (Math.abs(pose.offsetMm[i]) > 1e-9) offMm[axis] = round3(pose.offsetMm[i]);
+    });
+    template['insert-pose'] = {
+      rotation: {
+        type: 'grid',
+        grid: { z: pose.rot24.z, x: pose.rot24.x },
+        ...(Object.keys(offDeg).length > 0 ? { 'offset-deg': offDeg } : {}),
       },
+      translation: { 'offset-mm': offMm },
     };
   }
 
@@ -524,20 +576,20 @@ export function bindToRecords(input: BindInput): BoundRecords {
   // body, so the optic pose is the only truth for where the optic sits).
   if (input.wholeModule) {
     template.provenance = 'whole-module';
-    const insertFrames: Record<string, unknown> = {};
-    // WP-114: fall back to the frames the PORTS actually reference, not to
-    // the port NAMES. A mirror's ports are 'front'/'reflected' but both hang
-    // off the single datum frame, so keying by port name found only 'front'
-    // and missed the frame entirely when the names diverged — leaving
-    // `frames:` empty, which is what made verify-t1's OK vacuous
-    // (W_NO_INSERT_FRAME: it passes without ever comparing a pose).
-    const portFrameNames = Object.values(ports).map(
-      p => (p as { frame?: string }).frame ?? '',
-    );
-    for (const name of opticFrameNames.length ? opticFrameNames : portFrameNames) {
-      if (frames[name]) insertFrames[name] = frames[name];
+    if (pose) {
+      // The pose road: every posed record frame IS an insert frame.
+      if (Object.keys(frames).length > 0) template.frames = frames;
+    } else {
+      // Legacy gizmo road: the placed-optic frames; else every clicked datum.
+      const insertFrames: Record<string, unknown> = {};
+      const names = opticFrameNames.length
+        ? opticFrameNames
+        : Object.keys(frames).filter(n => n !== 'optical');
+      for (const name of names) {
+        if (frames[name]) insertFrames[name] = frames[name];
+      }
+      if (Object.keys(insertFrames).length > 0) template.frames = insertFrames;
     }
-    if (Object.keys(insertFrames).length > 0) template.frames = insertFrames;
   }
 
   // The module's component ref: a caret range on the existing component's
@@ -568,48 +620,6 @@ export function bindToRecords(input: BindInput): BoundRecords {
   };
 
   return { component, template, module, warnings, errors };
-}
-
-/**
- * WP-114 — the component record as it must actually ship: the DRAFT's optics
- * (what it does to light — the fragment, the materials, the mount angle) with
- * the WORKBENCH's frames and ports (where on the mesh it sits, and how the
- * beam enters and leaves).
- *
- * Both halves are needed and neither is a superset. The bind flow used to
- * build a datum-derived stub component and then have the caller overwrite it
- * wholesale with `recordToYaml(draft)` — so the template declared frames
- * named after the datums while the shipped component still declared only
- * `optical` at z=0. That is the E_POSE_MISMATCH verify-t1 reports
- * ("template holds frame 'front' but component declares no such datum
- * frame"), and it is why a mirror's authored orientation never reached any
- * record and the part rendered unfolded in the assembly.
- *
- * `bound.component` is null when the pair binds an EXISTING library
- * component; then there is nothing to merge and the draft stands as authored.
- */
-export function withBoundOptics(
-  record: Record<string, unknown>,
-  bound: BoundRecords,
-): Record<string, unknown> {
-  const stub = bound.component;
-  if (!stub) return record;
-  const stubOptics = (stub.optics ?? {}) as Record<string, unknown>;
-  const frames = stubOptics.frames as Record<string, unknown> | undefined;
-  const ports = stubOptics.ports as Record<string, unknown> | undefined;
-  // No authored datums (frames is just the reserved `optical` origin, no
-  // ports) — the draft already says everything true about this part.
-  if (!ports || Object.keys(ports).length === 0) return record;
-  const draftOptics = (record.optics ?? {}) as Record<string, unknown>;
-  return {
-    ...record,
-    optics: {
-      ...draftOptics,
-      // The mesh is the authority on WHERE; the draft on WHAT.
-      ...(frames ? { frames } : {}),
-      ports,
-    },
-  };
 }
 
 /** ±Infinity → .inf survives the yaml stringifier via a replacer pass. */

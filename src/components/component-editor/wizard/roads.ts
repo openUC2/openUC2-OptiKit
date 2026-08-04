@@ -224,20 +224,14 @@ export const ROADS: Record<RoadId, RoadDef> = {
       {
         key: 'datums',
         viewport: true,
-        label: 'the datums',
+        label: 'the pose',
         help:
-          'Now that the cube knows what optic it holds: where inside it does that optic ' +
-          'act? If the export is marker-stamped (the Inventor naming contract), the datum ' +
-          'frames extract automatically — confirm what was found. Otherwise click the ' +
-          'optical surface in datum mode, exactly like the housing road.',
+          'Where does the record frame sit inside the cube? Click the optical surface to ' +
+          'set the origin (marker-stamped exports set it automatically), pick one of the ' +
+          '24 insert rotations with the 90° buttons. The beam directions are computed from ' +
+          'the record through the pose — the defaults (origin at the cube centre, identity ' +
+          'rotation) are already a valid answer.',
         Body: CubeDatums,
-        blocked: (ctx, bind) => {
-          const expected = expectedDatumOf(ctx.draft.category);
-          return bind.datums.length > 0
-            ? null
-            : `no datum or placed optic yet — click ${expected.what} in datum mode, or add ` +
-              'an optic and place it on its face';
-        },
       },
       {
         key: 'verify',

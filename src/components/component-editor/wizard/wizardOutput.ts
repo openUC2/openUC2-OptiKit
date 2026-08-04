@@ -10,8 +10,8 @@
 import {
   bindToRecords,
   recordsToFiles,
-  withBoundOptics,
   type BindDatum,
+  type InsertPose,
   type MeshTransform,
 } from '../../../model/bindRecord';
 import { recordToYaml, type RecordDraft } from '../../../model/componentRecord';
@@ -31,6 +31,8 @@ export interface WizardBindState {
   wholeModule: boolean;
   housingOnly: boolean;
   meshSizeMm: Vec3 | null;
+  /** WP-116: the F2→F3 pose the cube road authors. */
+  insertPose?: InsertPose | null;
 }
 
 export interface WizardOutput {
@@ -59,7 +61,10 @@ export function buildWizardOutput(
       componentOnly: true,
     };
   }
-  const hasMechanics = Boolean(bind.glbBytes) && bind.datums.length > 0 && Boolean(draft.name);
+  const hasMechanics =
+    Boolean(bind.glbBytes) &&
+    (bind.datums.length > 0 || Boolean(bind.insertPose)) &&
+    Boolean(draft.name);
   if (!hasMechanics) {
     return {
       files: { [`components/${record.id}/component.yml`]: recordToYaml(record) },
@@ -84,19 +89,27 @@ export function buildWizardOutput(
     existingComponent: null,
     wholeModule: bind.wholeModule,
     housingOnly: bind.housingOnly,
+    // WP-116: the F2 side verbatim; the pose does the transforming.
+    insertPose: bind.insertPose ?? null,
+    recordFrames: Object.fromEntries(
+      draft.frames.map(f => [f.name, [0, 0, f.zMm] as [number, number, number]]),
+    ),
+    recordPorts: draft.ports.map(p => ({
+      name: p.name,
+      frame: p.frame,
+      direction: p.direction,
+      afterSurface: p.afterSurface,
+    })),
   });
   const files = recordsToFiles(bound, bind.meshFile || 'part.step', {
     step: bind.stepBytes,
     glb: bind.glbBytes,
     thumbnailPng: null,
   });
-  // WP-114: the draft's optics with the workbench's frames/ports folded in.
-  // Writing `recordToYaml(record)` verbatim here erased the datum-derived
-  // frames the TEMPLATE declares, which is exactly the E_POSE_MISMATCH
-  // verify-t1 reports on the last step of this very road.
-  files[`components/${record.id}/component.yml`] = recordToYaml(
-    withBoundOptics(record as unknown as Record<string, unknown>, bound) as unknown as ComponentRecord,
-  );
+  // WP-116: the record ships VERBATIM (F2). The template carries the pose
+  // and the posed frames — component and template agree BY CONSTRUCTION,
+  // which is what WP-114's merge tried to patch at the wrong layer.
+  files[`components/${record.id}/component.yml`] = recordToYaml(record);
   const ids = [
     record.id,
     bound.template.id as string,

@@ -17,7 +17,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Vec3 } from '../../document';
-import { datumToCube } from '../../model/bindRecord';
+import { datumToCube, poseDirection, posePoint } from '../../model/bindRecord';
 import {
   PORT_AXIS_VECTORS,
   maxSemiApertureMm,
@@ -213,11 +213,25 @@ export function OpticGlyph({
 export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
   const datums = useBindStore(s => s.datums);
   const transform = useBindStore(s => s.transform);
+  const insertPose = useBindStore(s => s.insertPose);
   const showOptics = useBindStore(s => s.showOptics);
   const galvoTiltDeg = useBindStore(s => s.galvoTiltDeg);
 
   const anchor = useMemo(() => {
     // Gizmo-placed optics render via PlacedOptics — skip them here.
+    // WP-116: an authored insert pose is the binding — draw the record's
+    // optic exactly where the pose puts it (pose ∘ record entry frame).
+    if (insertPose) {
+      const entryPort = draft.ports.find(p => /^(front|sensor|in|plane)$/.test(p.name))
+        ?? draft.ports[0];
+      if (!entryPort) return null;
+      const entryFrame = draft.frames.find(f => f.name === entryPort.frame);
+      const dir = PORT_AXIS_VECTORS[entryPort.direction] ?? ([0, 0, -1] as [number, number, number]);
+      return {
+        pointMm: posePoint(insertPose, [0, 0, entryFrame?.zMm ?? 0]),
+        direction: poseDirection(insertPose, dir),
+      };
+    }
     const datum =
       datums.find(d => !d.quaternion && ANCHOR_KINDS.includes(d.kind)) ??
       datums.find(d => !d.quaternion) ?? null;
@@ -236,7 +250,7 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
       pointMm: [0, 0, frame?.zMm ?? 0] as [number, number, number],
       direction: PORT_AXIS_VECTORS[entry.direction] ?? ([0, 0, -1] as [number, number, number]),
     };
-  }, [datums, transform, draft.ports, draft.frames]);
+  }, [datums, transform, insertPose, draft.ports, draft.frames]);
 
   const quat = useMemo(() => {
     const d = new THREE.Vector3(...docToThree(anchor?.direction ?? [0, 1, 0]));

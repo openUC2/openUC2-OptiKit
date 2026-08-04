@@ -234,7 +234,10 @@ export interface OpticsSpec {
  * Verbatim Optiland surface fragment.
  *
  * The surface dicts use Optiland's own serialization schema and are opaque to
- * optikit-core except for their count and order, which are preserved exactly.
+ * optikit-core except for their count and order, which are preserved exactly —
+ * with one WP-74 exception: a ``response`` block on a surface is validated
+ * (so a typo is an error, not silently swallowed by ``extra="allow"``) while
+ * still stored verbatim.
  */
 export interface FragmentSpec {
   surfaces: Surfaces;

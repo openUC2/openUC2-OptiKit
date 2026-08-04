@@ -7,9 +7,14 @@
 
 import { create } from 'zustand';
 import type { Vec3 } from '../../document';
-import type { BindDatum, DatumKind, MeshTransform } from '../../model/bindRecord';
+import * as THREE from 'three';
+import { insertPoseMatrix, type BindDatum, type DatumKind, type InsertPose, type MeshTransform } from '../../model/bindRecord';
+import { decomposeRot24 } from '../../document/rot24';
 
-export type BindMode = 'translate' | 'rotate' | 'datum' | 'optics';
+/** WP-116: 'pose' — a click on the mesh sets the INSERT POSE's origin (the
+ * record frame's position in the cube, F3); rotation comes from the 90°
+ * steppers. The old 'datum' mode stays for the legacy housing road. */
+export type BindMode = 'translate' | 'rotate' | 'datum' | 'optics' | 'pose';
 export type OrthoView = 'top' | 'front' | 'side';
 
 interface BindState {
@@ -40,6 +45,9 @@ interface BindState {
    * datums INSIDE a whole-cube export, which is otherwise opaque — the
    * reason "toggle ghost cube" looked like it did nothing. */
   showMesh: boolean;
+  /** WP-116: the F2→F3 insert pose being authored (null = legacy datum
+   * road). The wizard's cube road seeds identity on entry. */
+  insertPose: InsertPose | null;
   /** Galvo groundwork (WP-40): mirror-normal tilt, °; the arm swings by 2θ. */
   galvoTiltDeg: number;
   /** WP-42: per-placed-mirror actuation tilt (° about its own pivot), keyed by
@@ -72,6 +80,12 @@ interface BindState {
   setExistingComponentId: (id: string) => void;
   toggleShowOptics: () => void;
   toggleShowMesh: () => void;
+  setInsertPose: (pose: InsertPose | null) => void;
+  /** Compose a 90° world-axis step onto the insert pose and re-snap to the
+   * nearest of the 24 (residual preserved through the decomposition). */
+  rotateInsert90: (axis: 'x' | 'y' | 'z', sign: 1 | -1) => void;
+  setInsertOffsetMm: (offsetMm: Vec3) => void;
+  setInsertOffsetDeg: (offsetDeg: Vec3) => void;
   setGalvoTiltDeg: (deg: number) => void;
   setOpticTilt: (id: string, deg: number) => void;
   toggleWholeModule: () => void;
@@ -123,6 +137,7 @@ export const useBindStore = create<BindState>((set, get) => ({
   existingComponentId: '',
   showOptics: true,
   showMesh: true,
+  insertPose: null,
   galvoTiltDeg: 0,
   opticTilt: {},
   wholeModule: false,
@@ -154,6 +169,26 @@ export const useBindStore = create<BindState>((set, get) => ({
   setExistingComponentId: existingComponentId => set({ existingComponentId }),
   toggleShowOptics: () => set(s => ({ showOptics: !s.showOptics })),
   toggleShowMesh: () => set(s => ({ showMesh: !s.showMesh })),
+  setInsertPose: insertPose => set({ insertPose }),
+  rotateInsert90: (axis, sign) => {
+    const pose = get().insertPose;
+    if (!pose) return;
+    const step = new THREE.Matrix4().makeRotationAxis(
+      new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0),
+      (sign * Math.PI) / 2,
+    );
+    const composed = step.multiply(insertPoseMatrix(pose));
+    const d = decomposeRot24(composed);
+    set({
+      insertPose: {
+        ...pose,
+        rot24: d.rot24,
+        offsetDeg: [d.offsetDeg.x, d.offsetDeg.y, d.offsetDeg.z],
+      },
+    });
+  },
+  setInsertOffsetMm: offsetMm => set(s => (s.insertPose ? { insertPose: { ...s.insertPose, offsetMm } } : {})),
+  setInsertOffsetDeg: offsetDeg => set(s => (s.insertPose ? { insertPose: { ...s.insertPose, offsetDeg } } : {})),
   setGalvoTiltDeg: galvoTiltDeg => set({ galvoTiltDeg }),
   setOpticTilt: (id, deg) => set(s => ({ opticTilt: { ...s.opticTilt, [id]: deg } })),
   toggleWholeModule: () => set(s => ({ wholeModule: !s.wholeModule, housingOnly: false })),
@@ -224,6 +259,6 @@ export const useBindStore = create<BindState>((set, get) => ({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
       meshBboxCenter: null, meshSizeMm: null, selectedOpticId: null, error: null,
-      wholeModule: false, housingOnly: false, showMesh: true,
+      wholeModule: false, housingOnly: false, showMesh: true, insertPose: null,
     }),
 }));

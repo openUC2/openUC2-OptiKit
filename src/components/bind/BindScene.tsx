@@ -192,7 +192,7 @@ function PartMesh() {
   };
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    if (mode !== 'datum' || !e.face || !groupRef.current) return;
+    if ((mode !== 'datum' && mode !== 'pose') || !e.face || !groupRef.current) return;
     // A drag is a camera move, not an authoring click.
     const from = downAt.current;
     downAt.current = null;
@@ -201,6 +201,18 @@ function PartMesh() {
       if (moved > 4) return;
     }
     e.stopPropagation();
+    // WP-116 pose mode: the click is a POSITION picker — it sets the insert
+    // pose's origin in the CUBE frame (world/doc coords; the cube frame is
+    // the scene frame). Never a direction oracle.
+    if (mode === 'pose') {
+      const p = threeToDoc(e.point.clone());
+      useBindStore.getState().setInsertOffsetMm([
+        Math.round(p[0] * 100) / 100,
+        Math.round(p[1] * 100) / 100,
+        Math.round(p[2] * 100) / 100,
+      ]);
+      return;
+    }
     // Convert the world hit into the PART frame (WP-31): datums belong to
     // the mesh and follow it through later transforms.
     const g = groupRef.current;
@@ -236,7 +248,7 @@ function PartMesh() {
       >
         <primitive object={scene} />
       </group>
-      {mode !== 'datum' && mode !== 'optics' && (
+      {mode !== 'datum' && mode !== 'optics' && mode !== 'pose' && (
         <TransformControls
           ref={controls => {
             // DEV probe: lets tests assert the gizmo is attached to OUR

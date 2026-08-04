@@ -18,7 +18,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { RecordDraft } from '../../../model/componentRecord';
-import type { BindDatum, MeshTransform } from '../../../model/bindRecord';
+import type { BindDatum, InsertPose, MeshTransform } from '../../../model/bindRecord';
 import { useBindStore } from '../../bind/bindStore';
 
 /** The three roads of WP-110 §1 — named for what the user HAS. */
@@ -35,6 +35,8 @@ export interface BindSnapshot {
   templateClass: 'fixed' | 'adaptive' | 'generative';
   wholeModule: boolean;
   housingOnly: boolean;
+  /** WP-116: the F2→F3 pose survives a reload with the rest. */
+  insertPose?: InsertPose | null;
 }
 
 interface WizardState {
@@ -102,6 +104,7 @@ export const usePartWizard = create<WizardState>()(
             templateClass: b.templateClass,
             wholeModule: b.wholeModule,
             housingOnly: b.housingOnly,
+            insertPose: b.insertPose,
           },
         });
       },
@@ -115,6 +118,7 @@ export const usePartWizard = create<WizardState>()(
           templateClass: snap.templateClass,
           wholeModule: snap.wholeModule,
           housingOnly: snap.housingOnly,
+          insertPose: snap.insertPose ?? null,
         });
       },
       clear: () =>

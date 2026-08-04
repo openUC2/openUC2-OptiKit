@@ -1,43 +1,55 @@
 /**
- * WP-19 (+WP-31): datum → record mapping. Datums live in the PART frame and
- * travel through the mesh placement into cube-frame record frames/ports;
- * assets ship with the file map; binding to an existing component skips the
- * stub. The generated trio must follow the library conventions — the
- * committed fixture is validated against optikit-core `library validate`.
+ * WP-19/31, re-founded on the frame treaty in WP-116: the binding authors
+ * the F3 side of the trio — the template's insert-pose, its posed frames,
+ * and the record's ports as mounted. Component optics are NEVER derived
+ * from geometry (no stub component, no click→port reflection law, no
+ * mesh-offset): the record speaks F2 and ships verbatim.
  */
 
 import { describe, expect, it } from 'vitest';
-import { parse as parseYaml } from 'yaml';
 import * as THREE from 'three';
 import {
   AXIS_SNAP_WARN_DEG,
+  IDENTITY_INSERT_POSE,
+  asMountedDirection,
   bindToRecords,
   cubeToDatum,
   datumToCube,
+  posePoint,
   recordsToFiles,
   snapToAxis,
   threePoseToMeshTransform,
   type BindInput,
+  type InsertPose,
 } from '../bindRecord';
 
-function laserInput(): BindInput {
+/** The 45° mirror of round 16: record frame front:-z, reflected:-x. */
+const MIRROR_PORTS = [
+  { name: 'front', frame: 'optical', direction: '-z', afterSurface: null },
+  { name: 'reflected', frame: 'optical', direction: '-x', afterSurface: 0 },
+];
+
+/** Optical axis (record +z) mounted along the cube's +x. */
+const POSE_Z_TO_X: InsertPose = {
+  rot24: { z: '+x', x: '-z' },
+  offsetDeg: [0, 0, 0],
+  offsetMm: [0, 0, 0],
+};
+
+function mirrorInput(over: Partial<BindInput> = {}): BindInput {
   return {
     namespace: 'user',
-    name: 'laser-pointer',
-    category: 'source',
+    name: 'mirr-test',
+    category: 'mirror',
     templateClass: 'fixed',
-    meshFile: 'laser-housing.step',
-    meshTransform: { positionMm: [0, 0, -5], rotationDeg: [0, 0, 90] },
-    datums: [
-      {
-        id: 'd1',
-        name: 'out',
-        kind: 'source',
-        pointMm: [0, 0, 20],
-        direction: [0, 0, 1],
-        areaDiameterMm: 3,
-      },
-    ],
+    meshFile: 'cube.glb',
+    meshTransform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
+    datums: [],
+    wholeModule: true,
+    insertPose: { ...IDENTITY_INSERT_POSE },
+    recordFrames: { optical: [0, 0, 0] },
+    recordPorts: MIRROR_PORTS,
+    ...over,
   };
 }
 
@@ -51,422 +63,169 @@ describe('snapToAxis', () => {
   });
 });
 
-describe('housing only (WP-67)', () => {
-  it('emits component + housing template (footprint null, component ref), NO module', () => {
-    const bound = bindToRecords({ ...laserInput(), housingOnly: true });
+describe('the insert pose (WP-116)', () => {
+  it('carries record-frame points into the cube frame', () => {
+    // Optical axis onto +x: the frame at record z=10 lands at cube x=10.
+    expect(posePoint(POSE_Z_TO_X, [0, 0, 10]).map(Math.round)).toEqual([10, 0, 0]);
+    // Translation adds on top.
+    const shifted = { ...POSE_Z_TO_X, offsetMm: [0, 0, -5] as [number, number, number] };
+    expect(posePoint(shifted, [0, 0, 10]).map(Math.round)).toEqual([10, 0, -5]);
+  });
+
+  it('mounts port directions through the pose, snapped to axis literals', () => {
+    // Record front faces -z; with +z→+x the mounted front faces -x.
+    expect(asMountedDirection(POSE_Z_TO_X, '-z')).toBe('-x');
+    // The fold arm (-x in F2) lands on +z.
+    expect(asMountedDirection(POSE_Z_TO_X, '-x')).toBe('+z');
+  });
+
+  it('template frames = pose ∘ record frames; the pose itself is emitted', () => {
+    const bound = bindToRecords(
+      mirrorInput({
+        insertPose: POSE_Z_TO_X,
+        recordFrames: { optical: [0, 0, 10] },
+      }),
+    );
+    expect(bound.errors).toEqual([]);
+    const frames = bound.template.frames as Record<string, Record<string, number>>;
+    expect(frames.optical['x-mm']).toBeCloseTo(10, 3);
+    expect(frames.optical['z-mm']).toBeCloseTo(0, 3);
+    const pose = bound.template['insert-pose'] as {
+      rotation: { grid: { z: string; x: string } };
+    };
+    expect(pose.rotation.grid).toEqual({ z: '+x', x: '-z' });
+    // Ports as mounted: front -z → -x.
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.front.direction).toBe('-x');
+    expect(ports.reflected.direction).toBe('+z');
+  });
+
+  it('never emits a component — the record ships verbatim from the caller', () => {
+    expect(bindToRecords(mirrorInput()).component).toBeNull();
+    expect(
+      bindToRecords(
+        mirrorInput({ existingComponent: { id: 'openuc2.mirror.flat_45', version: '1.0.0' } }),
+      ).component,
+    ).toBeNull();
+  });
+
+  it('refuses a rotated mesh with a sentence — the cube frame is the reference', () => {
+    const bound = bindToRecords(
+      mirrorInput({ meshTransform: { positionMm: [0, 0, 0], rotationDeg: [-89.9, -135, -45] } }),
+    );
+    expect(bound.errors.some(e => e.includes('rotate') && e.includes('insert pose'))).toBe(true);
+  });
+
+  it('mesh-offset is retired — nothing writes the dead field', () => {
+    const bound = bindToRecords(
+      mirrorInput({ meshTransform: { positionMm: [1, 2, 3], rotationDeg: [0, 0, 0] } }),
+    );
+    expect(bound.template['mesh-offset']).toBeUndefined();
+    // A translation is view alignment only — warned, not recorded.
+    expect(bound.warnings.some(w => w.includes('translated'))).toBe(true);
+  });
+});
+
+describe('legacy datum road (housing / expert tab)', () => {
+  const laser = (): BindInput => ({
+    namespace: 'user',
+    name: 'laser-pointer',
+    category: 'source',
+    templateClass: 'fixed',
+    meshFile: 'laser-housing.step',
+    meshTransform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
+    datums: [
+      {
+        id: 'd1',
+        name: 'out',
+        kind: 'source',
+        pointMm: [0, 0, 20],
+        direction: [0, 0, 1],
+        areaDiameterMm: 3,
+      },
+    ],
+    recordPorts: [{ name: 'out', frame: 'optical', direction: '+z', afterSurface: null }],
+    housingOnly: true,
+  });
+
+  it('emits the housing template (footprint null, component ref), NO module', () => {
+    const bound = bindToRecords(laser());
     expect(bound.errors).toEqual([]);
     expect(bound.module).toBeNull();
     expect(bound.template.footprint_grid).toBeNull();
     expect(bound.template.component).toBe('user.source.laser-pointer@^0.1');
-    expect(bound.component).not.toBeNull();
-
-    const files = recordsToFiles(bound, 'laser-housing.step');
-    const paths = Object.keys(files);
-    expect(paths.some(p => p.startsWith('components/'))).toBe(true);
-    expect(paths.some(p => p.startsWith('templates/'))).toBe(true);
-    expect(paths.some(p => p.startsWith('modules/'))).toBe(false);
-    // The YAML spells the housing state explicitly for the Python loader.
-    expect(files['templates/user.tpl.laser-pointer/template.yml']).toMatch(
-      /footprint_grid: null/,
-    );
   });
 
-  it('an existing component keeps its ref on the housing template', () => {
-    const bound = bindToRecords({
-      ...laserInput(),
-      housingOnly: true,
-      existingComponent: { id: 'openuc2.source.laser_488', version: '1.1.0' },
-    });
-    expect(bound.component).toBeNull();
-    expect(bound.template.component).toBe('openuc2.source.laser_488@^1.1');
-    expect(bound.module).toBeNull();
+  it('ports come from the RECORD — a datum never becomes a port', () => {
+    const bound = bindToRecords(laser());
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(Object.keys(ports)).toEqual(['out']);
+    expect(ports.out.direction).toBe('+z');
+  });
+
+  it('a pose-less, datum-less whole-module warns that verify-t1 will be vacuous', () => {
+    const bound = bindToRecords(
+      mirrorInput({ insertPose: null, recordFrames: undefined, datums: [] }),
+    );
+    expect(bound.warnings.some(w => w.includes('vacuous'))).toBe(true);
   });
 });
 
 describe('dead-record guard (WP-77)', () => {
   it('refuses class generative — no generator block can ever be emitted here', () => {
-    const bound = bindToRecords({ ...laserInput(), templateClass: 'generative' });
-    expect(bound.errors).toHaveLength(1);
-    expect(bound.errors[0]).toMatch(/generate a holder/);
+    const bound = bindToRecords(mirrorInput({ templateClass: 'generative' }));
+    expect(bound.errors.some(e => e.includes('generator'))).toBe(true);
   });
 
   it('refuses class adaptive — zero DOFs degrade to free movement', () => {
-    const bound = bindToRecords({ ...laserInput(), templateClass: 'adaptive' });
-    expect(bound.errors).toHaveLength(1);
-    expect(bound.errors[0]).toMatch(/DOF/);
+    const bound = bindToRecords(mirrorInput({ templateClass: 'adaptive' }));
+    expect(bound.errors.some(e => e.includes('DOF'))).toBe(true);
   });
 
   it('T1 fixed stays error-free', () => {
-    expect(bindToRecords(laserInput()).errors).toEqual([]);
+    expect(bindToRecords(mirrorInput()).errors).toEqual([]);
   });
 });
 
-describe('datum frame math (WP-31: datums follow the part)', () => {
-  it('rotating the part 90° about z carries an x-offset datum to +y', () => {
-    const t = { positionMm: [0, 0, 0] as [number, number, number], rotationDeg: [0, 0, 90] as [number, number, number] };
-    const world = datumToCube({ pointMm: [10, 0, 0], direction: [1, 0, 0] }, t);
-    expect(world.pointMm[0]).toBeCloseTo(0, 6);
-    expect(world.pointMm[1]).toBeCloseTo(10, 6);
-    expect(world.direction[1]).toBeCloseTo(1, 6);
-  });
-
-  it('cubeToDatum is the exact inverse of datumToCube', () => {
-    const t = { positionMm: [3, -4, 5] as [number, number, number], rotationDeg: [10, 20, 30] as [number, number, number] };
-    const part = { pointMm: [7, 8, -9] as [number, number, number], direction: [0, 0, 1] as [number, number, number] };
-    const world = datumToCube(part, t);
-    const back = cubeToDatum(world.pointMm, world.direction, t);
-    back.pointMm.forEach((v, i) => expect(v).toBeCloseTo(part.pointMm[i], 6));
-    back.direction.forEach((v, i) => expect(v).toBeCloseTo(part.direction[i], 6));
-  });
-});
-
-describe('bindToRecords', () => {
-  it('maps the part-frame datum through the placement into cube-frame frames + ports', () => {
-    const bound = bindToRecords(laserInput());
-    expect(bound.warnings).toEqual([]);
-    const optics = bound.component!.optics as {
-      frames: Record<string, Record<string, number>>;
-      ports: Record<string, { frame: string; direction: string }>;
-    };
-    // Part-frame [0,0,20] through the placement (z −5, yaw 90) → cube z 15.
-    expect(optics.frames.out).toEqual({ 'z-mm': 15 });
-    expect(optics.ports.out).toEqual({ frame: 'out', direction: '+z' });
-    expect(bound.component!.id).toBe('user.source.laser-pointer');
-    expect(bound.component!.category).toBe('source');
-  });
-
-  it('binding to an EXISTING component skips the stub and refs it (WP-31)', () => {
-    const input = laserInput();
-    input.existingComponent = { id: 'thorlabs.lens.ac254-050-a', version: '0.1.0' };
-    const bound = bindToRecords(input);
-    expect(bound.component).toBeNull();
-    expect((bound.module as { component: string }).component).toBe(
-      'thorlabs.lens.ac254-050-a@^0.1',
-    );
-    // Template still carries the datum-derived optical ports.
-    const tplPorts = (bound.template as { optical_ports: Record<string, unknown> }).optical_ports;
-    expect(Object.keys(tplPorts)).toEqual(['out']);
-  });
-
-  it('puts the placement transform on the template as mesh-offset', () => {
-    const bound = bindToRecords(laserInput());
-    const template = bound.template as Record<string, unknown>;
-    expect(template.step).toBe('laser-housing.step'); // source of truth
-    expect(template.glb).toBe('laser-housing.glb'); // derived render copy
-    expect(template['mesh-offset']).toEqual({
-      'x-mm': 0, 'y-mm': 0, 'z-mm': -5,
-      'rot-deg': { x: 0, y: 0, z: 90 },
+describe('file layout (WP-31)', () => {
+  it('emits the library-PR file map WITH the mesh assets, and no component', () => {
+    const bound = bindToRecords(mirrorInput());
+    const files = recordsToFiles(bound, 'cube.glb', {
+      glb: new Uint8Array([1, 2, 3]),
     });
-    expect((bound.module as { component: string }).component).toBe(
-      'user.source.laser-pointer@^0.1',
-    );
-  });
-
-  it('warns on off-axis datums and reflective parts get a fold fragment', () => {
-    const input = laserInput();
-    input.category = 'mirror';
-    input.meshTransform = { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] };
-    input.datums = [
-      {
-        id: 'd1', name: 'front', kind: 'reflective',
-        pointMm: [0, 0, 0], direction: [0.1, 0, -1], areaDiameterMm: 25,
-      },
-    ];
-    const bound = bindToRecords(input);
-    expect(bound.warnings.join()).toMatch(/off the -z axis/);
-    const fragment = (bound.component!.optics as { fragment: { surfaces: unknown[] } }).fragment;
-    expect(fragment.surfaces).toHaveLength(1);
-  });
-
-  it('emits the library-PR file layout WITH the mesh assets (WP-31)', () => {
-    const step = new Uint8Array([1, 2, 3]);
-    const glb = new Uint8Array([4, 5, 6]);
-    const files = recordsToFiles(bindToRecords(laserInput()), 'laser-housing.step', {
-      step, glb, thumbnailPng: new Uint8Array([7]),
-    });
-    expect(Object.keys(files).sort()).toEqual([
-      'components/user.source.laser-pointer/component.yml',
-      'modules/user.cube.laser-pointer/module.yml',
-      'templates/user.tpl.laser-pointer/laser-housing.glb',
-      'templates/user.tpl.laser-pointer/laser-housing.step',
-      'templates/user.tpl.laser-pointer/template.yml',
-      'templates/user.tpl.laser-pointer/thumbnail.png',
-    ]);
-    expect(files['templates/user.tpl.laser-pointer/laser-housing.step']).toBe(step);
-    expect(files['components/user.source.laser-pointer/component.yml']).toContain('z-mm: 15');
-  });
-});
-
-describe('threePoseToMeshTransform (WP-33: the gizmo commit math)', () => {
-  it('decomposes a dragged three-space pose back to the doc-frame transform', () => {
-    // Simulate the drag the bug used to lose: +20mm doc-x, −5mm doc-y (three
-    // z = −doc y), and a 90° yaw about doc z (three y).
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    const t = threePoseToMeshTransform({ x: 20, y: 0, z: 5 }, q);
-    expect(t.positionMm).toEqual([20, -5, 0]);
-    expect(t.rotationDeg[2]).toBeCloseTo(90, 4);
-    expect(t.rotationDeg[0]).toBeCloseTo(0, 4);
-    expect(t.rotationDeg[1]).toBeCloseTo(0, 4);
-  });
-
-  it('is the inverse of the PartMesh quaternion composition', () => {
-    // The same composition PartMesh renders from a stored transform:
-    const rot: [number, number, number] = [10, 20, 30]; // doc extrinsic ZXY
-    const [rx, ry, rz] = rot.map(v => (v * Math.PI) / 180);
-    const qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rz);
-    const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), rx);
-    const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), ry);
-    const q = qz.clone().multiply(qx).multiply(qy);
-    const t = threePoseToMeshTransform({ x: 1, y: 2, z: 3 }, q);
-    t.rotationDeg.forEach((v, i) => expect(v).toBeCloseTo(rot[i], 1));
-    expect(t.positionMm).toEqual([1, -3, 2]);
-  });
-});
-
-describe('continuous datum directions (WP-39)', () => {
-  it('keeps a 30°-off direction as a unit vector instead of force-snapping', () => {
-    const input = laserInput();
-    input.meshTransform = { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] };
-    input.datums = [{
-      id: 'd1', name: 'out', kind: 'source',
-      pointMm: [0, 0, 10],
-      direction: [Math.sin(Math.PI / 6), 0, Math.cos(Math.PI / 6)], // 30° off +z
-      areaDiameterMm: null,
-    }];
-    const bound = bindToRecords(input);
-    const component = bound.component!;
-    const optics = component.optics as {
-      ports: Record<string, { direction: string | number[] }>;
-    };
-    const dir = optics.ports.out.direction;
-    expect(Array.isArray(dir)).toBe(true);
-    expect((dir as number[])[0]).toBeCloseTo(0.5, 3);
-    expect(bound.warnings.some(w => w.includes('kept the continuous direction'))).toBe(true);
-  });
-
-  it('still snaps within the 2° tolerance', () => {
-    const input = laserInput();
-    input.datums = [{
-      id: 'd1', name: 'out', kind: 'source',
-      pointMm: [0, 0, 10],
-      direction: [0.01, 0, 0.9999], // ~0.6° off +z
-      areaDiameterMm: null,
-    }];
-    const bound = bindToRecords(input);
-    const optics = bound.component!.optics as {
-      ports: Record<string, { direction: string | number[] }>;
-    };
-    expect(optics.ports.out.direction).toBe('+z');
-  });
-});
-
-// ── WP-41: whole-module binding + gizmo-placed optics ────────────────────────
-
-import {
-  datumQuatToCube,
-  threePoseToDatum,
-  docQuatToThree,
-  threeQuatToDoc,
-  quatToEulerDeg,
-  eulerDegToQuat,
-} from '../bindRecord';
-
-function placedMirror(quat: [number, number, number, number]): BindInput {
-  return {
-    namespace: 'user',
-    name: 'mirror-cube',
-    category: 'mirror',
-    templateClass: 'fixed',
-    meshFile: 'mirror-cube.step',
-    meshTransform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
-    wholeModule: true,
-    datums: [{
-      id: 'm1', name: 'front', kind: 'reflective',
-      pointMm: [0, 0, 0], direction: [0, 1, 0], areaDiameterMm: 25,
-      quaternion: quat,
-    }],
-  };
-}
-
-describe('whole-module binding (WP-41)', () => {
-  it('marks the template whole-module and promotes the placed frame', () => {
-    // 45° mirror: normal tilted so local +y goes between +x and −y.
-    const half = Math.PI / 8; // 45°/2 about... choose about z so +y → 45° in xy
-    const q: [number, number, number, number] = [0, 0, Math.sin(half), Math.cos(half)];
-    const bound = bindToRecords(placedMirror(q));
-    expect(bound.template.provenance).toBe('whole-module');
-    const tplFrames = bound.template.frames as Record<string, { rotation?: number[] }>;
-    expect(tplFrames.front).toBeDefined();
-    // the promoted frame carries the placed rotation (non-identity)
-    expect(tplFrames.front.rotation).toBeDefined();
-    // component frame == template frame (verify-t1 will be green)
-    const compFrames = (bound.component!.optics as { frames: Record<string, unknown> }).frames;
-    expect(compFrames.front).toEqual(tplFrames.front);
-  });
-
-  it('a placed mirror emits front + reflected ports via the reflection law', () => {
-    // normal = +y rotated 45° about z → points at 45° in the xy plane.
-    const half = Math.PI / 8;
-    const q: [number, number, number, number] = [0, 0, Math.sin(half), Math.cos(half)];
-    const bound = bindToRecords(placedMirror(q));
-    const ports = (bound.component!.optics as {
-      ports: Record<string, { direction: unknown; 'after-surface'?: number }>;
-    }).ports;
-    expect(ports.front).toBeDefined();
-    expect(ports.reflected).toBeDefined();
-    expect(ports.reflected['after-surface']).toBe(0);
-    // one reflective fragment surface
-    const frag = (bound.component!.optics as { fragment: { surfaces: unknown[] } }).fragment;
-    expect(frag.surfaces).toHaveLength(1);
-  });
-
-  it('two placed mirrors → two surfaces + per-instance ports (galvo)', () => {
-    const q: [number, number, number, number] = [0, 0, 0, 1];
-    const input = placedMirror(q);
-    input.datums = [
-      { id: 'mx', name: 'mirror-x', kind: 'reflective', pointMm: [0, 0, 0], direction: [0, 1, 0], areaDiameterMm: 12, quaternion: [0, 0, 0.383, 0.924] },
-      { id: 'my', name: 'mirror-y', kind: 'reflective', pointMm: [5, 0, 0], direction: [0, 1, 0], areaDiameterMm: 12, quaternion: [0.383, 0, 0, 0.924] },
-    ];
-    const bound = bindToRecords(input);
-    const frag = (bound.component!.optics as { fragment: { surfaces: unknown[] } }).fragment;
-    expect(frag.surfaces).toHaveLength(2);
-    const ports = (bound.component!.optics as { ports: Record<string, unknown> }).ports;
-    expect(Object.keys(ports).sort()).toEqual(
-      ['mirror-x-in', 'mirror-x-refl', 'mirror-y-in', 'mirror-y-refl'].sort(),
-    );
-  });
-});
-
-describe('gizmo pose round trip (WP-41)', () => {
-  it('threePoseToDatum inverts the render pose (identity mesh)', () => {
-    const t = { positionMm: [0, 0, 0] as Vec3, rotationDeg: [0, 0, 0] as Vec3 };
-    const datum: BindDatum = {
-      id: 'x', name: 'front', kind: 'reflective',
-      pointMm: [3, -4, 5], direction: [0, 1, 0], areaDiameterMm: 25,
-      quaternion: [0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8)],
-    };
-    // render pose: cube point (identity mesh) → three; cube quat → three
-    const cubeQuat = new THREE.Quaternion(...datum.quaternion);
-    const threeQuat = docQuatToThree(cubeQuat);
-    const threePos = { x: 3, y: 5, z: 4 }; // doc(3,-4,5) → three(x, z, -y)=(3,5,4)
-    const patch = threePoseToDatum(threePos, threeQuat, t);
-    expect(patch.pointMm[0]).toBeCloseTo(3, 3);
-    expect(patch.pointMm[1]).toBeCloseTo(-4, 3);
-    expect(patch.pointMm[2]).toBeCloseTo(5, 3);
-    // quaternion recovered
-    patch.quaternion.forEach((v, i) => expect(v).toBeCloseTo(datum.quaternion![i], 3));
-  });
-
-  it('docQuatToThree and threeQuatToDoc are inverses', () => {
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.7);
-    const back = threeQuatToDoc(docQuatToThree(q));
-    expect(back.x).toBeCloseTo(q.x, 6);
-    expect(back.y).toBeCloseTo(q.y, 6);
-    expect(back.z).toBeCloseTo(q.z, 6);
-    expect(back.w).toBeCloseTo(q.w, 6);
-  });
-
-  it('datumQuatToCube composes the mesh rotation', () => {
-    // identity datum quat, mesh rotated 90° about z → cube quat is the mesh's.
-    const t = { positionMm: [0, 0, 0] as Vec3, rotationDeg: [0, 0, 90] as Vec3 };
-    const cube = datumQuatToCube([0, 0, 0, 1], t);
-    // 90° about doc z
-    expect(cube[2]).toBeCloseTo(Math.sin(Math.PI / 4), 3);
-    expect(cube[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3);
-  });
-});
-
-describe('placed-optic Euler editing (WP-41 follow-up)', () => {
-  it('quatToEulerDeg / eulerDegToQuat round-trip a 45° yaw', () => {
-    const half = Math.PI / 8;
-    const q: [number, number, number, number] = [0, 0, Math.sin(half), Math.cos(half)];
-    const e = quatToEulerDeg(q);
-    expect(e.z).toBeCloseTo(45, 4);
-    expect(e.x).toBeCloseTo(0, 4);
-    expect(e.y).toBeCloseTo(0, 4);
-    const back = eulerDegToQuat(e);
-    back.forEach((v, i) => expect(v).toBeCloseTo(q[i], 4));
-  });
-
-  it('editing one Euler axis leaves the others intact', () => {
-    // start at pitch 30, roll 0, yaw 0
-    const q0 = eulerDegToQuat({ x: 30, y: 0, z: 0 });
-    const e0 = quatToEulerDeg(q0);
-    expect(e0.x).toBeCloseTo(30, 4);
-    expect(e0.y).toBeCloseTo(0, 4);
-    expect(e0.z).toBeCloseTo(0, 4);
-    // set yaw to 45 → pitch stays 30
-    const q1 = eulerDegToQuat({ ...e0, z: 45 });
-    const e1 = quatToEulerDeg(q1);
-    expect(e1.x).toBeCloseTo(30, 3);
-    expect(e1.z).toBeCloseTo(45, 3);
-  });
-});
-
-describe('the emitted template is honest about its mesh (WP-109)', () => {
-  const parse = (files: Record<string, string | Uint8Array>, path: string) =>
-    parseYaml(files[path] as string) as Record<string, unknown>;
-
-  it('a dropped GLB does not become the record\'s STEP', () => {
-    // This is the defect that shipped: `step:` was written unconditionally
-    // from meshFile, so binding a .glb published a template whose STEP was a
-    // glTF — and the index then served gltf-binary bytes under assets.step.
-    const bound = bindToRecords({ ...laserInput(), meshFile: 'cube.glb' });
-    const tpl = parse(recordsToFiles(bound, 'cube.glb', {}), `templates/${bound.template.id}/template.yml`);
-    expect(tpl.step).toBeUndefined();
-    expect(tpl.glb).toBe('cube.glb');
-  });
-
-  it('a real STEP still declares both halves', () => {
-    const bound = bindToRecords(laserInput());
-    const tpl = parse(
-      recordsToFiles(bound, 'laser-housing.step', {}),
-      `templates/${bound.template.id}/template.yml`,
-    );
-    expect(tpl.step).toBe('laser-housing.step');
-    expect(tpl.glb).toBe('laser-housing.glb');
-  });
-
-  it('declares the MEASURED envelope when the viewport has one', () => {
-    // `library validate` (WP-109) checks the mesh against this number, so a
-    // guessed 50/50/50 is a guaranteed disagreement for every real cube.
-    const bound = bindToRecords({ ...laserInput(), envelopeMm: [49.8, 49.8, 54.4] });
-    const tpl = parse(
-      recordsToFiles(bound, 'laser-housing.step', {}),
-      `templates/${bound.template.id}/template.yml`,
-    );
-    expect(tpl.envelope).toEqual({ 'x-mm': 49.8, 'y-mm': 49.8, 'z-mm': 54.4 });
+    const paths = Object.keys(files);
+    expect(paths).toContain('templates/user.tpl.mirr-test/template.yml');
+    expect(paths).toContain('modules/user.cube.mirr-test/module.yml');
+    expect(paths.some(p => p.endsWith('.glb'))).toBe(true);
+    // No component file — the caller owns the record (F2, verbatim).
+    expect(paths.some(p => p.startsWith('components/'))).toBe(false);
   });
 
   it('falls back to the real 55 mm cube pitch, not 50', () => {
-    const bound = bindToRecords(laserInput());
-    const tpl = parse(
-      recordsToFiles(bound, 'laser-housing.step', {}),
-      `templates/${bound.template.id}/template.yml`,
-    );
-    expect((tpl.envelope as Record<string, number>)['z-mm']).toBe(55);
+    const bound = bindToRecords(mirrorInput({ envelopeMm: undefined }));
+    expect((bound.template.envelope as Record<string, number>)['z-mm']).toBe(55);
+  });
+});
+
+describe('frame conversions (WP-31/33)', () => {
+  it('datumToCube round-trips through cubeToDatum', () => {
+    const t = {
+      positionMm: [1, 2, 3] as [number, number, number],
+      rotationDeg: [0, 90, 0] as [number, number, number],
+    };
+    const datum = {
+      pointMm: [5, 0, 0] as [number, number, number],
+      direction: [0, 0, 1] as [number, number, number],
+    };
+    const cube = datumToCube(datum, t);
+    const back = cubeToDatum(cube.pointMm, cube.direction, t);
+    expect(back.pointMm.map(v => Math.round(v * 1e6) / 1e6 || 0)).toEqual(datum.pointMm);
+    expect(back.direction.map(v => Math.round(v * 1e6) / 1e6 || 0)).toEqual(datum.direction);
   });
 
-  it('omits mesh-offset when the mesh was never moved', () => {
-    // Nothing in either repo READS mesh-offset; a zero block on every record
-    // was pure noise that looked like a placement.
-    const bound = bindToRecords({
-      ...laserInput(),
-      meshTransform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
-    });
-    const tpl = parse(
-      recordsToFiles(bound, 'laser-housing.step', {}),
-      `templates/${bound.template.id}/template.yml`,
-    );
-    expect(tpl['mesh-offset']).toBeUndefined();
-  });
-
-  it('keeps mesh-offset when the mesh WAS moved', () => {
-    const bound = bindToRecords(laserInput()); // positionMm [0,0,-5]
-    const tpl = parse(
-      recordsToFiles(bound, 'laser-housing.step', {}),
-      `templates/${bound.template.id}/template.yml`,
-    );
-    expect(tpl['mesh-offset']).toMatchObject({ 'z-mm': -5 });
+  it('threePoseToMeshTransform inverts the doc→three basis change', () => {
+    const t = threePoseToMeshTransform({ x: 1, y: 3, z: -2 }, new THREE.Quaternion());
+    expect(t.positionMm.map(v => v || 0)).toEqual([1, 2, 3]);
+    expect(t.rotationDeg.map(v => v || 0)).toEqual([0, 0, 0]);
   });
 });

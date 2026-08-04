@@ -24,7 +24,6 @@ import * as THREE from 'three';
 import { saveAs } from 'file-saver';
 import { stringify as stringifyYaml } from 'yaml';
 import {
-  PORT_AXIS_VECTORS,
   derivedPortWarnings,
   foldDegOfDraft,
   paraxialEflMm,
@@ -38,6 +37,7 @@ import { PreviewCanvas } from '../../common/PreviewCanvas';
 import { DecimalField } from '../../common/DecimalField';
 
 import { useBindStore } from '../../bind/bindStore';
+import { IDENTITY_INSERT_POSE } from '../../../model/bindRecord';
 import {
   CoreServiceError,
   base64ToBytes,
@@ -723,20 +723,29 @@ export function CubeMesh() {
   );
 }
 
-/** WP-113.2: the datums step — marker-stamped exports extract them
- * automatically through the SAME importer the CLI uses; the manual click
- * road (DeviceAlign) stays underneath for unstamped files. */
+/** WP-116: the POSE step — "place the record frame". The click is a
+ * position picker, the rotation is one of 24 discrete steps, and the beam
+ * directions are COMPUTED from the record's ports through the pose — never
+ * asked. Marker-stamped exports (WP-113.2) still extract the origin
+ * automatically through the same importer the CLI uses. */
 export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
   const glbBytes = useBindStore(s => s.glbBytes);
   const meshFile = useBindStore(s => s.meshFile);
+  const insertPose = useBindStore(s => s.insertPose);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [found, setFound] = useState<{
     frames: [string, { x: number; y: number; z: number; apertureMm: number | null }][];
     review: string[];
     opticalFrame: string;
-    frontDirection: string;
   } | null>(null);
+
+  // The step opens READY: identity pose seeded, pose mode active, overlay on.
+  useEffect(() => {
+    const st = useBindStore.getState();
+    if (!st.insertPose) st.setInsertPose({ ...IDENTITY_INSERT_POSE });
+    useBindStore.setState({ mode: 'pose', showOptics: true });
+  }, []);
 
   const extract = async () => {
     if (!glbBytes) return;
@@ -771,7 +780,6 @@ export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
         frames,
         review: res.review,
         opticalFrame: front?.frame ?? frames[0]?.[0] ?? '',
-        frontDirection: front?.direction ?? '-z',
       });
     } catch (err) {
       setError(err instanceof CoreServiceError ? `${err.code}: ${err.message}` : String(err));
@@ -782,31 +790,32 @@ export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
 
   const confirm = () => {
     if (!found) return;
-    const expected = expectedDatumOf(ctx.draft.category);
-    useBindStore.setState({
-      datums: found.frames.map(([name, f], i) => ({
-        id: `marker-${i + 1}`,
-        name,
-        kind: name === found.opticalFrame ? expected.kind : ('custom' as const),
-        pointMm: [f.x, f.y, f.z] as [number, number, number],
-        direction: (PORT_AXIS_VECTORS[found.frontDirection] ?? [0, 0, -1]) as [
-          number, number, number,
-        ],
-        areaDiameterMm: f.apertureMm,
-      })),
-    });
+    const opt = found.frames.find(([name]) => name === found.opticalFrame) ?? found.frames[0];
+    if (opt) {
+      const st = useBindStore.getState();
+      if (!st.insertPose) st.setInsertPose({ ...IDENTITY_INSERT_POSE });
+      st.setInsertOffsetMm([opt[1].x, opt[1].y, opt[1].z]);
+    }
     setFound(null);
   };
 
   return (
     <Stack spacing={1}>
+      <Alert severity={insertPose ? 'success' : 'info'}>
+        <Typography variant="caption">
+          The record already says what the optic does — this step only says WHERE its frame
+          sits in the cube. Click the optical surface to set the origin, use the 90° buttons
+          for the orientation (one of the 24 insert rotations); the beam directions below the
+          viewport are computed from the record through the pose, never asked.
+        </Typography>
+      </Alert>
       <Stack direction="row" spacing={1} alignItems="center">
         <Button size="small" variant="outlined" disabled={!glbBytes || busy} onClick={() => void extract()}>
-          {busy ? 'reading markers…' : 'extract datum frames from the markers'}
+          {busy ? 'reading markers…' : 'set the origin from the markers'}
         </Button>
         <Typography variant="caption" color="text.secondary">
           for exports following the Inventor naming contract (PLN / AXIS / PT nodes) — an
-          unstamped file just reports what it guessed, and you click the datums instead.
+          unstamped file just reports what it guessed, and you click instead.
         </Typography>
       </Stack>
       {error && (
@@ -819,7 +828,7 @@ export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
           severity={found.frames.length > 0 ? 'success' : 'warning'}
           action={
             found.frames.length > 0 ? (
-              <Button size="small" onClick={confirm}>use these</Button>
+              <Button size="small" onClick={confirm}>use as origin</Button>
             ) : undefined
           }
         >
@@ -832,7 +841,6 @@ export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
             <Typography key={name} variant="caption" sx={{ display: 'block', fontFamily: 'monospace' }}>
               • {name} at ({f.x.toFixed(1)}, {f.y.toFixed(1)}, {f.z.toFixed(1)}) mm
               {f.apertureMm !== null ? ` · Ø${f.apertureMm} mm` : ''}
-              {name === found.opticalFrame ? ` · beam ${found.frontDirection}` : ''}
             </Typography>
           ))}
           {found.review.map((r, i) => (
@@ -842,7 +850,6 @@ export function CubeDatums({ ctx }: { ctx: WizardCtx }) {
           ))}
         </Alert>
       )}
-      <DeviceAlign ctx={ctx} />
     </Stack>
   );
 }
