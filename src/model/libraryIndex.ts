@@ -198,6 +198,25 @@ export interface LibraryIndex {
   housings?: IndexHousing[];
 }
 
+/**
+ * WP-128: does the SERVICE that built this index know the frame contract?
+ *
+ * `ports_frame` (WP-124) is stamped on every module entry by a current
+ * `library build`. A service started before that ships an index that looks
+ * fine and silently loses three facts the editors need — which frame a GLB
+ * speaks (`mesh_frame`, WP-123), which frame the pins speak (`ports_frame`),
+ * and a mirror's rectangular aperture (`mirror_rect_mm`, WP-125). The
+ * symptoms are all "the fix didn't work": cubes tipped on their side, round
+ * mirrors that should be rectangular. A long-running dev service on :8000 is
+ * exactly how this happens, so the UI says it out loud instead.
+ */
+export function indexPredatesFrameContract(
+  index: { modules?: IndexModule[] } | null | undefined,
+): boolean {
+  const modules = index?.modules ?? [];
+  return modules.length > 0 && modules.every(m => m.ports_frame === undefined);
+}
+
 const URL_STORAGE_KEY = 'optikit-library-index-url';
 /** Bundled dev snapshot — the offline fallback. */
 export const FALLBACK_INDEX_URL = `${import.meta.env.BASE_URL}optikit-library/index.json`;

@@ -37,6 +37,7 @@ import type { DocCategory } from '../../document';
 import {
   bumpLibraryIndex,
   fetchIndexComponent,
+  indexPredatesFrameContract,
   useLibraryIndex,
   type IndexComponent,
 } from '../../model/libraryIndex';
@@ -350,7 +351,8 @@ export function LibraryBrowser({
               <InputAdornment position="end">
                 <Tooltip title="reload index">
                   {/* WP-105: setUrl with an UNCHANGED value is a no-op in
-                      useLibraryIndex, so the refresh button did nothing unless
+                      indexPredatesFrameContract,
+  useLibraryIndex, so the refresh button did nothing unless
                       the URL had been edited. bumpLibraryIndex forces the
                       refetch every mounted index hook is listening for. */}
                   <IconButton
@@ -368,6 +370,16 @@ export function LibraryBrowser({
             ),
           }}
         />
+        {indexPredatesFrameContract(index) && (
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', mt: 0.75, color: 'warning.main' }}
+          >
+            this service predates the frame contract — restart optikit-core to serve it.
+            Until then placed cubes may sit tipped over and rect mirrors draw round
+            (the index carries no ports-frame / mesh-frame / aperture).
+          </Typography>
+        )}
       </Box>
     </Box>
   );
