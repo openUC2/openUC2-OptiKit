@@ -58,15 +58,19 @@ function draftToElement(
       return {
         ...base,
         type: 'mirror',
-        // WP-107: the engine's `angle` is the PLATE angle measured from the
-        // beam axis (`mirrorDir = rotate({1,0}, rotation - angle)`), not the
-        // mount angle from the normal — its own default is −45. Passing the
-        // record's mount angle straight through (+45) folded this sketch the
-        // OPPOSITE way from the schematic, which never sets `angle` at all
-        // and so used the −45 default. θ=45 → −45, θ=0 → −90 (retro).
-        params: { aperture, angle: (mirrorAngleDeg ?? 45) - 90, reflectivity: 1 },
+        // WP-126: the engine's `angle` is the PLATE angle from the beam axis
+        // (`mirrorDir = rotate({1,0}, rotation - angle)`), and engine +y is
+        // SVG-down. The glyph preview beside this sketch draws its canonical
+        // exit arm UP (foldDeg toward +y, unsigned — see foldDeg.test.ts),
+        // so the sketch must fold up-screen too: θ=45 → +45 (exit (0,−1),
+        // up in the SVG), θ=0 → +90 (retro). WP-107's θ−90 matched the
+        // schematic's engine default but mirrored the glyph next to it —
+        // round 19: "the ray sketch renders a different axis than the glyph".
+        params: { aperture, angle: 90 - (mirrorAngleDeg ?? 45), reflectivity: 1 },
       };
     case 'beamsplitter':
+      // The splitter's surface param is spelled differently in the engine
+      // (rotate((0,1), +angle)); 45 already folds up-screen like the glyph.
       return { ...base, type: 'beamsplitter', params: { aperture, splitRatio: 0.5, angle: 45 } };
     case 'dichroic':
       return {
