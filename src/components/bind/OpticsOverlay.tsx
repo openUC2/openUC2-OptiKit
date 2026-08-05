@@ -16,14 +16,7 @@
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import type { Vec3 } from '../../document';
-import {
-  datumToCube,
-  docQuatToThree,
-  insertPoseMatrix,
-  posePoint,
-  threeQuatToDoc,
-} from '../../model/bindRecord';
+import { datumToCube, posePoint } from '../../model/bindRecord';
 import {
   PORT_AXIS_VECTORS,
   maxSemiApertureMm,
@@ -31,8 +24,15 @@ import {
   type RecordDraft,
 } from '../../model/componentRecord';
 import { useBindStore } from './bindStore';
+import {
+  baseQuatOf,
+  docToThree as docToThreeVec,
+  exitLocalOf,
+  overlayQuatOf,
+  plateFrom,
+} from './overlayFrames';
 
-const docToThree = (v: Vec3): [number, number, number] => [v[0], v[2], -v[1]];
+const docToThree = docToThreeVec;
 
 const ENTRY_COLOR = '#f0a53c';
 const EXIT_COLOR = '#2ec4a5';
@@ -118,6 +118,7 @@ export function OpticGlyph({
   diameterMm = null,
   galvoTiltDeg = 0,
   mountAngleDeg = 0,
+  exitLocal = null,
 }: {
   category: string;
   surfaces: RecordDraft['surfaces'];
@@ -128,8 +129,25 @@ export function OpticGlyph({
    * the beam and tilted only by the galvo slider (default 0), so a 45° fold
    * mirror rendered as a disc facing the beam — the one thing a fold mirror
    * never is. Default 0 keeps hand-placed optics where the user put them.
+   *
+   * WP-131: only a FALLBACK now — when `exitLocal` is given, the plate comes
+   * from the record's own reflected port and this angle is display-only.
    */
   mountAngleDeg?: number;
+  /**
+   * WP-131: the record's reflected arm, expressed in GLYPH-LOCAL axes — the
+   * beam travels local −y in, and this is where the record says it leaves.
+   *
+   * Without it the plate was `Rx(mountAngle + galvoTilt)·(0,1,0)`: a fold
+   * pinned to the local y–z plane, while the enclosing group's alignment
+   * quaternion (`setFromUnitVectors`) left the roll about the beam axis
+   * ARBITRARY. So the drawn arm had no defined relationship to the declared
+   * one — measured 90° apart even at the identity pose. That is how a record
+   * declaring a fold its own mesh cannot perform still looked right here, was
+   * published, and cost four rounds to find. The plate is now the bisector of
+   * entry and exit, the same law the schematic uses (glyphs.tsx `plateAngle`).
+   */
+  exitLocal?: THREE.Vector3 | null;
 }) {
   const semi = diameterMm ? diameterMm / 2 : maxSemiApertureMm(surfaces);
   const isMirror = ['mirror', 'beamsplitter', 'dichroic'].includes(category);
@@ -160,13 +178,10 @@ export function OpticGlyph({
   // WP-107: the record's mount angle is the BASE tilt; the galvo slider is a
   // delta on top of it, so the reflection law below keeps producing the exit
   // arrow for free and the slider still means "swing it by θ".
-  const { normal, reflected } = useMemo(() => {
-    const theta = ((galvoTiltDeg + mountAngleDeg) * Math.PI) / 180;
-    const n = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), theta);
-    const beam = new THREE.Vector3(0, -1, 0);
-    const r = beam.clone().sub(n.clone().multiplyScalar(2 * beam.dot(n)));
-    return { normal: n, reflected: r };
-  }, [galvoTiltDeg, mountAngleDeg]);
+  const { normal, reflected } = useMemo(
+    () => plateFrom(exitLocal, galvoTiltDeg, mountAngleDeg),
+    [galvoTiltDeg, mountAngleDeg, exitLocal],
+  );
 
   return (
     <group>
@@ -275,19 +290,23 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
     };
   }, [datums, transform, insertPose, draft.ports, draft.frames]);
 
-  const quat = useMemo(() => {
-    const d = new THREE.Vector3(...docToThree(anchor?.direction ?? [0, 1, 0]));
-    const base = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      d.lengthSq() > 0 ? d.normalize() : new THREE.Vector3(0, 1, 0),
-    );
-    if (!insertPose) return base;
-    // WP-121: the FULL pose — doc-frame rotation conjugated into three
-    // space and composed onto the base alignment: QB·R·QB⁻¹ · q₀. At the
-    // identity pose this reduces to q₀, so nothing jumps.
-    const rPose = new THREE.Quaternion().setFromRotationMatrix(insertPoseMatrix(insertPose));
-    return docQuatToThree(rPose.multiply(threeQuatToDoc(base)));
-  }, [anchor?.direction, insertPose]);
+  // WP-131: `base` only pins the glyph's +y onto the entry direction — the
+  // ROLL about that axis is whatever setFromUnitVectors happens to pick. It
+  // is hoisted out of the quaternion memo because the exit arm has to be
+  // expressed against exactly this roll (see `exitLocal`).
+  const base = useMemo(() => baseQuatOf(anchor?.direction), [anchor?.direction]);
+
+  /**
+   * The record's reflected arm in glyph-local axes.
+   *
+   * The enclosing group already carries the FULL pose (`quat` below), so a
+   * posed direction here would apply the pose twice. The record-frame travel
+   * direction v renders at B·R_pose·v, and the group maps a local u to
+   * B·R_pose·B⁻¹·base·u — so u = base⁻¹·B·v, i.e. `base⁻¹ · docToThree(v)`.
+   */
+  const exitLocal = useMemo(() => exitLocalOf(draft.ports, base), [draft.ports, base]);
+
+  const quat = useMemo(() => overlayQuatOf(base, insertPose), [base, insertPose]);
 
   if (!showOptics || !anchor) return null;
   return (
@@ -297,6 +316,7 @@ export function OpticsOverlay({ draft }: { draft: RecordDraft }) {
         surfaces={draft.surfaces}
         galvoTiltDeg={galvoTiltDeg}
         mountAngleDeg={draft.mirrorAngleDeg ?? 0}
+        exitLocal={exitLocal}
       />
     </group>
   );

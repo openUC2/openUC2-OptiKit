@@ -19,6 +19,7 @@
  * the service wire format) so Python's json.loads round-trips it to ±inf.
  */
 
+import { meshContentQuat } from '../../components/assembly/meshFrame';
 import { buildDocBom, docBomCsv, getSnapshot } from '../../document';
 import type { DocSnapshot } from '../../document';
 import { compileDesign } from '../../api/coreClient';
@@ -194,7 +195,23 @@ async function tryExportGlb(snap: DocSnapshot): Promise<Uint8Array | null> {
       if (glbUrl) {
         try {
           const gltf = await loader.loadAsync(glbUrl);
-          holder.add(gltf.scene);
+          // WP-132: the holder carries the CONJUGATED pose (B·R·B⁻¹, right
+          // for viewer-authored children); F3 mesh content needs the trailing
+          // basis so the composition is B·R — the same rule the assembly
+          // applies (meshFrame.ts). Without it the exported cube's pin axis
+          // pointed along viewer z instead of y: the bundle shipped every
+          // part rotated 90°, invisible only because the fallback below is a
+          // symmetric box. NOT a blanket B — a 'record'-frame file is already
+          // y-up and would double-rotate.
+          const content = new THREE.Group();
+          content.quaternion.copy(
+            meshContentQuat(
+              doc.renderInfoOf(part.libraryRef).meshFrame ?? '',
+              gltf.scene.children,
+            ),
+          );
+          content.add(gltf.scene);
+          holder.add(content);
         } catch {
           holder.add(new THREE.Mesh(new THREE.BoxGeometry(48, 48, 48)));
         }

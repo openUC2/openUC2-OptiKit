@@ -78,6 +78,7 @@ import { BindScene } from './BindScene';
 import { DecimalField } from '../common/DecimalField';
 import { AttachInventorDialog } from '../assembly/AttachInventorDialog';
 import { boundRecordsFor } from './boundRecords';
+import { axisText, portFacesText } from '../../document';
 import { useBindStore } from './bindStore';
 import { decomposeRot24 } from '../../document/rot24';
 import * as THREE from 'three';
@@ -407,13 +408,16 @@ export function MechanicsPanel({
         </Box>
         {store.insertPose && (
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            {/* WP-133: these are CUBE-frame axes. The viewport draws that same
+                axis pointing up and its triad used to call it "y", so a bare
+                "-z" here read as a contradiction — four rounds of it. */}
             <Chip size="small" color="primary" variant="outlined"
-              label={`optical axis → ${store.insertPose.rot24.z}`} />
+              label={`record +z (optical axis) → ${axisText(store.insertPose.rot24.z, 'cube')}`} />
             <Chip size="small" variant="outlined"
-              label={`origin (${store.insertPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm`} />
+              label={`origin (${store.insertPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm in the cube frame`} />
             {draft.ports.map(p => (
               <Chip key={p.name} size="small" variant="outlined"
-                label={`${p.name} faces ${String(asMountedDirection(store.insertPose!, p.direction))}`} />
+                label={portFacesText(p.name, asMountedDirection(store.insertPose!, p.direction), 'cube')} />
             ))}
           </Stack>
         )}
@@ -810,12 +814,9 @@ export function MechanicsPanel({
             {draft.ports.length > 0 && (
               <Alert severity="info" sx={{ py: 0 }}>
                 <Typography variant="caption">
-                  as mounted:{' '}
+                  as mounted, in CUBE axes (z = the pin axis, drawn up):{' '}
                   {draft.ports
-                    .map(p => {
-                      const d = asMountedDirection(store.insertPose!, p.direction);
-                      return `${p.name} faces ${Array.isArray(d) ? `[${d.join(', ')}]` : d}`;
-                    })
+                    .map(p => portFacesText(p.name, asMountedDirection(store.insertPose!, p.direction), 'cube'))
                     .join(' · ')}
                   {' — '}derived from the record's ports through the pose.
                 </Typography>

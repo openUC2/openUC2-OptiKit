@@ -500,7 +500,14 @@ export function bindToRecords(input: BindInput): BoundRecords {
   if ((input.recordPorts ?? []).length === 0) {
     warnings.push('the record declares no ports — chaining will not work');
   }
-  // WP-129: does the MOUNTED fold stay in the baseplate plane?
+  // WP-129/133: does the MOUNTED fold stay in the baseplate plane?
+  //
+  // This is a STRING test and therefore weak: it can see that an arm points
+  // along the pin axis, but it cannot see whether the mirror in the mesh can
+  // physically fold that way. The durable check measures the plate normal
+  // from the GLB (PCA of the reflective node's vertices) and compares it with
+  // the reflection law — see DSN-CONTRACT §4c. Until that lands this warning
+  // is a hint, not a verdict, and it is worded as one.
   //
   // Round 19 shipped a mirror cube whose template read front:+x,
   // reflected:−z — a beam entering a side face and leaving through the
@@ -519,11 +526,12 @@ export function bindToRecords(input: BindInput): BoundRecords {
     );
     if (vertical.length > 0 && !entryVertical) {
       warnings.push(
-        `as mounted, ${vertical.map(([n]) => n).join('/')} leaves along the CUBE'S PIN AXIS ` +
-          `(${vertical.map(([, p]) => (p as { direction?: string }).direction).join('/')}) — ` +
-          'the beam exits through the top/bottom of the cube. Intentional for a periscope; ' +
-          'otherwise roll the insert pose 90° about the entry axis so the fold stays in the ' +
-          'baseplate plane.',
+        `as mounted, ${vertical.map(([n]) => n).join('/')} leaves along ` +
+          `${vertical.map(([, p]) => `${(p as { direction?: string }).direction} (cube)`).join('/')} — ` +
+          'the cube frame\'s z IS the pin axis, so this beam crosses between layers rather ' +
+          'than staying in the baseplate plane. That is a real part (a periscope cube), so ' +
+          'this is only a check: if you meant an in-plane fold, roll the insert pose 90° ' +
+          'about the entry axis.',
       );
     }
   }

@@ -523,7 +523,14 @@ export function templatePortsToSource(
   template: Record<string, unknown> | undefined,
 ): SourcePort[] | null {
   const ports = template?.optical_ports as
-    | Record<string, { frame?: string; direction?: string; 'after-surface'?: number | null }>
+    | Record<
+        string,
+        {
+          frame?: string;
+          direction?: string | [number, number, number];
+          'after-surface'?: number | null;
+        }
+      >
     | undefined;
   if (!template?.['insert-pose'] || !ports || Object.keys(ports).length === 0) return null;
   const frames = (template.frames ?? {}) as Record<
@@ -534,7 +541,11 @@ export function templatePortsToSource(
     const f = frames[port.frame ?? ''] ?? {};
     return {
       name,
-      direction: String(port.direction ?? '+z'),
+      // WP-132: pass a VECTOR through untouched. asMountedDirection emits a
+      // 3-vector whenever the pose is more than AXIS_SNAP_WARN_DEG off-axis,
+      // and String() turned it into "-0.985,-0.174,0" — which dirVecOf cannot
+      // parse, so it fell back to +x and a 10° fold read as a 180° retro.
+      direction: Array.isArray(port.direction) ? port.direction : String(port.direction ?? '+z'),
       positionMm: [f['x-mm'] ?? 0, f['y-mm'] ?? 0, f['z-mm'] ?? 0] as [number, number, number],
       afterSurface: port['after-surface'] ?? null,
     };

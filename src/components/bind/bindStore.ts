@@ -221,10 +221,14 @@ export const useBindStore = create<BindState>((set, get) => ({
   fitToCube: () => {
     const c = get().meshBboxCenter;
     if (!c) return;
-    // Center the module's bbox on the cube origin (translation only). The
-    // centre is FILE-NATIVE (WP-120); the doc-frame translation p must
-    // satisfy docToThree(p) = (-cx, -cy, -cz), i.e. p = (-cx, cz, -cy).
-    set({ transform: { positionMm: [-c[0], c[2], -c[1]], rotationDeg: [0, 0, 0] } });
+    // Centre the module's bbox on the cube origin (translation only). The
+    // centre is FILE-NATIVE (WP-120) and so is the placement: since WP-121
+    // the mesh renders inside <group quaternion={B}>, so the translation is
+    // applied in CUBE axes and is a plain negation. It still read
+    // [-cx, cz, -cy] — the pre-WP-121 formula for a raw <primitive> — which
+    // sent a mesh centred at (1,2,3) to (0,1,-5). Harmless on a centred cube,
+    // wrong for exactly the corner-origin exports this button exists for.
+    set({ transform: { positionMm: [-c[0], -c[1], -c[2]], rotationDeg: [0, 0, 0] } });
   },
   selectOptic: selectedOpticId => set({ selectedOpticId }),
   setOpticsGizmoMode: opticsGizmoMode => set({ opticsGizmoMode }),

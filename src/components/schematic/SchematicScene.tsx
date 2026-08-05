@@ -15,6 +15,7 @@ import {
   captureUndo,
   classifyPart,
   commitUndo,
+  DOC_AXIS_LABELS,
   docQuatToThree,
   interfaceKindOf,
   layerAppearance,
@@ -803,8 +804,14 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
       <EscapeRays />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
+        {/* WP-130: drei's default labels are VIEWER axes (y up), but every
+            number in this app — cells, offsets, port directions — is DOCUMENT
+            frame (z up). The triad said "Y" for the axis the document calls z,
+            which is how "the pins point along y" survived four rounds. Labels
+            and colours both move: drei binds axisColors[1] to the y head. */}
         <GizmoViewport
-          axisColors={['#e0533d', '#7cc142', '#2c8fff']}
+          axisColors={['#e0533d', '#2c8fff', '#7cc142']}
+          labels={DOC_AXIS_LABELS}
           labelColor="#ffffff"
         />
       </GizmoHelper>

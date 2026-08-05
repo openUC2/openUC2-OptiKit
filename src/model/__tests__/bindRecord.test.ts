@@ -115,17 +115,38 @@ describe('the insert pose (WP-116)', () => {
     const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
     expect(ports.front.direction).toBe('+x');
     expect(ports.reflected.direction).toBe('-z');
-    expect(bound.warnings.some(w => w.includes('PIN AXIS') && w.includes('roll'))).toBe(true);
-    // It stays a warning — a periscope cube is a real part.
+    // WP-133: the axis names its frame — the viewport draws that direction
+    // pointing down and its triad used to call it "y".
+    expect(
+      bound.warnings.some(
+        w => w.includes('(cube)') && w.includes('pin axis') && w.includes('roll the insert pose'),
+      ),
+    ).toBe(true);
+    // It stays a warning — a periscope cube is a real part, and this string
+    // test cannot see whether the MESH can fold that way.
     expect(bound.errors).toEqual([]);
   });
 
-  it('a fold that stays in the plane says nothing', () => {
+  it('warns for either sign — +z is the pin axis just as much as −z', () => {
     const bound = bindToRecords(mirrorInput({ insertPose: POSE_Z_TO_X }));
     const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
     expect(ports.reflected.direction).toBe('+z');
-    // …but THIS one does leave the plane, so it must warn: +z is the pin axis.
-    expect(bound.warnings.some(w => w.includes('PIN AXIS'))).toBe(true);
+    expect(bound.warnings.some(w => w.includes('pin axis'))).toBe(true);
+  });
+
+  it('says nothing for the pose that actually matches the mesh (+x ↔ −y)', () => {
+    // The GLB's plate normal is (−0.707, +0.707, 0): a beam into the +x face
+    // leaves along −y, in the baseplate plane. This is the pose round 20
+    // should have used, and it must draw no complaint at all.
+    const bound = bindToRecords(
+      mirrorInput({
+        insertPose: { rot24: { z: '-x', x: '+y' }, offsetDeg: [0, 0, 0], offsetMm: [0, 0, 0] },
+      }),
+    );
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.front.direction).toBe('+x');
+    expect(ports.reflected.direction).toBe('-y');
+    expect(bound.warnings.some(w => w.includes('pin axis'))).toBe(false);
   });
 
   it('never emits a component — the record ships verbatim from the caller', () => {

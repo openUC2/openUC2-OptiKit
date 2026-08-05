@@ -34,6 +34,8 @@ import { SwapVert as FlipIcon } from '@mui/icons-material';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { RefObject } from 'react';
 import type { Vec3 } from '../../document';
+import { DOC_AXIS_LABELS, axisText } from '../../document';
+import { hasWrapperRotation } from '../assembly/meshFrame';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
 import {
   datumQuatToCubeQuat,
@@ -124,7 +126,7 @@ function DatumPin({ datum, transform }: { datum: BindDatum; transform: MeshTrans
       )}
       <Billboard position={[p[0], p[1] + 6, p[2]]}>
         <Text fontSize={4} color={color} anchorX="center" outlineWidth={0.3} outlineColor="#000000aa">
-          {`${datum.name} (${snap.axis})`}
+          {`${datum.name} · ${axisText(snap.axis, 'cube')}`}
         </Text>
       </Billboard>
     </group>
@@ -188,15 +190,9 @@ function PartMesh() {
           // — older exports carry an Rx(±90°) wrapper node that pre-rotates
           // the cube-frame content. Detect it so the emitted template can
           // DECLARE its mesh-frame instead of leaving validate guessing.
-          let wrapper = false;
-          for (const child of gltf.scene.children) {
-            const e = new THREE.Euler().setFromQuaternion(child.quaternion, 'XYZ');
-            if (
-              Math.abs(Math.abs(THREE.MathUtils.radToDeg(e.x)) - 90) < 1 &&
-              Math.abs(THREE.MathUtils.radToDeg(e.y)) < 1 &&
-              Math.abs(THREE.MathUtils.radToDeg(e.z)) < 1
-            ) wrapper = true;
-          }
+          // WP-132: ONE rule, shared with the assembly — the wrapper node is
+          // often nested, and a depth-1 scan mis-declared seven shipped GLBs.
+          const wrapper = hasWrapperRotation(gltf.scene.children);
           useBindStore.setState({ meshFrameDetected: wrapper ? 'record' : 'cube' });
         }
       },
@@ -496,7 +492,13 @@ function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDra
       <SceneContent colors={colors} draft={draft} />
       {!ortho && (
         <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
-          <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
+          {/* WP-130: this viewport shows the CUBE frame (z = the pin axis),
+              so the triad must say z where three.js would say y. */}
+          <GizmoViewport
+            axisColors={['#e0533d', '#2c8fff', '#7cc142']}
+            labels={DOC_AXIS_LABELS}
+            labelColor="#ffffff"
+          />
         </GizmoHelper>
       )}
     </PreviewCanvas>

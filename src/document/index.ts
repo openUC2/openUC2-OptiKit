@@ -58,6 +58,8 @@ export {
   useFibersStore,
 } from './fibersStore';
 export type { DocFiber, FiberType } from './fibersStore';
+export { DOC_AXIS_LABELS, axisLabel, axisText, portFacesText } from './axisText';
+export type { AxisFrame } from './axisText';
 export {
   DEFAULT_LIB_ROT,
   LIBRARY_GROUP,

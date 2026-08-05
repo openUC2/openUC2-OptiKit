@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { DOC_TO_THREE_QUAT, meshContentQuat } from '../meshFrame';
+import { DOC_TO_THREE_QUAT, hasWrapperRotation, meshContentQuat } from '../meshFrame';
 import { ROT24_TABLE, rot24Matrix } from '../../../document/rot24';
 
 const child = (xDeg: number) => ({
@@ -37,6 +37,43 @@ describe('meshContentQuat — the decision table', () => {
   it('undeclared without a wrapper → the basis (a raw F3 export)', () => {
     expect(meshContentQuat('', [child(0)]).angleTo(DOC_TO_THREE_QUAT)).toBeCloseTo(0);
     expect(meshContentQuat('', []).angleTo(DOC_TO_THREE_QUAT)).toBeCloseTo(0);
+  });
+});
+
+describe('the wrapper walk (WP-132: the node is often nested)', () => {
+  const node = (
+    xDeg: number,
+    over: { children?: unknown[]; isMesh?: boolean } = {},
+  ) => ({
+    quaternion: new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(THREE.MathUtils.degToRad(xDeg), 0, 0),
+    ),
+    ...over,
+  });
+
+  it('finds a wrapper one level down — the real shape of 7 shipped GLBs', () => {
+    // openuc2.tpl.{mirror_mount,camera_mount,laser_pointer,puzzle}_1x1 and
+    // three user templates all export <unnamed>[rx=0] → child[rx=-90]. The
+    // depth-1 scan called them cube-frame and applied B on top of a rotation
+    // that already WAS B — a doubled basis is a 90° x-rotation.
+    const scene = [node(0, { children: [node(-90, { isMesh: true })] })];
+    expect(hasWrapperRotation(scene)).toBe(true);
+    expect(meshContentQuat('', scene).angleTo(new THREE.Quaternion())).toBeCloseTo(0);
+  });
+
+  it('accumulates: two 45° hops are a wrapper, one is not', () => {
+    expect(hasWrapperRotation([node(45, { children: [node(45, { isMesh: true })] })])).toBe(true);
+    expect(hasWrapperRotation([node(45, { children: [node(0, { isMesh: true })] })])).toBe(false);
+  });
+
+  it('stops at geometry — a rotation BELOW a mesh is part authoring, not framing', () => {
+    const scene = [node(0, { isMesh: true, children: [node(-90)] })];
+    expect(hasWrapperRotation(scene)).toBe(false);
+  });
+
+  it('a declared frame still wins over anything the file looks like', () => {
+    const wrapped = [node(0, { children: [node(-90, { isMesh: true })] })];
+    expect(meshContentQuat('cube', wrapped).angleTo(DOC_TO_THREE_QUAT)).toBeCloseTo(0);
   });
 });
 

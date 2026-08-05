@@ -26,6 +26,7 @@ import {
   captureUndo,
   classifyPart,
   commitUndo,
+DOC_AXIS_LABELS,
   docQuatToThree,
   interfaceKindOf,
   layerAppearance,
@@ -652,7 +653,12 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
       })}
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
-        <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
+        {/* WP-130: document axes — see SchematicScene. */}
+        <GizmoViewport
+          axisColors={['#e0533d', '#2c8fff', '#7cc142']}
+          labels={DOC_AXIS_LABELS}
+          labelColor="#ffffff"
+        />
       </GizmoHelper>
     </>
   );
