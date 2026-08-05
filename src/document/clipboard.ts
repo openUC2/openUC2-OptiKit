@@ -71,26 +71,40 @@ export function uniquifiedRef(ref: string): string {
 }
 
 /**
+ * Materialize a copied SELECTION (relative layout preserved by the caller's
+ * positions) as ONE undo step. Parts whose library ref no longer resolves are
+ * skipped. Returns the new part ids in input order.
+ */
+export function pasteParts(items: { clip: PartClipboard; positionMm: Vec3 }[]): string[] {
+  if (items.length === 0) return [];
+  const token = captureUndo();
+  const ids: string[] = [];
+  for (const { clip, positionMm } of items) {
+    const id = addPart(clip.libraryRef, positionMm);
+    if (id === null) continue;
+    // addPart applied the palette's default rotation — overwrite with the
+    // copied orientation (rot24 + residual, exactly as it was stored).
+    setPartOrientation(id, clip.rot24, clip.offsetDeg);
+    for (const [key, value] of Object.entries(clip.params)) {
+      setPartParam(id, key, value);
+    }
+    for (const [name, value] of Object.entries(clip.dofValues)) {
+      setDofValue(id, name, value);
+    }
+    renamePart(id, uniquifiedRef(clip.ref));
+    ids.push(id);
+  }
+  if (ids.length > 0) commitUndo(token);
+  return ids;
+}
+
+/**
  * Materialize a copied part at `positionMm` (document frame). Returns the
  * new part id, or null when the library ref no longer resolves. ONE undo
  * step; the paste is unwired (no chains) by construction.
  */
 export function pastePart(clip: PartClipboard, positionMm: Vec3): string | null {
-  const token = captureUndo();
-  const id = addPart(clip.libraryRef, positionMm);
-  if (id === null) return null;
-  // addPart applied the palette's default rotation — overwrite with the
-  // copied orientation (rot24 + residual, exactly as it was stored).
-  setPartOrientation(id, clip.rot24, clip.offsetDeg);
-  for (const [key, value] of Object.entries(clip.params)) {
-    setPartParam(id, key, value);
-  }
-  for (const [name, value] of Object.entries(clip.dofValues)) {
-    setDofValue(id, name, value);
-  }
-  renamePart(id, uniquifiedRef(clip.ref));
-  commitUndo(token);
-  return id;
+  return pasteParts([{ clip, positionMm }])[0] ?? null;
 }
 
 /** Copy + paste one cell over (the Ctrl/Cmd+D verb). */

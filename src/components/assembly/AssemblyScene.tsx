@@ -181,6 +181,7 @@ function GhostBox({
 
 function InsertHandle({ part, dof }: { part: DocPart; dof: TranslationDof }) {
   const reportClamp = useAssemblyStore(s => s.reportClamp);
+  const clearClamp = useAssemblyStore(s => s.clearClamp);
   const [hovered, setHovered] = useState(false);
   const drag = useRef<{ startValue: number; grabT: number; undo: UndoToken } | null>(null);
 
@@ -240,11 +241,13 @@ function InsertHandle({ part, dof }: { part: DocPart; dof: TranslationDof }) {
       const clamped = Math.min(hi, Math.max(lo, raw));
       if (raw < lo - 1e-6 || raw > hi + 1e-6) {
         reportClamp(part.id, dof.key, raw, dof.range);
+      } else {
+        clearClamp(dof.key);
       }
       const snapped = Math.round(clamped * 100) / 100;
       if (snapped !== value) setDofValue(part.id, dof.name, snapped);
     },
-    [paramAlongAxis, lo, hi, value, part.id, dof, reportClamp],
+    [paramAlongAxis, lo, hi, value, part.id, dof, reportClamp, clearClamp],
   );
 
   const endDrag = useCallback((e: ThreeEvent<PointerEvent>) => {

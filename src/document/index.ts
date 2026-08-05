@@ -112,7 +112,7 @@ export { swapPartModule } from './swap';
 export type { SwapResult } from './swap';
 export { unbindPart } from './unbind';
 export type { UnbindOutcome } from './unbind';
-export { copyPart, duplicatePart, pastePart, removePartUndoable, uniquifiedRef } from './clipboard';
+export { copyPart, duplicatePart, pastePart, pasteParts, removePartUndoable, uniquifiedRef } from './clipboard';
 export type { PartClipboard } from './clipboard';
 export {
   listSelectedPartIds,

@@ -60,6 +60,8 @@ export interface SchematicSettings {
   showRays: boolean;
   /** Locked 2.5D camera (WP-23): LMB is for parts; orbit on RMB only. */
   lockView: boolean;
+  /** Live pointer mm readout on the working plane (page-level overlay). */
+  cursorReadout: boolean;
 }
 
 interface SceneProps {

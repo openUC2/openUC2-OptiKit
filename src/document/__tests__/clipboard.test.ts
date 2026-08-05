@@ -18,7 +18,7 @@ import {
   setPath,
   undo,
 } from '../OptikitDocument';
-import { copyPart, duplicatePart, pastePart, uniquifiedRef } from '../clipboard';
+import { copyPart, duplicatePart, pastePart, pasteParts, uniquifiedRef } from '../clipboard';
 import { makePortRef } from '../types';
 import { usePathsStore } from '../pathsStore';
 import { useAppStore } from '../../stores/appStore';
@@ -100,6 +100,23 @@ describe('clipboard (WP-78)', () => {
     pastePart(copyPart(id)!, [50, 0, 0]);
     expect(listParts().length).toBe(before + 1);
     undo();
+    expect(listParts().length).toBe(before);
+  });
+
+  it('a selection pastes as one undo step with its layout preserved', () => {
+    const a = addPart(LENS.id, [0, 0, 0])!;
+    const b = addPart(LENS.id, [50, 0, 55])!;
+    setDofValue(b, 'dz', 4);
+    const before = listParts().length;
+    const ids = pasteParts([
+      { clip: copyPart(a)!, positionMm: [200, 0, 0] },
+      { clip: copyPart(b)!, positionMm: [250, 0, 55] },
+    ]);
+    expect(ids).toHaveLength(2);
+    expect(getPart(ids[0])!.worldPose.positionMm).toEqual([200, 0, 0]);
+    expect(getPart(ids[1])!.worldPose.positionMm).toEqual([250, 0, 55]);
+    expect(getPart(ids[1])!.dofs.find(d => d.name === 'dz')?.value).toBe(4);
+    undo(); // ONE step drops the whole pasted set
     expect(listParts().length).toBe(before);
   });
 

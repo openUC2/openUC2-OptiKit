@@ -36,6 +36,7 @@ import {
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   Rotate90DegreesCcw as SnapYawIcon,
+  Straighten as CursorIcon,
   Timeline as RaysIcon,
   Cable as FiberIcon,
   Receipt as BomIcon,
@@ -66,7 +67,7 @@ import {
   listLibraryEntries,
   listParts,
   parsePortRef,
-  pastePart,
+  pasteParts,
   removePart,
   removePartUndoable,
   selectPart,
@@ -89,6 +90,7 @@ import { isFiberPort } from './ports';
 import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
 import { SchematicLegend, LEGEND_SEEN_KEY } from './SchematicLegend';
+import { CursorReadout } from './CursorReadout';
 import { BomDialog } from '../bom/BomDialog';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
 import { ServicePanel } from './ServicePanel';
@@ -107,6 +109,7 @@ export function SchematicPage() {
     snapYaw: false,
     showRays: true,
     lockView: true,
+    cursorReadout: false,
   });
   // Affordance legend (WP-23): opens itself once, then lives behind "?".
   const [legendOpen, setLegendOpen] = useState(
@@ -146,12 +149,19 @@ export function SchematicPage() {
   const loadStateFromStorage = useAppStore(s => s.loadStateFromStorage);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
+  const canvasBoxRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
 
   // ── WP-78: clipboard + context menu ────────────────────────────────────────
-  // The copied part plus its source position (keyboard paste lands one cell
-  // over; each further paste steps one more so copies never stack).
-  const clipboardRef = useRef<{ clip: PartClipboard; sourceMm: Vec3; pastes: number } | null>(null);
+  // The copied selection: each part as a clip plus its offset from the first
+  // part (the anchor), so a multi-part paste keeps the relative layout.
+  // Keyboard paste lands one cell over; each further paste steps one more so
+  // copies never stack.
+  const clipboardRef = useRef<{
+    items: { clip: PartClipboard; offsetMm: Vec3 }[];
+    sourceMm: Vec3;
+    pastes: number;
+  } | null>(null);
   const [menu, setMenu] = useState<{
     at: { left: number; top: number };
     partId: string | null; // null = empty canvas
@@ -162,18 +172,33 @@ export function SchematicPage() {
   const [holderPartId, setHolderPartId] = useState<string | null>(null);
   const holderPart = listParts().find(p => p.id === holderPartId);
 
-  const copyToClipboard = useCallback((partId: string) => {
-    const clip = copyPart(partId);
-    const part = getPart(partId);
-    if (!clip || !part) return;
-    clipboardRef.current = { clip, sourceMm: [...part.worldPose.positionMm], pastes: 0 };
+  const copySelection = useCallback((ids: string[]) => {
+    const items: { clip: PartClipboard; offsetMm: Vec3 }[] = [];
+    let anchor: Vec3 | null = null;
+    for (const id of ids) {
+      const clip = copyPart(id);
+      const part = getPart(id);
+      if (!clip || !part) continue;
+      const p = part.worldPose.positionMm;
+      if (!anchor) anchor = [p[0], p[1], p[2]];
+      items.push({ clip, offsetMm: [p[0] - anchor[0], p[1] - anchor[1], p[2] - anchor[2]] });
+    }
+    if (items.length === 0 || !anchor) return;
+    clipboardRef.current = { items, sourceMm: anchor, pastes: 0 };
     useAppStore.getState().addNotification({
       type: 'info',
-      title: 'part copied',
-      message: `${clip.ref} — paste with Ctrl/Cmd+V or right-click → paste`,
+      title: items.length === 1 ? 'part copied' : `${items.length} parts copied`,
+      message:
+        `${items.length === 1 ? items[0].clip.ref : 'selection'} — ` +
+        'paste with Ctrl/Cmd+V or right-click → paste',
       duration: 3000,
     });
   }, []);
+
+  const copyToClipboard = useCallback(
+    (partId: string) => copySelection([partId]),
+    [copySelection],
+  );
 
   /**
    * WP-101: the ONE place the free-placement snap is decided. Parts with a
@@ -207,8 +232,19 @@ export function SchematicPage() {
         held.sourceMm[2],
       ];
     }
-    const id = pastePart(held.clip, target);
-    if (id) selectPart(id);
+    // One undo step for the whole selection; relative layout preserved.
+    const ids = pasteParts(
+      held.items.map(({ clip, offsetMm }) => ({
+        clip,
+        positionMm: [
+          target[0] + offsetMm[0],
+          target[1] + offsetMm[1],
+          target[2] + offsetMm[2],
+        ] as Vec3,
+      })),
+    );
+    if (ids.length === 1) selectPart(ids[0]);
+    else if (ids.length > 1) setSelectedParts(ids);
   }, [snapFree]);
 
   /** ERC marker click: frame the part without changing the view direction. */
@@ -387,8 +423,10 @@ export function SchematicPage() {
           }
           return;
         }
-        if (key === 'c' && selectedId) {
-          copyToClipboard(selectedId);
+        if (key === 'c') {
+          // A multi-selection copies as a set (relative layout preserved).
+          const ids = selectedIds.length > 0 ? selectedIds : selectedId ? [selectedId] : [];
+          if (ids.length > 0) copySelection(ids);
           return;
         }
         if (key === 'v' && clipboardRef.current) {
@@ -426,7 +464,7 @@ export function SchematicPage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chainDraft, copyToClipboard, fiberDraft, fiberMode, finishChain, pasteClipboard,
+  }, [chainDraft, copySelection, fiberDraft, fiberMode, finishChain, pasteClipboard,
       selectedId, selectedIds]);
 
   // ── pointer → active working plane (shared by drop / context menu) ─────────
@@ -532,6 +570,7 @@ export function SchematicPage() {
           </Drawer>
 
           <Box
+            ref={canvasBoxRef}
             sx={{ flexGrow: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}
             onDragOver={e => {
               e.preventDefault();
@@ -563,6 +602,13 @@ export function SchematicPage() {
               controlsRef={controlsRef}
             />
             {legendOpen && <SchematicLegend onClose={closeLegend} />}
+            {settings.cursorReadout && (
+              <CursorReadout
+                containerRef={canvasBoxRef}
+                cameraRef={cameraRef}
+                planeZMm={settings.planeZMm}
+              />
+            )}
             <BomDialog open={bomOpen} onClose={() => setBomOpen(false)} />
 
             {/* Bottom toolbar: snap / rays / working plane */}
@@ -607,6 +653,16 @@ export function SchematicPage() {
                   sx={{ '&.Mui-selected': { color: 'info.main' } }}
                 >
                   <RaysIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title="Live cursor coordinates (mm on the working plane) — read off where the rays converge">
+                <ToggleButton
+                  value="cursorReadout"
+                  selected={settings.cursorReadout}
+                  size="small"
+                  onChange={() => setSettings(s => ({ ...s, cursorReadout: !s.cursorReadout }))}
+                >
+                  <CursorIcon fontSize="small" />
                 </ToggleButton>
               </Tooltip>
               <Tooltip title="Fiber tool (WP-46): click two port pins to lay a patch cord — no geometric constraint between them">
