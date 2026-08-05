@@ -26,7 +26,7 @@ import {
 } from './mapping';
 import { useDocumentStore } from './documentStore';
 import type { DocumentSnapshot } from './documentStore';
-import { defaultRotationFor, groupEntryOf, libraryEntryOf } from './libraryPalette';
+import { defaultRotationFor, groupEntryOf, libraryEntryOf, yawRotationFor } from './libraryPalette';
 import { useGroupEditStore } from './groupStore';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
@@ -161,12 +161,18 @@ export function addPart(
   const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
   if (!def) return null;
   const placement = splitWorldPosition(positionMm);
-  // Library records author their optics along ±z (schema convention); rotate
-  // the placement so the entry beam runs along document +x and any fold arm
-  // points -y — the WP-29 plane convention (like the golden designs do).
+  // WP-124: two placement conventions, keyed on WHICH frame the ports speak.
+  // 'mounted' (cube frame, insert-pose already in-plane): only YAW — pins
+  // stay +z, tipping a cube is never right. 'record' (component F2): the
+  // WP-29 tip — entry beam onto +x, fold arm toward -y — because ±z record
+  // optics must be laid into the document plane.
   const lib = libraryEntryOf(libraryRef);
   const rot24: Rot24 =
-    (lib ? defaultRotationFor(lib.ports) : null) ?? { z: '+z', x: '+x' };
+    (lib
+      ? lib.portsFrame === 'mounted'
+        ? yawRotationFor(lib.ports)
+        : defaultRotationFor(lib.ports)
+      : null) ?? { z: '+z', x: '+x' };
   const params = { ...(def.defaultParams ?? {}) };
   const part: DsnPart = {
     id: uuidv4(),

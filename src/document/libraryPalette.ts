@@ -110,6 +110,10 @@ export interface LibraryPaletteEntry {
    * needs the doc→viewer basis at render) or 'record' (pre-rotated wrapper
    * exports, already y-up). '' = undeclared legacy (renderer detects). */
   meshFrame: string;
+  /** WP-124: which frame `ports` speaks. 'mounted' = cube frame F3 (already
+   * in-plane — placement may only YAW, pins stay +z); 'record' = component
+   * F2 (placement tips the optics into the document plane, WP-29). */
+  portsFrame: 'mounted' | 'record';
   /** Record-style ports (local record axes, ±z = optical axis). */
   ports: SourcePort[];
   /** Effective focal length when meaningful — feeds the 2D ray preview. */
@@ -254,6 +258,45 @@ export function defaultRotationFor(ports: SourcePort[]): Rot24 | null {
   return rot;
 }
 
+/** The four upright rotations — x-axis image per 0/90/180/270° yaw about +z. */
+const YAWS: readonly AxisDir[] = ['+x', '+y', '-x', '-y'];
+
+/**
+ * Default placement rotation for a part whose served ports are AS-MOUNTED
+ * (cube frame F3, WP-122/124): the insert-pose already put the beam in the
+ * document plane, so placement may only YAW the cube — pins stay +z, the
+ * T-rule. Picks the yaw that sends the entry beam along +x (fold arm toward
+ * -y as tiebreak); tipping the cube to "fix" a beam is exactly the round-19
+ * flipped-assembly bug, and it can never be right for a cube on a baseplate.
+ */
+export function yawRotationFor(ports: SourcePort[]): Rot24 | null {
+  if (ports.length === 0) return null;
+  const entryPort =
+    ports.find(p => p.name === 'front') ??
+    ports.find(p => INPUT_PORT_NAMES.test(p.name)) ??
+    ports.find(p => p.name === 'out') ??
+    ports[0];
+  const b = beamDir(entryPort);
+  const fold = ports
+    .map(p => beamDir(p))
+    .find(d => Math.abs(d.dot(b)) < 0.5);
+  let best: AxisDir = '+x';
+  let bestScore = -Infinity;
+  YAWS.forEach((xImage, k) => {
+    // The yaw about +z, built explicitly — setFromUnitVectors(+x, -x) would
+    // pick a 180° flip about +y and tip the pins, the very bug this fixes.
+    const q = new THREE.Quaternion().setFromAxisAngle(AXIS_VEC['+z'], (k * Math.PI) / 2);
+    const score =
+      b.clone().applyQuaternion(q).dot(AXIS_VEC['+x']) * 2 +
+      (fold ? fold.clone().applyQuaternion(q).dot(AXIS_VEC['-y']) : 0);
+    if (score > bestScore + 1e-9) {
+      bestScore = score;
+      best = xImage;
+    }
+  });
+  return best === '+x' ? null : { z: '+z', x: best };
+}
+
 const CATEGORY_MAP: Record<string, DocCategory> = {
   source: 'source',
   lens: 'lens',
@@ -382,6 +425,7 @@ function entryFromIndexModule(
     thumbnailUrl: abs(mod.assets?.thumbnail),
     glbUrl: abs(mod.assets?.glb),
     meshFrame: mod.assets?.mesh_frame ?? '',
+    portsFrame: mod.ports_frame ?? 'record',
     ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
@@ -461,6 +505,7 @@ export function entriesFromWorkspace(
     thumbnailUrl: thumbnails[record.id] ?? null,
     glbUrl: null,
     meshFrame: '',
+    portsFrame: 'record',
     ports: recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
@@ -555,6 +600,7 @@ export function entriesFromComponents(
       // hardcode null — a housed device rendered as a ghost).
       glbUrl: abs(housing?.assets.glb),
       meshFrame: '',
+      portsFrame: 'record',
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],

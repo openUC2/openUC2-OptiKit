@@ -64,6 +64,7 @@ export {
   isLibraryModule,
   T_CLASS_LABEL,
   defaultRotationFor,
+  yawRotationFor,
   docCategoryOfRecord,
   entriesFromComponents,
   entriesFromIndex,

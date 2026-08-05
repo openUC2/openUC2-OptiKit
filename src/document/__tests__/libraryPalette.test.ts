@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   defaultRotationFor,
+  yawRotationFor,
   entriesFromComponents,
   entriesFromIndex,
   registerLibraryModules,
@@ -49,6 +50,43 @@ describe('defaultRotationFor (record ±z optics → document plane)', () => {
 
   it('leaves in-plane records alone', () => {
     expect(defaultRotationFor([P('front', '-x'), P('back', '+x')])).toBeNull();
+  });
+});
+
+describe('yawRotationFor (WP-124: as-mounted ports — pins stay +z)', () => {
+  it('the round-19 testmirror: front +x, reflected -z → yaw 180°, never a tip', () => {
+    // defaultRotationFor on these SAME ports computes {z:+y, x:-x} — a cube
+    // lying on its side, the "assembly is flipped again" report.
+    const rot = yawRotationFor([P('front', '+x'), P('reflected', '-z')]);
+    expect(rot).toEqual({ z: '+z', x: '-x' });
+    // Entry beam (travels -(+x) = -x) → world +x under the yaw.
+    expect(applyRot(rot, [-1, 0, 0])).toEqual([1, 0, 0]);
+    // Pins stay up.
+    expect(applyRot(rot, [0, 0, 1])).toEqual([0, 0, 1]);
+  });
+
+  it('the beam wins over the fold arm — no yaw can fix both, keep the beam', () => {
+    // Fold toward +y with the beam already on +x: flipping the arm to -y
+    // would need a roll about x, which a yaw cannot do. Stay put.
+    expect(yawRotationFor([P('front', '-x'), P('reflected', '+y')])).toBeNull();
+  });
+
+  it('with a vertical beam the fold arm tiebreak decides the yaw', () => {
+    // Periscope-style: beam along -z (yaw-invariant), arm toward +y → the
+    // 180° yaw brings the arm to -y, pins still up.
+    const rot = yawRotationFor([P('front', '+z'), P('reflected', '+y')]);
+    expect(rot).toEqual({ z: '+z', x: '-x' });
+    expect(applyRot(rot, [0, 1, 0])).toEqual([0, -1, 0]);
+  });
+
+  it('already-conventional ports need no rotation at all', () => {
+    expect(yawRotationFor([P('front', '-x'), P('back', '+x')])).toBeNull();
+    expect(yawRotationFor([])).toBeNull();
+  });
+
+  it('a vertical (posed periscope) beam never tips the cube', () => {
+    const rot = yawRotationFor([P('front', '+z'), P('back', '-z')]);
+    expect(rot === null || rot.z === '+z').toBe(true);
   });
 });
 

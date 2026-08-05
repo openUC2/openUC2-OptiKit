@@ -235,6 +235,8 @@ export function registerBundleLibrary(
         thumbnailUrl: null,
         glbUrl: template?.glbUrl ?? null,
         meshFrame: String(tplRecord['mesh-frame'] ?? ''),
+        portsFrame:
+          tplRecord['insert-pose'] && tplRecord.optical_ports ? 'mounted' : 'record',
         ports: component ? recordPortsToSource(component) : [],
         eflMm:
           typeof component?.effective_focal_length_mm === 'number'

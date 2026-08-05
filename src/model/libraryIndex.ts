@@ -164,6 +164,9 @@ export interface IndexModule {
     mesh_frame?: string;
   };
   ports?: IndexPort[];
+  /** WP-124: which frame `ports` speaks — 'mounted' (cube frame F3, already
+   * in-plane; placement may only yaw) or 'record' (component F2 fallback). */
+  ports_frame?: 'mounted' | 'record';
   electronics: unknown | null;
 }
 
