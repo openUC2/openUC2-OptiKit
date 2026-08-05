@@ -500,6 +500,33 @@ export function bindToRecords(input: BindInput): BoundRecords {
   if ((input.recordPorts ?? []).length === 0) {
     warnings.push('the record declares no ports — chaining will not work');
   }
+  // WP-129: does the MOUNTED fold stay in the baseplate plane?
+  //
+  // Round 19 shipped a mirror cube whose template read front:+x,
+  // reflected:−z — a beam entering a side face and leaving through the
+  // floor. The GLB says otherwise (the plate is tilted about the pin axis,
+  // so it folds x↔y), and no placement convention can rescue a record whose
+  // optics disagree with its mechanics: the pose was rolled 90° about the
+  // entry axis. A cube that deflects along the pins IS legal (periscopes
+  // exist), so this is a warning that names the fix, not a wall.
+  if (pose && input.wholeModule) {
+    const vertical = Object.entries(ports).filter(([name, p]) => {
+      const dir = (p as { direction?: string }).direction ?? '';
+      return name !== 'front' && (dir === '+z' || dir === '-z');
+    });
+    const entryVertical = /^[+-]z$/.test(
+      (ports.front as { direction?: string } | undefined)?.direction ?? '',
+    );
+    if (vertical.length > 0 && !entryVertical) {
+      warnings.push(
+        `as mounted, ${vertical.map(([n]) => n).join('/')} leaves along the CUBE'S PIN AXIS ` +
+          `(${vertical.map(([, p]) => (p as { direction?: string }).direction).join('/')}) — ` +
+          'the beam exits through the top/bottom of the cube. Intentional for a periscope; ' +
+          'otherwise roll the insert pose 90° about the entry axis so the fold stays in the ' +
+          'baseplate plane.',
+      );
+    }
+  }
 
   // WP-116: no stub component, ever — the caller ships the record verbatim.
   const component: Record<string, unknown> | null = null;

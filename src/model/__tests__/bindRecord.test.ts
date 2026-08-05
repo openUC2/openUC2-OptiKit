@@ -100,6 +100,34 @@ describe('the insert pose (WP-116)', () => {
     expect(ports.reflected.direction).toBe('+z');
   });
 
+  it('warns when the mounted fold leaves the baseplate plane (WP-129)', () => {
+    // Round 19's published mirror: front lands on +x, but the reflected arm
+    // lands on the PIN axis — the beam would exit through the cube's floor.
+    // The GLB's plate is tilted about z (it folds x↔y), so the pose is
+    // rolled 90° about the entry axis.
+    const bound = bindToRecords(
+      mirrorInput({
+        // record front -z, reflected -x; pose +z→-x puts front on +x and the
+        // fold arm on -z.
+        insertPose: { rot24: { z: '-x', x: '+z' }, offsetDeg: [0, 0, 0], offsetMm: [0, 0, 0] },
+      }),
+    );
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.front.direction).toBe('+x');
+    expect(ports.reflected.direction).toBe('-z');
+    expect(bound.warnings.some(w => w.includes('PIN AXIS') && w.includes('roll'))).toBe(true);
+    // It stays a warning — a periscope cube is a real part.
+    expect(bound.errors).toEqual([]);
+  });
+
+  it('a fold that stays in the plane says nothing', () => {
+    const bound = bindToRecords(mirrorInput({ insertPose: POSE_Z_TO_X }));
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.reflected.direction).toBe('+z');
+    // …but THIS one does leave the plane, so it must warn: +z is the pin axis.
+    expect(bound.warnings.some(w => w.includes('PIN AXIS'))).toBe(true);
+  });
+
   it('never emits a component — the record ships verbatim from the caller', () => {
     expect(bindToRecords(mirrorInput()).component).toBeNull();
     expect(
