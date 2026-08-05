@@ -35,6 +35,10 @@ export interface IndexComponent {
   ports?: IndexPort[];
   /** WP-60: source emission lines in µm (empty for non-sources). */
   wavelengths_um?: number[];
+  /** Normalized source facts (both record dialects): full-angle divergence in
+   * degrees and 1/e² beam diameter in mm — 0 / null when undeclared. */
+  divergence_deg?: number;
+  beam_diameter_mm?: number | null;
   /** WP-60: authored schematic symbol URL path, when the record ships one. */
   symbol?: string | null;
   /** WP-60: the record's own optiland surface stack, verbatim — a placed
@@ -133,6 +137,10 @@ export interface IndexModule {
     efl_mm: number | null;
     /** WP-47: the source record's emission lines, µm (empty for non-sources). */
     wavelengths_um?: number[];
+    /** Normalized source facts (both record dialects): full-angle divergence
+     * in degrees and 1/e² beam diameter in mm — 0 / null when undeclared. */
+    divergence_deg?: number;
+    beam_diameter_mm?: number | null;
     /** WP-47: pixel facts for slm/display parts. */
     programmable?: {
       mode: 'reflective' | 'transmissive';

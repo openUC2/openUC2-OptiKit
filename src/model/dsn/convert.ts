@@ -154,12 +154,61 @@ export function paletteOpticsOf(part: {
     portSpecs[p.name] = spec;
   }
 
+  const emission =
+    part.category === 'source'
+      ? emissionOf(lib, part.params, Object.keys(portSpecs))
+      : null;
   return {
     ...(surfaces ? { fragment: { surfaces } } : {}),
     ...(passthrough ? { passthrough: true } : {}),
+    ...(emission ? { emission } : {}),
     frames,
     ports: portSpecs,
   } as NonNullable<CompSpec['optics']>;
+}
+
+/**
+ * §9.5 emission block for a placed source, from the palette entry's
+ * normalized record facts. Without it a source exports as bare ports and the
+ * kernel materializes the point/collimated 0.55 µm default — one axial green
+ * ray, whatever the laser. The placement's picked line (WP-47 runtime state)
+ * filters the spectrum here, because materialize reads `emission.spectrum`
+ * before the picker.
+ */
+function emissionOf(
+  lib: ReturnType<typeof libraryEntryOf>,
+  params: Record<string, unknown>,
+  portNames: string[],
+): Record<string, unknown> | null {
+  if (!lib || portNames.length === 0) return null;
+  const lines = (lib.wavelengthsUm ?? []).filter(w => w > 0);
+  const divergence = lib.divergenceDeg ?? 0;
+  const beam = lib.beamDiameterMm ?? null;
+  if (lines.length === 0 && divergence <= 0 && !(beam && beam > 0)) return null;
+  const picked =
+    typeof params.wavelengthUm === 'number' && params.wavelengthUm > 0
+      ? params.wavelengthUm
+      : null;
+  const spectrum = (picked !== null ? [picked] : lines).map(w => ({
+    wavelength_um: round6(w),
+    weight: 1.0,
+  }));
+  return {
+    port: portNames.includes('out') ? 'out' : portNames[0],
+    ...(spectrum.length ? { spectrum } : {}),
+    // WP-112 reconciliation: beam_diameter_mm is the 1/e² full diameter; the
+    // emission disc is its radius. Divergence is the full angle; the cone
+    // takes the half angle.
+    spatial:
+      beam && beam > 0
+        ? { type: 'disc', radius_mm: round6(beam / 2) }
+        : { type: 'point' },
+    angular:
+      divergence > 0
+        ? { type: 'cone', half_angle_deg: round6(divergence / 2) }
+        : { type: 'collimated' },
+    flux: 1.0,
+  };
 }
 
 /**

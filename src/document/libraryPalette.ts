@@ -113,6 +113,12 @@ export interface LibraryPaletteEntry {
   /** WP-47: the source record's emission lines in µm (empty for non-sources);
    * a placement picks one as its active wavelength. */
   wavelengthsUm: number[];
+  /** Normalized source facts (both record dialects, via the index): full-angle
+   * beam divergence in degrees and 1/e² beam diameter in mm. They feed the
+   * exported §9.5 emission block — without them a placed laser materializes
+   * as a point/collimated default: one axial ray. */
+  divergenceDeg?: number;
+  beamDiameterMm?: number | null;
   /** WP-48: authored schematic symbol URL, or null to derive the glyph. */
   symbolUrl: string | null;
   /** WP-47: pixel facts for slm/display parts (null for everything else). */
@@ -380,6 +386,8 @@ function entryFromIndexModule(
     ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
+    divergenceDeg: mod.component?.divergence_deg ?? 0,
+    beamDiameterMm: mod.component?.beam_diameter_mm ?? null,
     symbolUrl: abs(mod.assets?.symbol),
     programmable: mod.component?.programmable
       ? {
@@ -459,6 +467,10 @@ export function entriesFromWorkspace(
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
       (record as { source?: { wavelengths_um?: number[] } }).source?.wavelengths_um ?? [],
+    divergenceDeg:
+      (record as { source?: { divergence_deg?: number } }).source?.divergence_deg ?? 0,
+    beamDiameterMm:
+      (record as { source?: { beam_diameter_mm?: number } }).source?.beam_diameter_mm ?? null,
     // Workspace drafts have no served asset yet — they derive their glyph.
     symbolUrl: null,
     programmable: null,
@@ -551,6 +563,8 @@ export function entriesFromComponents(
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],
+      divergenceDeg: component.divergence_deg ?? 0,
+      beamDiameterMm: component.beam_diameter_mm ?? null,
       symbolUrl: abs(component.symbol),
       programmable: null,
       vendorName: component.vendor?.name || null,

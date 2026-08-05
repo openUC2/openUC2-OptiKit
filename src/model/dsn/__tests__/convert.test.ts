@@ -205,6 +205,45 @@ describe('palette optics enrichment (WP-32)', () => {
     ]);
   });
 
+  it('a registry source exports its §9.5 emission block (colors + beam width)', () => {
+    // Without emission the kernel materializes the point/collimated 0.55 µm
+    // default — one axial green ray, whatever the laser. The palette entry's
+    // normalized source facts become the design's physical emission model.
+    registerLibraryModules(entriesFromIndex([{
+      id: 'bound.source.laser488', version: '0.1.0', kind: 'cube_module', description: '',
+      tags: [], category: 'source', thumbnail: null, footprint_grid: [1, 1, 1], review: false,
+      component: {
+        ref: 'c@^1', resolved: '1.0.0', vendor: null, efl_mm: null,
+        wavelengths_um: [0.488, 0.635], divergence_deg: 1.2, beam_diameter_mm: 2,
+      },
+      template: { ref: 't@^0.1', resolved: '0.1.0', class: 'fixed', actuatable: false, dof: [] },
+      assets: { thumbnail: null, glb: null, step: null },
+      ports: [],
+      electronics: null,
+    }], 'http://x'));
+    const laser = componentOf(
+      part({ id: 's', ref: 'Laser', category: 'source', libraryRef: 'bound.source.laser488' }),
+    );
+    expect(laser.optics!.emission).toEqual({
+      port: 'out',
+      spectrum: [
+        { wavelength_um: 0.488, weight: 1 },
+        { wavelength_um: 0.635, weight: 1 },
+      ],
+      spatial: { type: 'disc', radius_mm: 1 },
+      angular: { type: 'cone', half_angle_deg: 0.6 },
+      flux: 1,
+    });
+
+    // WP-47 runtime state: the picked line filters the exported spectrum
+    // (materialize reads emission.spectrum before the picker field).
+    const picked = componentOf(
+      part({ id: 's2', ref: 'Laser', category: 'source', libraryRef: 'bound.source.laser488',
+             params: { wavelengthUm: 0.635 } }),
+    );
+    expect(picked.optics!.emission!.spectrum).toEqual([{ wavelength_um: 0.635, weight: 1 }]);
+  });
+
   it('filters export as passthrough; sources export their emit port', () => {
     const filter = componentOf(
       part({ id: 'f', ref: 'Filter', category: 'filter', libraryRef: 'filter-bandpass' }),
