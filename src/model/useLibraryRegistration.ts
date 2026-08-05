@@ -24,7 +24,7 @@ import { assetsBaseUrl, useLibraryIndex, type IndexComponent } from './libraryIn
 import type { LibraryPaletteEntry } from '../document/libraryPalette';
 import type { ComponentRecord } from './dsn/generated/library-component';
 import { mergeRepoIndexes, useMountedRepos } from './communityRepos';
-import { useWorkspaceLibrary } from './workspaceLibrary';
+import { hydrateMeshUrl, useWorkspaceLibrary } from './workspaceLibrary';
 import { useBundleLibrary } from './dsn/bundleImport';
 
 /**
@@ -91,6 +91,10 @@ export function useLibraryRegistration() {
   const libraryIndex = useLibraryIndex();
   const workspaceRecords = useWorkspaceLibrary(s => s.records);
   const workspaceThumbs = useWorkspaceLibrary(s => s.thumbnails);
+  // WP-127: a draft's mechanics pair + its mesh URL, so a bound draft places
+  // as the cube it is instead of a bare primitive.
+  const workspaceBindings = useWorkspaceLibrary(s => s.bindings);
+  const workspaceMeshUrls = useWorkspaceLibrary(s => s.meshUrls);
   // WP-98: modules a .dsn bundle registered for this session.
   const bundleEntries = useBundleLibrary(s => s.entries);
   const modules = useAppStore(s => s.modules);
@@ -115,8 +119,16 @@ export function useLibraryRegistration() {
       enrichEntry(e, libraryIndex.components, workspaceRecords, bundleByModule),
     );
     const registryIds = new Set(registry.map(e => e.moduleId));
-    const workspace = entriesFromWorkspace(workspaceRecords, workspaceThumbs)
-      .filter(e => !registryIds.has(e.moduleId));
+    const workspace = entriesFromWorkspace(
+      workspaceRecords,
+      workspaceThumbs,
+      workspaceBindings,
+      workspaceMeshUrls,
+    ).filter(e => !registryIds.has(e.moduleId));
+    // WP-127: bound drafts keep their mesh in IndexedDB — pull it up as an
+    // object URL once per page load (the call is idempotent and bumps the
+    // index when a URL appears, so the palette re-registers with the mesh).
+    for (const id of Object.keys(workspaceBindings)) void hydrateMeshUrl(id);
     const workspaceIds = new Set(workspace.map(e => e.moduleId));
     // WP-60: published symbols NO module binds place directly — grouped
     // "<category> · unbound". Local drafts with the same id keep precedence.
@@ -142,7 +154,7 @@ export function useLibraryRegistration() {
     registerLibraryModules([...registry, ...workspace, ...unbound, ...bundle]);
     // WP-44: groups (the OPM arrangements) register alongside the modules.
     registerLibraryGroups(groupEntriesFromIndex(merged.groups));
-  }, [merged, libraryIndex.components, libraryIndex.housings, libraryIndex.url, workspaceRecords, workspaceThumbs, bundleEntries, modules]);
+  }, [merged, libraryIndex.components, libraryIndex.housings, libraryIndex.url, workspaceRecords, workspaceThumbs, workspaceBindings, workspaceMeshUrls, bundleEntries, modules]);
 
   return { libraryIndex, merged, mountedRepos };
 }

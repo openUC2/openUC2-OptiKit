@@ -513,32 +513,77 @@ export function groupEntriesFromIndex(groups: IndexGroup[]): LibraryGroupEntry[]
 }
 
 /** Workspace component records (no mechanics yet) → palette entries. */
+/**
+ * WP-127: a bound draft's template ports, as mounted — the same rule
+ * optikit-core's `_as_mounted_ports` applies when it builds the index. A
+ * template that carries an insert-pose has complete, cube-frame
+ * `optical_ports`; its `frames` hold their posed positions.
+ */
+export function templatePortsToSource(
+  template: Record<string, unknown> | undefined,
+): SourcePort[] | null {
+  const ports = template?.optical_ports as
+    | Record<string, { frame?: string; direction?: string; 'after-surface'?: number | null }>
+    | undefined;
+  if (!template?.['insert-pose'] || !ports || Object.keys(ports).length === 0) return null;
+  const frames = (template.frames ?? {}) as Record<
+    string,
+    { 'x-mm'?: number; 'y-mm'?: number; 'z-mm'?: number }
+  >;
+  return Object.entries(ports).map(([name, port]) => {
+    const f = frames[port.frame ?? ''] ?? {};
+    return {
+      name,
+      direction: String(port.direction ?? '+z'),
+      positionMm: [f['x-mm'] ?? 0, f['y-mm'] ?? 0, f['z-mm'] ?? 0] as [number, number, number],
+      afterSurface: port['after-surface'] ?? null,
+    };
+  });
+}
+
 export function entriesFromWorkspace(
   records: Record<string, ComponentRecord>,
   thumbnails: Record<string, string>,
+  /** WP-127: component id → the draft's template/module pair, when bound. */
+  bindings: Record<string, { template: Record<string, unknown>; module: Record<string, unknown> }> = {},
+  /** WP-127: component id → object URL for the bound mesh (blob:). */
+  meshUrls: Record<string, string> = {},
 ): LibraryPaletteEntry[] {
-  return Object.values(records).map(record => ({
+  return Object.values(records).map(record => {
+  const binding = bindings[record.id];
+  const template = binding?.template;
+  const mountedPorts = templatePortsToSource(template);
+  const footprint = (template?.footprint_grid as [number, number, number] | undefined) ?? null;
+  return {
     moduleId: record.id,
     componentId: record.id,
     name: shortName(record.id),
     description: record.description ?? '',
+    // WP-127: a bound draft is a real cube — its template says which class.
     category: docCategoryOfRecord(record.category),
-    templateClass: null,
-    // WP-103: a local draft has optics and no mechanics — bare, by definition.
-    mount: 'bare' as const,
-    templateId: (record as { mechanics?: { template?: string } }).mechanics?.template ?? null,
+    templateClass: binding
+      ? ((template?.class as TemplateClass | undefined) ?? 'fixed')
+      : null,
+    mount: (binding && footprint ? 'cube' : 'bare') as PartMount,
+    templateId:
+      (template?.id as string | undefined) ??
+      (record as { mechanics?: { template?: string } }).mechanics?.template ??
+      null,
     states: [],
     dofs: [],
-    footprintGrid: [1, 1, 1],
+    footprintGrid: footprint ?? [1, 1, 1],
     thumbnailUrl: thumbnails[record.id] ?? null,
-    glbUrl: null,
-    meshFrame: '',
-    portsFrame: 'record',
+    glbUrl: (binding && meshUrls[record.id]) || null,
+    meshFrame: String(template?.['mesh-frame'] ?? ''),
+    portsFrame: (mountedPorts ? 'mounted' : 'record') as 'mounted' | 'record',
     mirrorRectMm: rectApertureOf(
       (record as { optics?: { fragment?: { surfaces?: Record<string, unknown>[] } } })
         .optics?.fragment?.surfaces,
     ),
-    ports: recordPortsToSource(record),
+    // WP-127: a bound draft serves its AS-MOUNTED pins, exactly like the
+    // published index does (WP-122) — so the schematic, the assembly glyph
+    // and the parts editor agree before the record ever reaches the registry.
+    ports: mountedPorts ?? recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
       (record as { source?: { wavelengths_um?: number[] } }).source?.wavelengths_um ?? [],
@@ -554,14 +599,15 @@ export function entriesFromWorkspace(
     // WP-60 published components, so an imported Optiland primitive placed
     // from the workspace offers "generate a holder…" like any other unbound
     // part (cubify is the T-class binding moment).
-    unbound: true,
+    unbound: !(binding && footprint),
     // A draft's authored surfaces ARE its prescription (WP-60 convention).
     fragmentSurfaces:
       ((record.optics as { fragment?: { surfaces?: Record<string, unknown>[] } } | undefined)
         ?.fragment?.surfaces) ?? [],
     carrier: false,
     bays: {},
-  }));
+  };
+  });
 }
 
 /**

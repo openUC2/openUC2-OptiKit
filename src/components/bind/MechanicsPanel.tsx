@@ -53,7 +53,6 @@ import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
   IDENTITY_INSERT_POSE,
   asMountedDirection,
-  bindToRecords,
   insertPoseMatrix,
   eulerDegToQuat,
   quatFromDirection,
@@ -78,6 +77,7 @@ import { GenerateDraftHolderDialog } from '../component-editor/GenerateDraftHold
 import { BindScene } from './BindScene';
 import { DecimalField } from '../common/DecimalField';
 import { AttachInventorDialog } from '../assembly/AttachInventorDialog';
+import { boundRecordsFor } from './boundRecords';
 import { useBindStore } from './bindStore';
 import { decomposeRot24 } from '../../document/rot24';
 import * as THREE from 'three';
@@ -295,43 +295,15 @@ export function MechanicsPanel({
   // The record pair (WP-33): template/module reference — in priority order —
   // the picked existing component, the validating DRAFT, or the datum stub.
   const bound = useMemo(() => {
-    // WP-118: a pose IS a binding — datums are the legacy road's evidence.
-    if (!draft.name || (store.datums.length === 0 && !store.insertPose)) return null;
     const picked = componentOptions.find(([id]) => id === store.existingComponentId);
     const existing = picked
       ? { id: picked[0], version: picked[1] }
       : record
         ? { id: record.id, version: record.version }
         : null;
-    return bindToRecords({
-      namespace: draft.namespace,
-      name: draft.name,
-      category: draft.category,
-      templateClass: store.templateClass,
-      meshFile: store.meshFile || 'part.step',
-      meshTransform: store.transform,
-      // WP-109: the measured box, so the record's envelope is true.
-      envelopeMm: store.meshSizeMm ?? undefined,
-      datums: store.datums,
-      existingComponent: existing,
-      wholeModule: store.wholeModule,
-      housingOnly: store.housingOnly,
-      meshFrame: store.meshFrameDetected,
-      // WP-116: the F2 side, verbatim from the draft — the pose transforms it.
-      insertPose: store.insertPose,
-      recordFrames: Object.fromEntries(
-        draft.frames.map(f => [f.name, [0, 0, f.zMm] as [number, number, number]]),
-      ),
-      recordPorts: draft.ports.map(p => ({
-        name: p.name,
-        frame: p.frame,
-        direction: p.direction,
-        afterSurface: p.afterSurface,
-      })),
-    });
-  }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
-      store.meshFile, store.transform, store.meshSizeMm, store.datums, store.wholeModule,
-      store.housingOnly, store.insertPose, store.meshFrameDetected]);
+    // WP-127: shared with "save to workspace" — one binding builder.
+    return boundRecordsFor(draft, store, existing);
+  }, [draft, record, componentOptions, store]);
 
   // WP-118: the write button's disabled reason, VISIBLE — a silently greyed
   // button read as "cannot save, can still corrupt" in round 16.
