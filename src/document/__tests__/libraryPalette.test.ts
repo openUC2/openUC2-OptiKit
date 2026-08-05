@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import {
   defaultRotationFor,
   yawRotationFor,
+  rectApertureOf,
   entriesFromComponents,
   entriesFromIndex,
   registerLibraryModules,
@@ -87,6 +88,26 @@ describe('yawRotationFor (WP-124: as-mounted ports — pins stay +z)', () => {
   it('a vertical (posed periscope) beam never tips the cube', () => {
     const rot = yawRotationFor([P('front', '+z'), P('back', '-z')]);
     expect(rot === null || rot.z === '+z').toBe(true);
+  });
+});
+
+describe('rectApertureOf (WP-125: rect mirrors draw rect)', () => {
+  it('reads the reflective surface\'s RectangularAperture as [w, h]', () => {
+    expect(
+      rectApertureOf([
+        {
+          interaction_model: { type: 'refractive_reflective', is_reflective: true },
+          aperture: { type: 'RectangularAperture', x_min: -12.7, x_max: 12.7, y_min: -6, y_max: 6 },
+        },
+        {},
+      ]),
+    ).toEqual([25.4, 12]);
+  });
+
+  it('round records (semi-aperture only) stay null', () => {
+    expect(rectApertureOf([{ semi_aperture: 12.5 }])).toBeNull();
+    expect(rectApertureOf([])).toBeNull();
+    expect(rectApertureOf(undefined)).toBeNull();
   });
 });
 

@@ -476,6 +476,7 @@ function AssemblyPart({
                 foldDeg={insertFoldDeg}
                 dimmed={dimmed}
                 interfaceKind={null}
+                mirrorRectMm={entry?.mirrorRectMm ?? null}
               />
             </group>
           </group>

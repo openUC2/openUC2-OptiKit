@@ -307,6 +307,7 @@ function SchematicPart({
               tint={glyphTint}
               dimmed={sourceOff || dimmed}
               interfaceKind={ifaceKind}
+              mirrorRectMm={libraryEntryOf(part.libraryRef)?.mirrorRectMm ?? null}
             />
           )}
           <OpticalAxisArrow

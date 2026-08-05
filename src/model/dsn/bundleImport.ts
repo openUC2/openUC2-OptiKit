@@ -34,6 +34,7 @@ import type { ComponentRecord } from './generated/library-component';
 import {
   docCategoryOfRecord,
   recordPortsToSource,
+  rectApertureOf,
   type LibraryPaletteEntry,
 } from '../../document/libraryPalette';
 import { useWorkspaceLibrary } from '../workspaceLibrary';
@@ -237,6 +238,10 @@ export function registerBundleLibrary(
         meshFrame: String(tplRecord['mesh-frame'] ?? ''),
         portsFrame:
           tplRecord['insert-pose'] && tplRecord.optical_ports ? 'mounted' : 'record',
+        mirrorRectMm: rectApertureOf(
+          (component as { optics?: { fragment?: { surfaces?: Record<string, unknown>[] } } } | null)
+            ?.optics?.fragment?.surfaces,
+        ),
         ports: component ? recordPortsToSource(component) : [],
         eflMm:
           typeof component?.effective_focal_length_mm === 'number'

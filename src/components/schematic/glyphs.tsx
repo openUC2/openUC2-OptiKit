@@ -46,20 +46,53 @@ function LensGlyph({ color }: { color: string }) {
   );
 }
 
-function MirrorGlyph({ color, foldDeg }: { color: string; foldDeg: number }) {
+/** WP-125: plate cross-section from the record's clear aperture. A rect
+ * mirror draws the [w, h] plate it declares (scaled into the 28-unit glyph);
+ * null keeps the round disc. */
+function plateSize(rectMm: [number, number] | null): { w: number; h: number } | null {
+  if (!rectMm || rectMm[0] <= 0 || rectMm[1] <= 0) return null;
+  const scale = 28 / Math.max(rectMm[0], rectMm[1]);
+  return { w: rectMm[0] * scale, h: rectMm[1] * scale };
+}
+
+function MirrorGlyph({
+  color,
+  foldDeg,
+  rectMm = null,
+}: {
+  color: string;
+  foldDeg: number;
+  rectMm?: [number, number] | null;
+}) {
   // Thin plate oriented by the record's fold angle (180° = normal incidence).
   const n = plateAngle(foldDeg);
+  const rect = plateSize(rectMm);
   return (
     <group rotation={[0, 0, n - Math.PI]}>
       {/* authored with the reflective face toward -x (the incoming beam) */}
-      <mesh rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[14, 14, 2.5, 32]} />
-        <meshStandardMaterial color={color} metalness={0.9} roughness={0.15} />
-      </mesh>
-      <mesh position={[-1.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[14, 14, 0.4, 32]} />
-        <meshBasicMaterial color="#eef4f8" />
-      </mesh>
+      {rect ? (
+        <>
+          <mesh>
+            <boxGeometry args={[2.5, rect.w, rect.h]} />
+            <meshStandardMaterial color={color} metalness={0.9} roughness={0.15} />
+          </mesh>
+          <mesh position={[-1.8, 0, 0]}>
+            <boxGeometry args={[0.4, rect.w, rect.h]} />
+            <meshBasicMaterial color="#eef4f8" />
+          </mesh>
+        </>
+      ) : (
+        <>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[14, 14, 2.5, 32]} />
+            <meshStandardMaterial color={color} metalness={0.9} roughness={0.15} />
+          </mesh>
+          <mesh position={[-1.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[14, 14, 0.4, 32]} />
+            <meshBasicMaterial color="#eef4f8" />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }
@@ -305,6 +338,7 @@ export function SchematicGlyph({
   tint = null,
   dimmed = false,
   interfaceKind = null,
+  mirrorRectMm = null,
 }: {
   category: DocCategory;
   label: string;
@@ -317,6 +351,9 @@ export function SchematicGlyph({
   /** WP-64: structural interface-zone parts (plate/puzzle/baseplate) draw a
    * distinct flat glyph instead of the generic blob. */
   interfaceKind?: InterfaceKind | null;
+  /** WP-125: rectangular reflective aperture [w, h] mm — a rect mirror draws
+   * the plate the record declares instead of a disc. */
+  mirrorRectMm?: [number, number] | null;
 }) {
   const color = dimmed ? '#6b7280' : (tint ?? GLYPH_COLORS[category]);
   // WP-92: an interface part IS its flat glyph, whatever category its record
@@ -330,7 +367,7 @@ export function SchematicGlyph({
     case 'lens':
       return <LensGlyph color={color} />;
     case 'mirror':
-      return <MirrorGlyph color={color} foldDeg={fold} />;
+      return <MirrorGlyph color={color} foldDeg={fold} rectMm={mirrorRectMm} />;
     case 'source':
       return <SourceGlyph color={color} />;
     case 'detector':
@@ -353,7 +390,7 @@ export function SchematicGlyph({
     // its own colour so a DMD never reads as a plain fold mirror.
     case 'slm':
     case 'display':
-      return <MirrorGlyph color={color} foldDeg={fold} />;
+      return <MirrorGlyph color={color} foldDeg={fold} rectMm={mirrorRectMm} />;
     default:
       return <FallbackGlyph color={color} label={label} />;
   }

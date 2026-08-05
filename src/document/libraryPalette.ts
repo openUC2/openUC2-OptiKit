@@ -114,6 +114,9 @@ export interface LibraryPaletteEntry {
    * in-plane — placement may only YAW, pins stay +z); 'record' = component
    * F2 (placement tips the optics into the document plane, WP-29). */
   portsFrame: 'mounted' | 'record';
+  /** WP-125: reflective rectangular clear aperture [w, h] mm — a rect mirror
+   * draws as the plate the record declares, not a disc. null = round. */
+  mirrorRectMm: [number, number] | null;
   /** Record-style ports (local record axes, ±z = optical axis). */
   ports: SourcePort[];
   /** Effective focal length when meaningful — feeds the 2D ray preview. */
@@ -201,6 +204,30 @@ const AXIS_VEC: Record<string, THREE.Vector3> = {
 };
 
 const INPUT_PORT_NAMES = /^(front|sensor|in|plane)$/;
+
+/** WP-125: the reflective surface's rectangular clear aperture, [w, h] mm —
+ * from raw Optiland-spelling surfaces (fragment_surfaces / record fragment).
+ * null = round. Mirrors optikit-core's `_mirror_rect_mm`. */
+export function rectApertureOf(
+  surfaces?: Record<string, unknown>[] | null,
+): [number, number] | null {
+  if (!surfaces?.length) return null;
+  const reflective = surfaces.filter(su => {
+    const im = su.interaction_model as { is_reflective?: unknown } | undefined;
+    return Boolean(im?.is_reflective);
+  });
+  for (const su of reflective.length ? reflective : surfaces) {
+    const ap = su.aperture as
+      | { type?: string; x_min?: number; x_max?: number; y_min?: number; y_max?: number }
+      | undefined;
+    if (!ap || !/rectangular/i.test(ap.type ?? '')) continue;
+    if (ap.x_min == null || ap.x_max == null || ap.y_min == null || ap.y_max == null) continue;
+    const w = ap.x_max - ap.x_min;
+    const h = ap.y_max - ap.y_min;
+    if (w > 0 && h > 0) return [w, h];
+  }
+  return null;
+}
 
 function toAxisDir(v: THREE.Vector3): AxisDir {
   const ax: 'x' | 'y' | 'z' =
@@ -426,6 +453,7 @@ function entryFromIndexModule(
     glbUrl: abs(mod.assets?.glb),
     meshFrame: mod.assets?.mesh_frame ?? '',
     portsFrame: mod.ports_frame ?? 'record',
+    mirrorRectMm: mod.component?.mirror_rect_mm ?? null,
     ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
@@ -506,6 +534,10 @@ export function entriesFromWorkspace(
     glbUrl: null,
     meshFrame: '',
     portsFrame: 'record',
+    mirrorRectMm: rectApertureOf(
+      (record as { optics?: { fragment?: { surfaces?: Record<string, unknown>[] } } })
+        .optics?.fragment?.surfaces,
+    ),
     ports: recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
@@ -601,6 +633,7 @@ export function entriesFromComponents(
       glbUrl: abs(housing?.assets.glb),
       meshFrame: '',
       portsFrame: 'record',
+      mirrorRectMm: rectApertureOf(component.fragment_surfaces),
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],

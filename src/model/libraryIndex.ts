@@ -133,6 +133,8 @@ export interface IndexModule {
     efl_mm: number | null;
     /** WP-47: the source record's emission lines, µm (empty for non-sources). */
     wavelengths_um?: number[];
+    /** WP-125: reflective rectangular clear aperture [w, h] mm (null = round). */
+    mirror_rect_mm?: [number, number] | null;
     /** WP-47: pixel facts for slm/display parts. */
     programmable?: {
       mode: 'reflective' | 'transmissive';
