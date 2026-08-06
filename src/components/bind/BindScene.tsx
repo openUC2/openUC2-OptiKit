@@ -53,6 +53,13 @@ import type { OrthoView } from './bindStore';
 const NO_RAYCAST = () => null;
 
 const threeToDoc = (v: THREE.Vector3): Vec3 => [v.x, -v.z, v.y];
+
+/** WP-121: doc(x, y, z) = three(x, −z, y) as a quaternion — the rotation
+ * that stands doc-z-up (cube-frame) mesh content upright in three's y-up. */
+const DOC_TO_THREE_QUAT = new THREE.Quaternion().setFromAxisAngle(
+  new THREE.Vector3(1, 0, 0),
+  -Math.PI / 2,
+);
 const docToThree = (v: Vec3): [number, number, number] => [v[0], v[2], -v[1]];
 
 const KIND_COLORS: Record<string, string> = {
@@ -280,7 +287,16 @@ function PartMesh() {
         onPointerDown={onPointerDown}
         onClick={onClick}
       >
-        <primitive object={scene} />
+        {/* WP-121: the doc→three basis change (Rx(−90°): doc z-up → three
+            y-up), applied to the MESH CONTENT. A cube-frame export has its
+            pins along native z; rendered raw, three puts that axis
+            horizontal — the cube lay on its side at identity, everyone
+            rotated it −90° to compensate, and the WP-116 refusal then
+            punished exactly that. With the basis applied, an untouched
+            export stands pins-up, matching the ghost cell and gravity. */}
+        <group quaternion={DOC_TO_THREE_QUAT}>
+          <primitive object={scene} />
+        </group>
       </group>
       {mode !== 'datum' && mode !== 'optics' && mode !== 'pose' && (
         <TransformControls

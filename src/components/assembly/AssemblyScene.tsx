@@ -49,6 +49,7 @@ import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExpor
 import type { Marker } from '../schematic/MarkerList';
 import { useAssemblyStore } from './assemblyStore';
 import { KernelRays3D } from '../common/KernelRays3D';
+import { meshContentQuat } from './meshFrame';
 import { useSceneColors } from '../../theme/sceneColors';
 
 const NO_RAYCAST = () => null;
@@ -97,14 +98,22 @@ function entryTranslationDofs(
 function GLBModel({
   url,
   offset,
+  meshFrame = '',
   dimmed = false,
 }: {
   url: string;
   offset?: [number, number, number];
+  /** WP-123: 'cube' (F3, needs the basis), 'record' (pre-rotated y-up,
+   * render as-is), '' = undeclared legacy — detect a wrapper node. */
+  meshFrame?: string;
   /** WP-65: render the mesh nearly transparent (dimmed layer). */
   dimmed?: boolean;
 }) {
   const { scene } = useGLTF(url);
+  const contentQuat = useMemo(
+    () => meshContentQuat(meshFrame, scene.children),
+    [scene, meshFrame],
+  );
   const cloned = useMemo(() => {
     const c = skeletonClone(scene) as THREE.Group;
     if (dimmed) {
@@ -128,7 +137,9 @@ function GLBModel({
   }, [scene, dimmed]);
   return (
     <group position={offset}>
-      <primitive object={cloned} />
+      <group quaternion={contentQuat}>
+        <primitive object={cloned} />
+      </group>
     </group>
   );
 }
@@ -425,7 +436,12 @@ function AssemblyPart({
           // bug take a full session to find.
           <GLBErrorBoundary fallback={<GhostBox color={color} label="mesh failed" dimmed={dimmed} />}>
             <Suspense fallback={<GhostBox color={color} label="loading…" dimmed={dimmed} />}>
-              <GLBModel url={render.glbUrl} offset={render.glbOffset} dimmed={dimmed} />
+              <GLBModel
+                url={render.glbUrl}
+                offset={render.glbOffset}
+                meshFrame={render.meshFrame}
+                dimmed={dimmed}
+              />
             </Suspense>
           </GLBErrorBoundary>
         ) : unbound ? (

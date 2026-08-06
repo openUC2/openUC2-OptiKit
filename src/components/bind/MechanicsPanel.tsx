@@ -51,8 +51,10 @@ import {
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
+  IDENTITY_INSERT_POSE,
   asMountedDirection,
   bindToRecords,
+  insertPoseMatrix,
   eulerDegToQuat,
   quatFromDirection,
   quatToEulerDeg,
@@ -77,6 +79,8 @@ import { BindScene } from './BindScene';
 import { DecimalField } from '../common/DecimalField';
 import { AttachInventorDialog } from '../assembly/AttachInventorDialog';
 import { useBindStore } from './bindStore';
+import { decomposeRot24 } from '../../document/rot24';
+import * as THREE from 'three';
 
 const DATUM_KINDS: { value: DatumKind; label: string }[] = [
   { value: 'source', label: 'source plane' },
@@ -206,6 +210,45 @@ export function MechanicsPanel({
   const [attachOpen, setAttachOpen] = useState(false);
 
   const allowedKinds = KINDS_BY_CATEGORY[draft.category] ?? KINDS_BY_CATEGORY.other;
+  // WP-121: rotate mode has no meaning on a whole-cube mesh.
+  useEffect(() => {
+    if (store.wholeModule && store.mode === 'rotate') store.setMode('translate');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.wholeModule, store.mode]);
+
+  // WP-121: the pose's ABSOLUTE orientation (extrinsic Z-X-Y degrees of the
+  // full R = R24·ΔR) — what the user asked to edit directly instead of the
+  // residual split. Edits re-snap to rot24 + residual for storage, so the
+  // record spelling stays the contract's.
+  const poseAbsoluteDeg = useMemo<[number, number, number]>(() => {
+    if (!store.insertPose) return [0, 0, 0];
+    const e = new THREE.Euler().setFromRotationMatrix(
+      insertPoseMatrix(store.insertPose),
+      'ZXY',
+    );
+    const r1 = (v: number) => Math.round(THREE.MathUtils.radToDeg(v) * 10) / 10 || 0;
+    return [r1(e.x), r1(e.y), r1(e.z)];
+  }, [store.insertPose]);
+
+  const setPoseAbsoluteDeg = (axis: 'x' | 'y' | 'z', value: number) => {
+    if (!store.insertPose) return;
+    const next = { x: poseAbsoluteDeg[0], y: poseAbsoluteDeg[1], z: poseAbsoluteDeg[2], [axis]: value };
+    const m = new THREE.Matrix4().makeRotationFromEuler(
+      new THREE.Euler(
+        THREE.MathUtils.degToRad(next.x),
+        THREE.MathUtils.degToRad(next.y),
+        THREE.MathUtils.degToRad(next.z),
+        'ZXY',
+      ),
+    );
+    const d = decomposeRot24(m);
+    const clean = (v: number) => Math.round(v * 1e3) / 1e3 || 0;
+    store.setInsertPose({
+      ...store.insertPose,
+      rot24: d.rot24,
+      offsetDeg: [clean(d.offsetDeg.x), clean(d.offsetDeg.y), clean(d.offsetDeg.z)],
+    });
+  };
   // WP-114: the pending datum kind must be one this category allows. The
   // default is 'source', which a mirror does not offer — the select rendered
   // BLANK and a click would have authored a 'source' datum on a mirror. It
@@ -565,9 +608,15 @@ export function MechanicsPanel({
             <ToggleButton value="translate">
               <Tooltip title="move the part"><TranslateIcon fontSize="small" /></Tooltip>
             </ToggleButton>
+            {/* WP-121: a whole-cube module's mesh IS the reference frame —
+                rotating it is meaningless and was the source of the round-17
+                "rotation recorded nowhere" confusion. The insert pose is
+                what rotates. */}
+            {!store.wholeModule && (
             <ToggleButton value="rotate">
               <Tooltip title="rotate the part"><RotateIcon fontSize="small" /></Tooltip>
             </ToggleButton>
+            )}
             {show.datumTools && (
             <ToggleButton value="datum">
               <Tooltip title="datum mode: click the part surface to author an optical datum">
@@ -711,6 +760,17 @@ export function MechanicsPanel({
       <Typography variant="caption" color="text.secondary">
         placement: [{store.transform.positionMm.map(v => v.toFixed(1)).join(', ')}] mm ·
         rot [{store.transform.rotationDeg.map(v => v.toFixed(1)).join(', ')}]°
+        {(store.transform.positionMm.some(v => Math.abs(v) > 1e-6) ||
+          store.transform.rotationDeg.some(v => Math.abs(v) > 1e-6)) && (
+          <Button
+            size="small" sx={{ py: 0, ml: 1, minWidth: 0 }}
+            onClick={() =>
+              store.setTransform({ positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] })
+            }
+          >
+            reset placement
+          </Button>
+        )}
         {' · '}
         <Tooltip title="paraxial EFL of the draft's optics tab (2×2 ABCD walk) — '—' for a reflective stack, where it is undefined">
           <span>EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}</span>
@@ -754,21 +814,25 @@ export function MechanicsPanel({
                   slotProps={{ htmlInput: { style: { width: 56, fontSize: 12 } } }}
                 />
               ))}
-              <Typography variant="caption" color="text.secondary" sx={{ width: 90, ml: 1 }}>
-                residual (°)
-              </Typography>
+              <Tooltip title="the FULL orientation (extrinsic Z-X-Y, degrees) — edit freely; it is stored as the nearest of the 24 insert rotations plus a residual, per the DSN contract">
+                <Typography variant="caption" color="text.secondary" sx={{ width: 110, ml: 1 }}>
+                  orientation (°)
+                </Typography>
+              </Tooltip>
               {(['x', 'y', 'z'] as const).map((axis, i) => (
                 <DecimalField
                   key={axis} size="small" variant="standard" label={axis}
-                  value={store.insertPose!.offsetDeg[i]}
-                  onValue={v => {
-                    const next = [...store.insertPose!.offsetDeg] as Vec3;
-                    next[i] = v ?? 0;
-                    store.setInsertOffsetDeg(next);
-                  }}
+                  value={poseAbsoluteDeg[i]}
+                  onValue={v => setPoseAbsoluteDeg(axis, v ?? 0)}
                   slotProps={{ htmlInput: { style: { width: 52, fontSize: 12 } } }}
                 />
               ))}
+              <Button
+                size="small" sx={{ py: 0, minWidth: 0 }}
+                onClick={() => store.setInsertPose({ ...IDENTITY_INSERT_POSE })}
+              >
+                reset pose
+              </Button>
             </Stack>
             {/* the as-mounted sentence — computed, never asked (WP-116) */}
             {draft.ports.length > 0 && (

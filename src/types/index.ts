@@ -33,6 +33,8 @@ export interface ModuleDefinition {
   docsUrl?: string;
   glbUrl?: string;
   glbOffset?: [number, number, number];
+  /** WP-123: which frame the GLB content speaks ('cube' | 'record' | ''). */
+  meshFrame?: string;
   /** Explicit schematic category for library-registry modules (WP-34) —
    * checked before the group-name heuristics in `categoryOf`. */
   docCategory?: string;
