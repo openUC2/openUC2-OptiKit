@@ -44,6 +44,7 @@ import { AuthoredSymbol } from './AuthoredSymbol';
 import { KernelRays3D } from '../common/KernelRays3D';
 import { useAuthoredSymbol } from './symbolAsset';
 import { EscapeRays } from './EscapeRays';
+import { MeasureOverlay3D } from './MeasureOverlay3D';
 import { FIBER_COLOR, GLYPH_COLORS, sourceTint } from './colors';
 import { OpticalAxisArrow, SchematicGlyph } from './glyphs';
 import { beamAxesOf, glyphQuatOf, portsOf, resolvePortRef } from './ports';
@@ -816,6 +817,7 @@ function SceneContent({ settings, chainDraft, onPinClick, cameraRef, controlsRef
       )}
       <AuthoritativeRays />
       <EscapeRays />
+      <MeasureOverlay3D />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
         <GizmoViewport

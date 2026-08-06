@@ -36,6 +36,7 @@ import {
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   Rotate90DegreesCcw as SnapYawIcon,
+  SquareFoot as MeasureIcon,
   Straighten as CursorIcon,
   Timeline as RaysIcon,
   Cable as FiberIcon,
@@ -91,6 +92,8 @@ import { SchematicScene } from './SchematicScene';
 import type { SchematicSettings } from './SchematicScene';
 import { SchematicLegend, LEGEND_SEEN_KEY } from './SchematicLegend';
 import { CursorReadout } from './CursorReadout';
+import { MeasureTool } from './MeasureTool';
+import { useMeasureStore } from './measureStore';
 import { BomDialog } from '../bom/BomDialog';
 import { SchematicPropertyPanel } from './SchematicPropertyPanel';
 import { ServicePanel } from './ServicePanel';
@@ -111,6 +114,9 @@ export function SchematicPage() {
     lockView: true,
     cursorReadout: false,
   });
+  // Measure tool (the SolidWorks-style two-point verb) — store-backed so the
+  // scene overlay re-renders without this page doing so per pointer move.
+  const measureActive = useMeasureStore(s => s.active);
   // Affordance legend (WP-23): opens itself once, then lives behind "?".
   const [legendOpen, setLegendOpen] = useState(
     () => localStorage.getItem(LEGEND_SEEN_KEY) !== '1',
@@ -443,13 +449,21 @@ export function SchematicPage() {
         return;
       }
       switch (e.key) {
-        case 'Escape':
+        case 'Escape': {
+          // Measure first: drop the half-made measurement, then exit the tool.
+          const measure = useMeasureStore.getState();
+          if (measure.active) {
+            if (measure.draftA) measure.clearDraft();
+            else measure.setActive(false);
+            break;
+          }
           if (fiberDraft) setFiberDraft(null);
           else if (fiberMode) setFiberMode(false);
           else if (chainDraft) setChainDraft(null);
           else if (selectedIds.length > 1) setSelectedParts([]); // drop the set first
           else selectPart(null);
           break;
+        }
         case 'Enter':
           if (chainDraft) finishChain();
           break;
@@ -609,6 +623,11 @@ export function SchematicPage() {
                 planeZMm={settings.planeZMm}
               />
             )}
+            <MeasureTool
+              containerRef={canvasBoxRef}
+              cameraRef={cameraRef}
+              planeZMm={settings.planeZMm}
+            />
             <BomDialog open={bomOpen} onClose={() => setBomOpen(false)} />
 
             {/* Bottom toolbar: snap / rays / working plane */}
@@ -663,6 +682,16 @@ export function SchematicPage() {
                   onChange={() => setSettings(s => ({ ...s, cursorReadout: !s.cursorReadout }))}
                 >
                   <CursorIcon fontSize="small" />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title="Measure: click two points — snaps to part anchors and port datums; Esc exits (leaving clears)">
+                <ToggleButton
+                  value="measure"
+                  selected={measureActive}
+                  size="small"
+                  onChange={() => useMeasureStore.getState().setActive(!measureActive)}
+                >
+                  <MeasureIcon fontSize="small" />
                 </ToggleButton>
               </Tooltip>
               <Tooltip title="Fiber tool (WP-46): click two port pins to lay a patch cord — no geometric constraint between them">
@@ -741,6 +770,21 @@ export function SchematicPage() {
               {/* WP-65: per-layer visibility chips (shared with the assembly). */}
               <LayerChips />
             </Paper>
+
+            {/* Hint chip while measuring */}
+            {measureActive && (
+              <Paper
+                sx={{
+                  position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                  zIndex: 10, px: 2, py: 0.75, bgcolor: 'warning.main', color: 'warning.contrastText',
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="body2">
+                  Measuring — click two points · snaps to part anchors + port datums · Esc exits
+                </Typography>
+              </Paper>
+            )}
 
             {/* Hint chip while chaining */}
             {chainDraft && (
