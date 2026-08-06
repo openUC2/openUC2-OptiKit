@@ -307,20 +307,35 @@ export function yawRotationFor(ports: SourcePort[]): Rot24 | null {
   const fold = ports
     .map(p => beamDir(p))
     .find(d => Math.abs(d.dot(b)) < 0.5);
+  // WP-135: a fold mirror is RECIPROCAL — running the light backwards through
+  // it is the same physical cube. Two records that differ only in which arm
+  // is called 'front' (beam +y in → +x out, vs −x in → −y out) describe one
+  // object, but scoring only the forward traversal placed them with plates
+  // 90° apart on the canvas: the reversed spelling cannot reach "beam → +x
+  // AND fold → −y" through its 'front', so it settled for fold → +y. Score
+  // both traversals; whichever wins, the yaw applies to the same part.
+  const traversals: { entry: THREE.Vector3; exit: THREE.Vector3 | null }[] = [
+    { entry: b, exit: fold ?? null },
+  ];
+  if (fold) {
+    traversals.push({ entry: fold.clone().negate(), exit: b.clone().negate() });
+  }
   let best: AxisDir = '+x';
   let bestScore = -Infinity;
-  YAWS.forEach((xImage, k) => {
-    // The yaw about +z, built explicitly — setFromUnitVectors(+x, -x) would
-    // pick a 180° flip about +y and tip the pins, the very bug this fixes.
-    const q = new THREE.Quaternion().setFromAxisAngle(AXIS_VEC['+z'], (k * Math.PI) / 2);
-    const score =
-      b.clone().applyQuaternion(q).dot(AXIS_VEC['+x']) * 2 +
-      (fold ? fold.clone().applyQuaternion(q).dot(AXIS_VEC['-y']) : 0);
-    if (score > bestScore + 1e-9) {
-      bestScore = score;
-      best = xImage;
-    }
-  });
+  for (const t of traversals) {
+    YAWS.forEach((xImage, k) => {
+      // The yaw about +z, built explicitly — setFromUnitVectors(+x, -x) would
+      // pick a 180° flip about +y and tip the pins, the very bug this fixes.
+      const q = new THREE.Quaternion().setFromAxisAngle(AXIS_VEC['+z'], (k * Math.PI) / 2);
+      const score =
+        t.entry.clone().applyQuaternion(q).dot(AXIS_VEC['+x']) * 2 +
+        (t.exit ? t.exit.clone().applyQuaternion(q).dot(AXIS_VEC['-y']) : 0);
+      if (score > bestScore + 1e-9) {
+        bestScore = score;
+        best = xImage;
+      }
+    });
+  }
   return best === '+x' ? null : { z: '+z', x: best };
 }
 

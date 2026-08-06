@@ -66,18 +66,25 @@ describe('yawRotationFor (WP-124: as-mounted ports — pins stay +z)', () => {
     expect(applyRot(rot, [0, 0, 1])).toEqual([0, 0, 1]);
   });
 
-  it('the beam wins over the fold arm — no yaw can fix both, keep the beam', () => {
-    // Fold toward +y with the beam already on +x: flipping the arm to -y
-    // would need a roll about x, which a yaw cannot do. Stay put.
-    expect(yawRotationFor([P('front', '-x'), P('reflected', '+y')])).toBeNull();
+  it('a fold that cannot be canonical forwards gets there BACKWARDS (WP-135)', () => {
+    // Fold toward +y with the beam already on +x: no yaw fixes both through
+    // 'front' — but running the light backwards (in via 'reflected') reaches
+    // beam → +x AND fold → −y. Before reciprocity this returned null and the
+    // reciprocal spelling of the same cube placed 90° differently.
+    const rot = yawRotationFor([P('front', '-x'), P('reflected', '+y')]);
+    expect(rot).toEqual({ z: '+z', x: '+y' });
+    // The canvas plate lands where the forward-canonical spelling puts it.
+    const canonical = yawRotationFor([P('front', '-y'), P('reflected', '+x')]);
+    expect(applyRot(rot, [-1, 1, 0])).toEqual(applyRot(canonical, [1, -1, 0]));
   });
 
-  it('with a vertical beam the fold arm tiebreak decides the yaw', () => {
-    // Periscope-style: beam along -z (yaw-invariant), arm toward +y → the
-    // 180° yaw brings the arm to -y, pins still up.
+  it('a periscope accepts the horizontal beam, whichever arm carries it', () => {
+    // front +z (vertical, yaw-invariant), reflected +y: forwards the best
+    // yaw only manages fold → −y; backwards the horizontal arm IS the entry
+    // and lands on +x — the beam-routing canvas flows +x, so that wins.
     const rot = yawRotationFor([P('front', '+z'), P('reflected', '+y')]);
-    expect(rot).toEqual({ z: '+z', x: '-x' });
-    expect(applyRot(rot, [0, 1, 0])).toEqual([0, -1, 0]);
+    expect(rot).toEqual({ z: '+z', x: '+y' });
+    expect(applyRot(rot, [0, -1, 0])).toEqual([1, 0, 0]);
   });
 
   it('already-conventional ports need no rotation at all', () => {
@@ -88,6 +95,29 @@ describe('yawRotationFor (WP-124: as-mounted ports — pins stay +z)', () => {
   it('a vertical (posed periscope) beam never tips the cube', () => {
     const rot = yawRotationFor([P('front', '+z'), P('back', '-z')]);
     expect(rot === null || rot.z === '+z').toBe(true);
+  });
+
+  // WP-135: a fold mirror is reciprocal — a record that swaps which arm is
+  // called 'front' is the SAME physical cube, and round 21 caught the two
+  // spellings placing with plates 90° apart on the canvas.
+  it('reciprocal spellings of one mirror place identically', () => {
+    // testmirror3 as mounted: beam +y in → +x out.
+    const a = yawRotationFor([P('front', '-y'), P('reflected', '+x')]);
+    // testmirror3flipped as mounted: beam −x in → −y out — light run backwards.
+    const b = yawRotationFor([P('front', '+x'), P('reflected', '-y')]);
+    expect(a).toEqual({ z: '+z', x: '-y' });
+    expect(b).toEqual(a);
+    // Same canvas plate for both: the local bisector (1,−1,0) lands the same.
+    expect(applyRot(a, [1, -1, 0])).toEqual(applyRot(b, [1, -1, 0]));
+  });
+
+  it('the reversal never demotes a spelling that already places well', () => {
+    // The round-19 testmirror (front +x, reflected −z): the reversed
+    // traversal has a vertical arm and must not beat beam→+x.
+    expect(yawRotationFor([P('front', '+x'), P('reflected', '-z')])).toEqual({
+      z: '+z',
+      x: '-x',
+    });
   });
 });
 

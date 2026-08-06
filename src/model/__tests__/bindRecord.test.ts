@@ -220,6 +220,27 @@ describe('legacy datum road (housing / expert tab)', () => {
   });
 });
 
+describe('the envelope is a CUBE-frame field (WP-135)', () => {
+  it('a record-frame mesh gets its measured box un-rotated before writing', () => {
+    // The viewport measures file axes; a converted STP is y-up, so its 55 mm
+    // pin span sits on file y. Written verbatim, the template shipped an
+    // envelope its own mesh check must reject.
+    const bound = bindToRecords(
+      mirrorInput({ meshFrame: 'record', envelopeMm: [49.8, 53.8, 49.8] }),
+    );
+    const env = bound.template.envelope as Record<string, number>;
+    expect([env['x-mm'], env['y-mm'], env['z-mm']]).toEqual([49.8, 49.8, 53.8]);
+  });
+
+  it('a cube-frame mesh writes its box verbatim', () => {
+    const bound = bindToRecords(
+      mirrorInput({ meshFrame: 'cube', envelopeMm: [49.8, 49.8, 54.4] }),
+    );
+    const env = bound.template.envelope as Record<string, number>;
+    expect([env['x-mm'], env['y-mm'], env['z-mm']]).toEqual([49.8, 49.8, 54.4]);
+  });
+});
+
 describe('dead-record guard (WP-77)', () => {
   it('refuses class generative — no generator block can ever be emitted here', () => {
     const bound = bindToRecords(mirrorInput({ templateClass: 'generative' }));

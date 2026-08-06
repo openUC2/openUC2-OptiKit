@@ -555,12 +555,21 @@ export function bindToRecords(input: BindInput): BoundRecords {
     // WP-109: the cube's real z pitch is 55 mm, not 50 — a hardcoded 50/50/50
     // envelope makes `library validate`'s mesh check disagree with every
     // whole-cube export. The caller passes the measured box when it has one.
+    // WP-135: the box is measured in FILE axes; the envelope is a CUBE-frame
+    // field. For a record-frame file (converted STP, wrapper exports) file
+    // axes are cube (x, z, −y) — swap y/z back, or the template ships an
+    // envelope its own mesh check must reject (testlens: 49.8 × 53.8 × 49.8
+    // recorded for a 49.8 × 49.8 × 53.8 part).
     envelope: input.envelopeMm
-      ? {
-          'x-mm': round3(input.envelopeMm[0]),
-          'y-mm': round3(input.envelopeMm[1]),
-          'z-mm': round3(input.envelopeMm[2]),
-        }
+      ? (() => {
+          const [ex, ey, ez] = input.envelopeMm;
+          const cube = input.meshFrame === 'record' ? [ex, ez, ey] : [ex, ey, ez];
+          return {
+            'x-mm': round3(cube[0]),
+            'y-mm': round3(cube[1]),
+            'z-mm': round3(cube[2]),
+          };
+        })()
       : { 'x-mm': 50, 'y-mm': 50, 'z-mm': 55 },
     ...(isStep ? { step: input.meshFile } : {}),
     glb: input.meshFile.replace(/\.(step|stp)$/i, '.glb'),

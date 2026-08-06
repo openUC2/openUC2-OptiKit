@@ -222,13 +222,20 @@ export const useBindStore = create<BindState>((set, get) => ({
     const c = get().meshBboxCenter;
     if (!c) return;
     // Centre the module's bbox on the cube origin (translation only). The
-    // centre is FILE-NATIVE (WP-120) and so is the placement: since WP-121
-    // the mesh renders inside <group quaternion={B}>, so the translation is
-    // applied in CUBE axes and is a plain negation. It still read
-    // [-cx, cz, -cy] — the pre-WP-121 formula for a raw <primitive> — which
-    // sent a mesh centred at (1,2,3) to (0,1,-5). Harmless on a centred cube,
-    // wrong for exactly the corner-origin exports this button exists for.
-    set({ transform: { positionMm: [-c[0], -c[1], -c[2]], rotationDeg: [0, 0, 0] } });
+    // centre is measured in the FILE's root axes (WP-120), but the
+    // translation is applied OUTSIDE the content basis — so the formula
+    // depends on which basis the content got (WP-135, same rule as the
+    // assembly): a cube-frame file renders inside <group quaternion={B}>
+    // (file axes ≡ doc axes → plain negation), while a record-frame file
+    // (converted STP, wrapper-node exports) renders as-is (file axes ≡
+    // viewer axes → docToThree(t) = −c, i.e. t = [−cx, cz, −cy]).
+    const record = get().meshFrameDetected === 'record';
+    set({
+      transform: {
+        positionMm: record ? [-c[0], c[2], -c[1]] : [-c[0], -c[1], -c[2]],
+        rotationDeg: [0, 0, 0],
+      },
+    });
   },
   selectOptic: selectedOpticId => set({ selectedOpticId }),
   setOpticsGizmoMode: opticsGizmoMode => set({ opticsGizmoMode }),

@@ -35,7 +35,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { RefObject } from 'react';
 import type { Vec3 } from '../../document';
 import { DOC_AXIS_LABELS, axisText } from '../../document';
-import { hasWrapperRotation } from '../assembly/meshFrame';
+import { hasWrapperRotation, meshContentQuat } from '../assembly/meshFrame';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
 import {
   datumQuatToCubeQuat,
@@ -58,10 +58,6 @@ const threeToDoc = (v: THREE.Vector3): Vec3 => [v.x, -v.z, v.y];
 
 /** WP-121: doc(x, y, z) = three(x, −z, y) as a quaternion — the rotation
  * that stands doc-z-up (cube-frame) mesh content upright in three's y-up. */
-const DOC_TO_THREE_QUAT = new THREE.Quaternion().setFromAxisAngle(
-  new THREE.Vector3(1, 0, 0),
-  -Math.PI / 2,
-);
 const docToThree = (v: Vec3): [number, number, number] => [v[0], v[2], -v[1]];
 
 const KIND_COLORS: Record<string, string> = {
@@ -147,6 +143,7 @@ function PartMesh() {
   const hideCubeHalves = useBindStore(s => s.hideCubeHalves);
   const setTransform = useBindStore(s => s.setTransform);
   const addDatum = useBindStore(s => s.addDatum);
+  const meshFrameDetected = useBindStore(s => s.meshFrameDetected);
   const groupRef = useRef<THREE.Group>(null);
   const [scene, setScene] = useState<THREE.Group | null>(null);
   // WP-114: where the pointer went down, so an ORBIT DRAG that happens to end
@@ -216,6 +213,13 @@ function PartMesh() {
     return q;
   }, [transform.rotationDeg]);
 
+  // WP-135: the SAME content-basis rule as the assembly (meshContentQuat):
+  // 'cube' → B, 'record' → identity. The detector already ran at load.
+  const contentQuat = useMemo(
+    () => meshContentQuat(meshFrameDetected ?? '', scene?.children ?? []),
+    [meshFrameDetected, scene],
+  );
+
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     downAt.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
   };
@@ -283,14 +287,16 @@ function PartMesh() {
         onPointerDown={onPointerDown}
         onClick={onClick}
       >
-        {/* WP-121: the doc→three basis change (Rx(−90°): doc z-up → three
-            y-up), applied to the MESH CONTENT. A cube-frame export has its
-            pins along native z; rendered raw, three puts that axis
-            horizontal — the cube lay on its side at identity, everyone
-            rotated it −90° to compensate, and the WP-116 refusal then
-            punished exactly that. With the basis applied, an untouched
-            export stands pins-up, matching the ghost cell and gravity. */}
-        <group quaternion={DOC_TO_THREE_QUAT}>
+        {/* WP-121/135: the doc→three basis, applied to CUBE-frame content —
+            and ONLY to cube-frame content, by the same meshContentQuat rule
+            the assembly uses. This was an unconditional B: a converted STP
+            (the service emits y-up glTF with an Rx(−90°) wrapper) rendered
+            double-rotated HERE while the assembly, honouring mesh-frame:
+            record, drew it correctly — so the user posed the optic against
+            a mesh the assembly would never show ("there seems to be an
+            offset between the parts editor and the assembly view"). One
+            rule, one place, both views. */}
+        <group quaternion={contentQuat}>
           <primitive object={scene} />
         </group>
       </group>
@@ -375,6 +381,11 @@ function PlacedOptic({
             surfaces={draft.surfaces}
             diameterMm={datum.areaDiameterMm}
             galvoTiltDeg={tiltDeg}
+            // WP-135: without the record's fold a gizmo-placed mirror drew a
+            // plate square to the beam — a retro-reflector, the one thing a
+            // fold mirror never is (the overlay learned this in WP-107; this
+            // call site was missed).
+            mountAngleDeg={draft.mirrorAngleDeg ?? 0}
           />
         )}
         {/* selection ring on the placement plane */}
