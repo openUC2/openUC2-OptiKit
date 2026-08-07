@@ -37,6 +37,9 @@ export interface BindSnapshot {
   housingOnly: boolean;
   /** WP-116: the F2→F3 pose survives a reload with the rest. */
   insertPose?: InsertPose | null;
+  /** WP-137: the FILE→cube correction survives too. */
+  meshFrameDetected?: 'cube' | 'record' | null;
+  meshPoseGrid?: [string, string] | null;
 }
 
 interface WizardState {
@@ -105,6 +108,8 @@ export const usePartWizard = create<WizardState>()(
             wholeModule: b.wholeModule,
             housingOnly: b.housingOnly,
             insertPose: b.insertPose,
+            meshFrameDetected: b.meshFrameDetected,
+            meshPoseGrid: b.meshPoseGrid,
           },
         });
       },
@@ -118,6 +123,8 @@ export const usePartWizard = create<WizardState>()(
           templateClass: snap.templateClass,
           wholeModule: snap.wholeModule,
           housingOnly: snap.housingOnly,
+          meshFrameDetected: snap.meshFrameDetected ?? null,
+          meshPoseGrid: snap.meshPoseGrid ?? null,
           insertPose: snap.insertPose ?? null,
         });
       },

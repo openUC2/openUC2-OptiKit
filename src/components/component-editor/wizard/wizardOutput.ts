@@ -35,6 +35,7 @@ export interface WizardBindState {
   insertPose?: InsertPose | null;
   /** WP-120: the detected mesh frame, declared on the template. */
   meshFrameDetected?: 'cube' | 'record' | null;
+  meshPoseGrid?: [string, string] | null;
 }
 
 export interface WizardOutput {
@@ -92,6 +93,7 @@ export function buildWizardOutput(
     wholeModule: bind.wholeModule,
     housingOnly: bind.housingOnly,
     meshFrame: bind.meshFrameDetected ?? null,
+    meshPoseGrid: bind.meshPoseGrid ?? null,
     // WP-116: the F2 side verbatim; the pose does the transforming.
     insertPose: bind.insertPose ?? null,
     recordFrames: Object.fromEntries(

@@ -41,6 +41,7 @@ export function boundRecordsFor(
     wholeModule: store.wholeModule,
     housingOnly: store.housingOnly,
     meshFrame: store.meshFrameDetected,
+    meshPoseGrid: store.meshPoseGrid,
     // WP-116: the F2 side, verbatim from the draft — the pose transforms it.
     insertPose: store.insertPose,
     recordFrames: Object.fromEntries(

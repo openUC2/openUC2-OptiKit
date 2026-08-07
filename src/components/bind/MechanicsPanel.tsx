@@ -51,6 +51,8 @@ import {
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
+  cubeToDatum,
+  datumToCube,
   IDENTITY_INSERT_POSE,
   asMountedDirection,
   insertPoseMatrix,
@@ -733,25 +735,90 @@ export function MechanicsPanel({
           </Alert>
         )}
       </Box>
-      <Typography variant="caption" color="text.secondary">
-        placement: [{store.transform.positionMm.map(v => v.toFixed(1)).join(', ')}] mm ·
-        rot [{store.transform.rotationDeg.map(v => v.toFixed(1)).join(', ')}]°
-        {(store.transform.positionMm.some(v => Math.abs(v) > 1e-6) ||
-          store.transform.rotationDeg.some(v => Math.abs(v) > 1e-6)) && (
-          <Button
-            size="small" sx={{ py: 0, ml: 1, minWidth: 0 }}
-            onClick={() =>
-              store.setTransform({ positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] })
-            }
-          >
-            reset placement
-          </Button>
-        )}
-        {' · '}
+      {/* WP-138: the placement is TYPEABLE, not caption-only — "we need to
+          be able to enter values of placement manually too". Document/cube
+          axes, same spelling the gizmo commits. */}
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+        <Typography variant="caption" color="text.secondary">placement (mm, cube axes)</Typography>
+        {(['x', 'y', 'z'] as const).map((ax, i) => (
+          <TextField
+            key={`p${ax}`} size="small" label={ax} type="number"
+            value={store.transform.positionMm[i]}
+            onChange={e => {
+              const positionMm = [...store.transform.positionMm] as [number, number, number];
+              positionMm[i] = Number(e.target.value) || 0;
+              store.setTransform({ ...store.transform, positionMm });
+            }}
+            sx={{ width: 84 }} inputProps={{ step: 0.5 }}
+          />
+        ))}
+        <Typography variant="caption" color="text.secondary">rot (°, extrinsic ZXY)</Typography>
+        {(['x', 'y', 'z'] as const).map((ax, i) => (
+          <TextField
+            key={`r${ax}`} size="small" label={ax} type="number"
+            value={store.transform.rotationDeg[i]}
+            onChange={e => {
+              const rotationDeg = [...store.transform.rotationDeg] as [number, number, number];
+              rotationDeg[i] = Number(e.target.value) || 0;
+              store.setTransform({ ...store.transform, rotationDeg });
+            }}
+            sx={{ width: 84 }} inputProps={{ step: 5 }}
+          />
+        ))}
+        <Button
+          size="small" sx={{ py: 0, minWidth: 0 }}
+          disabled={
+            store.transform.positionMm.every(v => Math.abs(v) < 1e-6) &&
+            store.transform.rotationDeg.every(v => Math.abs(v) < 1e-6)
+          }
+          onClick={() =>
+            store.setTransform({ positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] })
+          }
+        >
+          reset placement
+        </Button>
         <Tooltip title="paraxial EFL of the draft's optics tab (2×2 ABCD walk) — '—' for a reflective stack, where it is undefined">
-          <span>EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}</span>
+          <Typography variant="caption" color="text.secondary">
+            EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}
+          </Typography>
         </Tooltip>
-      </Typography>
+      </Stack>
+
+      {/* WP-137: the FILE→cube correction — for a wrongly exported mesh.
+          Writes the template's mesh-pose, so EVERY view draws the corrected
+          file; the free gizmo rotation stays view-only and refused at save. */}
+      {store.meshFile && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          <Tooltip title="wrong export frame? Rotate the FILE into the cube frame in 90° steps — recorded on the template as mesh-pose. The cube must end pins-up (z); orient the OPTIC with the insert pose, not with these.">
+            <Typography variant="caption" color="text.secondary">
+              mesh · file → cube correction
+            </Typography>
+          </Tooltip>
+          {(['x', 'y', 'z'] as const).map(ax => (
+            <Button
+              key={ax} size="small" variant="outlined" sx={{ minWidth: 44 }}
+              onClick={() => store.rotateMeshGrid(ax)}
+            >
+              {ax} ↻90°
+            </Button>
+          ))}
+          <Chip
+            size="small" variant="outlined"
+            label={
+              store.meshPoseGrid
+                ? `file +z → ${axisText(store.meshPoseGrid[0], 'cube')} · +x → ${axisText(store.meshPoseGrid[1], 'cube')}`
+                : store.meshFrameDetected === 'record'
+                  ? 'detected: y-up export (record frame)'
+                  : 'no correction — file taken as cube frame'
+            }
+          />
+          {store.meshPoseGrid && (
+            <Button size="small" sx={{ py: 0, minWidth: 0 }} onClick={() => store.resetMeshPose()}>
+              reset correction
+            </Button>
+          )}
+        </Stack>
+      )}
 
       {/* ── insert pose (WP-116): where the record frame sits in the cube ── */}
       {show.poseTools && store.insertPose && (
@@ -833,11 +900,17 @@ export function MechanicsPanel({
       </Divider>
       <Stack spacing={1}>
         {store.datums.map(datum => {
-          const snap = snapToAxis(datum.direction);
+          // WP-138: rows speak the WORLD (cube) frame — "right now I don't
+          // know if it's referenced to the imported part's origin". The
+          // stored datum stays part-frame (it moves with the mesh); the
+          // conversion runs both ways through the live mesh transform.
+          const world = datumToCube(datum, store.transform);
+          const snap = snapToAxis(world.direction);
           const setAxis = (i: 0 | 1 | 2) => (v: number | null) => {
-            const next = [...datum.pointMm] as Vec3;
-            next[i] = v ?? 0;
-            store.updateDatum(datum.id, { pointMm: next });
+            const point = [...world.pointMm] as Vec3;
+            point[i] = v ?? 0;
+            const back = cubeToDatum(point, world.direction, store.transform);
+            store.updateDatum(datum.id, { pointMm: back.pointMm });
           };
           const isPlaced = Boolean(datum.quaternion);
           const isSelected = isPlaced && store.selectedOpticId === datum.id;
@@ -878,8 +951,9 @@ export function MechanicsPanel({
               <Stack direction="row" spacing={0.5} alignItems="center">
                 {(['x', 'y', 'z'] as const).map((axis, i) => (
                   <DecimalField
-                    key={axis} size="small" variant="standard" label={axis}
-                    value={datum.pointMm[i]}
+                    key={axis} size="small" variant="standard"
+                    label={`${axis} (cube)`}
+                    value={Math.round(world.pointMm[i] * 1e3) / 1e3 || 0}
                     onValue={setAxis(i as 0 | 1 | 2)}
                     slotProps={{ htmlInput: { style: { width: 56, fontSize: 12 } } }}
                   />
@@ -894,7 +968,12 @@ export function MechanicsPanel({
                     disabled={isPlaced}
                     onChange={e => {
                       const axis = DIRECTION_AXES.find(a => a.value === e.target.value);
-                      if (axis) store.updateDatum(datum.id, { direction: axis.vec });
+                      // The picker speaks cube axes; store the part-frame
+                      // equivalent so the datum keeps riding the mesh.
+                      if (axis) {
+                        const back = cubeToDatum(world.pointMm, axis.vec, store.transform);
+                        store.updateDatum(datum.id, { direction: back.direction });
+                      }
                     }}
                     sx={{ width: 60 }}
                   >

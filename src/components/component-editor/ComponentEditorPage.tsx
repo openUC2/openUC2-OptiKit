@@ -354,6 +354,18 @@ export function ComponentEditorPage({
       if (tpl.provenance === 'whole-module') {
         useBindStore.setState({ wholeModule: true, housingOnly: false });
       }
+      // WP-137: the FILE→cube correction comes back with the pose — without
+      // this a re-opened binding rendered the raw file and the correction
+      // silently dropped off the next save.
+      const meshPose = (tpl as Record<string, unknown>)['mesh-pose'] as
+        | { rotation?: { grid?: { z?: string; x?: string } } }
+        | undefined;
+      const grid = meshPose?.rotation?.grid;
+      if (grid?.z || grid?.x) {
+        useBindStore.setState({
+          meshPoseGrid: [grid.z ?? '+z', grid.x ?? '+x'],
+        });
+      }
       // Freeze only what verify-t1 CERTIFIES (the round-16 answer) — a
       // failing or unverifiable pair stays editable.
       if (moduleEntry?.id) {

@@ -144,6 +144,7 @@ function PartMesh() {
   const setTransform = useBindStore(s => s.setTransform);
   const addDatum = useBindStore(s => s.addDatum);
   const meshFrameDetected = useBindStore(s => s.meshFrameDetected);
+  const meshPoseGrid = useBindStore(s => s.meshPoseGrid);
   const groupRef = useRef<THREE.Group>(null);
   const [scene, setScene] = useState<THREE.Group | null>(null);
   // WP-114: where the pointer went down, so an ORBIT DRAG that happens to end
@@ -216,8 +217,8 @@ function PartMesh() {
   // WP-135: the SAME content-basis rule as the assembly (meshContentQuat):
   // 'cube' → B, 'record' → identity. The detector already ran at load.
   const contentQuat = useMemo(
-    () => meshContentQuat(meshFrameDetected ?? '', scene?.children ?? []),
-    [meshFrameDetected, scene],
+    () => meshContentQuat(meshFrameDetected ?? '', scene?.children ?? [], meshPoseGrid),
+    [meshFrameDetected, scene, meshPoseGrid],
   );
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {

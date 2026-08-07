@@ -34,6 +34,7 @@ import type { ComponentRecord } from './generated/library-component';
 import {
   docCategoryOfRecord,
   recordPortsToSource,
+  meshPoseGridOf,
   rectApertureOf,
   type LibraryPaletteEntry,
 } from '../../document/libraryPalette';
@@ -236,6 +237,7 @@ export function registerBundleLibrary(
         thumbnailUrl: null,
         glbUrl: template?.glbUrl ?? null,
         meshFrame: String(tplRecord['mesh-frame'] ?? ''),
+        meshPoseGrid: meshPoseGridOf(tplRecord),
         portsFrame:
           tplRecord['insert-pose'] && tplRecord.optical_ports ? 'mounted' : 'record',
         mirrorRectMm: rectApertureOf(

@@ -110,6 +110,9 @@ export interface LibraryPaletteEntry {
    * needs the doc→viewer basis at render) or 'record' (pre-rotated wrapper
    * exports, already y-up). '' = undeclared legacy (renderer detects). */
   meshFrame: string;
+  /** WP-137: the FILE→cube correction grid [z, x] — the total map, wins over
+   * meshFrame. null = no correction declared. */
+  meshPoseGrid: [string, string] | null;
   /** WP-124: which frame `ports` speaks. 'mounted' = cube frame F3 (already
    * in-plane — placement may only YAW, pins stay +z); 'record' = component
    * F2 (placement tips the optics into the document plane, WP-29). */
@@ -204,6 +207,18 @@ const AXIS_VEC: Record<string, THREE.Vector3> = {
 };
 
 const INPUT_PORT_NAMES = /^(front|sensor|in|plane)$/;
+
+/** WP-137: the mesh-pose grid [z, x] out of a raw template record. */
+export function meshPoseGridOf(
+  template: Record<string, unknown> | undefined,
+): [string, string] | null {
+  const pose = template?.['mesh-pose'] as
+    | { rotation?: { grid?: { z?: string; x?: string } } }
+    | undefined;
+  const grid = pose?.rotation?.grid;
+  if (!grid?.z && !grid?.x) return null;
+  return [grid.z ?? '+z', grid.x ?? '+x'];
+}
 
 /** WP-125: the reflective surface's rectangular clear aperture, [w, h] mm —
  * from raw Optiland-spelling surfaces (fragment_surfaces / record fragment).
@@ -467,6 +482,7 @@ function entryFromIndexModule(
     thumbnailUrl: abs(mod.assets?.thumbnail),
     glbUrl: abs(mod.assets?.glb),
     meshFrame: mod.assets?.mesh_frame ?? '',
+    meshPoseGrid: mod.assets?.mesh_pose_grid ?? null,
     portsFrame: mod.ports_frame ?? 'record',
     mirrorRectMm: mod.component?.mirror_rect_mm ?? null,
     ports: indexPortsToSource(mod.ports),
@@ -601,6 +617,7 @@ export function entriesFromWorkspace(
     thumbnailUrl: thumbnails[record.id] ?? null,
     glbUrl: (binding && meshUrls[record.id]) || null,
     meshFrame: String(template?.['mesh-frame'] ?? ''),
+    meshPoseGrid: meshPoseGridOf(template),
     portsFrame: (mountedPorts ? 'mounted' : 'record') as 'mounted' | 'record',
     mirrorRectMm: rectApertureOf(
       (record as { optics?: { fragment?: { surfaces?: Record<string, unknown>[] } } })
@@ -703,7 +720,8 @@ export function entriesFromComponents(
       // WP-67: the housing mesh TRAVELS with the unbound part (this used to
       // hardcode null — a housed device rendered as a ghost).
       glbUrl: abs(housing?.assets.glb),
-      meshFrame: '',
+      meshFrame: housing?.assets.mesh_frame ?? '',
+      meshPoseGrid: housing?.assets.mesh_pose_grid ?? null,
       portsFrame: 'record',
       mirrorRectMm: rectApertureOf(component.fragment_surfaces),
       ports: indexPortsToSource(component.ports),
@@ -822,6 +840,7 @@ function toModuleDefinition(entry: LibraryPaletteEntry): ModuleDefinition {
     description: entry.description,
     glbUrl: entry.glbUrl ?? undefined,
     meshFrame: entry.meshFrame,
+    meshPoseGrid: entry.meshPoseGrid,
     docCategory: entry.category,
   };
 }

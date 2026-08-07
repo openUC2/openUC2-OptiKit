@@ -58,10 +58,43 @@ export function hasWrapperRotation(nodes: readonly MeshNodeLike[]): boolean {
   return nodes.some(node => walk(node, new THREE.Quaternion(), 0));
 }
 
+/** The y-up glTF convention as a FILE→cube grid map — `mesh-frame: record`
+ * is sugar for exactly this (file y = cube z, file z = cube −y). Exported so
+ * the bind store can seed a correction from a detected wrapper file. */
+export const RECORD_GRID: [string, string] = ['-y', '+x'];
+
+const AXIS_VECS: Record<string, THREE.Vector3> = {
+  '+x': new THREE.Vector3(1, 0, 0), '-x': new THREE.Vector3(-1, 0, 0),
+  '+y': new THREE.Vector3(0, 1, 0), '-y': new THREE.Vector3(0, -1, 0),
+  '+z': new THREE.Vector3(0, 0, 1), '-z': new THREE.Vector3(0, 0, -1),
+};
+
+/** FILE→cube rotation for a grid spelling ({z, x} = where the file's +z and
+ * +x land in cube axes) — the same construction as rot24Matrix, kept local so
+ * this module stays importable without the document store. */
+export function meshPoseQuat(grid: readonly [string, string]): THREE.Quaternion {
+  const zv = AXIS_VECS[grid[0]];
+  const xv = AXIS_VECS[grid[1]];
+  if (!zv || !xv) return IDENTITY_QUAT;
+  const yv = new THREE.Vector3().crossVectors(zv, xv);
+  const m = new THREE.Matrix4().makeBasis(xv, yv, zv);
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+/**
+ * WP-137: `meshPoseGrid` is the declared TOTAL file→cube map and wins over
+ * everything — the sugar and the sniff exist only for files with no
+ * declaration. The content transform is B · R(grid): un-rotate the file into
+ * cube axes, then apply the one display basis.
+ */
 export function meshContentQuat(
   meshFrame: string,
   children: readonly MeshNodeLike[],
+  meshPoseGrid?: readonly [string, string] | null,
 ): THREE.Quaternion {
+  if (meshPoseGrid) {
+    return DOC_TO_THREE_QUAT.clone().multiply(meshPoseQuat(meshPoseGrid));
+  }
   if (meshFrame === 'record') return IDENTITY_QUAT;
   if (meshFrame === 'cube') return DOC_TO_THREE_QUAT;
   return hasWrapperRotation(children) ? IDENTITY_QUAT : DOC_TO_THREE_QUAT;

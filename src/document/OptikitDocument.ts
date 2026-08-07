@@ -415,10 +415,19 @@ export function movePartGrid(partId: string, cell: Vec3): void {
 export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boolean }): void {
   const part = findDsnPart(partId);
   if (!part) return;
+  // WP-136: a T1 cube is BOUND to the grid — its only legal yaws are the
+  // four 90° states, exactly like its offsets are pinned to the cell
+  // (constrainOffsetToTemplate). This is the one choke point every yaw
+  // road passes through (property panel, yaw ring), so quantizing here
+  // makes "I rotated a fixed cube to 55°" structurally impossible instead
+  // of a per-widget rule.
+  const lib = libraryEntryOf(part.libraryRef);
+  const t1Cube = lib?.templateClass === 'fixed' && lib.mount === 'cube';
+  const snap = t1Cube || (opts?.snap ?? false);
   // Yaw replaces ONLY the yaw component of the discrete orientation; any
   // tilt/roll stays put, and the sub-90° remainder becomes the offset-deg
   // residual. `applyYawToRot24` is the exact inverse of `partYawDeg`.
-  const { rot24, residualDeg } = applyYawToRot24(part.rot24, yawDeg, opts?.snap ?? false);
+  const { rot24, residualDeg } = applyYawToRot24(part.rot24, yawDeg, snap);
   autoPush();
   useDocumentStore.getState().updatePart(partId, {
     rot24,
@@ -636,12 +645,19 @@ export interface PartRenderInfo {
   glbOffset?: [number, number, number];
   /** WP-123: which frame the GLB content speaks ('cube' | 'record' | ''). */
   meshFrame?: string;
+  /** WP-137: the FILE→cube correction grid [z, x] (wins over meshFrame). */
+  meshPoseGrid?: [string, string] | null;
 }
 
 /** Presentation assets for a library ref (GLB model), for the assembly view. */
 export function renderInfoOf(libraryRef: string): PartRenderInfo {
   const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
-  return { glbUrl: def?.glbUrl, glbOffset: def?.glbOffset, meshFrame: def?.meshFrame };
+  return {
+    glbUrl: def?.glbUrl,
+    glbOffset: def?.glbOffset,
+    meshFrame: def?.meshFrame,
+    meshPoseGrid: def?.meshPoseGrid ?? null,
+  };
 }
 
 // ── React subscriptions ───────────────────────────────────────────────────────

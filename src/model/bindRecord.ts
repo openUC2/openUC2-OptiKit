@@ -326,6 +326,9 @@ export interface BindInput {
    * detected at load — declared on the template so `library validate`'s
    * axes check stops guessing between the two shipping conventions. */
   meshFrame?: 'cube' | 'record' | null;
+  /** WP-137: the user's FILE→cube correction (total grid map), when the file
+   * was exported in the wrong frame. Ships as the template's `mesh-pose`. */
+  meshPoseGrid?: [string, string] | null;
   /**
    * WP-116: the F2→F3 pose. When present, the template's frames are
    * insert-pose ∘ recordFrames and the datums are ignored — the pose IS the
@@ -574,6 +577,18 @@ export function bindToRecords(input: BindInput): BoundRecords {
     ...(isStep ? { step: input.meshFile } : {}),
     glb: input.meshFile.replace(/\.(step|stp)$/i, '.glb'),
     ...(input.meshFrame ? { 'mesh-frame': input.meshFrame } : {}),
+    // WP-137: the correction is the TOTAL file→cube map and wins over the
+    // sugar above — emitted only when it says something the sugar does not.
+    ...(input.meshPoseGrid
+      ? {
+          'mesh-pose': {
+            rotation: {
+              type: 'grid',
+              grid: { z: input.meshPoseGrid[0], x: input.meshPoseGrid[1] },
+            },
+          },
+        }
+      : {}),
     optical_ports: Object.fromEntries(
       Object.entries(ports).map(([name, port]) => [name, port]),
     ),
@@ -586,9 +601,11 @@ export function bindToRecords(input: BindInput): BoundRecords {
   const t = input.meshTransform;
   if (t.rotationDeg.some(v => Math.abs(v) > 1e-6)) {
     errors.push(
-      'the mesh is rotated in the viewport — that rotation is recorded nowhere. ' +
-        'The cube frame is the reference: leave the mesh as exported and rotate ' +
-        'the insert pose instead (or re-export the file in the cube frame).',
+      'the mesh is rotated freely in the viewport — that rotation is recorded ' +
+        'nowhere. Was the file exported in the wrong frame? Use the mesh ' +
+        '"rotate 90°" buttons instead: they write the correction onto the ' +
+        'template (mesh-pose), so every view draws the corrected file. The ' +
+        'OPTIC is oriented by the insert pose, never by turning the mesh.',
     );
   }
   if (t.positionMm.some(v => Math.abs(v) > 1e-6)) {

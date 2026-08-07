@@ -344,10 +344,10 @@ function PartProperties({ part }: { part: DocPart }) {
           disabled={isT1}
         />
         <NumberField
-          label="Yaw z°"
+          label={isT1 ? 'Yaw z° (90° steps)' : 'Yaw z°'}
           value={part.worldPose.yawDeg}
           onCommit={v => withUndoStep(() => rotatePart(part.id, v))}
-          step={5}
+          step={isT1 ? 90 : 5}
         />
       </Stack>
 

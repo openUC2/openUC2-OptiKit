@@ -99,6 +99,7 @@ function GLBModel({
   url,
   offset,
   meshFrame = '',
+  meshPoseGrid = null,
   dimmed = false,
 }: {
   url: string;
@@ -106,13 +107,15 @@ function GLBModel({
   /** WP-123: 'cube' (F3, needs the basis), 'record' (pre-rotated y-up,
    * render as-is), '' = undeclared legacy — detect a wrapper node. */
   meshFrame?: string;
+  /** WP-137: the declared FILE→cube correction — wins over everything. */
+  meshPoseGrid?: readonly [string, string] | null;
   /** WP-65: render the mesh nearly transparent (dimmed layer). */
   dimmed?: boolean;
 }) {
   const { scene } = useGLTF(url);
   const contentQuat = useMemo(
-    () => meshContentQuat(meshFrame, scene.children),
-    [scene, meshFrame],
+    () => meshContentQuat(meshFrame, scene.children, meshPoseGrid),
+    [scene, meshFrame, meshPoseGrid],
   );
   const cloned = useMemo(() => {
     const c = skeletonClone(scene) as THREE.Group;
@@ -437,6 +440,7 @@ function AssemblyPart({
                 url={render.glbUrl}
                 offset={render.glbOffset}
                 meshFrame={render.meshFrame}
+                meshPoseGrid={render.meshPoseGrid}
                 dimmed={dimmed}
               />
             </Suspense>

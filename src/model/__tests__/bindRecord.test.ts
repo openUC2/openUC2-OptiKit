@@ -220,6 +220,21 @@ describe('legacy datum road (housing / expert tab)', () => {
   });
 });
 
+describe('mesh-pose emission (WP-137)', () => {
+  it('a declared correction ships on the template as a grid rotation', () => {
+    const bound = bindToRecords(mirrorInput({ meshPoseGrid: ['+y', '+x'] }));
+    expect(bound.template['mesh-pose']).toEqual({
+      rotation: { type: 'grid', grid: { z: '+y', x: '+x' } },
+    });
+  });
+
+  it('no correction, no field — the sugar alone carries the common cases', () => {
+    const bound = bindToRecords(mirrorInput({ meshFrame: 'record' }));
+    expect(bound.template['mesh-pose']).toBeUndefined();
+    expect(bound.template['mesh-frame']).toBe('record');
+  });
+});
+
 describe('the envelope is a CUBE-frame field (WP-135)', () => {
   it('a record-frame mesh gets its measured box un-rotated before writing', () => {
     // The viewport measures file axes; a converted STP is y-up, so its 55 mm

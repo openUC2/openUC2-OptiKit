@@ -164,6 +164,8 @@ export interface IndexModule {
     symbol?: string | null;
     /** WP-123: 'cube' | 'record' | '' — which frame the GLB content speaks. */
     mesh_frame?: string;
+    /** WP-137: the FILE→cube correction grid [z, x] (wins over mesh_frame). */
+    mesh_pose_grid?: [string, string] | null;
   };
   ports?: IndexPort[];
   /** WP-124: which frame `ports` speaks — 'mounted' (cube frame F3, already
@@ -184,7 +186,14 @@ export interface IndexHousing {
   review: boolean;
   component: { ref: string | null; resolved: string | null; id: string | null };
   dof: IndexDof[];
-  assets: { thumbnail: string | null; glb: string | null; step: string | null };
+  assets: {
+    thumbnail: string | null;
+    glb: string | null;
+    step: string | null;
+    /** WP-137: housings carry the frame fields too (they used to be dropped). */
+    mesh_frame?: string;
+    mesh_pose_grid?: [string, string] | null;
+  };
 }
 
 export interface LibraryIndex {
