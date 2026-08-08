@@ -23,6 +23,7 @@ export {
   repointPartLibraryRef,
   renderInfoOf,
   rotatePart,
+  stepPartRot24,
   selectPart,
   setDofValue,
   setPartOrientation,

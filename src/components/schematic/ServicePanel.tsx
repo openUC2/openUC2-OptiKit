@@ -182,7 +182,14 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
           <Stack direction="row" alignItems="center">
             <Switch size="small" checked={store.live} onChange={e => store.setLive(e.target.checked)} />
             <Typography variant="caption">live</Typography>
-          </Stack>
+        {Object.keys(store.simByPath).length > 0 && (
+          <Tooltip title="throw the traced rays away — greying them out was the only exit before, so a design with no valid trace kept ray geometry on screen (WP-141)">
+            <Button size="small" variant="text" onClick={() => store.clearSim()}>
+              clear rays
+            </Button>
+          </Tooltip>
+        )}
+</Stack>
         </Tooltip>
         <Button size="small" variant="outlined" startIcon={<OptimizeIcon />} onClick={() => setOptimizeOpen(true)}>
           optimize…

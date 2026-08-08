@@ -44,6 +44,8 @@ import {
 } from '../../model/actuation';
 import { sourceTint } from './colors';
 import {
+  stepPartRot24,
+  axisText,
   T_CLASS_LABEL,
   activeWavelengthUm,
   captureUndo,
@@ -325,31 +327,53 @@ function PartProperties({ part }: { part: DocPart }) {
       )}
 
       <Typography variant="caption" color="text.secondary">
-        Orientation (°) — fine tilts about the part's local axes (WP-28)
-        {isT1 && ' — locked by the T1 template'}
+        {isT1
+          ? 'Orientation — a T1 cube turns in 90° steps, about DOCUMENT axes (all 24)'
+          : "Orientation (°) — fine tilts about the part's local axes (WP-28)"}
       </Typography>
+      {/* WP-143: a T1 cube is bound to the grid but NOT to four yaws — it can
+          sit pins-sideways in a stack, so its legal set is all 24 grid
+          orientations. Residual tilts stay forbidden (they would break the
+          T-rule); these compose onto rot24 instead. */}
+      {isT1 ? (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          {(['x', 'y', 'z'] as const).map(axis => (
+            <Button
+              key={axis}
+              size="small"
+              variant="outlined"
+              sx={{ minWidth: 52 }}
+              onClick={() => withUndoStep(() => stepPartRot24(part.id, axis))}
+            >
+              {axis} ↻90°
+            </Button>
+          ))}
+          <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+            {axisText(part.gridPose.rot24.z, 'doc')} · x → {axisText(part.gridPose.rot24.x, 'doc')}
+          </Typography>
+        </Stack>
+      ) : (
       <Stack direction="row" spacing={1}>
         <NumberField
           label="Pitch x°"
           value={part.gridPose.offsetDeg.x}
           onCommit={v => withUndoStep(() => tiltPart(part.id, { x: v }))}
           step={0.5}
-          disabled={isT1}
         />
         <NumberField
           label="Roll y°"
           value={part.gridPose.offsetDeg.y}
           onCommit={v => withUndoStep(() => tiltPart(part.id, { y: v }))}
           step={0.5}
-          disabled={isT1}
         />
         <NumberField
-          label={isT1 ? 'Yaw z° (90° steps)' : 'Yaw z°'}
+          label="Yaw z°"
           value={part.worldPose.yawDeg}
           onCommit={v => withUndoStep(() => rotatePart(part.id, v))}
-          step={isT1 ? 90 : 5}
+          step={5}
         />
       </Stack>
+      )}
 
       {/* T1 with declared states (WP-34 amendment): a discrete configuration
           switcher (Inventor positional representations), not free pose. */}

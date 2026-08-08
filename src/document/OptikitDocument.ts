@@ -13,6 +13,7 @@
  */
 
 import { useMemo } from 'react';
+import * as THREE from 'three';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../stores/appStore';
 import { MODULE_SIMULATION_MODELS } from '../types';
@@ -28,6 +29,7 @@ import { useDocumentStore } from './documentStore';
 import type { DocumentSnapshot } from './documentStore';
 import { defaultRotationFor, groupEntryOf, libraryEntryOf, yawRotationFor } from './libraryPalette';
 import { useGroupEditStore } from './groupStore';
+import { decomposeRot24, rot24Matrix } from './rot24';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
 import { useFibersStore } from './fibersStore';
@@ -440,6 +442,33 @@ export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boole
  * y (roll) axes — the offset-deg components the yaw ring can't reach (WP-28).
  * Omitted axes keep their value.
  */
+/**
+ * WP-143: turn a part by 90° about a DOCUMENT axis, discretely.
+ *
+ * A T1 cube is bound to the grid but NOT to four yaws — a cube can be
+ * mounted pins-sideways in a stack, so its legal set is the full 24 grid
+ * orientations. `tiltPart` writes `offset-deg` residuals, which is the wrong
+ * mechanism for a discrete step (and is disabled for T1 precisely because a
+ * residual tilt would break the T-rule); this composes onto `rot24` instead
+ * and leaves the residual alone.
+ */
+export function stepPartRot24(partId: string, axis: 'x' | 'y' | 'z', turns = 1): void {
+  const part = findDsnPart(partId);
+  if (!part) return;
+  const step = new THREE.Matrix4().makeRotationFromEuler(
+    new THREE.Euler(
+      axis === 'x' ? (Math.PI / 2) * turns : 0,
+      axis === 'y' ? (Math.PI / 2) * turns : 0,
+      axis === 'z' ? (Math.PI / 2) * turns : 0,
+    ),
+  );
+  // Left-multiply: the step is about a DOCUMENT axis, like the yaw ring.
+  const next = step.multiply(rot24Matrix(part.rot24));
+  const { rot24 } = decomposeRot24(next);
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, { rot24 });
+}
+
 export function tiltPart(partId: string, tilt: { x?: number; y?: number }): void {
   const part = findDsnPart(partId);
   if (!part) return;
