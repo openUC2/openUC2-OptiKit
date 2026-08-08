@@ -22,6 +22,7 @@ export {
   renamePart,
   repointPartLibraryRef,
   renderInfoOf,
+  addStructureJoints,
   rotatePart,
   stepPartRot24,
   selectPart,

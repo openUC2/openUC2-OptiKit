@@ -434,7 +434,17 @@ function AssemblyPart({
           // palette-placed cube never showed its cube. Each fallback now says
           // which one it is — the shared "no template" label is what made this
           // bug take a full session to find.
-          <GLBErrorBoundary fallback={<GhostBox color={color} label="mesh failed" dimmed={dimmed} />}>
+          <GLBErrorBoundary
+            fallback={reason => (
+              <GhostBox
+                color={color}
+                // WP-146: say WHAT failed. The reason is usually a fetch
+                // status or a parse error, and either one names its own fix.
+                label={`mesh failed — ${reason.slice(0, 60)}`}
+                dimmed={dimmed}
+              />
+            )}
+          >
             <Suspense fallback={<GhostBox color={color} label="loading…" dimmed={dimmed} />}>
               <GLBModel
                 url={render.glbUrl}

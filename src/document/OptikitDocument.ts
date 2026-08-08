@@ -27,7 +27,14 @@ import {
 } from './mapping';
 import { useDocumentStore } from './documentStore';
 import type { DocumentSnapshot } from './documentStore';
-import { defaultRotationFor, groupEntryOf, libraryEntryOf, yawRotationFor } from './libraryPalette';
+import {
+  defaultRotationFor,
+  groupEntryOf,
+  interfaceKindOf,
+  libraryEntryOf,
+  listLibraryEntries,
+  yawRotationFor,
+} from './libraryPalette';
 import { useGroupEditStore } from './groupStore';
 import { decomposeRot24, rot24Matrix } from './rot24';
 import type { Rot24 } from './rot24';
@@ -303,6 +310,62 @@ export function addGroup(groupId: string, positionMm: Vec3): AddGroupResult | nu
   batchDepth--;
 
   return { instanceId, partIds, snappedToBay, bayOverflow };
+}
+
+/**
+ * WP-146: derive the layer joints a hand-placed design needs.
+ *
+ * Round 23: "I still cannot see the puzzle pieces anywhere". They exist —
+ * `openuc2.cube.puzzle_1x1` — but were placed ONLY by `addGroup`, from a
+ * group record's declared `joint_cells`. A design assembled cube by cube
+ * therefore never got any structure at all.
+ *
+ * The rule the real hardware imposes: a puzzle piece is 5 mm thick and lives
+ * in the interface gap, so every cube needs one ABOVE it, and the bottom
+ * layer needs one BELOW as well. Pieces tile in x/y into a plate, which is
+ * why one piece per occupied CELL is exactly right — no fitting problem, no
+ * choice to make. A joint at cell z sits above the cubes of layer z
+ * (`layers.ts` classifies it as layer z+1, `interface: true`).
+ */
+export function addStructureJoints(): { added: number; jointModuleId: string | null } {
+  const jointModuleId =
+    listLibraryEntries().find(e => interfaceKindOf(e.moduleId) === 'puzzle')?.moduleId ?? null;
+  if (!jointModuleId) return { added: 0, jointModuleId: null };
+
+  // Cells that hold a real cube — interface parts are structure, not cargo.
+  const cubes = listDsnParts().filter(part => {
+    const entry = libraryEntryOf(part.libraryRef);
+    return entry?.mount === 'cube' && interfaceKindOf(part.libraryRef) === null;
+  });
+  if (cubes.length === 0) return { added: 0, jointModuleId };
+
+  const taken = new Set(
+    listDsnParts()
+      .filter(p => interfaceKindOf(p.libraryRef) === 'puzzle')
+      .map(p => p.cell.join(',')),
+  );
+  const minLayer = Math.min(...cubes.map(c => c.cell[2]));
+  const wanted = new Set<string>();
+  for (const cube of cubes) {
+    const [x, y, z] = cube.cell;
+    wanted.add([x, y, z].join(','));          // the joint above this cube
+    if (z === minLayer) wanted.add([x, y, z - 1].join(',')); // …and under the stack
+  }
+
+  let added = 0;
+  batchDepth++;
+  for (const key of wanted) {
+    if (taken.has(key)) continue;
+    const [x, y, z] = key.split(',').map(Number);
+    const id = addPart(jointModuleId, [
+      x * UC2_GRID_MM[0],
+      y * UC2_GRID_MM[1],
+      z * UC2_GRID_MM[2],
+    ]);
+    if (id) added++;
+  }
+  batchDepth--;
+  return { added, jointModuleId };
 }
 
 /** Dissolve a group instance: members stay, the rigid-drag tag goes (WP-44). */

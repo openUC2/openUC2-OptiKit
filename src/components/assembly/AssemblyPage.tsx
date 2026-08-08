@@ -37,6 +37,7 @@ import * as THREE from 'three';
 // layout live in appStore until the .dsn document replaces it.
 import { useAppStore } from '../../stores/appStore';
 import {
+  addStructureJoints,
   MOUNT_LABEL,
   T_CLASS_LABEL,
   getPart,
@@ -369,6 +370,36 @@ export function AssemblyPage() {
                 >
                   BOM
                 </Button>
+                {/* WP-146: a hand-placed design never got structure — joints
+                    were only ever placed by a GROUP, from its declared
+                    joint_cells. One 5 mm puzzle piece per occupied cell,
+                    above every cube and under the bottom layer. */}
+                <Tooltip title="add the 5 mm puzzle joints this design needs: one above every cube, one under the bottom layer. They tile in x/y into a plate; existing pieces are left alone.">
+                  <Button
+                    size="small" variant="outlined"
+                    onClick={() => {
+                      const { added, jointModuleId } = addStructureJoints();
+                      useAppStore.getState().addNotification(
+                        jointModuleId === null
+                          ? {
+                              type: 'warning',
+                              title: 'No joint module',
+                              message: 'the library has no puzzle piece registered',
+                            }
+                          : {
+                              type: 'info',
+                              title: added > 0 ? 'Structure added' : 'Structure already complete',
+                              message:
+                                added > 0
+                                  ? `${added} puzzle joint${added === 1 ? '' : 's'} placed`
+                                  : 'every cube already has its joints',
+                            },
+                      );
+                    }}
+                  >
+                    add joints
+                  </Button>
+                </Tooltip>
               </Stack>
 
               {cubifyState && (
