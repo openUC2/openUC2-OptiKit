@@ -51,7 +51,6 @@ import {
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
-  cubeToDatum,
   datumToCube,
   IDENTITY_INSERT_POSE,
   asMountedDirection,
@@ -900,17 +899,17 @@ export function MechanicsPanel({
       </Divider>
       <Stack spacing={1}>
         {store.datums.map(datum => {
-          // WP-138: rows speak the WORLD (cube) frame — "right now I don't
-          // know if it's referenced to the imported part's origin". The
-          // stored datum stays part-frame (it moves with the mesh); the
-          // conversion runs both ways through the live mesh transform.
+          // WP-139 (reverting WP-138's world rows): datums are measured in
+          // the PART frame — the housing's own axes — so rotating the housing
+          // carries the beam with it, which is the point of a housed device.
+          // The fix round 22 actually needed was NAMING the frame, so the
+          // labels say "(part)" and the world value is shown alongside.
           const world = datumToCube(datum, store.transform);
-          const snap = snapToAxis(world.direction);
+          const snap = snapToAxis(datum.direction);
           const setAxis = (i: 0 | 1 | 2) => (v: number | null) => {
-            const point = [...world.pointMm] as Vec3;
-            point[i] = v ?? 0;
-            const back = cubeToDatum(point, world.direction, store.transform);
-            store.updateDatum(datum.id, { pointMm: back.pointMm });
+            const next = [...datum.pointMm] as Vec3;
+            next[i] = v ?? 0;
+            store.updateDatum(datum.id, { pointMm: next });
           };
           const isPlaced = Boolean(datum.quaternion);
           const isSelected = isPlaced && store.selectedOpticId === datum.id;
@@ -952,8 +951,8 @@ export function MechanicsPanel({
                 {(['x', 'y', 'z'] as const).map((axis, i) => (
                   <DecimalField
                     key={axis} size="small" variant="standard"
-                    label={`${axis} (cube)`}
-                    value={Math.round(world.pointMm[i] * 1e3) / 1e3 || 0}
+                    label={`${axis} (part)`}
+                    value={datum.pointMm[i]}
                     onValue={setAxis(i as 0 | 1 | 2)}
                     slotProps={{ htmlInput: { style: { width: 56, fontSize: 12 } } }}
                   />
@@ -968,12 +967,7 @@ export function MechanicsPanel({
                     disabled={isPlaced}
                     onChange={e => {
                       const axis = DIRECTION_AXES.find(a => a.value === e.target.value);
-                      // The picker speaks cube axes; store the part-frame
-                      // equivalent so the datum keeps riding the mesh.
-                      if (axis) {
-                        const back = cubeToDatum(world.pointMm, axis.vec, store.transform);
-                        store.updateDatum(datum.id, { direction: back.direction });
-                      }
+                      if (axis) store.updateDatum(datum.id, { direction: axis.vec });
                     }}
                     sx={{ width: 60 }}
                   >
@@ -981,6 +975,11 @@ export function MechanicsPanel({
                       <MenuItem key={a.value} value={a.value}>{a.value}</MenuItem>
                     ))}
                   </TextField>
+                </Tooltip>
+                <Tooltip title="the same point in WORLD (cube) axes — read-only; edit the part-frame fields, they ride the mesh">
+                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    ≙ [{world.pointMm.map(v => (Math.round(v * 10) / 10 || 0).toFixed(1)).join(', ')}] (cube)
+                  </Typography>
                 </Tooltip>
                 <DecimalField
                   size="small" variant="standard" label="⌀mm"
