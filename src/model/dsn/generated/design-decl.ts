@@ -23,6 +23,7 @@ export type X = string;
 export type X1 = number | string;
 export type Y = number | string;
 export type Z1 = number | string;
+export type Quaternion = number[];
 export type Anchor = string;
 export type X2 = number | string;
 export type Y1 = number | string;
@@ -180,6 +181,7 @@ export interface RotSpec {
   grid?: RotGridSpec;
   'offset-deg'?: ContinuousXYZ;
   'z-spherical'?: ZSpherical;
+  quaternion?: Quaternion;
   [k: string]: unknown;
 }
 /**
