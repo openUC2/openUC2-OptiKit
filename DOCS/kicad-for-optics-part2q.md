@@ -186,6 +186,51 @@ if stp is not possible we should probably find a way to convert it on the fly?
   parts/DOFs), stored in the design's `simulation:` block; `/v1/optimize`
   consumes it. Closer-to-optiland is the stated direction; WP-144 is the
   prerequisite.
+### Carried over from the roadmap (2026-08-09)
+
+`kicad-for-optics-roadmap.md` is the M0…M10 plan through the MVP. Everything
+it lists through **WP-92** has landed (WP-87 Optiland import, WP-89 the part
+inspector's optics, WP-90 per-category authoring, WP-91 palette list view +
+multispectral, WP-92 the bug sweep — each has code and tests in tree). These
+four never started, and are restated here so ONE document holds the open work.
+The roadmap keeps the milestone framing and the full prompts; this is the
+backlog.
+
+- **WP-88 · Sequential beam-path scripting** *(roadmap Phase 4)*. A small
+  Optiland/PyOpticL-style DSL that builds the circuit line by line and stays
+  two-way in sync with the canvas — the inverse authoring direction to chain
+  inference. Nothing in tree.
+- **WP-93 · The optimizer becomes a design tool** *(roadmap M9)*. Free-space
+  **pose variables** for unbound optics — `_free_dofs` varies only *declared*
+  DOFs today, so "break the optic loose and let the optimizer place it"
+  silently does nothing; plus per-variable constraints (bounds/fix/link), a
+  merit CHOICE instead of the hardcoded RMS spot, and the "change the
+  holder…" verb so an optimizer-moved part gets new mechanics in one undo
+  step. **Overlaps WP-151** (merit tables in optiland's formalism) — treat
+  them as one package when either is picked up, and note WP-144 part 2 is the
+  prerequisite for expressing folded systems in optiland's own terms.
+- **WP-94 · Virtual detectors** *(roadmap M9)*. Non-physical probes placed
+  anywhere in the beam (including inside a sample volume) returning an
+  irradiance map + homogeneity, power, D86. Consumes no cube, appears in no
+  BOM, never perturbs the trace. Feeds WP-93's merit — and it is what makes
+  the fluo-scope's stated acceptance criterion computable at all.
+- **WP-95 · The benchmark suite** *(roadmap M9, the MVP gate)*. Three
+  instruments as goldens + CI: the fluorescence scope (exists; gains the
+  optimization + probe acceptance), the **light sheet** (two independent arms
+  crossing at the aquarium — the geometry-complexity test) and the
+  **laser-scanning confocal** (galvo tilt deflecting at 2θ, pinhole gating the
+  return — the reference test). Note the audit's compiler finding #1: a
+  rotation DOF currently swings the beam by θ where the reflection law wants
+  2θ, so the confocal benchmark cannot pass until that is fixed.
+
+Post-MVP, unchanged and still in the roadmap (M10): WP-70 publish loop, WP-55
+GitHub docs sideload, WP-56 embedded viewer v2, WP-59 OSHWLab-for-optics,
+WP-72 accounts/storage ADR, WP-73 the UX overhaul. Plus the roadmap's own
+**WP-90 amendment** (multi-axis DOF authoring + a generic
+`openuc2.tpl.lens_holder_xyz` with independent dx/dy/dz — every T2 template
+in the library declares exactly one translation axis, though the placement
+machinery already handles N).
+
 - ⏳ **Audit carry-overs** (still open, unranked): rotatePart's mixed-frame
   yaw on TIPPED parts (upright cubes are safe since WP-124/136); compiler
   physics #1 (DOF θ→2θ), #2 (per-hop `cs` read as absolute), #4
