@@ -35,6 +35,9 @@ export interface IndexComponent {
   ports?: IndexPort[];
   /** WP-60: source emission lines in µm (empty for non-sources). */
   wavelengths_um?: number[];
+  /** WP-145: the source's 1/e² beam diameter, mm — optiland's entrance pupil
+   * and the canvas glow read this same number. */
+  beam_diameter_mm?: number | null;
   /** WP-60: authored schematic symbol URL path, when the record ships one. */
   symbol?: string | null;
   /** WP-60: the record's own optiland surface stack, verbatim — a placed
@@ -133,6 +136,8 @@ export interface IndexModule {
     efl_mm: number | null;
     /** WP-47: the source record's emission lines, µm (empty for non-sources). */
     wavelengths_um?: number[];
+    /** WP-145: the source's 1/e² beam diameter, mm. */
+    beam_diameter_mm?: number | null;
     /** WP-125: reflective rectangular clear aperture [w, h] mm (null = round). */
     mirror_rect_mm?: [number, number] | null;
     /** WP-47: pixel facts for slm/display parts. */

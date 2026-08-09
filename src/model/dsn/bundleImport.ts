@@ -252,6 +252,9 @@ export function registerBundleLibrary(
         wavelengthsUm:
           (component as { source?: { wavelengths_um?: number[] } } | null)?.source
             ?.wavelengths_um ?? [],
+        beamDiameterMm:
+          (component as { source?: { beam_diameter_mm?: number } } | null)?.source
+            ?.beam_diameter_mm ?? null,
         symbolUrl: null,
         programmable: null,
         vendorName:

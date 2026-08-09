@@ -127,6 +127,10 @@ export interface LibraryPaletteEntry {
   /** WP-47: the source record's emission lines in µm (empty for non-sources);
    * a placement picks one as its active wavelength. */
   wavelengthsUm: number[];
+  /** WP-145: the source's 1/e² beam diameter in mm — the ONE number the
+   * canvas glow and optiland's entrance pupil must both read. null for
+   * non-sources and for records that never declared it. */
+  beamDiameterMm: number | null;
   /** WP-48: authored schematic symbol URL, or null to derive the glyph. */
   symbolUrl: string | null;
   /** WP-47: pixel facts for slm/display parts (null for everything else). */
@@ -488,6 +492,7 @@ function entryFromIndexModule(
     ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
+    beamDiameterMm: mod.component?.beam_diameter_mm ?? null,
     symbolUrl: abs(mod.assets?.symbol),
     programmable: mod.component?.programmable
       ? {
@@ -630,6 +635,8 @@ export function entriesFromWorkspace(
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
       (record as { source?: { wavelengths_um?: number[] } }).source?.wavelengths_um ?? [],
+    beamDiameterMm:
+      (record as { source?: { beam_diameter_mm?: number } }).source?.beam_diameter_mm ?? null,
     // Workspace drafts have no served asset yet — they derive their glyph.
     symbolUrl: null,
     programmable: null,
@@ -727,6 +734,7 @@ export function entriesFromComponents(
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],
+    beamDiameterMm: component.beam_diameter_mm ?? null,
       symbolUrl: abs(component.symbol),
       programmable: null,
       vendorName: component.vendor?.name || null,
