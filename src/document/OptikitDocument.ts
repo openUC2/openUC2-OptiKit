@@ -35,7 +35,7 @@ import {
   listLibraryEntries,
   yawRotationFor,
 } from './libraryPalette';
-import { useGroupEditStore } from './groupStore';
+import { isGroupLocked, useGroupEditStore } from './groupStore';
 import { decomposeRot24, rot24Matrix } from './rot24';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
@@ -366,6 +366,30 @@ export function addStructureJoints(): { added: number; jointModuleId: string | n
   }
   batchDepth--;
   return { added, jointModuleId };
+}
+
+/**
+ * WP-150: delete a part — or the whole arrangement it belongs to.
+ *
+ * Round 24: "we cannot delete an entire group once it's in the editor".
+ * True: every delete road removed exactly the selected part, so a 20-member
+ * miniFRAME had to be dismantled one cube at a time. A grouped part deletes
+ * its whole instance, because half an arrangement is not a thing anyone
+ * asked for — UNLESS the group is unlocked for member editing, which is
+ * precisely the state that says "I am working on the members".
+ *
+ * Returns the ids removed, as ONE undo step.
+ */
+export function removePartOrGroup(partId: string): string[] {
+  const instanceId = groupInstanceOf(partId);
+  const rigid = instanceId !== null && isGroupLocked(instanceId);
+  const ids = rigid ? partsOfGroup(instanceId).map(p => p.id) : [partId];
+  const token = captureUndo();
+  batchDepth++;
+  for (const id of ids) removePart(id);
+  batchDepth--;
+  commitUndo(token);
+  return ids;
 }
 
 /** Dissolve a group instance: members stay, the rigid-drag tag goes (WP-44). */

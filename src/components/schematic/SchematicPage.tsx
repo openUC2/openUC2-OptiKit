@@ -55,6 +55,7 @@ import { PartLibrary } from '../PartLibrary';
 import { useAppStore } from '../../stores/appStore';
 import type { PartClipboard, PortRef, Vec3 } from '../../document';
 import {
+  removePartOrGroup,
   addFiber,
   addPart,
   copyPart,
@@ -67,7 +68,6 @@ import {
   listParts,
   parsePortRef,
   pastePart,
-  removePart,
   removePartUndoable,
   selectPart,
   setPath,
@@ -417,7 +417,8 @@ export function SchematicPage() {
           break;
         case 'Delete':
         case 'Backspace':
-          if (selectedId) removePart(selectedId);
+          // WP-150: a grouped part takes its whole arrangement with it.
+          if (selectedId) removePartOrGroup(selectedId);
           break;
         case 's':
           setSettings(s => ({ ...s, snapGrid: !s.snapGrid }));

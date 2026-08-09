@@ -32,7 +32,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { SwapHoriz as SwapIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, SwapHoriz as SwapIcon } from '@mui/icons-material';
 import { slugOf } from '../../model/librarySearch';
 // Notifications only — the design model itself flows through src/document
 // (the same exception PartLibrary uses).
@@ -41,6 +41,7 @@ import { GenerateHolderDialog } from '../assembly/GenerateHolderDialog';
 import { runUnbind } from './unbindAction';
 import type { DocPart, LibraryPaletteEntry, TemplateClass } from '../../document';
 import {
+  removePartOrGroup,
   T_CLASS_LABEL,
   buildDocBom,
   layerOf,
@@ -247,25 +248,53 @@ export function ModulesPanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
                   else rowRefs.current.delete(part.id);
                 }}
                 secondaryAction={
-                  <Tooltip
-                    title={locked
-                      ? 'unlock the group to edit members'
-                      : 'module actions: swap · take out of cube · put in a cube…'}
-                  >
-                    <span>
+                  <Stack direction="row" spacing={0}>
+                    <Tooltip
+                      title={locked
+                        ? 'unlock the group to edit members'
+                        : 'module actions: swap · take out of cube · put in a cube…'}
+                    >
+                      <span>
+                        <IconButton
+                          size="small"
+                          edge="end"
+                          disabled={locked}
+                          aria-label={`swap module of ${part.ref}`}
+                          onClick={e =>
+                            setMenu({ partId: part.id, anchor: e.currentTarget, showAll: false })
+                          }
+                        >
+                          <SwapIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    {/* WP-150: a part could be added from here but never
+                        removed — the only delete lived on the canvas, and a
+                        GROUP member could not be reached at all. Deleting a
+                        grouped part removes the WHOLE instance, because half
+                        an arrangement is not a thing the user asked for. */}
+                    <Tooltip
+                      title={group
+                        ? `delete the whole ${group.label} arrangement`
+                        : `delete ${part.ref}`}
+                    >
                       <IconButton
                         size="small"
                         edge="end"
-                        disabled={locked}
-                        aria-label={`swap module of ${part.ref}`}
-                        onClick={e =>
-                          setMenu({ partId: part.id, anchor: e.currentTarget, showAll: false })
-                        }
+                        aria-label={`delete ${part.ref}`}
+                        onClick={() => {
+                          const ids = removePartOrGroup(part.id);
+                          useAppStore.getState().addNotification({
+                            type: 'info',
+                            title: group ? 'Arrangement deleted' : 'Module deleted',
+                            message: `${ids.length} part${ids.length === 1 ? '' : 's'} removed — undo with ⌘Z`,
+                          });
+                        }}
                       >
-                        <SwapIcon fontSize="small" />
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
-                    </span>
-                  </Tooltip>
+                    </Tooltip>
+                  </Stack>
                 }
               >
                 <ListItemButton
