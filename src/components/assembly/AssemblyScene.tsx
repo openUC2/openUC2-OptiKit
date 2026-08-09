@@ -182,7 +182,8 @@ function GhostBox({
           fillOpacity={dimmed ? 0.3 : 1}
           anchorX="center"
           outlineWidth={dimmed ? 0 : 0.4}
-          outlineColor="#000000aa"
+          outlineColor="#000000"
+          outlineOpacity={0.67}
         >
           {label}
         </Text>
@@ -316,7 +317,8 @@ function InsertHandle({ part, dof }: { part: DocPart; dof: TranslationDof }) {
         />
       </mesh>
       <Billboard position={handlePos.clone().add(new THREE.Vector3(0, 14, 0))}>
-        <Text fontSize={5.5} color="#ffd24d" anchorX="center" outlineWidth={0.4} outlineColor="#000000aa">
+        <Text fontSize={5.5} color="#ffd24d" anchorX="center" outlineWidth={0.4} outlineColor="#000000"
+          outlineOpacity={0.67}>
           {`${dof.name} = ${value.toFixed(2)} ${dof.unit}`}
         </Text>
       </Billboard>

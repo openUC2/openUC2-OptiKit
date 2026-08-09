@@ -127,7 +127,8 @@ function DatumPin({ datum, transform }: { datum: BindDatum; transform: MeshTrans
         </mesh>
       )}
       <Billboard position={[p[0], p[1] + 6, p[2]]}>
-        <Text fontSize={4} color={color} anchorX="center" outlineWidth={0.3} outlineColor="#000000aa">
+        <Text fontSize={4} color={color} anchorX="center" outlineWidth={0.3} outlineColor="#000000"
+          outlineOpacity={0.67}>
           {`${datum.name} · ${axisText(snap.axis, 'cube')}`}
         </Text>
       </Billboard>
