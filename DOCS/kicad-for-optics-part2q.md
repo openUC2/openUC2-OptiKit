@@ -49,7 +49,7 @@ lines are regenerated examples. The divergences, each with our position:
    `UC2_GRID_MM` — good).
 
 Deliverable: a short DISCUSSION.md for Ethan with the table above, then the
-accept-and-normalize importer (quaternion → rot24 + offset-deg) behind tests.
+accept-and-normalize importer (quaternion → rot24 + offset-deg) behind tests. We should also merge all related discussions and open point that need to be clarfieid and discussed between our optikit implementation and the Go implementation from Ethan. I am quite happy with the current feature set of the non-Go implementation, hence what are the difference and how should Go change (if it's a wise thing) so that we are sharing one contract. 
 
 ### WP-141 · Authoritative-ray lifecycle
 
@@ -85,7 +85,17 @@ the wrong mechanism for discrete steps and currently disabled anyway).
 Unbound parts (no template) place entirely freely — verify nothing still
 clamps them. The WP-136 yaw quantization stays.
 
----
+-------------------------------
+
+## Status (updated 2026-08-09)
+
+**P0 is complete.** WP-140 (quaternion accept-and-normalize + `DOCS/GO-SYNC.md`
++ regenerated wire types), WP-141 (ray lifecycle), WP-142 (E_GEOMETRY message,
+diagnosed as a genuinely misaligned design), WP-143 (T1 reaches all 24).
+
+**P1 is complete except the second half of WP-144.** WP-145, WP-146, WP-147
+and WP-148 are landed; WP-144's basis transport is landed, its folded-surface
+rework is not — see the note under WP-144 below.
 
 ## P1 · structure & correctness
 
@@ -102,7 +112,18 @@ transport (u, v) through each fold, drop the unfold warnings. This also
 unblocks WP-151 (merit functions in optiland's own formalism) and fixes
 audit findings #2/#3 in one move. Big, golden-test risk — its own branch.
 
+**Part 1 landed (2026-08-09):** `_transport_basis` parallel-transports (u, v)
+across every fold, so the ray overlay is trustworthy again — the 90° roll the
+audit measured is gone, pinned by `tests/test_transverse_transport.py`.
+**Part 2 still open:** emitting folds as REFLECTIVE surfaces with real `cs`
+rotations instead of unfolding onto a straight axis. That rewrites the
+emission loop, the arc-length accumulation and the manifest→world mapping at
+once, so it keeps its branch. Feasibility confirmed: optiland 0.6.0's
+`CoordinateSystem` takes `rx/ry/rz` and `reference_cs`.
+
 ### WP-145 · One laser diameter
+
+**Landed.** `CompSpec.source` is typed, the index ships `beam_diameter_mm`, and the compiler's entrance pupil reads it (an explicit `simulation.aperture` still wins).
 
 The frontend beam render and the optiland trace disagree on the source
 diameter (schematic ~2 mm glow vs entrance pupil 10.000 mm). The record's
@@ -111,6 +132,8 @@ the same field.
 
 ### WP-146 · cubify synthesizes plates & joints
 
+**Landed** as `addStructureJoints` ("add joints" beside cubify) — one 5 mm piece per occupied cell, above every cube and under the bottom layer, idempotent. The puzzle GLB was never broken: it parses to 1044 meshes and serves 200. What was wrong is that five openuc2 exports are y-up and declared nothing; they now say `mesh-frame: record`, and "mesh failed" carries its reason.
+
 Answer to "I still cannot see the puzzle pieces anywhere": they exist as
 `openuc2.cube.puzzle_1x1` (palette search "puzzle") but are auto-placed ONLY
 by placing a cube GROUP that declares `joint_cells` (miniframe brightfield
@@ -118,8 +141,14 @@ places 9). A hand-placed design never gets structure — cubify should derive
 the sandwich plates and one joint per shared cube edge, as `addGroup`
 already does for groups. (Also: the "plates & joints" toggle persists — if it
 was ever switched off, everything structural is hidden; check it first.)
+Right now it says "mesh failed" when trying to display a manually placed puzzle 1x1. 
+The puzzle is a 5mm thick piece that sits on top of and below the cube. Multiple 
+puzzle pieces can be connected in x/y to form a large plate to mount multiple cubes in one
+layer and stack multiple cube in the z-direction 
 
 ### WP-147 · FRAME OPM: the inner cube as a carrier group
+
+**Landed.** The 3×3×2 group and the `miniframe` bay already existed; the FRAME body is now the carrier's placeholder mesh with a MEASURED envelope. Measuring it needed a core fix: the export uses `KHR_mesh_quantization`, so `glb_bounding_box` read it as 10 157 770 mm until it learned to dequantize.
 
 Files provided (`FRAME_reduced-compressed.glb`, `frame3d.html`). Build in
 optikit-core's library: a 3×3×2 `cube_group` for the FRAME inner cube with
@@ -131,11 +160,14 @@ the ids land.
 
 ### WP-148 · The insert turns inside a fixed cube — visibly
 
+**Landed.** The scene renders twice with complementary masks — halves in place, insert under the conjugated pose. On the STP: the viewport never renders one; the service already converts STP→glTF on import, so both roads are covered.
+
 Round-22/23 ask, twice: in the bind pose step, rotating the insert pose
 should rotate the INSERT SUBTREE of the GLB (every node not matching
-`CUBHLF`) while the cube halves stay pins-up. Today only the optics overlay
+`CUBHLF`) and also the stp if possible  while the cube halves stay pins-up. Today only the optics overlay
 previews the pose and the mesh sits still. Render split: halves at the shell
 transform, rest at shell ∘ insert-pose. Pure display — records unchanged.
+if stp is not possible we should probably find a way to convert it on the fly?
 
 ---
 
@@ -163,3 +195,44 @@ transform, rest at shell ∘ insert-pose. Pure display — records unchanged.
   wire; an explicit port `role:` replacing the six copies of
   `/^(front|sensor|in|plane)$/`; community-repo modules never enrich
   (mergeRepoIndexes drops `components`).
+
+
+
+WP-88 — Sequential beam-path scripting (Phase 4, with WP-78). A small Optiland/PyOpticL-style DSL that builds the circuit line by line and stays two-way in sync with the canvas — the inverse authoring direction to chain inference.
+
+### WP-88 — Script the beam path: a sequential authoring mode
+
+```
+PROMPT (repo: openUC2-OptiKit, thin core support)
+
+Optiland let you BUILD a system in code, sequentially — add a
+source, then a lens 40 mm downstream, then a mirror. Offer the same for the
+schematic: a text/script pane that authors the design programmatically, as
+an alternative to dragging.
+
+1. A small, safe DSL (NOT arbitrary JS): line-oriented commands mirroring the
+   Optiland vocabulary — `source 488nm`, `lens f=50 @ +40mm`,
+   `mirror 45deg @ +30mm turn=up`, `detector @ +50mm`. Each line places a
+   part relative to the previous element along the beam (the WP-88 constraint
+   is the {distance | x | y | z} + turn vocabulary PyOpticL uses), resolved to
+   grid cells + intra-cube residual by the same placement path drag uses.
+2. The script is a VIEW of the document, two-way: editing the script re-lays
+   the parts; dragging a part updates the script (round-trips through the
+   .dsn like everything else). A parse error is a marker, not a crash.
+3. It composes with the library: `place openuc2.cube.mirror_1x1 @ +30mm`
+   drops a real catalog cube; `lens f=50` synthesizes an unbound primitive
+   (WP-60) the way the palette lens does.
+4. Reference the OpticsChainer relationship in the docs: this is the INVERSE
+   authoring direction to chain inference — the user writes the sequence and
+   the geometry follows, where inference reads the geometry and proposes the
+   sequence. Same netlist model underneath.
+
+Acceptance: a five-line script (source, filter, dichroic, objective, camera)
+lays out the fluo-scope excitation arm; dragging the objective updates its
+`@ +Nmm` in the script; a syntax error shows a marker and the rest still
+lays out.
+```
+
+**For humans:** for people who think in code (and to paste a setup from a paper
+or an Optiland notebook), a little scripting language that builds the optical
+circuit line by line — and stays in sync when you drag things around.
