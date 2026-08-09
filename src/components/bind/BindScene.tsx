@@ -34,8 +34,14 @@ import { SwapVert as FlipIcon } from '@mui/icons-material';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { RefObject } from 'react';
 import type { Vec3 } from '../../document';
-import { DOC_AXIS_LABELS, axisText } from '../../document';
+// NOTE: two functions share this name. bindRecord's is a LEFT MULTIPLY
+// (QB·q, for F3-authored children); mapping's is the CONJUGATION
+// (B·R·B⁻¹, for a rotation that must act in doc/cube axes above a
+// content basis). WP-148 needs the conjugation — hence the alias.
+import { DOC_AXIS_LABELS, axisText, docQuatToThree as docRotToViewer } from '../../document';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { hasWrapperRotation, meshContentQuat } from '../assembly/meshFrame';
+import { insertPoseMatrix } from '../../model/bindRecord';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
 import {
   datumQuatToCubeQuat,
@@ -216,6 +222,19 @@ function PartMesh() {
 
   // WP-135: the SAME content-basis rule as the assembly (meshContentQuat):
   // 'cube' → B, 'record' → identity. The detector already ran at load.
+  // WP-148: only the cube road splits — a housing has no "halves" to hold
+  // still, and an identity pose would render two identical copies for
+  // nothing. The pose ITSELF is the trigger: no pose, no turning.
+  const insertPose = useBindStore(s => s.insertPose);
+  const wholeModule = useBindStore(s => s.wholeModule);
+  const insertQuatThree = useMemo(() => {
+    if (!insertPose) return new THREE.Quaternion();
+    const m = insertPoseMatrix(insertPose);
+    const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    return docRotToViewer([q.x, q.y, q.z, q.w]);
+  }, [insertPose]);
+  const splitInsert = Boolean(insertPose && wholeModule);
+
   const contentQuat = useMemo(
     () => meshContentQuat(meshFrameDetected ?? '', scene?.children ?? [], meshPoseGrid),
     [meshFrameDetected, scene, meshPoseGrid],
@@ -263,13 +282,51 @@ function PartMesh() {
     setTransform(threePoseToMeshTransform(g.position, g.quaternion));
   };
 
-  // Toggle the cube halves without reloading — the insert stays visible.
+  /**
+   * WP-148: the insert TURNS, the cube does not.
+   *
+   * Round 22 and 23 asked for this twice: rotating the insert pose should
+   * turn everything that is not a cube half, while the halves stay pins-up —
+   * because that is what the hardware does. Only the optics overlay
+   * previewed the pose before, so the mesh sat still and the user had to
+   * imagine the result.
+   *
+   * The split renders the SAME loaded scene twice with complementary
+   * visibility masks: the original carries the halves, a clone carries the
+   * insert and hangs under the pose rotation. (A node's `visible` hides its
+   * whole subtree, so the mask is decided per MESH by walking its ancestors
+   * for the `CUBHLF` name — the halves are not always leaves.)
+   */
+  const insertClone = useMemo(
+    () => (scene && splitInsert ? (skeletonClone(scene) as THREE.Object3D) : null),
+    [scene, splitInsert],
+  );
+
+  const belongsToHalf = (node: THREE.Object3D): boolean => {
+    for (let n: THREE.Object3D | null = node; n; n = n.parent) {
+      if (CUBE_HALF_RE.test(n.name)) return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
     if (!scene) return;
     scene.traverse(node => {
-      if (CUBE_HALF_RE.test(node.name)) node.visible = !hideCubeHalves;
+      const half = CUBE_HALF_RE.test(node.name);
+      if (half) node.visible = !hideCubeHalves;
+      // When the insert is drawn by the clone, this copy shows halves only.
+      else if (splitInsert && (node as THREE.Mesh).isMesh) {
+        node.visible = belongsToHalf(node) ? !hideCubeHalves : false;
+      }
     });
-  }, [scene, hideCubeHalves]);
+  }, [scene, hideCubeHalves, splitInsert]);
+
+  useEffect(() => {
+    if (!insertClone) return;
+    insertClone.traverse(node => {
+      if ((node as THREE.Mesh).isMesh) node.visible = !belongsToHalf(node);
+    });
+  }, [insertClone]);
 
   if (!scene || !showMesh) return null;
   // WP-33 bug fix: the gizmo must attach to OUR group via the explicit
@@ -300,6 +357,17 @@ function PartMesh() {
         <group quaternion={contentQuat}>
           <primitive object={scene} />
         </group>
+        {insertClone && (
+          // The pose is a rotation in CUBE axes, and the group below maps
+          // file→cube→viewer — so it enters CONJUGATED (B·R·B⁻¹), above the
+          // content basis. Composed: B·R·M, i.e. the insert turned by R in
+          // the cube frame. Pure display; the records never see it.
+          <group quaternion={insertQuatThree}>
+            <group quaternion={contentQuat}>
+              <primitive object={insertClone} />
+            </group>
+          </group>
+        )}
       </group>
       {mode !== 'datum' && mode !== 'optics' && mode !== 'pose' && (
         <TransformControls
