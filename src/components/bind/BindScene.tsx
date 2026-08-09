@@ -34,6 +34,14 @@ import { SwapVert as FlipIcon } from '@mui/icons-material';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { RefObject } from 'react';
 import type { Vec3 } from '../../document';
+// NOTE: two functions share this name. bindRecord's is a LEFT MULTIPLY
+// (QB·q, for F3-authored children); mapping's is the CONJUGATION
+// (B·R·B⁻¹, for a rotation that must act in doc/cube axes above a
+// content basis). WP-148 needs the conjugation — hence the alias.
+import { DOC_AXIS_LABELS, axisText, docQuatToThree as docRotToViewer } from '../../document';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { hasWrapperRotation, meshContentQuat } from '../assembly/meshFrame';
+import { insertPoseMatrix } from '../../model/bindRecord';
 import type { BindDatum, MeshTransform } from '../../model/bindRecord';
 import {
   datumQuatToCubeQuat,
@@ -56,10 +64,6 @@ const threeToDoc = (v: THREE.Vector3): Vec3 => [v.x, -v.z, v.y];
 
 /** WP-121: doc(x, y, z) = three(x, −z, y) as a quaternion — the rotation
  * that stands doc-z-up (cube-frame) mesh content upright in three's y-up. */
-const DOC_TO_THREE_QUAT = new THREE.Quaternion().setFromAxisAngle(
-  new THREE.Vector3(1, 0, 0),
-  -Math.PI / 2,
-);
 const docToThree = (v: Vec3): [number, number, number] => [v[0], v[2], -v[1]];
 
 const KIND_COLORS: Record<string, string> = {
@@ -123,8 +127,9 @@ function DatumPin({ datum, transform }: { datum: BindDatum; transform: MeshTrans
         </mesh>
       )}
       <Billboard position={[p[0], p[1] + 6, p[2]]}>
-        <Text fontSize={4} color={color} anchorX="center" outlineWidth={0.3} outlineColor="#000000aa">
-          {`${datum.name} (${snap.axis})`}
+        <Text fontSize={4} color={color} anchorX="center" outlineWidth={0.3} outlineColor="#000000"
+          outlineOpacity={0.67}>
+          {`${datum.name} · ${axisText(snap.axis, 'cube')}`}
         </Text>
       </Billboard>
     </group>
@@ -145,6 +150,8 @@ function PartMesh() {
   const hideCubeHalves = useBindStore(s => s.hideCubeHalves);
   const setTransform = useBindStore(s => s.setTransform);
   const addDatum = useBindStore(s => s.addDatum);
+  const meshFrameDetected = useBindStore(s => s.meshFrameDetected);
+  const meshPoseGrid = useBindStore(s => s.meshPoseGrid);
   const groupRef = useRef<THREE.Group>(null);
   const [scene, setScene] = useState<THREE.Group | null>(null);
   // WP-114: where the pointer went down, so an ORBIT DRAG that happens to end
@@ -188,15 +195,9 @@ function PartMesh() {
           // — older exports carry an Rx(±90°) wrapper node that pre-rotates
           // the cube-frame content. Detect it so the emitted template can
           // DECLARE its mesh-frame instead of leaving validate guessing.
-          let wrapper = false;
-          for (const child of gltf.scene.children) {
-            const e = new THREE.Euler().setFromQuaternion(child.quaternion, 'XYZ');
-            if (
-              Math.abs(Math.abs(THREE.MathUtils.radToDeg(e.x)) - 90) < 1 &&
-              Math.abs(THREE.MathUtils.radToDeg(e.y)) < 1 &&
-              Math.abs(THREE.MathUtils.radToDeg(e.z)) < 1
-            ) wrapper = true;
-          }
+          // WP-132: ONE rule, shared with the assembly — the wrapper node is
+          // often nested, and a depth-1 scan mis-declared seven shipped GLBs.
+          const wrapper = hasWrapperRotation(gltf.scene.children);
           useBindStore.setState({ meshFrameDetected: wrapper ? 'record' : 'cube' });
         }
       },
@@ -219,6 +220,26 @@ function PartMesh() {
     q.copy(qz).multiply(qx).multiply(qy);
     return q;
   }, [transform.rotationDeg]);
+
+  // WP-135: the SAME content-basis rule as the assembly (meshContentQuat):
+  // 'cube' → B, 'record' → identity. The detector already ran at load.
+  // WP-148: only the cube road splits — a housing has no "halves" to hold
+  // still, and an identity pose would render two identical copies for
+  // nothing. The pose ITSELF is the trigger: no pose, no turning.
+  const insertPose = useBindStore(s => s.insertPose);
+  const wholeModule = useBindStore(s => s.wholeModule);
+  const insertQuatThree = useMemo(() => {
+    if (!insertPose) return new THREE.Quaternion();
+    const m = insertPoseMatrix(insertPose);
+    const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    return docRotToViewer([q.x, q.y, q.z, q.w]);
+  }, [insertPose]);
+  const splitInsert = Boolean(insertPose && wholeModule);
+
+  const contentQuat = useMemo(
+    () => meshContentQuat(meshFrameDetected ?? '', scene?.children ?? [], meshPoseGrid),
+    [meshFrameDetected, scene, meshPoseGrid],
+  );
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     downAt.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
@@ -262,13 +283,51 @@ function PartMesh() {
     setTransform(threePoseToMeshTransform(g.position, g.quaternion));
   };
 
-  // Toggle the cube halves without reloading — the insert stays visible.
+  /**
+   * WP-148: the insert TURNS, the cube does not.
+   *
+   * Round 22 and 23 asked for this twice: rotating the insert pose should
+   * turn everything that is not a cube half, while the halves stay pins-up —
+   * because that is what the hardware does. Only the optics overlay
+   * previewed the pose before, so the mesh sat still and the user had to
+   * imagine the result.
+   *
+   * The split renders the SAME loaded scene twice with complementary
+   * visibility masks: the original carries the halves, a clone carries the
+   * insert and hangs under the pose rotation. (A node's `visible` hides its
+   * whole subtree, so the mask is decided per MESH by walking its ancestors
+   * for the `CUBHLF` name — the halves are not always leaves.)
+   */
+  const insertClone = useMemo(
+    () => (scene && splitInsert ? (skeletonClone(scene) as THREE.Object3D) : null),
+    [scene, splitInsert],
+  );
+
+  const belongsToHalf = (node: THREE.Object3D): boolean => {
+    for (let n: THREE.Object3D | null = node; n; n = n.parent) {
+      if (CUBE_HALF_RE.test(n.name)) return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
     if (!scene) return;
     scene.traverse(node => {
-      if (CUBE_HALF_RE.test(node.name)) node.visible = !hideCubeHalves;
+      const half = CUBE_HALF_RE.test(node.name);
+      if (half) node.visible = !hideCubeHalves;
+      // When the insert is drawn by the clone, this copy shows halves only.
+      else if (splitInsert && (node as THREE.Mesh).isMesh) {
+        node.visible = belongsToHalf(node) ? !hideCubeHalves : false;
+      }
     });
-  }, [scene, hideCubeHalves]);
+  }, [scene, hideCubeHalves, splitInsert]);
+
+  useEffect(() => {
+    if (!insertClone) return;
+    insertClone.traverse(node => {
+      if ((node as THREE.Mesh).isMesh) node.visible = !belongsToHalf(node);
+    });
+  }, [insertClone]);
 
   if (!scene || !showMesh) return null;
   // WP-33 bug fix: the gizmo must attach to OUR group via the explicit
@@ -287,16 +346,29 @@ function PartMesh() {
         onPointerDown={onPointerDown}
         onClick={onClick}
       >
-        {/* WP-121: the doc→three basis change (Rx(−90°): doc z-up → three
-            y-up), applied to the MESH CONTENT. A cube-frame export has its
-            pins along native z; rendered raw, three puts that axis
-            horizontal — the cube lay on its side at identity, everyone
-            rotated it −90° to compensate, and the WP-116 refusal then
-            punished exactly that. With the basis applied, an untouched
-            export stands pins-up, matching the ghost cell and gravity. */}
-        <group quaternion={DOC_TO_THREE_QUAT}>
+        {/* WP-121/135: the doc→three basis, applied to CUBE-frame content —
+            and ONLY to cube-frame content, by the same meshContentQuat rule
+            the assembly uses. This was an unconditional B: a converted STP
+            (the service emits y-up glTF with an Rx(−90°) wrapper) rendered
+            double-rotated HERE while the assembly, honouring mesh-frame:
+            record, drew it correctly — so the user posed the optic against
+            a mesh the assembly would never show ("there seems to be an
+            offset between the parts editor and the assembly view"). One
+            rule, one place, both views. */}
+        <group quaternion={contentQuat}>
           <primitive object={scene} />
         </group>
+        {insertClone && (
+          // The pose is a rotation in CUBE axes, and the group below maps
+          // file→cube→viewer — so it enters CONJUGATED (B·R·B⁻¹), above the
+          // content basis. Composed: B·R·M, i.e. the insert turned by R in
+          // the cube frame. Pure display; the records never see it.
+          <group quaternion={insertQuatThree}>
+            <group quaternion={contentQuat}>
+              <primitive object={insertClone} />
+            </group>
+          </group>
+        )}
       </group>
       {mode !== 'datum' && mode !== 'optics' && mode !== 'pose' && (
         <TransformControls
@@ -379,6 +451,11 @@ function PlacedOptic({
             surfaces={draft.surfaces}
             diameterMm={datum.areaDiameterMm}
             galvoTiltDeg={tiltDeg}
+            // WP-135: without the record's fold a gizmo-placed mirror drew a
+            // plate square to the beam — a retro-reflector, the one thing a
+            // fold mirror never is (the overlay learned this in WP-107; this
+            // call site was missed).
+            mountAngleDeg={draft.mirrorAngleDeg ?? 0}
           />
         )}
         {/* selection ring on the placement plane */}
@@ -496,7 +573,13 @@ function Viewport({ ortho, draft }: { ortho: OrthoView | null; draft?: RecordDra
       <SceneContent colors={colors} draft={draft} />
       {!ortho && (
         <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
-          <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
+          {/* WP-130: this viewport shows the CUBE frame (z = the pin axis),
+              so the triad must say z where three.js would say y. */}
+          <GizmoViewport
+            axisColors={['#e0533d', '#2c8fff', '#7cc142']}
+            labels={DOC_AXIS_LABELS}
+            labelColor="#ffffff"
+          />
         </GizmoHelper>
       )}
     </PreviewCanvas>

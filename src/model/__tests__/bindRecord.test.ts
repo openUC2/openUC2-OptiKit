@@ -100,6 +100,55 @@ describe('the insert pose (WP-116)', () => {
     expect(ports.reflected.direction).toBe('+z');
   });
 
+  it('warns when the mounted fold leaves the baseplate plane (WP-129)', () => {
+    // Round 19's published mirror: front lands on +x, but the reflected arm
+    // lands on the PIN axis — the beam would exit through the cube's floor.
+    // The GLB's plate is tilted about z (it folds x↔y), so the pose is
+    // rolled 90° about the entry axis.
+    const bound = bindToRecords(
+      mirrorInput({
+        // record front -z, reflected -x; pose +z→-x puts front on +x and the
+        // fold arm on -z.
+        insertPose: { rot24: { z: '-x', x: '+z' }, offsetDeg: [0, 0, 0], offsetMm: [0, 0, 0] },
+      }),
+    );
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.front.direction).toBe('+x');
+    expect(ports.reflected.direction).toBe('-z');
+    // WP-133: the axis names its frame — the viewport draws that direction
+    // pointing down and its triad used to call it "y".
+    expect(
+      bound.warnings.some(
+        w => w.includes('(cube)') && w.includes('pin axis') && w.includes('roll the insert pose'),
+      ),
+    ).toBe(true);
+    // It stays a warning — a periscope cube is a real part, and this string
+    // test cannot see whether the MESH can fold that way.
+    expect(bound.errors).toEqual([]);
+  });
+
+  it('warns for either sign — +z is the pin axis just as much as −z', () => {
+    const bound = bindToRecords(mirrorInput({ insertPose: POSE_Z_TO_X }));
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.reflected.direction).toBe('+z');
+    expect(bound.warnings.some(w => w.includes('pin axis'))).toBe(true);
+  });
+
+  it('says nothing for the pose that actually matches the mesh (+x ↔ −y)', () => {
+    // The GLB's plate normal is (−0.707, +0.707, 0): a beam into the +x face
+    // leaves along −y, in the baseplate plane. This is the pose round 20
+    // should have used, and it must draw no complaint at all.
+    const bound = bindToRecords(
+      mirrorInput({
+        insertPose: { rot24: { z: '-x', x: '+y' }, offsetDeg: [0, 0, 0], offsetMm: [0, 0, 0] },
+      }),
+    );
+    const ports = bound.template.optical_ports as Record<string, { direction: unknown }>;
+    expect(ports.front.direction).toBe('+x');
+    expect(ports.reflected.direction).toBe('-y');
+    expect(bound.warnings.some(w => w.includes('pin axis'))).toBe(false);
+  });
+
   it('never emits a component — the record ships verbatim from the caller', () => {
     expect(bindToRecords(mirrorInput()).component).toBeNull();
     expect(
@@ -168,6 +217,42 @@ describe('legacy datum road (housing / expert tab)', () => {
       mirrorInput({ insertPose: null, recordFrames: undefined, datums: [] }),
     );
     expect(bound.warnings.some(w => w.includes('vacuous'))).toBe(true);
+  });
+});
+
+describe('mesh-pose emission (WP-137)', () => {
+  it('a declared correction ships on the template as a grid rotation', () => {
+    const bound = bindToRecords(mirrorInput({ meshPoseGrid: ['+y', '+x'] }));
+    expect(bound.template['mesh-pose']).toEqual({
+      rotation: { type: 'grid', grid: { z: '+y', x: '+x' } },
+    });
+  });
+
+  it('no correction, no field — the sugar alone carries the common cases', () => {
+    const bound = bindToRecords(mirrorInput({ meshFrame: 'record' }));
+    expect(bound.template['mesh-pose']).toBeUndefined();
+    expect(bound.template['mesh-frame']).toBe('record');
+  });
+});
+
+describe('the envelope is a CUBE-frame field (WP-135)', () => {
+  it('a record-frame mesh gets its measured box un-rotated before writing', () => {
+    // The viewport measures file axes; a converted STP is y-up, so its 55 mm
+    // pin span sits on file y. Written verbatim, the template shipped an
+    // envelope its own mesh check must reject.
+    const bound = bindToRecords(
+      mirrorInput({ meshFrame: 'record', envelopeMm: [49.8, 53.8, 49.8] }),
+    );
+    const env = bound.template.envelope as Record<string, number>;
+    expect([env['x-mm'], env['y-mm'], env['z-mm']]).toEqual([49.8, 49.8, 53.8]);
+  });
+
+  it('a cube-frame mesh writes its box verbatim', () => {
+    const bound = bindToRecords(
+      mirrorInput({ meshFrame: 'cube', envelopeMm: [49.8, 49.8, 54.4] }),
+    );
+    const env = bound.template.envelope as Record<string, number>;
+    expect([env['x-mm'], env['y-mm'], env['z-mm']]).toEqual([49.8, 49.8, 54.4]);
   });
 });
 

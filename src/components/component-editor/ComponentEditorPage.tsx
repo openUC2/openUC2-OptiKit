@@ -55,6 +55,7 @@ import {
   type RecordDraft,
 } from '../../model/componentRecord';
 import { useWorkspaceLibrary } from '../../model/workspaceLibrary';
+import { boundRecordsFor } from '../bind/boundRecords';
 import { docCategoryOfRecord } from '../../document';
 import type { PartMount, TemplateClass } from '../../document';
 import { PartAnatomy } from '../inspector/PartAnatomy';
@@ -105,6 +106,7 @@ export function ComponentEditorPage({
     return defaultDraft('lens');
   });
   const saveRecord = useWorkspaceLibrary(s => s.save);
+  const saveBinding = useWorkspaceLibrary(s => s.saveBinding);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   // WP-38: where the open record came from (drives the editing-a-copy banner)
   // and whether its mesh could be resolved into the mechanics tab.
@@ -185,6 +187,19 @@ export function ComponentEditorPage({
   const saveToWorkspace = () => {
     if (!record) return;
     saveRecord(record);
+    // WP-127: a draft the user has bound keeps its mechanics. Without this
+    // the workspace stored the component alone and the part came back from
+    // the palette as a bare primitive — "the part remains unbound".
+    const bound = boundRecordsFor(draft, useBindStore.getState(), {
+      id: record.id,
+      version: record.version,
+    });
+    saveBinding(
+      record.id,
+      bound && bound.errors.length === 0 && bound.module
+        ? { template: bound.template, module: bound.module }
+        : null,
+    );
     setSavedFlash(record.id);
     setTimeout(() => setSavedFlash(null), 2500);
   };
@@ -338,6 +353,18 @@ export function ComponentEditorPage({
       }
       if (tpl.provenance === 'whole-module') {
         useBindStore.setState({ wholeModule: true, housingOnly: false });
+      }
+      // WP-137: the FILE→cube correction comes back with the pose — without
+      // this a re-opened binding rendered the raw file and the correction
+      // silently dropped off the next save.
+      const meshPose = (tpl as Record<string, unknown>)['mesh-pose'] as
+        | { rotation?: { grid?: { z?: string; x?: string } } }
+        | undefined;
+      const grid = meshPose?.rotation?.grid;
+      if (grid?.z || grid?.x) {
+        useBindStore.setState({
+          meshPoseGrid: [grid.z ?? '+z', grid.x ?? '+x'],
+        });
       }
       // Freeze only what verify-t1 CERTIFIES (the round-16 answer) — a
       // failing or unverifiable pair stays editable.

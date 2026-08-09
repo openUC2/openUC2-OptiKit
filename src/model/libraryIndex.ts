@@ -36,8 +36,10 @@ export interface IndexComponent {
   /** WP-60: source emission lines in µm (empty for non-sources). */
   wavelengths_um?: number[];
   /** Normalized source facts (both record dialects): full-angle divergence in
-   * degrees and 1/e² beam diameter in mm — 0 / null when undeclared. */
+   * degrees — 0 when undeclared. */
   divergence_deg?: number;
+  /** WP-145: the source's 1/e² beam diameter, mm — optiland's entrance pupil
+   * and the canvas glow read this same number. */
   beam_diameter_mm?: number | null;
   /** WP-60: authored schematic symbol URL path, when the record ships one. */
   symbol?: string | null;
@@ -138,9 +140,12 @@ export interface IndexModule {
     /** WP-47: the source record's emission lines, µm (empty for non-sources). */
     wavelengths_um?: number[];
     /** Normalized source facts (both record dialects): full-angle divergence
-     * in degrees and 1/e² beam diameter in mm — 0 / null when undeclared. */
+     * in degrees — 0 when undeclared. */
     divergence_deg?: number;
+    /** WP-145: the source's 1/e² beam diameter, mm. */
     beam_diameter_mm?: number | null;
+    /** WP-125: reflective rectangular clear aperture [w, h] mm (null = round). */
+    mirror_rect_mm?: [number, number] | null;
     /** WP-47: pixel facts for slm/display parts. */
     programmable?: {
       mode: 'reflective' | 'transmissive';
@@ -170,8 +175,13 @@ export interface IndexModule {
     symbol?: string | null;
     /** WP-123: 'cube' | 'record' | '' — which frame the GLB content speaks. */
     mesh_frame?: string;
+    /** WP-137: the FILE→cube correction grid [z, x] (wins over mesh_frame). */
+    mesh_pose_grid?: [string, string] | null;
   };
   ports?: IndexPort[];
+  /** WP-124: which frame `ports` speaks — 'mounted' (cube frame F3, already
+   * in-plane; placement may only yaw) or 'record' (component F2 fallback). */
+  ports_frame?: 'mounted' | 'record';
   electronics: unknown | null;
 }
 
@@ -187,7 +197,14 @@ export interface IndexHousing {
   review: boolean;
   component: { ref: string | null; resolved: string | null; id: string | null };
   dof: IndexDof[];
-  assets: { thumbnail: string | null; glb: string | null; step: string | null };
+  assets: {
+    thumbnail: string | null;
+    glb: string | null;
+    step: string | null;
+    /** WP-137: housings carry the frame fields too (they used to be dropped). */
+    mesh_frame?: string;
+    mesh_pose_grid?: [string, string] | null;
+  };
 }
 
 export interface LibraryIndex {
@@ -199,6 +216,25 @@ export interface LibraryIndex {
   groups?: IndexGroup[];
   /** WP-67: bare housings (absent on pre-housing indexes). */
   housings?: IndexHousing[];
+}
+
+/**
+ * WP-128: does the SERVICE that built this index know the frame contract?
+ *
+ * `ports_frame` (WP-124) is stamped on every module entry by a current
+ * `library build`. A service started before that ships an index that looks
+ * fine and silently loses three facts the editors need — which frame a GLB
+ * speaks (`mesh_frame`, WP-123), which frame the pins speak (`ports_frame`),
+ * and a mirror's rectangular aperture (`mirror_rect_mm`, WP-125). The
+ * symptoms are all "the fix didn't work": cubes tipped on their side, round
+ * mirrors that should be rectangular. A long-running dev service on :8000 is
+ * exactly how this happens, so the UI says it out loud instead.
+ */
+export function indexPredatesFrameContract(
+  index: { modules?: IndexModule[] } | null | undefined,
+): boolean {
+  const modules = index?.modules ?? [];
+  return modules.length > 0 && modules.every(m => m.ports_frame === undefined);
 }
 
 const URL_STORAGE_KEY = 'optikit-library-index-url';

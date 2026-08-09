@@ -110,6 +110,16 @@ export interface LibraryPaletteEntry {
    * needs the doc→viewer basis at render) or 'record' (pre-rotated wrapper
    * exports, already y-up). '' = undeclared legacy (renderer detects). */
   meshFrame: string;
+  /** WP-137: the FILE→cube correction grid [z, x] — the total map, wins over
+   * meshFrame. null = no correction declared. */
+  meshPoseGrid: [string, string] | null;
+  /** WP-124: which frame `ports` speaks. 'mounted' = cube frame F3 (already
+   * in-plane — placement may only YAW, pins stay +z); 'record' = component
+   * F2 (placement tips the optics into the document plane, WP-29). */
+  portsFrame: 'mounted' | 'record';
+  /** WP-125: reflective rectangular clear aperture [w, h] mm — a rect mirror
+   * draws as the plate the record declares, not a disc. null = round. */
+  mirrorRectMm: [number, number] | null;
   /** Record-style ports (local record axes, ±z = optical axis). */
   ports: SourcePort[];
   /** Effective focal length when meaningful — feeds the 2D ray preview. */
@@ -118,11 +128,13 @@ export interface LibraryPaletteEntry {
    * a placement picks one as its active wavelength. */
   wavelengthsUm: number[];
   /** Normalized source facts (both record dialects, via the index): full-angle
-   * beam divergence in degrees and 1/e² beam diameter in mm. They feed the
-   * exported §9.5 emission block — without them a placed laser materializes
-   * as a point/collimated default: one axial ray. */
+   * beam divergence in degrees. Feeds the exported §9.5 emission block —
+   * without it a placed laser materializes as a collimated default. */
   divergenceDeg?: number;
-  beamDiameterMm?: number | null;
+  /** WP-145: the source's 1/e² beam diameter in mm — the ONE number the
+   * canvas glow and optiland's entrance pupil must both read. null for
+   * non-sources and for records that never declared it. */
+  beamDiameterMm: number | null;
   /** WP-48: authored schematic symbol URL, or null to derive the glyph. */
   symbolUrl: string | null;
   /** WP-47: pixel facts for slm/display parts (null for everything else). */
@@ -204,6 +216,42 @@ const AXIS_VEC: Record<string, THREE.Vector3> = {
 
 const INPUT_PORT_NAMES = /^(front|sensor|in|plane)$/;
 
+/** WP-137: the mesh-pose grid [z, x] out of a raw template record. */
+export function meshPoseGridOf(
+  template: Record<string, unknown> | undefined,
+): [string, string] | null {
+  const pose = template?.['mesh-pose'] as
+    | { rotation?: { grid?: { z?: string; x?: string } } }
+    | undefined;
+  const grid = pose?.rotation?.grid;
+  if (!grid?.z && !grid?.x) return null;
+  return [grid.z ?? '+z', grid.x ?? '+x'];
+}
+
+/** WP-125: the reflective surface's rectangular clear aperture, [w, h] mm —
+ * from raw Optiland-spelling surfaces (fragment_surfaces / record fragment).
+ * null = round. Mirrors optikit-core's `_mirror_rect_mm`. */
+export function rectApertureOf(
+  surfaces?: Record<string, unknown>[] | null,
+): [number, number] | null {
+  if (!surfaces?.length) return null;
+  const reflective = surfaces.filter(su => {
+    const im = su.interaction_model as { is_reflective?: unknown } | undefined;
+    return Boolean(im?.is_reflective);
+  });
+  for (const su of reflective.length ? reflective : surfaces) {
+    const ap = su.aperture as
+      | { type?: string; x_min?: number; x_max?: number; y_min?: number; y_max?: number }
+      | undefined;
+    if (!ap || !/rectangular/i.test(ap.type ?? '')) continue;
+    if (ap.x_min == null || ap.x_max == null || ap.y_min == null || ap.y_max == null) continue;
+    const w = ap.x_max - ap.x_min;
+    const h = ap.y_max - ap.y_min;
+    if (w > 0 && h > 0) return [w, h];
+  }
+  return null;
+}
+
 function toAxisDir(v: THREE.Vector3): AxisDir {
   const ax: 'x' | 'y' | 'z' =
     Math.abs(v.x) > 0.5 ? 'x' : Math.abs(v.y) > 0.5 ? 'y' : 'z';
@@ -258,6 +306,60 @@ export function defaultRotationFor(ports: SourcePort[]): Rot24 | null {
   const rot: Rot24 = { z: toAxisDir(zImage), x: toAxisDir(xImage) };
   if (rot.z === '+z' && rot.x === '+x') return null; // identity — already in-plane
   return rot;
+}
+
+/** The four upright rotations — x-axis image per 0/90/180/270° yaw about +z. */
+const YAWS: readonly AxisDir[] = ['+x', '+y', '-x', '-y'];
+
+/**
+ * Default placement rotation for a part whose served ports are AS-MOUNTED
+ * (cube frame F3, WP-122/124): the insert-pose already put the beam in the
+ * document plane, so placement may only YAW the cube — pins stay +z, the
+ * T-rule. Picks the yaw that sends the entry beam along +x (fold arm toward
+ * -y as tiebreak); tipping the cube to "fix" a beam is exactly the round-19
+ * flipped-assembly bug, and it can never be right for a cube on a baseplate.
+ */
+export function yawRotationFor(ports: SourcePort[]): Rot24 | null {
+  if (ports.length === 0) return null;
+  const entryPort =
+    ports.find(p => p.name === 'front') ??
+    ports.find(p => INPUT_PORT_NAMES.test(p.name)) ??
+    ports.find(p => p.name === 'out') ??
+    ports[0];
+  const b = beamDir(entryPort);
+  const fold = ports
+    .map(p => beamDir(p))
+    .find(d => Math.abs(d.dot(b)) < 0.5);
+  // WP-135: a fold mirror is RECIPROCAL — running the light backwards through
+  // it is the same physical cube. Two records that differ only in which arm
+  // is called 'front' (beam +y in → +x out, vs −x in → −y out) describe one
+  // object, but scoring only the forward traversal placed them with plates
+  // 90° apart on the canvas: the reversed spelling cannot reach "beam → +x
+  // AND fold → −y" through its 'front', so it settled for fold → +y. Score
+  // both traversals; whichever wins, the yaw applies to the same part.
+  const traversals: { entry: THREE.Vector3; exit: THREE.Vector3 | null }[] = [
+    { entry: b, exit: fold ?? null },
+  ];
+  if (fold) {
+    traversals.push({ entry: fold.clone().negate(), exit: b.clone().negate() });
+  }
+  let best: AxisDir = '+x';
+  let bestScore = -Infinity;
+  for (const t of traversals) {
+    YAWS.forEach((xImage, k) => {
+      // The yaw about +z, built explicitly — setFromUnitVectors(+x, -x) would
+      // pick a 180° flip about +y and tip the pins, the very bug this fixes.
+      const q = new THREE.Quaternion().setFromAxisAngle(AXIS_VEC['+z'], (k * Math.PI) / 2);
+      const score =
+        t.entry.clone().applyQuaternion(q).dot(AXIS_VEC['+x']) * 2 +
+        (t.exit ? t.exit.clone().applyQuaternion(q).dot(AXIS_VEC['-y']) : 0);
+      if (score > bestScore + 1e-9) {
+        bestScore = score;
+        best = xImage;
+      }
+    });
+  }
+  return best === '+x' ? null : { z: '+z', x: best };
 }
 
 const CATEGORY_MAP: Record<string, DocCategory> = {
@@ -388,6 +490,9 @@ function entryFromIndexModule(
     thumbnailUrl: abs(mod.assets?.thumbnail),
     glbUrl: abs(mod.assets?.glb),
     meshFrame: mod.assets?.mesh_frame ?? '',
+    meshPoseGrid: mod.assets?.mesh_pose_grid ?? null,
+    portsFrame: mod.ports_frame ?? 'record',
+    mirrorRectMm: mod.component?.mirror_rect_mm ?? null,
     ports: indexPortsToSource(mod.ports),
     eflMm: mod.component?.efl_mm ?? null,
     wavelengthsUm: mod.component?.wavelengths_um ?? [],
@@ -449,27 +554,89 @@ export function groupEntriesFromIndex(groups: IndexGroup[]): LibraryGroupEntry[]
 }
 
 /** Workspace component records (no mechanics yet) → palette entries. */
+/**
+ * WP-127: a bound draft's template ports, as mounted — the same rule
+ * optikit-core's `_as_mounted_ports` applies when it builds the index. A
+ * template that carries an insert-pose has complete, cube-frame
+ * `optical_ports`; its `frames` hold their posed positions.
+ */
+export function templatePortsToSource(
+  template: Record<string, unknown> | undefined,
+): SourcePort[] | null {
+  const ports = template?.optical_ports as
+    | Record<
+        string,
+        {
+          frame?: string;
+          direction?: string | [number, number, number];
+          'after-surface'?: number | null;
+        }
+      >
+    | undefined;
+  if (!template?.['insert-pose'] || !ports || Object.keys(ports).length === 0) return null;
+  const frames = (template.frames ?? {}) as Record<
+    string,
+    { 'x-mm'?: number; 'y-mm'?: number; 'z-mm'?: number }
+  >;
+  return Object.entries(ports).map(([name, port]) => {
+    const f = frames[port.frame ?? ''] ?? {};
+    return {
+      name,
+      // WP-132: pass a VECTOR through untouched. asMountedDirection emits a
+      // 3-vector whenever the pose is more than AXIS_SNAP_WARN_DEG off-axis,
+      // and String() turned it into "-0.985,-0.174,0" — which dirVecOf cannot
+      // parse, so it fell back to +x and a 10° fold read as a 180° retro.
+      direction: Array.isArray(port.direction) ? port.direction : String(port.direction ?? '+z'),
+      positionMm: [f['x-mm'] ?? 0, f['y-mm'] ?? 0, f['z-mm'] ?? 0] as [number, number, number],
+      afterSurface: port['after-surface'] ?? null,
+    };
+  });
+}
+
 export function entriesFromWorkspace(
   records: Record<string, ComponentRecord>,
   thumbnails: Record<string, string>,
+  /** WP-127: component id → the draft's template/module pair, when bound. */
+  bindings: Record<string, { template: Record<string, unknown>; module: Record<string, unknown> }> = {},
+  /** WP-127: component id → object URL for the bound mesh (blob:). */
+  meshUrls: Record<string, string> = {},
 ): LibraryPaletteEntry[] {
-  return Object.values(records).map(record => ({
+  return Object.values(records).map(record => {
+  const binding = bindings[record.id];
+  const template = binding?.template;
+  const mountedPorts = templatePortsToSource(template);
+  const footprint = (template?.footprint_grid as [number, number, number] | undefined) ?? null;
+  return {
     moduleId: record.id,
     componentId: record.id,
     name: shortName(record.id),
     description: record.description ?? '',
+    // WP-127: a bound draft is a real cube — its template says which class.
     category: docCategoryOfRecord(record.category),
-    templateClass: null,
-    // WP-103: a local draft has optics and no mechanics — bare, by definition.
-    mount: 'bare' as const,
-    templateId: (record as { mechanics?: { template?: string } }).mechanics?.template ?? null,
+    templateClass: binding
+      ? ((template?.class as TemplateClass | undefined) ?? 'fixed')
+      : null,
+    mount: (binding && footprint ? 'cube' : 'bare') as PartMount,
+    templateId:
+      (template?.id as string | undefined) ??
+      (record as { mechanics?: { template?: string } }).mechanics?.template ??
+      null,
     states: [],
     dofs: [],
-    footprintGrid: [1, 1, 1],
+    footprintGrid: footprint ?? [1, 1, 1],
     thumbnailUrl: thumbnails[record.id] ?? null,
-    glbUrl: null,
-    meshFrame: '',
-    ports: recordPortsToSource(record),
+    glbUrl: (binding && meshUrls[record.id]) || null,
+    meshFrame: String(template?.['mesh-frame'] ?? ''),
+    meshPoseGrid: meshPoseGridOf(template),
+    portsFrame: (mountedPorts ? 'mounted' : 'record') as 'mounted' | 'record',
+    mirrorRectMm: rectApertureOf(
+      (record as { optics?: { fragment?: { surfaces?: Record<string, unknown>[] } } })
+        .optics?.fragment?.surfaces,
+    ),
+    // WP-127: a bound draft serves its AS-MOUNTED pins, exactly like the
+    // published index does (WP-122) — so the schematic, the assembly glyph
+    // and the parts editor agree before the record ever reaches the registry.
+    ports: mountedPorts ?? recordPortsToSource(record),
     eflMm: record.effective_focal_length_mm ?? null,
     wavelengthsUm:
       (record as { source?: { wavelengths_um?: number[] } }).source?.wavelengths_um ?? [],
@@ -489,14 +656,15 @@ export function entriesFromWorkspace(
     // WP-60 published components, so an imported Optiland primitive placed
     // from the workspace offers "generate a holder…" like any other unbound
     // part (cubify is the T-class binding moment).
-    unbound: true,
+    unbound: !(binding && footprint),
     // A draft's authored surfaces ARE its prescription (WP-60 convention).
     fragmentSurfaces:
       ((record.optics as { fragment?: { surfaces?: Record<string, unknown>[] } } | undefined)
         ?.fragment?.surfaces) ?? [],
     carrier: false,
     bays: {},
-  }));
+  };
+  });
 }
 
 /**
@@ -566,7 +734,10 @@ export function entriesFromComponents(
       // WP-67: the housing mesh TRAVELS with the unbound part (this used to
       // hardcode null — a housed device rendered as a ghost).
       glbUrl: abs(housing?.assets.glb),
-      meshFrame: '',
+      meshFrame: housing?.assets.mesh_frame ?? '',
+      meshPoseGrid: housing?.assets.mesh_pose_grid ?? null,
+      portsFrame: 'record',
+      mirrorRectMm: rectApertureOf(component.fragment_surfaces),
       ports: indexPortsToSource(component.ports),
       eflMm: component.efl_mm ?? null,
       wavelengthsUm: component.wavelengths_um ?? [],
@@ -685,6 +856,7 @@ function toModuleDefinition(entry: LibraryPaletteEntry): ModuleDefinition {
     description: entry.description,
     glbUrl: entry.glbUrl ?? undefined,
     meshFrame: entry.meshFrame,
+    meshPoseGrid: entry.meshPoseGrid,
     docCategory: entry.category,
   };
 }

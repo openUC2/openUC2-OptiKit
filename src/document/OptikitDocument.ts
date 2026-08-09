@@ -13,6 +13,7 @@
  */
 
 import { useMemo } from 'react';
+import * as THREE from 'three';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../stores/appStore';
 import { MODULE_SIMULATION_MODELS } from '../types';
@@ -26,8 +27,16 @@ import {
 } from './mapping';
 import { useDocumentStore } from './documentStore';
 import type { DocumentSnapshot } from './documentStore';
-import { defaultRotationFor, groupEntryOf, libraryEntryOf } from './libraryPalette';
-import { useGroupEditStore } from './groupStore';
+import {
+  defaultRotationFor,
+  groupEntryOf,
+  interfaceKindOf,
+  libraryEntryOf,
+  listLibraryEntries,
+  yawRotationFor,
+} from './libraryPalette';
+import { isGroupLocked, useGroupEditStore } from './groupStore';
+import { decomposeRot24, rot24Matrix } from './rot24';
 import type { Rot24 } from './rot24';
 import { usePathsStore } from './pathsStore';
 import { useFibersStore } from './fibersStore';
@@ -161,12 +170,18 @@ export function addPart(
   const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
   if (!def) return null;
   const placement = splitWorldPosition(positionMm);
-  // Library records author their optics along ±z (schema convention); rotate
-  // the placement so the entry beam runs along document +x and any fold arm
-  // points -y — the WP-29 plane convention (like the golden designs do).
+  // WP-124: two placement conventions, keyed on WHICH frame the ports speak.
+  // 'mounted' (cube frame, insert-pose already in-plane): only YAW — pins
+  // stay +z, tipping a cube is never right. 'record' (component F2): the
+  // WP-29 tip — entry beam onto +x, fold arm toward -y — because ±z record
+  // optics must be laid into the document plane.
   const lib = libraryEntryOf(libraryRef);
   const rot24: Rot24 =
-    (lib ? defaultRotationFor(lib.ports) : null) ?? { z: '+z', x: '+x' };
+    (lib
+      ? lib.portsFrame === 'mounted'
+        ? yawRotationFor(lib.ports)
+        : defaultRotationFor(lib.ports)
+      : null) ?? { z: '+z', x: '+x' };
   const params = { ...(def.defaultParams ?? {}) };
   const part: DsnPart = {
     id: uuidv4(),
@@ -297,6 +312,86 @@ export function addGroup(groupId: string, positionMm: Vec3): AddGroupResult | nu
   return { instanceId, partIds, snappedToBay, bayOverflow };
 }
 
+/**
+ * WP-146: derive the layer joints a hand-placed design needs.
+ *
+ * Round 23: "I still cannot see the puzzle pieces anywhere". They exist —
+ * `openuc2.cube.puzzle_1x1` — but were placed ONLY by `addGroup`, from a
+ * group record's declared `joint_cells`. A design assembled cube by cube
+ * therefore never got any structure at all.
+ *
+ * The rule the real hardware imposes: a puzzle piece is 5 mm thick and lives
+ * in the interface gap, so every cube needs one ABOVE it, and the bottom
+ * layer needs one BELOW as well. Pieces tile in x/y into a plate, which is
+ * why one piece per occupied CELL is exactly right — no fitting problem, no
+ * choice to make. A joint at cell z sits above the cubes of layer z
+ * (`layers.ts` classifies it as layer z+1, `interface: true`).
+ */
+export function addStructureJoints(): { added: number; jointModuleId: string | null } {
+  const jointModuleId =
+    listLibraryEntries().find(e => interfaceKindOf(e.moduleId) === 'puzzle')?.moduleId ?? null;
+  if (!jointModuleId) return { added: 0, jointModuleId: null };
+
+  // Cells that hold a real cube — interface parts are structure, not cargo.
+  const cubes = listDsnParts().filter(part => {
+    const entry = libraryEntryOf(part.libraryRef);
+    return entry?.mount === 'cube' && interfaceKindOf(part.libraryRef) === null;
+  });
+  if (cubes.length === 0) return { added: 0, jointModuleId };
+
+  const taken = new Set(
+    listDsnParts()
+      .filter(p => interfaceKindOf(p.libraryRef) === 'puzzle')
+      .map(p => p.cell.join(',')),
+  );
+  const minLayer = Math.min(...cubes.map(c => c.cell[2]));
+  const wanted = new Set<string>();
+  for (const cube of cubes) {
+    const [x, y, z] = cube.cell;
+    wanted.add([x, y, z].join(','));          // the joint above this cube
+    if (z === minLayer) wanted.add([x, y, z - 1].join(',')); // …and under the stack
+  }
+
+  let added = 0;
+  batchDepth++;
+  for (const key of wanted) {
+    if (taken.has(key)) continue;
+    const [x, y, z] = key.split(',').map(Number);
+    const id = addPart(jointModuleId, [
+      x * UC2_GRID_MM[0],
+      y * UC2_GRID_MM[1],
+      z * UC2_GRID_MM[2],
+    ]);
+    if (id) added++;
+  }
+  batchDepth--;
+  return { added, jointModuleId };
+}
+
+/**
+ * WP-150: delete a part — or the whole arrangement it belongs to.
+ *
+ * Round 24: "we cannot delete an entire group once it's in the editor".
+ * True: every delete road removed exactly the selected part, so a 20-member
+ * miniFRAME had to be dismantled one cube at a time. A grouped part deletes
+ * its whole instance, because half an arrangement is not a thing anyone
+ * asked for — UNLESS the group is unlocked for member editing, which is
+ * precisely the state that says "I am working on the members".
+ *
+ * Returns the ids removed, as ONE undo step.
+ */
+export function removePartOrGroup(partId: string): string[] {
+  const instanceId = groupInstanceOf(partId);
+  const rigid = instanceId !== null && isGroupLocked(instanceId);
+  const ids = rigid ? partsOfGroup(instanceId).map(p => p.id) : [partId];
+  const token = captureUndo();
+  batchDepth++;
+  for (const id of ids) removePart(id);
+  batchDepth--;
+  commitUndo(token);
+  return ids;
+}
+
 /** Dissolve a group instance: members stay, the rigid-drag tag goes (WP-44). */
 export function ungroupInstance(instanceId: string): void {
   for (const part of listDsnParts().filter(p => p.params.groupId === instanceId)) {
@@ -409,10 +504,19 @@ export function movePartGrid(partId: string, cell: Vec3): void {
 export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boolean }): void {
   const part = findDsnPart(partId);
   if (!part) return;
+  // WP-136: a T1 cube is BOUND to the grid — its only legal yaws are the
+  // four 90° states, exactly like its offsets are pinned to the cell
+  // (constrainOffsetToTemplate). This is the one choke point every yaw
+  // road passes through (property panel, yaw ring), so quantizing here
+  // makes "I rotated a fixed cube to 55°" structurally impossible instead
+  // of a per-widget rule.
+  const lib = libraryEntryOf(part.libraryRef);
+  const t1Cube = lib?.templateClass === 'fixed' && lib.mount === 'cube';
+  const snap = t1Cube || (opts?.snap ?? false);
   // Yaw replaces ONLY the yaw component of the discrete orientation; any
   // tilt/roll stays put, and the sub-90° remainder becomes the offset-deg
   // residual. `applyYawToRot24` is the exact inverse of `partYawDeg`.
-  const { rot24, residualDeg } = applyYawToRot24(part.rot24, yawDeg, opts?.snap ?? false);
+  const { rot24, residualDeg } = applyYawToRot24(part.rot24, yawDeg, snap);
   autoPush();
   useDocumentStore.getState().updatePart(partId, {
     rot24,
@@ -425,6 +529,33 @@ export function rotatePart(partId: string, yawDeg: number, opts?: { snap?: boole
  * y (roll) axes — the offset-deg components the yaw ring can't reach (WP-28).
  * Omitted axes keep their value.
  */
+/**
+ * WP-143: turn a part by 90° about a DOCUMENT axis, discretely.
+ *
+ * A T1 cube is bound to the grid but NOT to four yaws — a cube can be
+ * mounted pins-sideways in a stack, so its legal set is the full 24 grid
+ * orientations. `tiltPart` writes `offset-deg` residuals, which is the wrong
+ * mechanism for a discrete step (and is disabled for T1 precisely because a
+ * residual tilt would break the T-rule); this composes onto `rot24` instead
+ * and leaves the residual alone.
+ */
+export function stepPartRot24(partId: string, axis: 'x' | 'y' | 'z', turns = 1): void {
+  const part = findDsnPart(partId);
+  if (!part) return;
+  const step = new THREE.Matrix4().makeRotationFromEuler(
+    new THREE.Euler(
+      axis === 'x' ? (Math.PI / 2) * turns : 0,
+      axis === 'y' ? (Math.PI / 2) * turns : 0,
+      axis === 'z' ? (Math.PI / 2) * turns : 0,
+    ),
+  );
+  // Left-multiply: the step is about a DOCUMENT axis, like the yaw ring.
+  const next = step.multiply(rot24Matrix(part.rot24));
+  const { rot24 } = decomposeRot24(next);
+  autoPush();
+  useDocumentStore.getState().updatePart(partId, { rot24 });
+}
+
 export function tiltPart(partId: string, tilt: { x?: number; y?: number }): void {
   const part = findDsnPart(partId);
   if (!part) return;
@@ -630,12 +761,19 @@ export interface PartRenderInfo {
   glbOffset?: [number, number, number];
   /** WP-123: which frame the GLB content speaks ('cube' | 'record' | ''). */
   meshFrame?: string;
+  /** WP-137: the FILE→cube correction grid [z, x] (wins over meshFrame). */
+  meshPoseGrid?: [string, string] | null;
 }
 
 /** Presentation assets for a library ref (GLB model), for the assembly view. */
 export function renderInfoOf(libraryRef: string): PartRenderInfo {
   const def = useAppStore.getState().modules.find(m => m.id === libraryRef);
-  return { glbUrl: def?.glbUrl, glbOffset: def?.glbOffset, meshFrame: def?.meshFrame };
+  return {
+    glbUrl: def?.glbUrl,
+    glbOffset: def?.glbOffset,
+    meshFrame: def?.meshFrame,
+    meshPoseGrid: def?.meshPoseGrid ?? null,
+  };
 }
 
 // ── React subscriptions ───────────────────────────────────────────────────────

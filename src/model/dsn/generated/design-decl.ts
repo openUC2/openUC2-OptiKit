@@ -23,6 +23,7 @@ export type X = string;
 export type X1 = number | string;
 export type Y = number | string;
 export type Z1 = number | string;
+export type Quaternion = number[];
 export type Anchor = string;
 export type X2 = number | string;
 export type Y1 = number | string;
@@ -74,6 +75,10 @@ export type Surface = number | null;
 export type Dof = DofSpec[];
 export type Enabled = boolean;
 export type WavelengthUm1 = number | null;
+export type WavelengthsUm = number[];
+export type DivergenceDeg = number;
+export type PowerMw = number | null;
+export type BeamDiameterMm = number | null;
 export type Mode = 'reflective' | 'transmissive';
 export type PixelPitchUm = number | null;
 export type Resolution1 = [unknown, unknown] | null;
@@ -151,6 +156,7 @@ export interface CompSpec {
   dof?: Dof;
   enabled?: Enabled;
   'wavelength-um'?: WavelengthUm1;
+  source?: SourceSpec | null;
   programmable?: ProgrammableSpec | null;
   instantiation?: Instantiation;
   computation?: Computation;
@@ -189,6 +195,7 @@ export interface RotSpec {
   grid?: RotGridSpec;
   'offset-deg'?: ContinuousXYZ;
   'z-spherical'?: ZSpherical;
+  quaternion?: Quaternion;
   [k: string]: unknown;
 }
 /**
@@ -383,6 +390,21 @@ export interface DofSpec {
   actuatable?: Actuatable;
   'pivot-frame'?: PivotFrame;
   surface?: Surface;
+  [k: string]: unknown;
+}
+/**
+ * What a `category: source` component emits (WP-47).
+ *
+ * ``wavelengths_um`` is the source's LINE LIST — a multi-line laser declares
+ * every line it can emit; a design picks the active one per placement
+ * (``CompSpec.wavelength_um``). ``divergence_deg`` is the full-angle beam
+ * divergence of the bare emitter.
+ */
+export interface SourceSpec {
+  wavelengths_um?: WavelengthsUm;
+  divergence_deg?: DivergenceDeg;
+  power_mw?: PowerMw;
+  beam_diameter_mm?: BeamDiameterMm;
   [k: string]: unknown;
 }
 /**

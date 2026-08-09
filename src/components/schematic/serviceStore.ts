@@ -13,9 +13,10 @@ import {
   validateDesign,
 } from '../../api/coreClient';
 import type { ChainEscape, SimulateResponse } from '../../api/coreClient';
-import { getDocRevision, makePortRef, setPath, useDocRevision } from '../../document';
+import { getDocRevision, listPaths, makePortRef, setPath, useDocRevision } from '../../document';
 import type { Vec3 } from '../../document';
 import { UC2_GRID_MM } from '../../document/types';
+import { usePathsStore } from '../../document/pathsStore';
 import { useAppStore } from '../../stores/appStore';
 import { buildServiceDesign, serviceFiles, serviceFilesAtWavelength } from '../../model/dsn/serviceExport';
 
@@ -106,6 +107,12 @@ export interface PathSimResult {
   /** WP-91: one spot per source line ("simulate all lines"), overlaid in the
    * panel — null when the run traced a single wavelength. */
   multiSpot: { um: number; spot: { x: number[]; y: number[] } }[] | null;
+  /** WP-141: the traversal chain this result was traced over, joined. A path
+   * that has been RE-ROUTED keeps its name, so the name alone cannot say
+   * whether a result still describes the design — round 23: "when I change
+   * the ray path the beam paths is not automatically updated hence it uses
+   * the old one". */
+  chain: string;
 }
 
 interface ServiceState {
@@ -134,6 +141,28 @@ interface ServiceState {
   refreshProposals: () => Promise<void>;
   /** WP-78: declare one proposed path (the one-click "Adopt" chip). */
   adoptProposal: (name: string) => boolean;
+  /** WP-141: throw the traced rays away outright. Greying them out was the
+   * only exit before, so a design with no valid trace still had ray
+   * geometry on screen and in the panel. */
+  clearSim: () => void;
+}
+
+/**
+ * WP-141: the traversal chain of one declared path, as a stable string.
+ *
+ * A result is only about the design it was traced from. The path NAME is not
+ * enough — re-routing a path keeps its name — so results carry this and are
+ * dropped the moment the design's own spelling of the chain differs.
+ */
+function chainOf(design: { paths?: Record<string, unknown> }, name: string): string {
+  const path = (design.paths ?? {})[name] as { chain?: unknown[] } | undefined;
+  return JSON.stringify(path?.chain ?? []);
+}
+
+/** The same signature, read from the DOCUMENT rather than a built design. */
+function docChainOf(name: string): string | null {
+  const path = listPaths().find((p: { name: string }) => p.name === name);
+  return path ? JSON.stringify((path as { chain: unknown[] }).chain) : null;
 }
 
 function toError(err: unknown): { code: string; message: string } {
@@ -242,6 +271,9 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
   live: false,
 
   clearError: () => set({ error: null }),
+  // WP-141: the rays are GONE, not greyed. Round 23: a stale overlay kept
+  // drawing a path that no longer existed, and there was no way to say so.
+  clearSim: () => set({ simByPath: {}, simRevision: null, escapes: [] }),
   setLive: live => set({ live }),
 
   refreshProposals: async () => {
@@ -441,12 +473,14 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             warnings: result.warnings,
             error: null,
             multiSpot: null,
+            chain: chainOf(design, name),
           };
         } catch (err) {
           if (err instanceof CoreServiceError && err.status !== 0) {
             simByPath[name] = {
               raysWorld: [], spot: null, paraxial: null, photonBudget: null,
               warnings: [], error: toError(err), multiSpot: null,
+              chain: chainOf(design, name),
             };
           } else {
             throw err; // unreachable service: abort the whole run
@@ -473,7 +507,8 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
     }
     set({ simBusy: true, error: null });
     try {
-      const pathNames = Object.keys(buildServiceDesign().design.paths ?? {});
+      const { design } = buildServiceDesign();
+      const pathNames = Object.keys(design.paths ?? {});
       const simByPath: Record<string, PathSimResult> = {};
       for (const name of pathNames) {
         try {
@@ -492,6 +527,7 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
               warnings: result.warnings,
               error: null,
               multiSpot: null,
+              chain: chainOf(design, name),
             };
           }
           if (main) {
@@ -503,6 +539,7 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
             simByPath[name] = {
               raysWorld: [], spot: null, paraxial: null, photonBudget: null,
               warnings: [], error: toError(err), multiSpot: null,
+              chain: chainOf(design, name),
             };
           } else {
             throw err;
@@ -515,6 +552,36 @@ export const useServiceStore = create<ServiceState>((set, get) => ({
     }
   },
 }));
+
+/**
+ * WP-141: a traced result outlives its path only until the paths change.
+ *
+ * Round 23 reported three faces of one bug: deleting a path left its rays on
+ * screen (and its entry in the panel), re-routing a path silently kept the
+ * OLD traversals, and the only exit was a grey overlay. Results are keyed by
+ * path name and carry the chain they were traced over, so both "gone" and
+ * "re-routed" are the same test — and both DROP the result rather than
+ * dimming it.
+ */
+usePathsStore.subscribe(() => {
+  const { simByPath } = useServiceStore.getState();
+  const names = Object.keys(simByPath);
+  if (names.length === 0) return;
+  const kept: Record<string, PathSimResult> = {};
+  for (const name of names) {
+    const chain = docChainOf(name);
+    // Gone, or re-routed under the same name → the result is about a design
+    // that no longer exists.
+    if (chain !== null && chain === simByPath[name].chain) kept[name] = simByPath[name];
+  }
+  if (Object.keys(kept).length !== names.length) {
+    useServiceStore.setState({
+      simByPath: kept,
+      // Nothing traced left ⇒ nothing to call stale: back to 'none'.
+      simRevision: Object.keys(kept).length === 0 ? null : useServiceStore.getState().simRevision,
+    });
+  }
+});
 
 /** Fresh = computed at the current document revision. */
 export function useSimFreshness(): 'none' | 'fresh' | 'stale' {

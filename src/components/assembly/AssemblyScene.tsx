@@ -26,6 +26,7 @@ import {
   captureUndo,
   classifyPart,
   commitUndo,
+DOC_AXIS_LABELS,
   docQuatToThree,
   interfaceKindOf,
   layerAppearance,
@@ -99,6 +100,7 @@ function GLBModel({
   url,
   offset,
   meshFrame = '',
+  meshPoseGrid = null,
   dimmed = false,
 }: {
   url: string;
@@ -106,13 +108,15 @@ function GLBModel({
   /** WP-123: 'cube' (F3, needs the basis), 'record' (pre-rotated y-up,
    * render as-is), '' = undeclared legacy — detect a wrapper node. */
   meshFrame?: string;
+  /** WP-137: the declared FILE→cube correction — wins over everything. */
+  meshPoseGrid?: readonly [string, string] | null;
   /** WP-65: render the mesh nearly transparent (dimmed layer). */
   dimmed?: boolean;
 }) {
   const { scene } = useGLTF(url);
   const contentQuat = useMemo(
-    () => meshContentQuat(meshFrame, scene.children),
-    [scene, meshFrame],
+    () => meshContentQuat(meshFrame, scene.children, meshPoseGrid),
+    [scene, meshFrame, meshPoseGrid],
   );
   const cloned = useMemo(() => {
     const c = skeletonClone(scene) as THREE.Group;
@@ -179,7 +183,8 @@ function GhostBox({
           fillOpacity={dimmed ? 0.3 : 1}
           anchorX="center"
           outlineWidth={dimmed ? 0 : 0.4}
-          outlineColor="#000000aa"
+          outlineColor="#000000"
+          outlineOpacity={0.67}
         >
           {label}
         </Text>
@@ -316,7 +321,8 @@ function InsertHandle({ part, dof }: { part: DocPart; dof: TranslationDof }) {
         />
       </mesh>
       <Billboard position={handlePos.clone().add(new THREE.Vector3(0, 14, 0))}>
-        <Text fontSize={5.5} color="#ffd24d" anchorX="center" outlineWidth={0.4} outlineColor="#000000aa">
+        <Text fontSize={5.5} color="#ffd24d" anchorX="center" outlineWidth={0.4} outlineColor="#000000"
+          outlineOpacity={0.67}>
           {`${dof.name} = ${value.toFixed(2)} ${dof.unit}`}
         </Text>
       </Billboard>
@@ -434,12 +440,23 @@ function AssemblyPart({
           // palette-placed cube never showed its cube. Each fallback now says
           // which one it is — the shared "no template" label is what made this
           // bug take a full session to find.
-          <GLBErrorBoundary fallback={<GhostBox color={color} label="mesh failed" dimmed={dimmed} />}>
+          <GLBErrorBoundary
+            fallback={reason => (
+              <GhostBox
+                color={color}
+                // WP-146: say WHAT failed. The reason is usually a fetch
+                // status or a parse error, and either one names its own fix.
+                label={`mesh failed — ${reason.slice(0, 60)}`}
+                dimmed={dimmed}
+              />
+            )}
+          >
             <Suspense fallback={<GhostBox color={color} label="loading…" dimmed={dimmed} />}>
               <GLBModel
                 url={render.glbUrl}
                 offset={render.glbOffset}
                 meshFrame={render.meshFrame}
+                meshPoseGrid={render.meshPoseGrid}
                 dimmed={dimmed}
               />
             </Suspense>
@@ -480,6 +497,7 @@ function AssemblyPart({
                 foldDeg={insertFoldDeg}
                 dimmed={dimmed}
                 interfaceKind={null}
+                mirrorRectMm={entry?.mirrorRectMm ?? null}
               />
             </group>
           </group>
@@ -657,7 +675,12 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
       <KernelRays3D />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
-        <GizmoViewport axisColors={['#e0533d', '#7cc142', '#2c8fff']} labelColor="#ffffff" />
+        {/* WP-130: document axes — see SchematicScene. */}
+        <GizmoViewport
+          axisColors={['#e0533d', '#2c8fff', '#7cc142']}
+          labels={DOC_AXIS_LABELS}
+          labelColor="#ffffff"
+        />
       </GizmoHelper>
     </>
   );

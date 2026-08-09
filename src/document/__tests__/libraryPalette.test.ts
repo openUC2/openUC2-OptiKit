@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   defaultRotationFor,
+  yawRotationFor,
+  rectApertureOf,
   entriesFromComponents,
   entriesFromIndex,
   registerLibraryModules,
@@ -49,6 +51,93 @@ describe('defaultRotationFor (record ±z optics → document plane)', () => {
 
   it('leaves in-plane records alone', () => {
     expect(defaultRotationFor([P('front', '-x'), P('back', '+x')])).toBeNull();
+  });
+});
+
+describe('yawRotationFor (WP-124: as-mounted ports — pins stay +z)', () => {
+  it('the round-19 testmirror: front +x, reflected -z → yaw 180°, never a tip', () => {
+    // defaultRotationFor on these SAME ports computes {z:+y, x:-x} — a cube
+    // lying on its side, the "assembly is flipped again" report.
+    const rot = yawRotationFor([P('front', '+x'), P('reflected', '-z')]);
+    expect(rot).toEqual({ z: '+z', x: '-x' });
+    // Entry beam (travels -(+x) = -x) → world +x under the yaw.
+    expect(applyRot(rot, [-1, 0, 0])).toEqual([1, 0, 0]);
+    // Pins stay up.
+    expect(applyRot(rot, [0, 0, 1])).toEqual([0, 0, 1]);
+  });
+
+  it('a fold that cannot be canonical forwards gets there BACKWARDS (WP-135)', () => {
+    // Fold toward +y with the beam already on +x: no yaw fixes both through
+    // 'front' — but running the light backwards (in via 'reflected') reaches
+    // beam → +x AND fold → −y. Before reciprocity this returned null and the
+    // reciprocal spelling of the same cube placed 90° differently.
+    const rot = yawRotationFor([P('front', '-x'), P('reflected', '+y')]);
+    expect(rot).toEqual({ z: '+z', x: '+y' });
+    // The canvas plate lands where the forward-canonical spelling puts it.
+    const canonical = yawRotationFor([P('front', '-y'), P('reflected', '+x')]);
+    expect(applyRot(rot, [-1, 1, 0])).toEqual(applyRot(canonical, [1, -1, 0]));
+  });
+
+  it('a periscope accepts the horizontal beam, whichever arm carries it', () => {
+    // front +z (vertical, yaw-invariant), reflected +y: forwards the best
+    // yaw only manages fold → −y; backwards the horizontal arm IS the entry
+    // and lands on +x — the beam-routing canvas flows +x, so that wins.
+    const rot = yawRotationFor([P('front', '+z'), P('reflected', '+y')]);
+    expect(rot).toEqual({ z: '+z', x: '+y' });
+    expect(applyRot(rot, [0, -1, 0])).toEqual([1, 0, 0]);
+  });
+
+  it('already-conventional ports need no rotation at all', () => {
+    expect(yawRotationFor([P('front', '-x'), P('back', '+x')])).toBeNull();
+    expect(yawRotationFor([])).toBeNull();
+  });
+
+  it('a vertical (posed periscope) beam never tips the cube', () => {
+    const rot = yawRotationFor([P('front', '+z'), P('back', '-z')]);
+    expect(rot === null || rot.z === '+z').toBe(true);
+  });
+
+  // WP-135: a fold mirror is reciprocal — a record that swaps which arm is
+  // called 'front' is the SAME physical cube, and round 21 caught the two
+  // spellings placing with plates 90° apart on the canvas.
+  it('reciprocal spellings of one mirror place identically', () => {
+    // testmirror3 as mounted: beam +y in → +x out.
+    const a = yawRotationFor([P('front', '-y'), P('reflected', '+x')]);
+    // testmirror3flipped as mounted: beam −x in → −y out — light run backwards.
+    const b = yawRotationFor([P('front', '+x'), P('reflected', '-y')]);
+    expect(a).toEqual({ z: '+z', x: '-y' });
+    expect(b).toEqual(a);
+    // Same canvas plate for both: the local bisector (1,−1,0) lands the same.
+    expect(applyRot(a, [1, -1, 0])).toEqual(applyRot(b, [1, -1, 0]));
+  });
+
+  it('the reversal never demotes a spelling that already places well', () => {
+    // The round-19 testmirror (front +x, reflected −z): the reversed
+    // traversal has a vertical arm and must not beat beam→+x.
+    expect(yawRotationFor([P('front', '+x'), P('reflected', '-z')])).toEqual({
+      z: '+z',
+      x: '-x',
+    });
+  });
+});
+
+describe('rectApertureOf (WP-125: rect mirrors draw rect)', () => {
+  it('reads the reflective surface\'s RectangularAperture as [w, h]', () => {
+    expect(
+      rectApertureOf([
+        {
+          interaction_model: { type: 'refractive_reflective', is_reflective: true },
+          aperture: { type: 'RectangularAperture', x_min: -12.7, x_max: 12.7, y_min: -6, y_max: 6 },
+        },
+        {},
+      ]),
+    ).toEqual([25.4, 12]);
+  });
+
+  it('round records (semi-aperture only) stay null', () => {
+    expect(rectApertureOf([{ semi_aperture: 12.5 }])).toBeNull();
+    expect(rectApertureOf([])).toBeNull();
+    expect(rectApertureOf(undefined)).toBeNull();
   });
 });
 

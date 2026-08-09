@@ -2,12 +2,17 @@ import React from 'react';
 import type { ReactNode } from 'react';
 
 interface Props {
-  fallback: ReactNode;
+  /** Static fallback, or a render function that receives the failure reason. */
+  fallback: ReactNode | ((reason: string) => ReactNode);
   children: ReactNode;
 }
 
 interface State {
   hasError: boolean;
+  /** WP-146: WHY it failed. A bare "mesh failed" label sent round 24
+   * hunting a corrupt GLB for a file that parses cleanly (1044 meshes) and
+   * serves 200 — the reason never left the console. */
+  reason: string;
 }
 
 /**
@@ -15,10 +20,10 @@ interface State {
  * Renders `fallback` whenever a child throws during render.
  */
 export class GLBErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false };
+  state: State = { hasError: false, reason: '' };
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
+  static getDerivedStateFromError(err: Error): State {
+    return { hasError: true, reason: err.message || String(err) };
   }
 
   componentDidCatch(err: Error) {
@@ -26,6 +31,8 @@ export class GLBErrorBoundary extends React.Component<Props, State> {
   }
 
   render() {
-    return this.state.hasError ? this.props.fallback : this.props.children;
+    if (!this.state.hasError) return this.props.children;
+    const { fallback } = this.props;
+    return typeof fallback === 'function' ? fallback(this.state.reason) : fallback;
   }
 }

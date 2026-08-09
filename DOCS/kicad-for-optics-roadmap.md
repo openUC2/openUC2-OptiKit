@@ -9,6 +9,14 @@ build, in what order, and why** — so that when it is done a user can drive eve
 one of the five scenarios through the editor, then simulate → optimise → cubify
 → produce.
 
+> **Superseded for day-to-day planning (2026-08-09).** Everything through
+> **WP-92** has landed. The four packages that never started — **WP-88**
+> (beam-path scripting), **WP-93** (the optimizer as a design tool), **WP-94**
+> (virtual detectors) and **WP-95** (the benchmark suite) — now live in
+> [`kicad-for-optics-part2q.md`](kicad-for-optics-part2q.md) alongside the
+> current backlog, so one document holds the open work. This roadmap remains
+> the reference for the M0…M10 milestone framing and the full per-WP prompts.
+
 **Status date:** 2026-07-29. Everything through **WP-86** has landed (Parts
 2a–2k: the physics-correctness round, the verbs, part-first, the Inventor loop,
 hardware write-back, grouping). Open: Part 2l's **WP-87…92** and Part 2m's

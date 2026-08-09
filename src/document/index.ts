@@ -23,7 +23,9 @@ export {
   renamePart,
   repointPartLibraryRef,
   renderInfoOf,
+  addStructureJoints,
   rotatePart,
+  stepPartRot24,
   selectPart,
   setDofValue,
   setPartOrientation,
@@ -46,7 +48,7 @@ export {
 } from './OptikitDocument';
 export { buildDocBom, docBomCsv } from './bom';
 export type { DocBom, DocBomLine } from './bom';
-export { addGroup, groupInstanceOf, ungroupInstance } from './OptikitDocument';
+export { addGroup, groupInstanceOf, removePartOrGroup, ungroupInstance } from './OptikitDocument';
 export type { AddGroupResult } from './OptikitDocument';
 export { useGroupEditStore, isGroupLocked } from './groupStore';
 export {
@@ -59,12 +61,15 @@ export {
   useFibersStore,
 } from './fibersStore';
 export type { DocFiber, FiberType } from './fibersStore';
+export { DOC_AXIS_LABELS, axisLabel, axisText, portFacesText } from './axisText';
+export type { AxisFrame } from './axisText';
 export {
   DEFAULT_LIB_ROT,
   LIBRARY_GROUP,
   isLibraryModule,
   T_CLASS_LABEL,
   defaultRotationFor,
+  yawRotationFor,
   docCategoryOfRecord,
   entriesFromComponents,
   entriesFromIndex,

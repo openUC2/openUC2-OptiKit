@@ -51,9 +51,9 @@ import {
 import { saveAs } from 'file-saver';
 import { CoreServiceError, convertStepToGlb } from '../../api/coreClient';
 import {
+  datumToCube,
   IDENTITY_INSERT_POSE,
   asMountedDirection,
-  bindToRecords,
   insertPoseMatrix,
   eulerDegToQuat,
   quatFromDirection,
@@ -78,6 +78,8 @@ import { GenerateDraftHolderDialog } from '../component-editor/GenerateDraftHold
 import { BindScene } from './BindScene';
 import { DecimalField } from '../common/DecimalField';
 import { AttachInventorDialog } from '../assembly/AttachInventorDialog';
+import { boundRecordsFor } from './boundRecords';
+import { axisText, portFacesText } from '../../document';
 import { useBindStore } from './bindStore';
 import { decomposeRot24 } from '../../document/rot24';
 import * as THREE from 'three';
@@ -295,43 +297,15 @@ export function MechanicsPanel({
   // The record pair (WP-33): template/module reference — in priority order —
   // the picked existing component, the validating DRAFT, or the datum stub.
   const bound = useMemo(() => {
-    // WP-118: a pose IS a binding — datums are the legacy road's evidence.
-    if (!draft.name || (store.datums.length === 0 && !store.insertPose)) return null;
     const picked = componentOptions.find(([id]) => id === store.existingComponentId);
     const existing = picked
       ? { id: picked[0], version: picked[1] }
       : record
         ? { id: record.id, version: record.version }
         : null;
-    return bindToRecords({
-      namespace: draft.namespace,
-      name: draft.name,
-      category: draft.category,
-      templateClass: store.templateClass,
-      meshFile: store.meshFile || 'part.step',
-      meshTransform: store.transform,
-      // WP-109: the measured box, so the record's envelope is true.
-      envelopeMm: store.meshSizeMm ?? undefined,
-      datums: store.datums,
-      existingComponent: existing,
-      wholeModule: store.wholeModule,
-      housingOnly: store.housingOnly,
-      meshFrame: store.meshFrameDetected,
-      // WP-116: the F2 side, verbatim from the draft — the pose transforms it.
-      insertPose: store.insertPose,
-      recordFrames: Object.fromEntries(
-        draft.frames.map(f => [f.name, [0, 0, f.zMm] as [number, number, number]]),
-      ),
-      recordPorts: draft.ports.map(p => ({
-        name: p.name,
-        frame: p.frame,
-        direction: p.direction,
-        afterSurface: p.afterSurface,
-      })),
-    });
-  }, [draft, record, componentOptions, store.existingComponentId, store.templateClass,
-      store.meshFile, store.transform, store.meshSizeMm, store.datums, store.wholeModule,
-      store.housingOnly, store.insertPose, store.meshFrameDetected]);
+    // WP-127: shared with "save to workspace" — one binding builder.
+    return boundRecordsFor(draft, store, existing);
+  }, [draft, record, componentOptions, store]);
 
   // WP-118: the write button's disabled reason, VISIBLE — a silently greyed
   // button read as "cannot save, can still corrupt" in round 16.
@@ -435,13 +409,16 @@ export function MechanicsPanel({
         </Box>
         {store.insertPose && (
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            {/* WP-133: these are CUBE-frame axes. The viewport draws that same
+                axis pointing up and its triad used to call it "y", so a bare
+                "-z" here read as a contradiction — four rounds of it. */}
             <Chip size="small" color="primary" variant="outlined"
-              label={`optical axis → ${store.insertPose.rot24.z}`} />
+              label={`record +z (optical axis) → ${axisText(store.insertPose.rot24.z, 'cube')}`} />
             <Chip size="small" variant="outlined"
-              label={`origin (${store.insertPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm`} />
+              label={`origin (${store.insertPose.offsetMm.map(v => v.toFixed(1)).join(', ')}) mm in the cube frame`} />
             {draft.ports.map(p => (
               <Chip key={p.name} size="small" variant="outlined"
-                label={`${p.name} faces ${String(asMountedDirection(store.insertPose!, p.direction))}`} />
+                label={portFacesText(p.name, asMountedDirection(store.insertPose!, p.direction), 'cube')} />
             ))}
           </Stack>
         )}
@@ -757,25 +734,90 @@ export function MechanicsPanel({
           </Alert>
         )}
       </Box>
-      <Typography variant="caption" color="text.secondary">
-        placement: [{store.transform.positionMm.map(v => v.toFixed(1)).join(', ')}] mm ·
-        rot [{store.transform.rotationDeg.map(v => v.toFixed(1)).join(', ')}]°
-        {(store.transform.positionMm.some(v => Math.abs(v) > 1e-6) ||
-          store.transform.rotationDeg.some(v => Math.abs(v) > 1e-6)) && (
-          <Button
-            size="small" sx={{ py: 0, ml: 1, minWidth: 0 }}
-            onClick={() =>
-              store.setTransform({ positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] })
-            }
-          >
-            reset placement
-          </Button>
-        )}
-        {' · '}
+      {/* WP-138: the placement is TYPEABLE, not caption-only — "we need to
+          be able to enter values of placement manually too". Document/cube
+          axes, same spelling the gizmo commits. */}
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+        <Typography variant="caption" color="text.secondary">placement (mm, cube axes)</Typography>
+        {(['x', 'y', 'z'] as const).map((ax, i) => (
+          <TextField
+            key={`p${ax}`} size="small" label={ax} type="number"
+            value={store.transform.positionMm[i]}
+            onChange={e => {
+              const positionMm = [...store.transform.positionMm] as [number, number, number];
+              positionMm[i] = Number(e.target.value) || 0;
+              store.setTransform({ ...store.transform, positionMm });
+            }}
+            sx={{ width: 84 }} inputProps={{ step: 0.5 }}
+          />
+        ))}
+        <Typography variant="caption" color="text.secondary">rot (°, extrinsic ZXY)</Typography>
+        {(['x', 'y', 'z'] as const).map((ax, i) => (
+          <TextField
+            key={`r${ax}`} size="small" label={ax} type="number"
+            value={store.transform.rotationDeg[i]}
+            onChange={e => {
+              const rotationDeg = [...store.transform.rotationDeg] as [number, number, number];
+              rotationDeg[i] = Number(e.target.value) || 0;
+              store.setTransform({ ...store.transform, rotationDeg });
+            }}
+            sx={{ width: 84 }} inputProps={{ step: 5 }}
+          />
+        ))}
+        <Button
+          size="small" sx={{ py: 0, minWidth: 0 }}
+          disabled={
+            store.transform.positionMm.every(v => Math.abs(v) < 1e-6) &&
+            store.transform.rotationDeg.every(v => Math.abs(v) < 1e-6)
+          }
+          onClick={() =>
+            store.setTransform({ positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] })
+          }
+        >
+          reset placement
+        </Button>
         <Tooltip title="paraxial EFL of the draft's optics tab (2×2 ABCD walk) — '—' for a reflective stack, where it is undefined">
-          <span>EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}</span>
+          <Typography variant="caption" color="text.secondary">
+            EFL ≈ {eflMm === null ? '—' : `${eflMm.toFixed(2)} mm`}
+          </Typography>
         </Tooltip>
-      </Typography>
+      </Stack>
+
+      {/* WP-137: the FILE→cube correction — for a wrongly exported mesh.
+          Writes the template's mesh-pose, so EVERY view draws the corrected
+          file; the free gizmo rotation stays view-only and refused at save. */}
+      {store.meshFile && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          <Tooltip title="wrong export frame? Rotate the FILE into the cube frame in 90° steps — recorded on the template as mesh-pose. The cube must end pins-up (z); orient the OPTIC with the insert pose, not with these.">
+            <Typography variant="caption" color="text.secondary">
+              mesh · file → cube correction
+            </Typography>
+          </Tooltip>
+          {(['x', 'y', 'z'] as const).map(ax => (
+            <Button
+              key={ax} size="small" variant="outlined" sx={{ minWidth: 44 }}
+              onClick={() => store.rotateMeshGrid(ax)}
+            >
+              {ax} ↻90°
+            </Button>
+          ))}
+          <Chip
+            size="small" variant="outlined"
+            label={
+              store.meshPoseGrid
+                ? `file +z → ${axisText(store.meshPoseGrid[0], 'cube')} · +x → ${axisText(store.meshPoseGrid[1], 'cube')}`
+                : store.meshFrameDetected === 'record'
+                  ? 'detected: y-up export (record frame)'
+                  : 'no correction — file taken as cube frame'
+            }
+          />
+          {store.meshPoseGrid && (
+            <Button size="small" sx={{ py: 0, minWidth: 0 }} onClick={() => store.resetMeshPose()}>
+              reset correction
+            </Button>
+          )}
+        </Stack>
+      )}
 
       {/* ── insert pose (WP-116): where the record frame sits in the cube ── */}
       {show.poseTools && store.insertPose && (
@@ -838,12 +880,9 @@ export function MechanicsPanel({
             {draft.ports.length > 0 && (
               <Alert severity="info" sx={{ py: 0 }}>
                 <Typography variant="caption">
-                  as mounted:{' '}
+                  as mounted, in CUBE axes (z = the pin axis, drawn up):{' '}
                   {draft.ports
-                    .map(p => {
-                      const d = asMountedDirection(store.insertPose!, p.direction);
-                      return `${p.name} faces ${Array.isArray(d) ? `[${d.join(', ')}]` : d}`;
-                    })
+                    .map(p => portFacesText(p.name, asMountedDirection(store.insertPose!, p.direction), 'cube'))
                     .join(' · ')}
                   {' — '}derived from the record's ports through the pose.
                 </Typography>
@@ -860,6 +899,12 @@ export function MechanicsPanel({
       </Divider>
       <Stack spacing={1}>
         {store.datums.map(datum => {
+          // WP-139 (reverting WP-138's world rows): datums are measured in
+          // the PART frame — the housing's own axes — so rotating the housing
+          // carries the beam with it, which is the point of a housed device.
+          // The fix round 22 actually needed was NAMING the frame, so the
+          // labels say "(part)" and the world value is shown alongside.
+          const world = datumToCube(datum, store.transform);
           const snap = snapToAxis(datum.direction);
           const setAxis = (i: 0 | 1 | 2) => (v: number | null) => {
             const next = [...datum.pointMm] as Vec3;
@@ -905,7 +950,8 @@ export function MechanicsPanel({
               <Stack direction="row" spacing={0.5} alignItems="center">
                 {(['x', 'y', 'z'] as const).map((axis, i) => (
                   <DecimalField
-                    key={axis} size="small" variant="standard" label={axis}
+                    key={axis} size="small" variant="standard"
+                    label={`${axis} (part)`}
                     value={datum.pointMm[i]}
                     onValue={setAxis(i as 0 | 1 | 2)}
                     slotProps={{ htmlInput: { style: { width: 56, fontSize: 12 } } }}
@@ -929,6 +975,11 @@ export function MechanicsPanel({
                       <MenuItem key={a.value} value={a.value}>{a.value}</MenuItem>
                     ))}
                   </TextField>
+                </Tooltip>
+                <Tooltip title="the same point in WORLD (cube) axes — read-only; edit the part-frame fields, they ride the mesh">
+                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    ≙ [{world.pointMm.map(v => (Math.round(v * 10) / 10 || 0).toFixed(1)).join(', ')}] (cube)
+                  </Typography>
                 </Tooltip>
                 <DecimalField
                   size="small" variant="standard" label="⌀mm"

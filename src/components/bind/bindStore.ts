@@ -10,6 +10,7 @@ import type { Vec3 } from '../../document';
 import * as THREE from 'three';
 import { insertPoseMatrix, type BindDatum, type DatumKind, type InsertPose, type MeshTransform } from '../../model/bindRecord';
 import { decomposeRot24 } from '../../document/rot24';
+import { RECORD_GRID, meshPoseQuat } from '../assembly/meshFrame';
 
 /** WP-116: 'pose' — a click on the mesh sets the INSERT POSE's origin (the
  * record frame's position in the cube, F3); rotation comes from the 90°
@@ -72,6 +73,15 @@ interface BindState {
    * Rx(±90°) wrapper node was detected (the pre-rotated exports), 'cube'
    * otherwise. Emitted as the template's mesh-frame declaration. */
   meshFrameDetected: 'cube' | 'record' | null;
+  /** WP-137: the user's FILE→cube correction — the TOTAL grid map, or null
+   * when no correction is declared (render falls back to the detected
+   * frame). Rotating a wrongly exported mesh writes THIS, never the
+   * throwaway view transform, so the correction ships on the template as
+   * `mesh-pose` and every view draws the same file. */
+  meshPoseGrid: [string, string] | null;
+  /** Compose a 90° rotation about a CUBE axis onto the mesh correction. */
+  rotateMeshGrid: (axis: 'x' | 'y' | 'z') => void;
+  resetMeshPose: () => void;
   /** The optic instance (datum id) the placement gizmo drives, or null. */
   selectedOpticId: string | null;
   /** Placement gizmo mode in optics mode: move the optic or ROTATE it onto
@@ -129,6 +139,19 @@ const DEFAULT_NAMES: Record<DatumKind, string> = {
 
 let datumCounter = 0;
 
+/** Snap an exact 90°-multiple rotation back to its grid spelling. */
+function gridOfQuat(q: THREE.Quaternion): [string, string] {
+  const toAxis = (v: THREE.Vector3): string => {
+    const ax = Math.abs(v.x) > 0.5 ? 'x' : Math.abs(v.y) > 0.5 ? 'y' : 'z';
+    const val = v[ax as 'x' | 'y' | 'z'];
+    return `${val > 0 ? '+' : '-'}${ax}`;
+  };
+  return [
+    toAxis(new THREE.Vector3(0, 0, 1).applyQuaternion(q)),
+    toAxis(new THREE.Vector3(1, 0, 0).applyQuaternion(q)),
+  ];
+}
+
 export const useBindStore = create<BindState>((set, get) => ({
   glbBytes: null,
   stepBytes: null,
@@ -156,6 +179,19 @@ export const useBindStore = create<BindState>((set, get) => ({
   meshBboxCenter: null,
   meshSizeMm: null,
   meshFrameDetected: null,
+  meshPoseGrid: null,
+  rotateMeshGrid: axis => set(s => {
+    // Current TOTAL file→cube map: an explicit correction, else the detected
+    // frame's sugar (a wrapper file starts at the record grid, not identity).
+    const current = s.meshPoseGrid ?? (s.meshFrameDetected === 'record' ? RECORD_GRID : null);
+    const base = meshPoseQuat(current ?? ['+z', '+x']);
+    const step = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0),
+      Math.PI / 2,
+    );
+    return { meshPoseGrid: gridOfQuat(step.multiply(base)) };
+  }),
+  resetMeshPose: () => set({ meshPoseGrid: null }),
   selectedOpticId: null,
   opticsGizmoMode: 'translate',
 
@@ -170,6 +206,7 @@ export const useBindStore = create<BindState>((set, get) => ({
       meshBboxCenter: null,
       meshSizeMm: null,
       meshFrameDetected: null,
+      meshPoseGrid: null,
       selectedOpticId: null,
       error: null,
     }),
@@ -221,10 +258,28 @@ export const useBindStore = create<BindState>((set, get) => ({
   fitToCube: () => {
     const c = get().meshBboxCenter;
     if (!c) return;
-    // Center the module's bbox on the cube origin (translation only). The
-    // centre is FILE-NATIVE (WP-120); the doc-frame translation p must
-    // satisfy docToThree(p) = (-cx, -cy, -cz), i.e. p = (-cx, cz, -cy).
-    set({ transform: { positionMm: [-c[0], c[2], -c[1]], rotationDeg: [0, 0, 0] } });
+    // Centre the module's bbox on the cube origin (translation only). The
+    // centre is measured in the FILE's root axes (WP-120), but the
+    // translation is applied OUTSIDE the content basis — so the formula
+    // depends on which basis the content got (WP-135, same rule as the
+    // assembly): a cube-frame file renders inside <group quaternion={B}>
+    // (file axes ≡ doc axes → plain negation), while a record-frame file
+    // (converted STP, wrapper-node exports) renders as-is (file axes ≡
+    // viewer axes → docToThree(t) = −c, i.e. t = [−cx, cz, −cy]).
+    // Generalized for mesh-pose (WP-137): the content renders as B·R_total,
+    // so the doc translation that centres it is t = −R_total·c. Identity →
+    // plain negation; the record grid reproduces the old [−cx, cz, −cy].
+    const st = get();
+    const total = st.meshPoseGrid ?? (st.meshFrameDetected === 'record' ? RECORD_GRID : null);
+    const rc = new THREE.Vector3(c[0], c[1], c[2]).applyQuaternion(
+      meshPoseQuat(total ?? ['+z', '+x']),
+    );
+    set({
+      transform: {
+        positionMm: [-rc.x, -rc.y, -rc.z],
+        rotationDeg: [0, 0, 0],
+      },
+    });
   },
   selectOptic: selectedOpticId => set({ selectedOpticId }),
   setOpticsGizmoMode: opticsGizmoMode => set({ opticsGizmoMode }),
@@ -277,7 +332,7 @@ export const useBindStore = create<BindState>((set, get) => ({
     set({
       glbBytes: null, stepBytes: null, meshFile: '', datums: [],
       transform: { positionMm: [0, 0, 0], rotationDeg: [0, 0, 0] },
-      meshBboxCenter: null, meshSizeMm: null, meshFrameDetected: null, selectedOpticId: null, error: null,
+      meshBboxCenter: null, meshSizeMm: null, meshFrameDetected: null, meshPoseGrid: null, selectedOpticId: null, error: null,
       wholeModule: false, housingOnly: false, showMesh: true, insertPose: null,
       hideCubeHalves: false,
     }),

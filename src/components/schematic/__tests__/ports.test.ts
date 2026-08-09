@@ -10,7 +10,8 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { DocCategory, DocPart } from '../../../document';
 import { useSourceDesignStore } from '../../../document/sourceDesignStore';
-import { beamAxesOf, opticalAxisOf, portsOf, resolvePortRef } from '../ports';
+import {
+  beamAxesOfPorts, beamAxesOf, opticalAxisOf, portsOf, resolvePortRef } from '../ports';
 
 const FLUO_YAML = readFileSync(
   join(__dirname, '..', '..', '..', 'model', 'dsn', '__tests__', 'fixtures', 'fluo-scope.dsn.yml'),
@@ -254,5 +255,25 @@ describe('actuated-DOF beam swing (WP-42)', () => {
       ],
     }));
     expect(Math.abs((both.foldDeg ?? 0) - 90)).toBeCloseTo(30, 4);
+  });
+});
+
+describe('a part with no ports (WP-149)', () => {
+  it('reports no beam instead of crashing the page', () => {
+    // A fresh draft in the parts editor has no ports until you add one.
+    // `entryPortOf` returned `ports[0]` while claiming to return a port, so
+    // every caller dereferenced undefined and took the editor down.
+    const axes = beamAxesOfPorts([]);
+    expect(axes.exit).toBeNull();
+    expect(axes.foldDeg).toBeNull();
+    expect(axes.entry).toEqual([1, 0, 0]);
+  });
+
+  it('still folds normally once the ports exist', () => {
+    const axes = beamAxesOfPorts([
+      { name: 'front', direction: '-z', positionMm: [0, 0, 0], afterSurface: null },
+      { name: 'reflected', direction: '-x', positionMm: [0, 0, 0], afterSurface: 0 },
+    ]);
+    expect(axes.foldDeg).toBeCloseTo(90, 6);
   });
 });

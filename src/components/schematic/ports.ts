@@ -89,6 +89,10 @@ export function isFiberPort(parts: DocPart[], ref: PortRef): boolean {
   return portsOf(part).find(p => p.name === name)?.coupling === 'fiber';
 }
 
+/** The neutral optical axis: what `dirVecOf` itself falls back to. Used only
+ * where there is no port to ask — never to invent a fold. */
+const NO_PORT_AXIS: Vec3 = [1, 0, 0];
+
 function beamDirOf(port: SourcePort): Vec3 {
   const dir = dirVecOf(port.direction);
   // Entry ports face against the beam; negate to get the travel direction.
@@ -97,7 +101,13 @@ function beamDirOf(port: SourcePort): Vec3 {
   return [dir[0] * sign || 0, dir[1] * sign || 0, dir[2] * sign || 0];
 }
 
-function entryPortOf(ports: SourcePort[]): SourcePort {
+/**
+ * WP-149: the return type used to LIE — `ports[0]` is `undefined` for a part
+ * with no ports, and every caller dereferenced it. A draft with no ports yet
+ * is a normal state in the parts editor (you add them one at a time), so
+ * this crashed the whole page on `.direction` of undefined.
+ */
+function entryPortOf(ports: SourcePort[]): SourcePort | undefined {
   return (
     ports.find(p => p.name === 'front') ??
     ports.find(p => INPUT_PORT_NAMES.test(p.name)) ??
@@ -112,7 +122,8 @@ function entryPortOf(ports: SourcePort[]): SourcePort {
  * with +x as the optical axis, so scenes rotate them onto this vector.
  */
 export function opticalAxisOf(part: DocPart): Vec3 {
-  return beamDirOf(entryPortOf(recordPortsOf(part)));
+  const entry = entryPortOf(recordPortsOf(part));
+  return entry ? beamDirOf(entry) : NO_PORT_AXIS;
 }
 
 /**
@@ -122,7 +133,7 @@ export function opticalAxisOf(part: DocPart): Vec3 {
  * rays from the annotated anchor — matching the pin and the service trace.
  */
 export function anchorFrameMm(part: DocPart): Vec3 {
-  return entryPortOf(recordPortsOf(part)).positionMm;
+  return entryPortOf(recordPortsOf(part))?.positionMm ?? [0, 0, 0];
 }
 
 export interface BeamAxes {
@@ -157,6 +168,9 @@ export interface BeamAxes {
  */
 export function beamAxesOfPorts(ports: SourcePort[]): BeamAxes {
   const entryPort = entryPortOf(ports);
+  // No ports, no beam — and nothing to fold. Honest, and it keeps a
+  // half-authored draft from taking the editor down with it.
+  if (!entryPort) return { entry: NO_PORT_AXIS, exit: null, foldDeg: null };
   const entry = beamDirOf(entryPort);
 
   let exit: Vec3 | null = null;

@@ -326,6 +326,9 @@ export interface BindInput {
    * detected at load — declared on the template so `library validate`'s
    * axes check stops guessing between the two shipping conventions. */
   meshFrame?: 'cube' | 'record' | null;
+  /** WP-137: the user's FILE→cube correction (total grid map), when the file
+   * was exported in the wrong frame. Ships as the template's `mesh-pose`. */
+  meshPoseGrid?: [string, string] | null;
   /**
    * WP-116: the F2→F3 pose. When present, the template's frames are
    * insert-pose ∘ recordFrames and the datums are ignored — the pose IS the
@@ -500,6 +503,41 @@ export function bindToRecords(input: BindInput): BoundRecords {
   if ((input.recordPorts ?? []).length === 0) {
     warnings.push('the record declares no ports — chaining will not work');
   }
+  // WP-129/133: does the MOUNTED fold stay in the baseplate plane?
+  //
+  // This is a STRING test and therefore weak: it can see that an arm points
+  // along the pin axis, but it cannot see whether the mirror in the mesh can
+  // physically fold that way. The durable check measures the plate normal
+  // from the GLB (PCA of the reflective node's vertices) and compares it with
+  // the reflection law — see DSN-CONTRACT §4c. Until that lands this warning
+  // is a hint, not a verdict, and it is worded as one.
+  //
+  // Round 19 shipped a mirror cube whose template read front:+x,
+  // reflected:−z — a beam entering a side face and leaving through the
+  // floor. The GLB says otherwise (the plate is tilted about the pin axis,
+  // so it folds x↔y), and no placement convention can rescue a record whose
+  // optics disagree with its mechanics: the pose was rolled 90° about the
+  // entry axis. A cube that deflects along the pins IS legal (periscopes
+  // exist), so this is a warning that names the fix, not a wall.
+  if (pose && input.wholeModule) {
+    const vertical = Object.entries(ports).filter(([name, p]) => {
+      const dir = (p as { direction?: string }).direction ?? '';
+      return name !== 'front' && (dir === '+z' || dir === '-z');
+    });
+    const entryVertical = /^[+-]z$/.test(
+      (ports.front as { direction?: string } | undefined)?.direction ?? '',
+    );
+    if (vertical.length > 0 && !entryVertical) {
+      warnings.push(
+        `as mounted, ${vertical.map(([n]) => n).join('/')} leaves along ` +
+          `${vertical.map(([, p]) => `${(p as { direction?: string }).direction} (cube)`).join('/')} — ` +
+          'the cube frame\'s z IS the pin axis, so this beam crosses between layers rather ' +
+          'than staying in the baseplate plane. That is a real part (a periscope cube), so ' +
+          'this is only a check: if you meant an in-plane fold, roll the insert pose 90° ' +
+          'about the entry axis.',
+      );
+    }
+  }
 
   // WP-116: no stub component, ever — the caller ships the record verbatim.
   const component: Record<string, unknown> | null = null;
@@ -520,16 +558,37 @@ export function bindToRecords(input: BindInput): BoundRecords {
     // WP-109: the cube's real z pitch is 55 mm, not 50 — a hardcoded 50/50/50
     // envelope makes `library validate`'s mesh check disagree with every
     // whole-cube export. The caller passes the measured box when it has one.
+    // WP-135: the box is measured in FILE axes; the envelope is a CUBE-frame
+    // field. For a record-frame file (converted STP, wrapper exports) file
+    // axes are cube (x, z, −y) — swap y/z back, or the template ships an
+    // envelope its own mesh check must reject (testlens: 49.8 × 53.8 × 49.8
+    // recorded for a 49.8 × 49.8 × 53.8 part).
     envelope: input.envelopeMm
-      ? {
-          'x-mm': round3(input.envelopeMm[0]),
-          'y-mm': round3(input.envelopeMm[1]),
-          'z-mm': round3(input.envelopeMm[2]),
-        }
+      ? (() => {
+          const [ex, ey, ez] = input.envelopeMm;
+          const cube = input.meshFrame === 'record' ? [ex, ez, ey] : [ex, ey, ez];
+          return {
+            'x-mm': round3(cube[0]),
+            'y-mm': round3(cube[1]),
+            'z-mm': round3(cube[2]),
+          };
+        })()
       : { 'x-mm': 50, 'y-mm': 50, 'z-mm': 55 },
     ...(isStep ? { step: input.meshFile } : {}),
     glb: input.meshFile.replace(/\.(step|stp)$/i, '.glb'),
     ...(input.meshFrame ? { 'mesh-frame': input.meshFrame } : {}),
+    // WP-137: the correction is the TOTAL file→cube map and wins over the
+    // sugar above — emitted only when it says something the sugar does not.
+    ...(input.meshPoseGrid
+      ? {
+          'mesh-pose': {
+            rotation: {
+              type: 'grid',
+              grid: { z: input.meshPoseGrid[0], x: input.meshPoseGrid[1] },
+            },
+          },
+        }
+      : {}),
     optical_ports: Object.fromEntries(
       Object.entries(ports).map(([name, port]) => [name, port]),
     ),
@@ -542,9 +601,11 @@ export function bindToRecords(input: BindInput): BoundRecords {
   const t = input.meshTransform;
   if (t.rotationDeg.some(v => Math.abs(v) > 1e-6)) {
     errors.push(
-      'the mesh is rotated in the viewport — that rotation is recorded nowhere. ' +
-        'The cube frame is the reference: leave the mesh as exported and rotate ' +
-        'the insert pose instead (or re-export the file in the cube frame).',
+      'the mesh is rotated freely in the viewport — that rotation is recorded ' +
+        'nowhere. Was the file exported in the wrong frame? Use the mesh ' +
+        '"rotate 90°" buttons instead: they write the correction onto the ' +
+        'template (mesh-pose), so every view draws the corrected file. The ' +
+        'OPTIC is oriented by the insert pose, never by turning the mesh.',
     );
   }
   if (t.positionMm.some(v => Math.abs(v) > 1e-6)) {

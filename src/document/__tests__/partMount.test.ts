@@ -124,6 +124,62 @@ describe('the mount discriminator', () => {
     expect(entry.mount).toBe('bare');
   });
 
+  // WP-127: "save to browser" used to store the component alone, so a draft
+  // the user had just bound to a cube came back as a bare primitive.
+  const DRAFT_BINDING = {
+    template: {
+      kind: 'mechanical_template',
+      id: 'user.tpl.draft_mirror',
+      class: 'fixed',
+      footprint_grid: [1, 1, 1],
+      'mesh-frame': 'cube',
+      'insert-pose': { rotation: { type: 'grid', grid: { z: '-x', x: '+z' } } },
+      frames: { optical: { 'x-mm': 0, 'y-mm': 0, 'z-mm': 0 } },
+      optical_ports: {
+        front: { frame: 'optical', direction: '+x' },
+        reflected: { frame: 'optical', direction: '-z', 'after-surface': 0 },
+      },
+    },
+    module: { kind: 'cube_module', id: 'user.cube.draft_mirror' },
+  };
+
+  it('a BOUND draft is a cube — class, footprint, mesh frame and as-mounted pins', () => {
+    const [entry] = entriesFromWorkspace(
+      { [DRAFT.id]: DRAFT },
+      {},
+      { [DRAFT.id]: DRAFT_BINDING },
+      { [DRAFT.id]: 'blob:mesh' },
+    );
+    expect(entry.mount).toBe('cube');
+    expect(entry.unbound).toBe(false);
+    expect(entry.templateClass).toBe('fixed');
+    expect(entry.templateId).toBe('user.tpl.draft_mirror');
+    expect(entry.glbUrl).toBe('blob:mesh');
+    expect(entry.meshFrame).toBe('cube');
+    // The pins the CUBE presents (WP-122), not the record's own ±z ports —
+    // so placement yaws instead of tipping (WP-124).
+    expect(entry.portsFrame).toBe('mounted');
+    expect(entry.ports.map(p => `${p.name}:${p.direction}`).sort()).toEqual([
+      'front:+x',
+      'reflected:-z',
+    ]);
+  });
+
+  it('a binding with no footprint (a housing) stays out of the cube state', () => {
+    const [entry] = entriesFromWorkspace(
+      { [DRAFT.id]: DRAFT },
+      {},
+      {
+        [DRAFT.id]: {
+          ...DRAFT_BINDING,
+          template: { ...DRAFT_BINDING.template, footprint_grid: null },
+        },
+      },
+    );
+    expect(entry.mount).toBe('bare');
+    expect(entry.unbound).toBe(true);
+  });
+
   it('all three still agree with the legacy `unbound` flag (not in a cube)', () => {
     const cube = entriesFromIndex([MODULE], 'http://x')[0];
     const bare = entriesFromComponents([BARE], [], 'http://x')[0];

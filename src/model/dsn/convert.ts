@@ -243,6 +243,15 @@ export function bareComponentSpec(part: DocPart): CompSpec {
   const enabled = part.params.enabled !== false;
   const wavelengthUm = part.params.wavelengthUm;
   const dof = dofSpecsOf(part);
+  // WP-145: carry what this placement EMITS onto the design. Without it the
+  // compiler had nothing to size the entrance pupil from and fell back to a
+  // hardcoded 10 mm — the canvas drew the record's 2 mm, optiland traced 10.
+  // (emissionOf() adds the full §9.5 block from the same index facts;
+  // materialize ranks emission first, so the two blocks cannot disagree.)
+  const entry = libraryEntryOf(part.libraryRef);
+  const beamDiameterMm = entry?.beamDiameterMm ?? null;
+  const wavelengthsUm = entry?.wavelengthsUm ?? [];
+  const emits = part.category === 'source' && (beamDiameterMm !== null || wavelengthsUm.length > 0);
   return {
     type: 'primitive',
     primitive: { type: 'glb', model: part.libraryRef },
@@ -250,6 +259,14 @@ export function bareComponentSpec(part: DocPart): CompSpec {
     optics: paletteOpticsOf(part),
     pose: poseSpecOf(part),
     ...(dof.length ? { dof: dof as CompSpec['dof'] } : {}),
+    ...(emits
+      ? {
+          source: {
+            ...(wavelengthsUm.length > 0 ? { wavelengths_um: wavelengthsUm } : {}),
+            ...(beamDiameterMm !== null ? { beam_diameter_mm: beamDiameterMm } : {}),
+          },
+        }
+      : {}),
     ...(enabled ? {} : { enabled: false }),
     ...(typeof wavelengthUm === 'number' && wavelengthUm > 0
       ? { 'wavelength-um': wavelengthUm }

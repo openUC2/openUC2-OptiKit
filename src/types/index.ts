@@ -35,6 +35,8 @@ export interface ModuleDefinition {
   glbOffset?: [number, number, number];
   /** WP-123: which frame the GLB content speaks ('cube' | 'record' | ''). */
   meshFrame?: string;
+  /** WP-137: the FILE→cube correction grid [z, x] (wins over meshFrame). */
+  meshPoseGrid?: [string, string] | null;
   /** Explicit schematic category for library-registry modules (WP-34) —
    * checked before the group-name heuristics in `categoryOf`. */
   docCategory?: string;
