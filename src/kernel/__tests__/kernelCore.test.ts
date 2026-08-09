@@ -1,0 +1,169 @@
+/**
+ * EMB-B round-trip: the vendored oc-wasm kernel loads a materialized Scene3
+ * fixture and traces it in world frame (integration spec, EMB-B exit criteria).
+ *
+ * The fixture is the KIT-05 achromat probe (collimated 488 nm disc, r = 1 mm,
+ * 16 rays -> openuc2.lens.achromat_25mm_f50 at the origin -> detector at
+ * +100 mm), materialized by optikit-core `canvas.materialize`. Regenerate with
+ * `tests/cross_engine/kit05.probe_design` + `materialize` if the materializer's
+ * output format changes. The kernel's physics is verified cross-engine in
+ * optikit-core (KIT-05/06); this test guards the vendor plumbing: package
+ * resolution, wasm init, Scene3 parse, and the traceWorld3D buffer contract.
+ */
+
+import { readFileSync } from 'node:fs';
+import { beforeAll, describe, expect, it } from 'vitest';
+import init, { Canvas } from 'oc-wasm';
+import { decodeHits, parseDetectorResult } from '../detector';
+import { KernelCore } from '../kernelCore';
+import { SEGMENT_FLOATS } from '../messages';
+
+const FIXTURE = new URL('./fixtures/achromat_probe.ocanvas.json', import.meta.url);
+const WASM = new URL('../../../node_modules/oc-wasm/oc_wasm_bg.wasm', import.meta.url);
+
+// 16 rays x 3 legs (source->front surface, through the glass, back->detector).
+const EXPECTED_SEGMENTS = 48;
+
+let core: KernelCore;
+
+beforeAll(async () => {
+  await init({ module_or_path: readFileSync(WASM) });
+  core = new KernelCore(new Canvas());
+});
+
+describe('kernel round-trip (EMB-B)', () => {
+  it('loads the materialized Scene3 fixture', () => {
+    const res = core.handle({ id: 1, type: 'loadScene', sceneJson: readFileSync(FIXTURE, 'utf8') });
+    expect(res.type).toBe('sceneLoaded');
+    if (res.type !== 'sceneLoaded') return;
+    const report = JSON.parse(res.report);
+    expect(report.dimension).toBe(3);
+    expect(report.previewMode).toBe('full_3d');
+    expect(report.migratedFromV1).toBe(false);
+  });
+
+  it('traces the expected world-frame segments (f64)', () => {
+    const res = core.handle({ id: 2, type: 'traceWorld' });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    expect(res.buffer.length % SEGMENT_FLOATS).toBe(0);
+    expect(res.buffer.length / SEGMENT_FLOATS).toBe(EXPECTED_SEGMENTS);
+    // First leg launches from the source plane 100 mm upstream, aimed +x.
+    const [ax, , , bx] = res.buffer;
+    expect(ax).toBeCloseTo(-100, 6);
+    expect(bx).toBeGreaterThan(ax);
+  });
+
+  it('fast f32 preview returns the same segment count', () => {
+    const res = core.handle({ id: 3, type: 'traceWorldFast' });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    expect(res.buffer.length / SEGMENT_FLOATS).toBe(EXPECTED_SEGMENTS);
+  });
+
+  it('reports errors without throwing', () => {
+    const res = core.handle({ id: 4, type: 'loadScene', sceneJson: 'not json' });
+    expect(res.type).toBe('error');
+  });
+
+  // --- EMB-E: the detector readout rides the settled f64 trace ---------------
+
+  it('settled trace carries the f64 detector readout', () => {
+    const res = core.handle({ id: 5, type: 'traceWorld' });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    const detector = res.detector;
+    expect(detector).toBeTruthy();
+    const result = parseDetectorResult(detector!.resultJson)!;
+    // All 16 probe rays land on the detector.
+    expect(result.hits).toBe(16);
+    expect(result.totalSignal).toBeGreaterThan(0);
+    expect(result.bins[0] * result.bins[1]).toBe(result.incident.length);
+    // The probe is axially symmetric, so the f64 centroid sits on axis — the
+    // EMB-E embedding criterion (same kernel, same scene, honest numbers).
+    expect(Math.abs(result.centroid[0])).toBeLessThan(1e-9);
+    expect(Math.abs(result.centroid[1])).toBeLessThan(1e-9);
+    // Hit records: [halfW, halfH, n, 6 floats per record].
+    const hits = decodeHits(detector!.hits)!;
+    expect(hits.count).toBe(16);
+    expect(detector!.hits.length).toBe(3 + 16 * 6);
+    expect(hits.halfW).toBeGreaterThan(0);
+    // Binned flux sums to the f64 total signal (both from the same readout).
+    const binned = result.incident.reduce((a, b) => a + b, 0);
+    expect(binned).toBeCloseTo(result.totalSignal, 9);
+  });
+
+  it('fast f32 preview never carries a readout (rule 5)', () => {
+    const res = core.handle({ id: 6, type: 'traceWorldFast' });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    expect(res.detector).toBeUndefined();
+  });
+
+  it('readout: false skips the detector readout, same segments', () => {
+    const res = core.handle({ id: 7, type: 'traceWorld', readout: false });
+    expect(res.type).toBe('segments');
+    if (res.type !== 'segments') return;
+    expect(res.detector).toBeUndefined();
+    expect(res.buffer.length / SEGMENT_FLOATS).toBe(EXPECTED_SEGMENTS);
+  });
+
+  it('never emits ghost segments (ghosts pinned off for the openUC2 kernel)', () => {
+    // The achromat is uncoated glass: with ghosts on, Fresnel back-reflections
+    // would branch at every surface. The constructor pins setGhosts(false).
+    const res = core.handle({ id: 8, type: 'traceWorld' });
+    if (res.type !== 'segments') throw new Error('trace failed');
+    for (let i = 0; i < res.buffer.length / SEGMENT_FLOATS; i++) {
+      const flags = res.buffer[i * SEGMENT_FLOATS + 10];
+      expect(flags & 4, `segment ${i} carries the ghost bit`).toBe(0);
+    }
+  });
+});
+
+describe('tier-2 transformTrace (EMB-F / CV-C)', () => {
+  it('moves a batch on the loaded scene and the fast retrace follows', () => {
+    // Fresh scene so earlier tests' state cannot leak in.
+    core.handle({ id: 10, type: 'loadScene', sceneJson: readFileSync(FIXTURE, 'utf8') });
+    const scene = JSON.parse(readFileSync(FIXTURE, 'utf8')) as {
+      bodies: { common: { id: number } }[];
+      apertures: { common: { id: number } }[];
+    };
+    const lensIds = [
+      ...scene.bodies.map(b => b.common.id),
+      ...scene.apertures.map(a => a.common.id),
+    ];
+
+    const before = core.handle({ id: 11, type: 'traceWorldFast' });
+    if (before.type !== 'segments') throw new Error('baseline trace failed');
+
+    // Identity delta: picture unchanged.
+    const same = core.handle({
+      id: 12,
+      type: 'transformTrace',
+      batches: [{ ids: lensIds, delta: [0, 0, 0, 0, 0, 0, 1] }],
+    });
+    if (same.type !== 'segments') throw new Error('identity transform failed');
+    expect(Array.from(same.buffer)).toEqual(Array.from(before.buffer));
+
+    // Move the lens (body + mount) 20 mm sideways: the 1 mm probe beam misses
+    // the glass and the picture must change without any scene reload.
+    const moved = core.handle({
+      id: 13,
+      type: 'transformTrace',
+      batches: [{ ids: lensIds, delta: [0, 20, 0, 0, 0, 0, 1] }],
+    });
+    expect(moved.type).toBe('segments');
+    if (moved.type !== 'segments') return;
+    expect(Array.from(moved.buffer)).not.toEqual(Array.from(before.buffer));
+  });
+
+  it('an unknown id answers error and the caller falls back to tier 1', () => {
+    core.handle({ id: 14, type: 'loadScene', sceneJson: readFileSync(FIXTURE, 'utf8') });
+    const res = core.handle({
+      id: 15,
+      type: 'transformTrace',
+      batches: [{ ids: [99999], delta: [1, 0, 0, 0, 0, 0, 1] }],
+    });
+    expect(res.type).toBe('error');
+  });
+});

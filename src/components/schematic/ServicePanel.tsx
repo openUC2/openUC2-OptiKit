@@ -33,6 +33,7 @@ import { DEFAULT_CORE_URL, getCoreUrl, setCoreUrl } from '../../api/coreClient';
 import { selectPart, useDocPaths, useDocRevision } from '../../document';
 import { pathColor, sourceTint } from './colors';
 import { CalibrateDialog } from './CalibrateDialog';
+import { KernelPreviewPanel } from './KernelPreviewPanel';
 import { LayoutDialog } from './LayoutDialog';
 import { MarkerList } from './MarkerList';
 import { OptimizeDialog } from './OptimizeDialog';
@@ -161,6 +162,8 @@ export function ServicePanel({ onZoomToPart }: { onZoomToPart: (partId: string) 
 
   return (
     <Box>
+      <KernelPreviewPanel />
+
       <Divider sx={{ my: 1.5 }}>
         <Typography variant="overline">optikit-core service</Typography>
       </Divider>

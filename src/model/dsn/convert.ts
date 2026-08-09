@@ -154,12 +154,86 @@ export function paletteOpticsOf(part: {
     portSpecs[p.name] = spec;
   }
 
+  const emission =
+    part.category === 'source'
+      ? emissionOf(lib, part.params, Object.keys(portSpecs))
+      : null;
   return {
     ...(surfaces ? { fragment: { surfaces } } : {}),
     ...(passthrough ? { passthrough: true } : {}),
+    ...(emission ? { emission } : {}),
     frames,
     ports: portSpecs,
   } as NonNullable<CompSpec['optics']>;
+}
+
+/**
+ * §9.5 emission block for a placed source, from the palette entry's
+ * normalized record facts. Without it a source exports as bare ports and the
+ * kernel materializes the point/collimated 0.55 µm default — one axial green
+ * ray, whatever the laser. The placement's picked line (WP-47 runtime state)
+ * filters the spectrum here, because materialize reads `emission.spectrum`
+ * before the picker.
+ */
+function emissionOf(
+  lib: ReturnType<typeof libraryEntryOf>,
+  params: Record<string, unknown>,
+  portNames: string[],
+): Record<string, unknown> | null {
+  if (!lib || portNames.length === 0) return null;
+  const lines = (lib.wavelengthsUm ?? []).filter(w => w > 0);
+  const divergence = lib.divergenceDeg ?? 0;
+  const beam = lib.beamDiameterMm ?? null;
+  if (lines.length === 0 && divergence <= 0 && !(beam && beam > 0)) return null;
+  const picked =
+    typeof params.wavelengthUm === 'number' && params.wavelengthUm > 0
+      ? params.wavelengthUm
+      : null;
+  const spectrum = (picked !== null ? [picked] : lines).map(w => ({
+    wavelength_um: round6(w),
+    weight: 1.0,
+  }));
+  return {
+    port: portNames.includes('out') ? 'out' : portNames[0],
+    ...(spectrum.length ? { spectrum } : {}),
+    // WP-112 reconciliation: beam_diameter_mm is the 1/e² full diameter; the
+    // emission disc is its radius. Divergence is the full angle; the cone
+    // takes the half angle.
+    spatial:
+      beam && beam > 0
+        ? { type: 'disc', radius_mm: round6(beam / 2) }
+        : { type: 'point' },
+    angular:
+      divergence > 0
+        ? { type: 'cone', half_angle_deg: round6(divergence / 2) }
+        : { type: 'collimated' },
+    flux: 1.0,
+  };
+}
+
+/**
+ * The record's DOF declarations, as design `dof:` entries. Without them the
+ * engines IGNORE the part's `instantiation.dof_values` (`apply_dof_values`
+ * looks the name up in `comp.dof`) — a dragged T2 insert would write numbers
+ * nothing reads. The palette entry carries the record's declarations.
+ */
+function dofSpecsOf(part: DocPart): Record<string, unknown>[] {
+  const entry = libraryEntryOf(part.libraryRef);
+  // A fixed (T1) template with DOFs is the E_T1_HAS_DOF design error — a
+  // malformed registry row must not poison the export.
+  if (!entry || entry.templateClass === 'fixed') return [];
+  return entry.dofs
+    .filter(d => d.axis === 'x' || d.axis === 'y' || d.axis === 'z')
+    .map(d => ({
+      name: d.name,
+      kind: d.kind || 'translation',
+      axis: d.axis,
+      ...(d.range ? { range: [round6(d.range[0]), round6(d.range[1])] } : {}),
+      ...(d.unit ? { unit: d.unit } : {}),
+      ...(d.actuatable ? { actuatable: true } : {}),
+      ...(d.pivotFrame ? { 'pivot-frame': d.pivotFrame } : {}),
+      ...(typeof d.surface === 'number' ? { surface: d.surface } : {}),
+    }));
 }
 
 /** Component spec for a part with no retained source (palette placement). */
@@ -171,10 +245,13 @@ export function bareComponentSpec(part: DocPart): CompSpec {
   // WP-145: carry what this placement EMITS onto the design. Without it the
   // compiler had nothing to size the entrance pupil from and fell back to a
   // hardcoded 10 mm — the canvas drew the record's 2 mm, optiland traced 10.
+  // (The same quantity also reaches the kernel through `optics.emission`;
+  // WP-152 picks the canonical home — until then both are written.)
   const entry = libraryEntryOf(part.libraryRef);
   const beamDiameterMm = entry?.beamDiameterMm ?? null;
   const wavelengthsUm = entry?.wavelengthsUm ?? [];
   const emits = part.category === 'source' && (beamDiameterMm !== null || wavelengthsUm.length > 0);
+  const dof = dofSpecsOf(part);
   return {
     type: 'primitive',
     primitive: { type: 'glb', model: part.libraryRef },
@@ -189,6 +266,7 @@ export function bareComponentSpec(part: DocPart): CompSpec {
           },
         }
       : {}),
+    ...(dof.length ? { dof: dof as CompSpec['dof'] } : {}),
     ...(enabled ? {} : { enabled: false }),
     ...(typeof wavelengthUm === 'number' && wavelengthUm > 0
       ? { 'wavelength-um': wavelengthUm }

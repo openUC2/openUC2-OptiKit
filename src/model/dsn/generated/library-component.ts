@@ -34,6 +34,15 @@ export type Direction = string | number[];
 export type AfterSurface = number | null;
 export type Coupling = '' | 'fiber';
 export type Passthrough = boolean;
+export type Port = string;
+export type WavelengthUm = number;
+export type Weight = number;
+export type Spectrum = EmissionLine[];
+export type Type = string;
+export type RadiusMm = number | string | null;
+export type Type1 = string;
+export type HalfAngleDeg = number | null;
+export type Flux = number;
 export type Name = string;
 export type Mpn = string;
 export type Url = string;
@@ -77,6 +86,7 @@ export interface OpticsSpec {
   frames?: Frames;
   ports?: Ports;
   passthrough?: Passthrough;
+  emission?: EmissionSpec | null;
   [k: string]: unknown;
 }
 /**
@@ -129,6 +139,51 @@ export interface PortSpec {
   direction?: Direction;
   'after-surface'?: AfterSurface;
   coupling?: Coupling;
+  [k: string]: unknown;
+}
+/**
+ * Physical emission model of a source component (canvas spec §9.5).
+ *
+ * Beam radius, divergence, spectrum, and flux are properties of the module —
+ * unlike ray counts (numerical ``trace_quality`` policy) and unlike a
+ * sequential path's EPD (analysis configuration). A record with this block
+ * emits exactly one ``Source3`` at ``port``, however many paths reference it.
+ */
+export interface EmissionSpec {
+  port?: Port;
+  spectrum?: Spectrum;
+  spatial?: EmissionSpatial;
+  angular?: EmissionAngular;
+  flux?: Flux;
+  [k: string]: unknown;
+}
+/**
+ * One spectral line of a source's emission: wavelength (µm) and weight.
+ */
+export interface EmissionLine {
+  wavelength_um: WavelengthUm;
+  weight?: Weight;
+  [k: string]: unknown;
+}
+/**
+ * Spatial extent of the emitted beam. ``type`` is ``point`` or ``disc``
+ * (dialect v0); ``disc`` requires ``radius_mm``. The materializer rejects
+ * anything else with ``E_SIM_UNSUPPORTED`` — the schema stays permissive so
+ * newer records degrade gracefully in older tools.
+ */
+export interface EmissionSpatial {
+  type?: Type;
+  radius_mm?: RadiusMm;
+  [k: string]: unknown;
+}
+/**
+ * Angular emission model. The dialect supports ``collimated`` (a beam) and
+ * ``cone`` (uniform in solid angle within ``half_angle_deg`` about the port
+ * direction — a fluorophore emitting into an objective's acceptance cone).
+ */
+export interface EmissionAngular {
+  type?: Type1;
+  half_angle_deg?: HalfAngleDeg;
   [k: string]: unknown;
 }
 /**

@@ -50,6 +50,8 @@ interface AssemblyState {
   refreshDrc: () => Promise<void>;
   /** Client-side marker for a clamped drag attempt (cleared on next DRC run). */
   reportClamp: (partId: string, dofKey: string, attempted: number, range: [number, number]) => void;
+  /** Drop the clamp marker once the drag is back inside the range. */
+  clearClamp: (dofKey: string) => void;
   clearError: () => void;
 }
 
@@ -168,14 +170,27 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
   },
 
   reportClamp: (partId, dofKey, attempted, range) => {
+    // Not a fault: the handle hit the end of the stage's declared travel and
+    // stopped following the pointer. Says so, and clears once back in range.
+    const limit = attempted > range[1] ? range[1] : range[0];
     const marker: Marker = {
       id: `clamp-${dofKey}`,
       code: 'DRC_RANGE',
-      severity: 'error',
+      severity: 'warning',
       where: dofKey,
-      message: `attempted ${attempted.toFixed(2)} mm — clamped to the declared range [${range[0]}, ${range[1]}] mm`,
+      message:
+        `at its travel limit: the drag asked for ${attempted.toFixed(2)} mm, ` +
+        `but this insert only travels ${range[0]} to ${range[1]} mm; ` +
+        `holding at ${limit} mm`,
       partId,
     };
     set(s => ({ markers: [...s.markers.filter(m => m.id !== marker.id), marker] }));
   },
+
+  clearClamp: dofKey =>
+    set(s =>
+      s.markers.some(m => m.id === `clamp-${dofKey}`)
+        ? { markers: s.markers.filter(m => m.id !== `clamp-${dofKey}`) }
+        : s,
+    ),
 }));

@@ -49,6 +49,7 @@ import { GLBErrorBoundary } from '../../three/GLBErrorBoundary';
 import type { PartMechanics, TranslationDof } from '../../model/dsn/serviceExport';
 import type { Marker } from '../schematic/MarkerList';
 import { useAssemblyStore } from './assemblyStore';
+import { KernelRays3D } from '../common/KernelRays3D';
 import { meshContentQuat } from './meshFrame';
 import { useSceneColors } from '../../theme/sceneColors';
 
@@ -196,6 +197,7 @@ function GhostBox({
 
 function InsertHandle({ part, dof }: { part: DocPart; dof: TranslationDof }) {
   const reportClamp = useAssemblyStore(s => s.reportClamp);
+  const clearClamp = useAssemblyStore(s => s.clearClamp);
   const [hovered, setHovered] = useState(false);
   const drag = useRef<{ startValue: number; grabT: number; undo: UndoToken } | null>(null);
 
@@ -255,11 +257,13 @@ function InsertHandle({ part, dof }: { part: DocPart; dof: TranslationDof }) {
       const clamped = Math.min(hi, Math.max(lo, raw));
       if (raw < lo - 1e-6 || raw > hi + 1e-6) {
         reportClamp(part.id, dof.key, raw, dof.range);
+      } else {
+        clearClamp(dof.key);
       }
       const snapped = Math.round(clamped * 100) / 100;
       if (snapped !== value) setDofValue(part.id, dof.name, snapped);
     },
-    [paramAlongAxis, lo, hi, value, part.id, dof, reportClamp],
+    [paramAlongAxis, lo, hi, value, part.id, dof, reportClamp, clearClamp],
   );
 
   const endDrag = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -667,6 +671,8 @@ function SceneContent({ mechanics, unboundIds, lockView, cameraRef, controlsRef,
           />
         ));
       })}
+
+      <KernelRays3D />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 88]}>
         {/* WP-130: document axes — see SchematicScene. */}

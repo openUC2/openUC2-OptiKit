@@ -252,6 +252,9 @@ export function registerBundleLibrary(
         wavelengthsUm:
           (component as { source?: { wavelengths_um?: number[] } } | null)?.source
             ?.wavelengths_um ?? [],
+        divergenceDeg:
+          (component as { source?: { divergence_deg?: number } } | null)?.source
+            ?.divergence_deg ?? 0,
         beamDiameterMm:
           (component as { source?: { beam_diameter_mm?: number } } | null)?.source
             ?.beam_diameter_mm ?? null,

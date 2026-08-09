@@ -443,24 +443,29 @@ describe('T-class movement contract (through the document facade)', () => {
   });
 
   // WP-99: the assembly canvas used to take its T-class (and its DOFs) from
-  // the SERVICE EXPORT, which deliberately carries no `template:`/`dof:` block
-  // for a palette-placed part — so every part failed the class check, the
+  // the SERVICE EXPORT, which deliberately carries no `template:` block for a
+  // palette-placed part — so every part failed the class check, the
   // "no template" ghost won, and `renderInfoOf().glbUrl` was unreachable dead
-  // code. This pins both halves: the export is legitimately blank, and the
-  // palette registry has the answer. AssemblyScene must read the palette.
-  it('the palette holds the T-class and DOFs the service export drops', () => {
+  // code. The T-CLASS half still holds (the palette is the only class
+  // source). The DOF half flipped 2026-08-04: the export now CARRIES the
+  // record's dof declarations, because `apply_dof_values` reads `comp.dof` in
+  // BOTH engines — without them a dragged insert wrote numbers nothing read.
+  it('the palette holds the T-class; the export now carries the DOFs', () => {
     const mirrorId = addPart('openuc2.cube.mirror_45', [0, 0, 0])!;
     const lensId = addPart('openuc2.cube.lens_z', [50, 0, 0])!;
     const mech = listPartMechanics();
     const mirrorMech = mech.find(m => m.partId === mirrorId)!;
     const lensMech = mech.find(m => m.partId === lensId)!;
-    // The export: no template block, no dof block — by design (an emitted
-    // `class: null` would violate TemplateSpec, and `dof:` next to
-    // `class: fixed` is E_T1_HAS_DOF).
+    // Still no template block in the export (an emitted `class: null` would
+    // violate TemplateSpec) — class stays a palette fact.
     expect(mirrorMech.templateClass).toBeNull();
     expect(lensMech.templateClass).toBeNull();
-    expect(lensMech.translationDofs).toEqual([]);
-    // The palette: both facts present, plus the mesh that was never drawn.
+    // The z-stage's dz now reaches the engines through the design itself.
+    expect(lensMech.translationDofs).toHaveLength(1);
+    expect(lensMech.translationDofs[0]).toMatchObject({
+      name: 'dz', axis: 'z', range: [-7.5, 7.5],
+    });
+    // The palette: class + dofs + the mesh that was never drawn.
     expect(templateClassOf('openuc2.cube.mirror_45')).toBe('fixed');
     expect(renderInfoOf('openuc2.cube.mirror_45').glbUrl).toBeTruthy();
     const lensEntry = entries.find(e => e.moduleId === 'openuc2.cube.lens_z')!;
