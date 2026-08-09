@@ -186,6 +186,141 @@ if stp is not possible we should probably find a way to convert it on the fly?
   parts/DOFs), stored in the design's `simulation:` block; `/v1/optimize`
   consumes it. Closer-to-optiland is the stated direction; WP-144 is the
   prerequisite.
+### WP-152 · Land the canvas pair, consolidate the repos (round 25 — first)
+
+Ratified 2026-08-09: **merge before anything builds on top.**
+
+1. Backend: `kit-canvas-scene3-export` → optikit-core main (self-contained:
+   `/v1/scene3`, `/v1/library/verify-t1`, the compiler transverse-transport
+   fix rides along).
+2. Frontend: `emb-g-kernel-port` is dsn-model + 6 commits — merge it into
+   `dsn-model` first (near-trivial), then the repo move below.
+3. Repo topology (recommendation): **monorepo.** The pair is hard-coupled
+   (the frontend pins backend `83a315d+`, KIT-05 crosses the repos, one
+   contract) — bring the frontend into optikit-core under `/frontend` via
+   `git subtree add` (history preserved; a hard copy loses it), consider
+   renaming the combined repo `openUC2/optikit`. The old openUC2-OptiKit
+   repo stays untouched serving the legacy configurator: tag its main
+   `v1`, archive the repo with a pointer README, delete the migrated
+   `dsn-model` branch there. The backend stays at the repo root for now —
+   a cosmetic `/backend` move touches packaging/CI and can wait.
+4. Kernel source: the optiland-canvas author is a collaborator and can
+   share sources — replace the vendored tarball with a source dependency
+   (submodule or CI-built package), bring KIT-05/06 out of
+   maintainer-local into CI, and mirror the integration-spec sections the
+   code cites (§18/§19, rules 5/12/13) into DSN-CONTRACT as a scene3-lane
+   section.
+5. Riding the merge: a UI toggle for the kernel loop (on by default with
+   no off switch today), surface `kernel.findings`/warnings, pick the
+   canonical home for `optics.emission` vs `SourceSpec.beam_diameter_mm`
+   (GO_INTEGRATION ask #12), and one home each for the one-stop rule and
+   the ∞-spellings (both currently implemented twice, compiler + dialect).
+
+### WP-153 · The sequential projection — a third view of the one document (round 25)
+
+Ratified: the surface **table + unfolded 2D sketch** is the v1 UX (no
+docked-analysis ambition yet). The Optiland-style sequential editor is a
+**third projection of `OptikitDocument`** beside schematic and assembly —
+never a parallel model. Both maps between sequence-space and world-space
+already exist and are proven equivalent at ~1e-14 (KIT-05):
+sequence→world is `canvas/materialize.py:_Placer.local_pos`;
+world→sequence is `compile/compiler.py`'s `ManifestEntry.world`
+(fold-correct since the `_reflect_transverse` fix).
+
+- **Ordering — ray-swept, checked against intent.** The kernel trace can
+  construct the sequence physically: record the hit order of the traced
+  rays and map object ids → components through the scene3-manifest
+  (upstream ask: the segment readout must expose per-hit object ids).
+  But the *declared/inferred* `paths:` stay the intent — while editing, a
+  misaligned design's rays miss elements, and the table must keep showing
+  the intended sequence precisely so the user can fix it. Sweep agrees →
+  silent; sweep disagrees → a finding ("declared M1 before L2; rays hit
+  L2 first") with a repair offer. Long-term the compiler stops owning
+  sequencing and shrinks to the Optiland projection (optimize/merit,
+  spot/paraxial, `optic.json` interop) — it is not removed; WP-144 part 2
+  retires its unstable unfolding half. The table's axis is cumulative
+  path length along the traced ray — *display* unfolding, no physics.
+- **Read path**: per named path, table rows = traversal order + record
+  fragments (prescription) + gaps from part poses; folds render as
+  markers ("M1, 90°" — mechanically real, identity in prescription
+  space); a branch point renders as a terminator with a "switch to
+  path…" chip. The path selector is first-class — deliberately ahead of
+  Optiland's single-system worldview.
+- **Write-back routing**: air gaps / insert / delete / reorder are
+  **placement** edits → facade verbs (a new `shiftAlongPath(path,
+  fromElement, deltaMm)` re-poses everything downstream; insert = the
+  WP-60/WP-87 unbound-primitive road). Prescription columns are
+  **read-only for catalog parts** — library parts are static physical
+  objects, so the verb is `replace with…` (picker filtered by
+  EFL/Ø/λ/fits-a-cube), not edit-in-place; direct prescription editing
+  exists only for unbound user primitives (`lens f=50`), which are
+  already `user.*` drafts. The WP-87 workspace-copy road stays as the
+  import mechanism, off the critical path. Bound parts quantize gap
+  edits to cells + intra-cube residual via the same placement path drag
+  uses; a gap the T-class cannot absorb is a finding, not a silent
+  clamp.
+- **Live feedback for free**: gap edits are pose-only edits, so the kernel
+  tier-2 fast path (`PREVIEW_KEYS` in `src/kernel/kernelSim.ts`) previews
+  them instantly — the sequential editor inherits the live trace without
+  new infrastructure.
+- **Phasing**: (1) read-only table + unfolded 2D sketch, (2) editable gaps
+  + insert/delete/replace, (3) prescription editing for user primitives,
+  (4) the WP-88 DSL as the *textual serialization* of this projection
+  (script ↔ table ↔ sketch are one state; WP-88 stops being a standalone
+  package), (5) the optimize dialog moves here — in sequence space the
+  free pose variables ARE the air gaps, which is the variable set
+  WP-93/WP-151 expect. WP-144 part 2 (folds as reflective surfaces) is
+  the prereq for expressing folded systems in optiland's own formalism,
+  not for phases 1–3.
+
+### WP-154 · Dispersive elements & the spectral axis (round 25)
+
+Chromatic dispersion of *glass* effectively lands with the canvas branch pair
+(`kit-canvas-scene3-export` bakes real Sellmeier coefficients into the scene3
+`catalog.glasses`, refusing to approximate; the kernel traces wavelength-true;
+the sequential lane resolves the same glass names through optiland's own
+database). What is missing everywhere is dispersive **deflection** — the
+grating/prism axis that open-raman (WP-150) and the Czerny-Turner benchmark
+need:
+
+1. **Record vocabulary**: a `grating` category (`lines_per_mm`, `order`,
+   blaze) in the component schema + parts editor. The compiler's
+   `"diffractive" → DiffractiveInteractionModel` mapping
+   (`compile/compiler.py:115`) is vocabulary passthrough exercised by zero
+   records today; canvas dialect v0 whitelists only
+   `refractive_reflective | thin_lens` — both need the new type.
+2. **λ-dependent exit direction**: ports today carry one geometric direction;
+   a grating's out-direction obeys m·λ = d·(sin θᵢ + sin θd). Chain
+   inference and the ports model need either a λ-parametrized port direction
+   (evaluated at the design's primary line) or per-line path branches — the
+   spectral-aware inference (WP-74) gates on response, not geometry, so this
+   is a new mechanism, not an extension of it.
+3. **Both engines**: optiland's diffractive model on the sequential lane;
+   the kernel needs grating support upstream in optiland-canvas (it has
+   `addPrism` + Sellmeier, no grating) — the author is a collaborator with
+   sources shareable (WP-152.4), so this is a concrete upstream ask, not a
+   blocker.
+4. **Readout**: the dispersed fan across a detector is the spectrometer's
+   output — WP-94 virtual detectors (or the kernel's G4 readout slice) turn
+   it into a spectrum plot.
+
+Acceptance: a Czerny-Turner layout traces per-λ, per-λ spot centroids on the
+detector match the grating equation analytically, and the fan renders in the
+canvas. Prereq for the WP-95 benchmark suite's Raman ambition and the real
+enabler behind WP-150.
+
+### WP-155 · Vendor catalog connector (Thorlabs / Edmund)
+
+Metadata-only index (part number, family, EFL, Ø, λ-range, price, product
+URL) as a palette source badged by vendor — facts, small, cacheable, and
+filterable by what no vendor offers: "fits a 50 mm cube / has a holder
+generator". Prescriptions are fetched **at place time** into the user's
+workspace (the user does the download; we never redistribute): the fetch
+road feeds the existing `.zmx` importer (`importers/thorlabs.py` already
+does zmx → record with datum frames; today it is `--zmx-dir` only).
+Promotion to `thorlabs.*`/curated stays the explicit library-save flow.
+Check current vendor terms before building the fetch road.
+
 ### Carried over from the roadmap (2026-08-09)
 
 `kicad-for-optics-roadmap.md` is the M0…M10 plan through the MVP. Everything
@@ -199,7 +334,10 @@ backlog.
 - **WP-88 · Sequential beam-path scripting** *(roadmap Phase 4)*. A small
   Optiland/PyOpticL-style DSL that builds the circuit line by line and stays
   two-way in sync with the canvas — the inverse authoring direction to chain
-  inference. Nothing in tree.
+  inference. Nothing in tree. **Round 25: absorbed into WP-153 phase 4** —
+  the DSL becomes the textual serialization of the sequential projection,
+  which makes "two-way in sync" free (one document, three renderers, no sync
+  protocol).
 - **WP-93 · The optimizer becomes a design tool** *(roadmap M9)*. Free-space
   **pose variables** for unbound optics — `_free_dofs` varies only *declared*
   DOFs today, so "break the optic loose and let the optimizer place it"
