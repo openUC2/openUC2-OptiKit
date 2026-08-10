@@ -1,3 +1,9 @@
+> [!IMPORTANT]
+> **This branch has moved.** Development of the DSN editor continues in
+> [openUC2/optikit-frontend-v2](https://github.com/openUC2/optikit-frontend-v2)
+> (protected `main`, PR workflow). This repository remains the live demo /
+> configurator; nothing deploys from `dsn-model`.
+
 # OpenUC2 OptiKit — KiCad for optical setups
 
 Design an optical instrument the way you design a circuit board: place parts,
