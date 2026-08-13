@@ -10,6 +10,12 @@ PART frame again with the world value read-only alongside (WP-139); the
 compiler coerces every corpus spelling of ∞ (`.inf` / `inf` / `1e999`)
 instead of crashing; `_optiland_or_501` is gone — optiland is assumed.
 
+Round 24 landed outside the numbered list: the port-less-draft crash fix and
+the invalid-hex spam (logged as WP-149 in the commit log), whole-arrangement
+delete + the sidebar bin (WP-150 in the commit log), ACT VIII of the core
+tour, ARCHITECTURE §4b, and the roadmap merge. **Round 25 (the 13 Aug email)
+is triaged in its own section below — WP-158..166.**
+
 ---
 
 ## P0 · breaks the daily loop
@@ -173,11 +179,18 @@ if stp is not possible we should probably find a way to convert it on the fly?
 
 ## P2 · roadmap (design discussions before code)
 
-- **WP-149 · Multi-cube parts.** `footprint_grid` already spells N×M×K, but
+*(Numbering note: the round-24 commit log used WP-149 for the ports-crash fix
+and WP-150 for group delete — both landed. The two backlog items that carried
+those numbers are renumbered WP-156/WP-157 below — WP-152..155 belong to the
+strategy sections above, and WP-151 was never reused.)*
+
+- **WP-156 · Multi-cube parts.** `footprint_grid` already spells N×M×K, but
   placement, DRC overlap, the T-rule and the mesh cell check all assume
   1×1×1. Define: anchor cell + span, port cells, and how verify-t1 measures
-  a multi-cell envelope.
-- **WP-150 · open-raman → UC2 importer.** The Optiland-setup importer
+  a multi-cell envelope. *Round 25 asked three more times* ("NxM larger
+  components", "arbitrarily large components", "imported components can be
+  larger than one cube") — promote to the next P1 slot.
+- **WP-157 · open-raman → UC2 importer.** The Optiland-setup importer
   (WP-87) already carries prescriptions in; the missing half is a mapping
   road from a published system (open-raman.org) to cubes: match elements to
   library records by vendor/EFL/diameter, propose holders for the rest.
@@ -280,7 +293,7 @@ Chromatic dispersion of *glass* effectively lands with the canvas branch pair
 `catalog.glasses`, refusing to approximate; the kernel traces wavelength-true;
 the sequential lane resolves the same glass names through optiland's own
 database). What is missing everywhere is dispersive **deflection** — the
-grating/prism axis that open-raman (WP-150) and the Czerny-Turner benchmark
+grating/prism axis that open-raman (WP-157) and the Czerny-Turner benchmark
 need:
 
 1. **Record vocabulary**: a `grating` category (`lines_per_mm`, `order`,
@@ -307,7 +320,7 @@ need:
 Acceptance: a Czerny-Turner layout traces per-λ, per-λ spot centroids on the
 detector match the grating equation analytically, and the fan renders in the
 canvas. Prereq for the WP-95 benchmark suite's Raman ambition and the real
-enabler behind WP-150.
+enabler behind WP-157.
 
 ### WP-155 · Vendor catalog connector (Thorlabs / Edmund)
 
@@ -320,6 +333,81 @@ road feeds the existing `.zmx` importer (`importers/thorlabs.py` already
 does zmx → record with datum frames; today it is `--zmx-dir` only).
 Promotion to `thorlabs.*`/curated stays the explicit library-save flow.
 Check current vendor terms before building the fetch road.
+
+## Round 25 (2026-08-13) — the email triage
+
+Source: Bene's notes-to-self mail (openuc2.com, 13 Aug) + the attached
+`Untitled-Setup.dsn`. Two items in it are already visible working in its own
+screenshots (the vacuous-verify banner, the T1 90° steppers); one item is
+diagnosed below rather than deferred. New numbers start at WP-158
+(WP-152..155 are the strategy round's packages above; WP-149/150 were
+consumed by round-24 commit messages).
+
+### Quick wins first
+
+- **WP-158 · ±1-cell translation buttons.** "For the translation in xyz it
+  would be handy to have +/- grid position 50/55 mm buttons." The property
+  panel gets x/y/z ∓/± steppers that move exactly one cell (50/50/55), next
+  to the WP-143 rotation steppers. One function, six buttons.
+- **WP-159 · Fibers are first-class, and "no beam" says why.** The fiber
+  appears nowhere it can be deleted ("the fiber should appear in the
+  bom/parts overview"). And the attached design renders no beam for a
+  findable reason: it declares NO `paths:` at all — its only link is the
+  fiber `uc2-eyepiece.back → uc2-torch.out`, so inference has to walk a
+  FIBER hop from the source and propose the chain, and the panel must say
+  "no path declared — adopt or chain one" instead of rendering nothing.
+  Fibers get list rows (Design panel + BOM) with delete; the empty-paths
+  state gets words.
+- **WP-160 · Detect the ×1000 Inventor GLB scale.** "The glbs exported from
+  inventor have a 1000x scaling factor — detect automatically or have a
+  scaling factor in the imports." The node-scale ×1000 (m→mm) is already
+  honoured when present; the failure case is a file WITHOUT the wrapper
+  scale. Auto-detect by bbox sanity (a part measuring under ~2 mm or over
+  ~2 m is in the wrong unit) with a visible "assumed ×1000" note, plus an
+  explicit scale field in the mesh section for the cases the heuristic
+  cannot decide. Kin to the KHR-quantization fix (WP-147).
+- **WP-161 · `E_NO_FRAGMENT` is category-aware.** The mail's screenshot
+  shows `user.mechanics.uc2_cube` and `user.sample.uc2_sample` hard-failing
+  with "declares no fragment surfaces — nothing for the fixed insert to
+  hold". A pure-mechanics record and a sample plane legitimately HAVE no
+  surfaces; the check must exempt mechanics/sample/other categories (a
+  mirror or lens without a fragment stays an error).
+
+### P1 additions
+
+- **WP-162 · Place parts in the ASSEMBLY view.** Twice in one mail: "in the
+  assembly we also need to be able to place components freely" and "placing a
+  puzzle piece is not very intuitive [in the schematic] but renders correctly
+  in the assembly — maybe all mechanical components can also be placed in the
+  assembly view". The assembly gains a palette drop road (same `addPart`,
+  same grid snap); mechanical categories (puzzle, plates, empties) default
+  to it. Includes the "add empty cubes" affordance — a one-click spacer,
+  and optionally a fill rule for enclosed gaps.
+- **WP-163 · STP conversion fidelity: names and colours.** "Separation of
+  the cube halves in the stp does not work yet, it's the same name" — the
+  STP→GLB conversion flattens node names, so the WP-148 CUBHLF split cannot
+  find the halves in converted meshes; it must preserve the assembly tree's
+  names. Same pass: "step files do not show colours" — carry STEP face/solid
+  colours into the GLB materials (OCP exposes them).
+- **WP-164 · Attach a Zemax model to a component.** "How can we associate
+  e.g. an objective lens with a zemax model?" The `.zmx` importer exists for
+  whole setups (WP-87); this is the per-record road: an "attach .zmx…"
+  action on a component that imports the prescription into
+  `optics.fragment.surfaces` and keeps the file as provenance.
+- **WP-165 · Import a bare YAML design.** "How could we just import yaml?"
+  The importer accepts only `.dsn.zip` today; accept a raw
+  `optikit-design.yml` (drag-drop and file picker), with the zip road
+  unchanged for bundles that carry a library.
+
+### P2 additions
+
+- **WP-166 · Coupled DOFs (mechanical linkages).** "Some components (e.g.
+  the z stage) have this mechanical link — turn knob/move motor, translate
+  objective. Need to define it?" Yes: a `linked-to:` relation between DOFs
+  (ratio + offset), declared on the template, honoured by actuation and the
+  optimizer. Design discussion first — it touches the firmware contract.
+- **Library content, no WP needed:** a smartphone detector record ("add
+  phone") next to the cameras; it is authoring work in `library/`, not code.
 
 ### Carried over from the roadmap (2026-08-09)
 
